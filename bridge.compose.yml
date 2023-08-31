@@ -1,10 +1,9 @@
 version: '3.8'
 
 services:
-  bootnode:
+  eth_bootnode:
     image: ethereum/client-go
-    pull_policy: always
-    container_name: bootnode
+    container_name: eth_bootnode
     volumes:
       - ./bootnode:/root/.ethereum
     command:
@@ -16,10 +15,9 @@ services:
       bridge_net:
         ipv4_address: 172.28.1.1
 
-  node1:
+  eth_node1:
     image: ethereum/client-go
-    pull_policy: always
-    container_name: node1
+    container_name: eth_node1
     volumes:
       - ./node1:/root/.ethereum
     command:
@@ -35,10 +33,9 @@ services:
       bridge_net:
         ipv4_address: 172.28.1.2
 
-  node2:
+  eth_node2:
     image: ethereum/client-go
-    pull_policy: always
-    container_name: node2
+    container_name: eth_node2
     ports:
       - 30303:30303
       - 30303:30303/udp
@@ -72,6 +69,63 @@ services:
     networks:
       bridge_net:
         ipv4_address: 172.28.1.3
+
+  # key derived from "//0"
+  aleph_bootnode:
+    image: aleph-node:latest
+    container_name: aleph_bootnode
+    volumes:
+      - ./5D34dL5prEUaGNQtPPZ3yN5Y6BnkfXunKXXz6fo7ZJbLwRRH:/data
+    environment:
+      - PURGE_BEFORE_START=false
+      - RUST_LOG=info
+      - BASE_PATH=/data
+      - CHAIN=/data/chainspec.json
+      - NODE_KEY_PATH=/data/p2p_secret
+      - ALLOW_PRIVATE_IPV4=true
+      - DISCOVER_LOCAL=false
+      - UNIT_CREATION_DELAY=300
+      - RPC_PORT=9933
+      - WS_PORT=9943
+      - PORT=30333
+      - VALIDATOR_PORT=30343
+      - PUBLIC_VALIDATOR_ADDRESS=172.28.1.4:30343
+      - PUBLIC_ADDR=/ip4/172.28.1.4/tcp/30333
+      - NAME=AlephBootnode
+      - BOOT_NODES=/ip4/127.28.1.4/tcp/30333/p2p/12D3KooWQpZTu9kBfD9jY4zyvhdi3MhtMGkofc6xZXNCTbo5dnfM
+    networks:
+      bridge_net:
+        ipv4_address: 172.28.1.4
+
+  # key derived from "//1"
+  aleph_node1:
+    image: aleph-node:latest
+    container_name: aleph_node1
+    # TODO: expose ports
+    volumes:
+      - ./5GBNeWRhZc2jXu7D55rBimKYDk8PGk8itRYFTPfC8RJLKG5o:/data
+    environment:
+      - PURGE_BEFORE_START=false
+      - RUST_LOG=info
+      - BASE_PATH=/data
+      - CHAIN=/data/chainspec.json
+      - NODE_KEY_PATH=/data/p2p_secret
+      - ALLOW_PRIVATE_IPV4=true
+      - DISCOVER_LOCAL=false
+      - UNIT_CREATION_DELAY=300
+      - RPC_PORT=9933
+      - WS_PORT=9943
+      - PORT=30333
+      - VALIDATOR_PORT=30343
+      - PUBLIC_VALIDATOR_ADDRESS=172.28.1.5:30343
+      - PUBLIC_ADDR=/ip4/172.28.1.5/tcp/30333
+      - NAME=AlephNode1
+      - BOOT_NODES=/ip4/127.28.1.4/tcp/30333/p2p/12D3KooWQpZTu9kBfD9jY4zyvhdi3MhtMGkofc6xZXNCTbo5dnfM
+    networks:
+      bridge_net:
+        ipv4_address: 172.28.1.5
+
+# TODO : aleph_node2
 
 networks:
   bridge_net:
