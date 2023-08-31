@@ -37,4 +37,4 @@ To clean up:
 rm -rf bootstrap/geth node1/geth node2/geth
 ```
 
-Re-initialzie the nodes and run them again from a fresh genesis block.
+Re-initialize the nodes and run them again from a fresh genesis block.
