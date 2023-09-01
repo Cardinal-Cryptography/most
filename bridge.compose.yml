@@ -76,57 +76,65 @@ services:
       bridge_net:
         ipv4_address: 172.28.1.3
 
-  # # key derived from "//0"
-  # AlephBootnode:
-  #   image: aleph-node:latest
-  #   container_name: aleph_bootnode
-  #   volumes:
-  #     - ./5D34dL5prEUaGNQtPPZ3yN5Y6BnkfXunKXXz6fo7ZJbLwRRH:/data
-  #   environment:
-  #     - PURGE_BEFORE_START=false
-  #     - RUST_LOG=info
-  #     - BASE_PATH=/data
-  #     - CHAIN=/data/chainspec.json
-  #     - NODE_KEY_PATH=/data/p2p_secret
-  #     - ALLOW_PRIVATE_IPV4=true
-  #     - DISCOVER_LOCAL=false
-  #     - UNIT_CREATION_DELAY=300
-  #     - RPC_PORT=9933
-  #     - WS_PORT=9943
-  #     - PORT=30333
-  #     - VALIDATOR_PORT=30343
-  #     - PUBLIC_VALIDATOR_ADDRESS=AlephBootnode:30343
-  #     - NAME=AlephBootnode
-  #   networks:
-  #     bridge_net:
-  #       ipv4_address: 172.28.1.4
+  # key derived from "//0"
+  AlephBootnode:
+    image: aleph-node:latest
+    container_name: aleph_bootnode
+    volumes:
+      - ./5D34dL5prEUaGNQtPPZ3yN5Y6BnkfXunKXXz6fo7ZJbLwRRH:/data
+    environment:
+      - PURGE_BEFORE_START=false
+      - RUST_LOG=info
+      - BASE_PATH=/data
+      - CHAIN=/data/chainspec.json
+      - NODE_KEY_PATH=/data/p2p_secret
+      - ALLOW_PRIVATE_IPV4=true
+      - DISCOVER_LOCAL=false
+      - UNIT_CREATION_DELAY=300
+      - RPC_PORT=9933
+      - WS_PORT=9943
+      - PORT=30333
+      - VALIDATOR_PORT=30343
+      - PUBLIC_VALIDATOR_ADDRESS=AlephBootnode:30343
+      - NAME=AlephBootnode
+    networks:
+      bridge_net:
+        ipv4_address: 172.28.1.4
 
-  # # key derived from "//1"
-  # AlephNode1:
-  #   image: aleph-node:latest
-  #   container_name: aleph_node1
-  #   # TODO: expose ports
-  #   volumes:
-  #     - ./5GBNeWRhZc2jXu7D55rBimKYDk8PGk8itRYFTPfC8RJLKG5o:/data
-  #   environment:
-  #     - PURGE_BEFORE_START=false
-  #     - RUST_LOG=info
-  #     - BASE_PATH=/data
-  #     - CHAIN=/data/chainspec.json
-  #     - NODE_KEY_PATH=/data/p2p_secret
-  #     - ALLOW_PRIVATE_IPV4=true
-  #     - DISCOVER_LOCAL=false
-  #     - UNIT_CREATION_DELAY=300
-  #     - RPC_PORT=9933
-  #     - WS_PORT=9943
-  #     - PORT=30333
-  #     - VALIDATOR_PORT=30343
-  #     - PUBLIC_VALIDATOR_ADDRESS=AlephNode1:30343
-  #     - NAME=AlephNode1
-  #     - BOOT_NODES=/dns4/AlephBootnode/tcp/30333/p2p/12D3KooWQpZTu9kBfD9jY4zyvhdi3MhtMGkofc6xZXNCTbo5dnfM
-  #   networks:
-  #     bridge_net:
-  #       ipv4_address: 172.28.1.5
+  # key derived from "//1"
+  AlephNode1:
+    image: aleph-node:latest
+    container_name: aleph_node1
+    expose:
+      - 30333
+      - 9933
+      - 9943
+    ports:
+      - 0.0.0.0:30333:30333
+      - 0.0.0.0:9933:9933
+      - 0.0.0.0:9943:9943
+      - 0.0.0.0:9944:9943
+    volumes:
+      - ./5GBNeWRhZc2jXu7D55rBimKYDk8PGk8itRYFTPfC8RJLKG5o:/data
+    environment:
+      - PURGE_BEFORE_START=false
+      - RUST_LOG=info
+      - BASE_PATH=/data
+      - CHAIN=/data/chainspec.json
+      - NODE_KEY_PATH=/data/p2p_secret
+      - ALLOW_PRIVATE_IPV4=true
+      - DISCOVER_LOCAL=false
+      - UNIT_CREATION_DELAY=300
+      - RPC_PORT=9933
+      - WS_PORT=9943
+      - PORT=30333
+      - VALIDATOR_PORT=30343
+      - PUBLIC_VALIDATOR_ADDRESS=AlephNode1:30343
+      - NAME=AlephNode1
+      - BOOT_NODES=/dns4/AlephBootnode/tcp/30333/p2p/12D3KooWQpZTu9kBfD9jY4zyvhdi3MhtMGkofc6xZXNCTbo5dnfM
+    networks:
+      bridge_net:
+        ipv4_address: 172.28.1.5
 
 networks:
   bridge_net:
