@@ -38,7 +38,7 @@ Re-initialize the nodes and run them again from a fresh genesis block.
 
 ### Check eth nodes connectivity
 
-get a shell into running container
+get a shell into running container:
 
 ```bash
 docker exec -it eth_bootnode "geth attach /root/.ethereum/geth.ipc"
