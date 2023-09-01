@@ -3,7 +3,7 @@ version: '3.8'
 services:
 
   EthereumBootnode:
-    image: ethereum/client-go
+    image: ethereum/client-go:release-1.12
     container_name: eth_bootnode
     volumes:
       - ./0x7f938fd203fcabc449312661ab1d36b7fdb45118:/root/.ethereum
@@ -18,7 +18,7 @@ services:
         ipv4_address: 172.28.1.1
 
   EthereumNode1:
-    image: ethereum/client-go
+    image: ethereum/client-go:release-1.12
     container_name: eth_node1
     volumes:
       - ./0x129b9daee478e7bc5edada471982e31fa7705622:/root/.ethereum
@@ -38,7 +38,7 @@ services:
         ipv4_address: 172.28.1.2
 
   EthereumNode2:
-    image: ethereum/client-go
+    image: ethereum/client-go:release-1.12
     container_name: eth_node2
     ports:
       - 30303:30303
@@ -83,7 +83,7 @@ services:
     volumes:
       - ./5D34dL5prEUaGNQtPPZ3yN5Y6BnkfXunKXXz6fo7ZJbLwRRH:/data
     environment:
-      - PURGE_BEFORE_START=true
+      - PURGE_BEFORE_START=false
       - RUST_LOG=info
       - BASE_PATH=/data
       - CHAIN=/data/chainspec.json
@@ -117,7 +117,7 @@ services:
     volumes:
       - ./5GBNeWRhZc2jXu7D55rBimKYDk8PGk8itRYFTPfC8RJLKG5o:/data
     environment:
-      - PURGE_BEFORE_START=true
+      - PURGE_BEFORE_START=false
       - RUST_LOG=info
       - BASE_PATH=/data
       - CHAIN=/data/chainspec.json
