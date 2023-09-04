@@ -8,3 +8,9 @@ history
 
 backup-stash/
 db/
+
+# sol compilation
+build/
+
+# rust compilation
+target/

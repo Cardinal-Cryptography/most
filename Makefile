@@ -7,8 +7,8 @@ bootstrap:
 bridgenet:
 	docker-compose -f bridge.compose.yml up
 
-watch:
-	cd contracts/azero/flipper && cargo watch -s 'cargo contract check' -c
+azero-watch:
+	cd azero/contracts/flipper && cargo watch -s 'cargo contract check' -c
 
-release:
-	cd contracts/azero/flipper &&  cargo contract build --release
+azero-release:
+	cd azero/contracts/flipper &&  cargo contract build --release
