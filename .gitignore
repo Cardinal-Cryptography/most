@@ -2,3 +2,9 @@
 
 geth/
 jwt.hex
+history
+
+# aleph node blockchain data
+
+backup-stash/
+db/
