@@ -1,11 +1,9 @@
 # geth blockchain data
-
 geth/
 jwt.hex
 history
 
 # aleph node blockchain data
-
 backup-stash/
 db/
 
@@ -14,3 +12,6 @@ build/
 
 # rust compilation
 target/
+
+# env files
+.env
