@@ -5,7 +5,7 @@ contract Flipper {
 
   event Flip(bool newValue);
 
-  constructor() {
+  constructor() public {
     value = false;
   }
 
