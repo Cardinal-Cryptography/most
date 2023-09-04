@@ -55,7 +55,7 @@ services:
       - --nat=extip:172.28.1.3
       - --nodekey=/root/.ethereum/node.key
       - --http
-      - --http.api=eth,net,web3,engine,admin
+      - --http.api=eth,net,web3,engine,admin,personal
       - --http.addr=0.0.0.0
       - --http.vhosts=*
       - --http.corsdomain=*
@@ -72,6 +72,7 @@ services:
       - --authrpc.port=8551
       - --txlookuplimit=0
       - --snapshot=false
+      - --allow-insecure-unlock
     networks:
       bridge_net:
         ipv4_address: 172.28.1.3

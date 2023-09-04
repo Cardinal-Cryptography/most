@@ -2,6 +2,7 @@
 geth/
 jwt.hex
 history
+genesis.json
 
 # aleph node blockchain data
 backup-stash/
