@@ -4,7 +4,7 @@
 set -eo pipefail
 
 CONTRACTS_PATH=$(pwd)/contracts
-INK_DEV_IMAGE=paritytech/contracts-ci-linux:9a513893-20230620
+INK_DEV_IMAGE=public.ecr.aws/p6e8q1z1/ink-dev:1.0.0
 NODE=ws://127.0.0.1:9944
 AUTHORITY=5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY
 AUTHORITY_SEED=//Alice
@@ -37,8 +37,8 @@ run_ink_dev
 
 cd "$CONTRACTS_PATH"/flipper
 cargo_contract build --release
-FLIPPER_CODE_HASH=$(cargo_contract upload --url "$NODE" --suri "$AUTHORITY_SEED" --output-json --execute | jq -s . | jq -r '.[1].code_hash')
-FLIPPER=$(cargo_contract instantiate --url "$NODE" --constructor new --suri "$AUTHORITY_SEED" --skip-confirm --output-json --execute | jq -r '.contract')
+FLIPPER_CODE_HASH=$(cargo_contract upload --url "$NODE" --suri "$AUTHORITY_SEED" --output-json --skip-confirm  | jq -s . | jq -r '.[1].code_hash')
+FLIPPER=$(cargo_contract instantiate --url "$NODE" --constructor new --suri "$AUTHORITY_SEED" --skip-confirm --output-json | jq -r '.contract')
 
 # spit adresses to a JSON file
 cd "$CONTRACTS_PATH"
