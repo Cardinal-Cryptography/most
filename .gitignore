@@ -7,6 +7,7 @@ genesis.json
 # aleph node blockchain data
 backup-stash/
 db/
+chainspec.json
 
 # sol compilation
 build/
@@ -16,3 +17,6 @@ target/
 
 # env files
 .env
+
+# contracts
+addresses.json
