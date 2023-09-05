@@ -1,0 +1,16 @@
+[package]
+name = "relayer"
+version = "0.1.0"
+authors = ["fbielejec <filip.bielejec@cardinals.cc>"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+clap = "4.4.2"
+env_logger = "0.10.0"
+ethers = "2.0.9"
+futures = "0.3.28"
+# log = "0.4.20"
+thiserror = "1.0.48"
+tokio = { version = "1.32", features = ["rt", "rt-multi-thread", "macros", "test-util"] }
