@@ -19,7 +19,7 @@ impl Load for Config {
         Config {
             log_level: get_env_var("LOG_LEVEL", Some(String::from("info"))),
             eth_node_wss_url: get_env_var("ETH_WSS_URL", Some(String::from("ws://127.0.0.1:8546"))),
-            eth_contract_address: get_env_var("ETH_CONTRACT", None),
+            eth_contract_address: get_env_var("ETH_CONTRACT_ADDRESS", None),
             eth_from_block: get_env_var("ETH_FROM_BLOCK", Some(String::from("0")))
                 .parse()
                 .expect("Can't parse as int"),

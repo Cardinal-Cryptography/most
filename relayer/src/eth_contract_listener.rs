@@ -5,7 +5,7 @@ use ethers::{
     prelude::ContractError,
     providers::{Provider, ProviderError, StreamExt, Ws},
 };
-use eyre::Result;
+// use eyre::Result;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -34,6 +34,7 @@ pub async fn run(config: Arc<Config>) -> Result<(), EthListenerError> {
     let Config {
         eth_node_wss_url,
         eth_contract_address,
+        eth_from_block,
         ..
     } = &*config;
 
@@ -43,7 +44,7 @@ pub async fn run(config: Arc<Config>) -> Result<(), EthListenerError> {
 
     let contract: Flipper<Provider<Ws>> = Flipper::new(address, client);
 
-    let events = contract.event::<FlipFilter>().from_block(16232696);
+    let events = contract.event::<FlipFilter>().from_block(*eth_from_block);
     let mut stream = events.stream().await?.take(1);
 
     while let Some(Ok(f)) = stream.next().await {
