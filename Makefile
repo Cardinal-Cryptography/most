@@ -7,8 +7,17 @@ bootstrap:
 bridge:
 	docker-compose -f bridge.compose.yml up
 
-azero-watch:
+compile-eth:
+	cd eth && truffle compile
+
+deploy-eth:
+	cd eth && truffle migrate
+
+watch-azero:
 	cd azero/contracts/flipper && cargo watch -s 'cargo contract check' -c
 
-azero-release:
-	cd azero/contracts/flipper && cargo contract build --release
+deploy-azero:
+	cd azero/contracts/ && ./scripts/deploy.sh
+
+watch-relayer:
+	cd relayer && cargo watch -s 'cargo clippy' -c

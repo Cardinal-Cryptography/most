@@ -993,6 +993,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4aab5af432b3fe5b7756b60df5c9ddeb85a13414575ad8a9acd707c24f0a77a5"
 dependencies = [
  "ethers-core",
+ "ethers-solc",
  "reqwest",
  "semver",
  "serde",
@@ -1041,6 +1042,7 @@ dependencies = [
  "const-hex",
  "enr",
  "ethers-core",
+ "futures-channel",
  "futures-core",
  "futures-timer",
  "futures-util",
@@ -2379,7 +2381,12 @@ dependencies = [
  "clap",
  "env_logger",
  "ethers",
+ "eyre",
  "futures",
+ "log",
+ "rustc-hex",
+ "serde",
+ "serde_json",
  "thiserror",
  "tokio",
 ]
