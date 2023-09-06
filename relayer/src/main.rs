@@ -4,8 +4,9 @@ use log::info;
 use std::env;
 use std::sync::Arc;
 
+mod azero_listener;
 mod config;
-mod eth_contract_listener;
+mod eth_listener;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -16,7 +17,7 @@ async fn main() -> Result<()> {
 
     info!("{:#?}", &config);
 
-    eth_contract_listener::run(config).await?;
+    eth_listener::run(config).await?;
 
     Ok(())
 }

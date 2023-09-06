@@ -2,11 +2,9 @@ use crate::config::Config;
 use ethers::{
     contract::abigen,
     core::types::Address,
-    prelude::{Contract, ContractError},
-    providers::{Provider, ProviderError, StreamExt, Ws},
-    types::{BlockNumber, Filter, H160, H256},
+    prelude::ContractError,
+    providers::{Middleware, Provider, ProviderError, StreamExt, Ws},
 };
-// use eyre::Result;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -31,7 +29,6 @@ abigen!(
     ]"#,
 );
 
-// 1337..BlockNumber::Latest
 pub async fn run(config: Arc<Config>) -> Result<(), EthListenerError> {
     let Config {
         eth_node_wss_url,
@@ -43,30 +40,37 @@ pub async fn run(config: Arc<Config>) -> Result<(), EthListenerError> {
     let provider = connect(eth_node_wss_url).await?;
     let client = Arc::new(provider);
 
-    // let token_topics = vec![H256::from(eth_contract_address.parse::<H160>()?)];
-
     let address = eth_contract_address.parse::<Address>()?;
-    let contract = Flipper::new(address, client);
-    let events = contract.events();
+    let contract = Flipper::new(address, Arc::clone(&client));
+
+    let last_block_number = client.get_block_number().await?.as_u32();
 
     // replay past events
-    // TODO : in chunks
-    let past_events = events
-        .from_block(0)
-        .to_block(BlockNumber::Latest)
-        .query()
-        .await?;
-    println!("{:?}", past_events);
-    println!("{}", past_events.len());
+    for (from, to) in chunks(*eth_from_block as u32, last_block_number, 1000) {
+        let past_events = contract
+            .events()
+            .from_block(from)
+            .to_block(to)
+            .query()
+            .await?;
 
-    // subscribe to new events
-
-    let events = contract.events().from_block(0);
-    let mut stream = events.stream().await?.with_meta();
-    while let Some(Ok((event, meta))) = stream.next().await {
-        println!("{event:?}, {meta:?}");
+        past_events
+            .iter()
+            .try_for_each(|event| -> Result<(), EthListenerError> { handle_event(event) })?;
     }
 
+    // subscribe to new events
+    let events = contract.events().from_block(*eth_from_block);
+    let mut stream = events.stream().await?;
+    while let Some(Ok(event)) = stream.next().await {
+        handle_event(&event)?;
+    }
+
+    Ok(())
+}
+
+fn handle_event(event: &FlipFilter) -> Result<(), EthListenerError> {
+    println!("handling event: {event:?}");
     Ok(())
 }
 
@@ -74,7 +78,7 @@ async fn connect(url: &str) -> Result<Provider<Ws>, EthListenerError> {
     Ok(Provider::<Ws>::connect(url).await?)
 }
 
-fn chunks(from: i32, to: i32, step: i32) -> Vec<(i32, i32)> {
+fn chunks(from: u32, to: u32, step: u32) -> Vec<(u32, u32)> {
     let mut intervals = Vec::new();
     let mut current = from;
 

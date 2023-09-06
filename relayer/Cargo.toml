@@ -5,7 +5,6 @@ authors = ["fbielejec <filip.bielejec@cardinals.cc>"]
 edition = "2021"
 
 [dependencies]
-clap = "4.4.2"
 env_logger = "0.10.0"
 ethers = { version = "2.0.9", features = ["abigen", "rustls", "ws", "ethers-solc"] }
 futures = "0.3.28"
