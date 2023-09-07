@@ -20,3 +20,6 @@ target/
 
 # contracts
 addresses.json
+
+# half of the internet
+node_modules
