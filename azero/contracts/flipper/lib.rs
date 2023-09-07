@@ -2,12 +2,12 @@
 
 #[ink::contract]
 mod flipper {
-    use ink::codegen::EmitEvent;
-    use ink::reflect::ContractEventBase;
+    use ink::{codegen::EmitEvent, reflect::ContractEventBase};
 
     #[ink(storage)]
     pub struct Flipper {
-        value: bool,
+        flip: bool,
+        flop: bool,
     }
 
     pub type Event = <Flipper as ContractEventBase>::Type;
@@ -15,30 +15,39 @@ mod flipper {
     #[ink(event)]
     #[derive(Debug)]
     pub struct Flip {
-        new_value: bool,
+        value: bool,
+    }
+
+    #[ink(event)]
+    #[derive(Debug)]
+    pub struct Flop {
+        value: bool,
     }
 
     impl Flipper {
         #[ink(constructor)]
         pub fn new() -> Self {
-            Self { value: false }
+            Self {
+                flip: false,
+                flop: false,
+            }
         }
 
         #[ink(message)]
         pub fn flip(&mut self) {
-            self.value = !self.value;
-
-            Self::emit_event(
-                self.env(),
-                Event::Flip(Flip {
-                    new_value: self.value,
-                }),
-            );
+            self.flip = !self.flip;
+            Self::emit_event(self.env(), Event::Flip(Flip { value: self.flip }));
         }
 
         #[ink(message)]
-        pub fn get(&self) -> bool {
-            self.value
+        pub fn flop(&mut self) {
+            self.flop = !self.flop;
+            Self::emit_event(self.env(), Event::Flop(Flop { value: self.flop }));
+        }
+
+        #[ink(message)]
+        pub fn get(&self) -> (bool, bool) {
+            (self.flip, self.flop)
         }
 
         fn emit_event<EE>(emitter: EE, event: Event)
