@@ -1,10 +1,10 @@
+use std::{env, sync::Arc};
+
 use azero_listener::AzeroListenerError;
 use config::{Config, Load};
 use eth_listener::EthListenerError;
 use eyre::Result;
 use log::info;
-use std::env;
-use std::sync::Arc;
 use thiserror::Error;
 use tokio::runtime::Runtime;
 
@@ -12,6 +12,7 @@ mod aleph_zero;
 mod azero_listener;
 mod config;
 mod eth_listener;
+mod helpers;
 
 #[derive(Debug, Error)]
 #[error(transparent)]
