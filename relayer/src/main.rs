@@ -8,7 +8,6 @@ use log::info;
 use thiserror::Error;
 use tokio::runtime::Runtime;
 
-mod aleph_zero;
 mod azero_contracts;
 mod azero_listener;
 mod config;
