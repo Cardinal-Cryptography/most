@@ -6,6 +6,7 @@ use ethers::{
     prelude::ContractError,
     providers::{Middleware, Provider, ProviderError, StreamExt, Ws},
 };
+use log::info;
 use thiserror::Error;
 
 use crate::{config::Config, helpers::chunks};
@@ -72,7 +73,7 @@ pub async fn run(config: Arc<Config>) -> Result<(), EthListenerError> {
 }
 
 fn handle_event(event: &FlipFilter) -> Result<(), EthListenerError> {
-    println!("handling event: {event:?}");
+    info!("handling eth contract event: {event:?}");
     Ok(())
 }
 

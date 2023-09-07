@@ -3,8 +3,6 @@ use std::str::FromStr;
 use aleph_client::{contract::ContractInstance, AccountId};
 use thiserror::Error;
 
-use crate::config::Config;
-
 #[derive(Debug, Error)]
 #[error(transparent)]
 #[non_exhaustive]
@@ -26,7 +24,7 @@ impl FlipperInstance {
         let address = AccountId::from_str(address)
             .map_err(|why| ContractsError::NotAccountId(why.to_string()))?;
         Ok(Self {
-            contract: ContractInstance::new(address, &metadata)?,
+            contract: ContractInstance::new(address, metadata)?,
         })
     }
 }

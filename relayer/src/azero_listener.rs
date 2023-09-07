@@ -2,21 +2,20 @@ use std::sync::Arc;
 
 use aleph_client::{
     contract::{
-        event::{listen_contract_events, translate_events, BlockDetails, ContractEvent},
+        event::{translate_events, BlockDetails, ContractEvent},
         ContractInstance,
     },
-    pallets::balances::BalanceUserApi,
     utility::BlocksApi,
-    AlephConfig, Connection, ConnectionApi, KeyPair, SignedConnection, TxStatus,
+    AlephConfig, Connection,
 };
-use subxt::{blocks::BlocksClient, config::Header, OnlineClient};
+use futures::StreamExt;
+use log::info;
+use subxt::{events::Events, utils::H256};
 use thiserror::Error;
 
 use crate::{
-    aleph_zero::api::contracts::events::ContractEmitted,
     config::Config,
     contracts::{ContractsError, FlipperInstance},
-    eth_listener::Flipper,
     helpers::chunks,
 };
 
@@ -46,7 +45,7 @@ pub async fn run(config: Arc<Config>) -> Result<(), AzeroListenerError> {
         ..
     } = &*config;
 
-    // TODO : from 0 to latest
+    // replay past events from last known to the latest
     let connection = Connection::new(azero_node_wss_url).await;
     let last_block_number = connection
         .get_block_number_opt(None)
@@ -71,25 +70,46 @@ pub async fn run(config: Arc<Config>) -> Result<(), AzeroListenerError> {
                 .events()
                 .await?;
 
-            // TODO : filter contract events
-            for event in translate_events(
-                events.iter(),
-                &contracts,
-                Some(BlockDetails {
-                    block_number,
-                    block_hash,
-                }),
-            ) {
-                println!("event: {event:?}");
-            }
+            // filter contract events
+            handle_events(events, &contracts, block_number, block_hash)?;
         }
     }
 
-    // let subscription = connection
-    //     .as_client()
-    //     .blocks()
-    //     .subscribe_finalized()
-    //     .await?;
+    // subscribe to new events
+    let mut subscription = connection
+        .as_client()
+        .blocks()
+        .subscribe_finalized()
+        .await?;
 
+    while let Some(Ok(block)) = subscription.next().await {
+        let events = block.events().await?;
+        handle_events(events, &contracts, block.number(), block.hash())?;
+    }
+
+    Ok(())
+}
+
+fn handle_events(
+    events: Events<AlephConfig>,
+    contracts: &[&ContractInstance],
+    block_number: u32,
+    block_hash: H256,
+) -> Result<(), AzeroListenerError> {
+    for event in translate_events(
+        events.iter(),
+        contracts,
+        Some(BlockDetails {
+            block_number,
+            block_hash,
+        }),
+    ) {
+        handle_event(event?)?;
+    }
+    Ok(())
+}
+
+fn handle_event(event: ContractEvent) -> Result<(), AzeroListenerError> {
+    info!("handling A0 contract event: {event:?}");
     Ok(())
 }

@@ -123,7 +123,7 @@ services:
 
   # key derived from "//2"
   AlephNode2:
-    image: public.ecr.aws/p6e8q1z1/aleph-node:r-11.3 #public.ecr.aws/p6e8q1z1/aleph-node:6f3755a
+    image: public.ecr.aws/p6e8q1z1/aleph-node:r-11.3
     container_name: aleph_node2
     volumes:
       - ./5Dfis6XL8J2P6JHUnUtArnFWndn62SydeP8ee8sG2ky9nfm9:/data
