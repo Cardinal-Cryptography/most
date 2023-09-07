@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use aleph_client::{
     contract::{
-        event::{listen_contract_events, ContractEvent},
+        event::{listen_contract_events, translate_events, BlockDetails, ContractEvent},
         ContractInstance,
     },
     pallets::balances::BalanceUserApi,
@@ -12,7 +12,13 @@ use aleph_client::{
 use subxt::{blocks::BlocksClient, config::Header, OnlineClient};
 use thiserror::Error;
 
-use crate::{config::Config, helpers::chunks};
+use crate::{
+    aleph_zero::api::contracts::events::ContractEmitted,
+    config::Config,
+    contracts::{ContractsError, FlipperInstance},
+    eth_listener::Flipper,
+    helpers::chunks,
+};
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -24,6 +30,9 @@ pub enum AzeroListenerError {
     #[error("provider error")]
     Subxt(#[from] subxt::Error),
 
+    #[error("contract error")]
+    Contracts(#[from] ContractsError),
+
     #[error("no block found")]
     BlockNotFound,
 }
@@ -32,25 +41,20 @@ pub async fn run(config: Arc<Config>) -> Result<(), AzeroListenerError> {
     let Config {
         azero_node_wss_url,
         azero_last_known_block,
+        azero_contract_metadata,
+        azero_contract_address,
         ..
     } = &*config;
 
-    println!("@azero listener");
-
     // TODO : from 0 to latest
-
     let connection = Connection::new(azero_node_wss_url).await;
-
-    // let client: OnlineClient<AlephConfig> = connection.as_client().to_owned();
-    // let blocks_client = client.blocks();
-    // let rpc_client = client.rpc();
-
-    // let genesis_hash = connection.get_block_hash(0).await?;
-
     let last_block_number = connection
         .get_block_number_opt(None)
         .await?
         .ok_or(AzeroListenerError::BlockNotFound)?;
+
+    let instance = FlipperInstance::new(azero_contract_address, azero_contract_metadata)?;
+    let contracts = vec![&instance.contract];
 
     for (from, to) in chunks(*azero_last_known_block as u32, last_block_number, 1000) {
         for block_number in from..to {
@@ -68,12 +72,16 @@ pub async fn run(config: Arc<Config>) -> Result<(), AzeroListenerError> {
                 .await?;
 
             // TODO : filter contract events
-
-            // let tmp = events.iter().filter_map(|evt| {
-            //     //
-            //     todo!("")
-            //     //
-            // });
+            for event in translate_events(
+                events.iter(),
+                &contracts,
+                Some(BlockDetails {
+                    block_number,
+                    block_hash,
+                }),
+            ) {
+                println!("event: {event:?}");
+            }
         }
     }
 

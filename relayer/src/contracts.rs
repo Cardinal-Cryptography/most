@@ -18,22 +18,15 @@ pub enum ContractsError {
 
 #[derive(Debug)]
 pub struct FlipperInstance {
-    contract: ContractInstance,
+    pub contract: ContractInstance,
 }
 
 impl FlipperInstance {
-    pub fn new(config: &Config) -> Result<Self, ContractsError> {
-        let Config {
-            azero_contract_metadata,
-            azero_contract_address,
-            ..
-        } = &*config;
-
-        let address = AccountId::from_str(&azero_contract_address)
+    pub fn new(address: &str, metadata: &str) -> Result<Self, ContractsError> {
+        let address = AccountId::from_str(address)
             .map_err(|why| ContractsError::NotAccountId(why.to_string()))?;
-
         Ok(Self {
-            contract: ContractInstance::new(address, &azero_contract_metadata)?,
+            contract: ContractInstance::new(address, &metadata)?,
         })
     }
 }
