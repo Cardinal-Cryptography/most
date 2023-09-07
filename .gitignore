@@ -23,3 +23,6 @@ addresses.json
 
 # half of the internet
 node_modules
+
+# emacs
+relayer/src/ markdown-code-fontification:rustic-mode
