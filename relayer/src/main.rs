@@ -11,6 +11,7 @@ use tokio::runtime::Runtime;
 mod aleph_zero;
 mod azero_listener;
 mod config;
+mod contracts;
 mod eth_listener;
 mod helpers;
 

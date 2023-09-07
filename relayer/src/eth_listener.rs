@@ -35,7 +35,7 @@ pub async fn run(config: Arc<Config>) -> Result<(), EthListenerError> {
     let Config {
         eth_node_wss_url,
         eth_contract_address,
-        eth_from_block,
+        eth_last_known_block,
         ..
     } = &*config;
 
@@ -47,8 +47,8 @@ pub async fn run(config: Arc<Config>) -> Result<(), EthListenerError> {
 
     let last_block_number = client.get_block_number().await?.as_u32();
 
-    // replay past events
-    for (from, to) in chunks(*eth_from_block as u32, last_block_number, 1000) {
+    // replay past events from the last known block
+    for (from, to) in chunks(*eth_last_known_block as u32, last_block_number, 1000) {
         let past_events = contract
             .events()
             .from_block(from)
@@ -62,7 +62,7 @@ pub async fn run(config: Arc<Config>) -> Result<(), EthListenerError> {
     }
 
     // subscribe to new events
-    let events = contract.events().from_block(*eth_from_block);
+    let events = contract.events().from_block(last_block_number);
     let mut stream = events.stream().await?;
     while let Some(Ok(event)) = stream.next().await {
         handle_event(&event)?;

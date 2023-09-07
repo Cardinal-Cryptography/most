@@ -4,12 +4,15 @@ use std::env;
 pub struct Config {
     pub log_level: String,
     pub eth_node_wss_url: String,
+    // TODO : pass abi meta
     pub eth_contract_address: String,
     pub azero_node_wss_url: String,
     pub azero_sudo_seed: String,
+    pub azero_contract_metadata: String,
+    pub azero_contract_address: String,
 
-    // TODO: move to DB
-    pub eth_from_block: usize,
+    pub eth_last_known_block: usize,
+    pub azero_last_known_block: usize,
 }
 
 pub trait Load {
@@ -26,9 +29,14 @@ impl Load for Config {
                 "AZERO_WSS_URL",
                 Some(String::from("ws://127.0.0.1:9944")),
             ),
+            azero_contract_metadata: get_env_var("FLIPPER_METADATA", Some(String::from("/home/filip/CloudStation/aleph/membrane-bridge/azero/contracts/flipper/target/ink/flipper.json"))),
+            azero_contract_address: get_env_var("azero_contract_address", None),
             azero_sudo_seed: get_env_var("AZER_SUDO_SEED", Some(String::from("//Alice"))),
             eth_contract_address: get_env_var("ETH_CONTRACT_ADDRESS", None),
-            eth_from_block: get_env_var("ETH_FROM_BLOCK", Some(String::from("0")))
+            eth_last_known_block: get_env_var("ETH_LAST_KNOWN_BLOCK", Some(String::from("0")))
+                .parse()
+                .expect("Can't parse as int"),
+            azero_last_known_block: get_env_var("AZERO_LAST_KNOWN_BLOCK", Some(String::from("0")))
                 .parse()
                 .expect("Can't parse as int"),
         }
