@@ -2,7 +2,5 @@ use ethers::contract::abigen;
 
 abigen!(
     Flipper,
-    r#"[
-        event Flip(bool newValue)
-    ]"#,
+    "/home/filip/CloudStation/aleph/membrane-bridge/eth/build/contracts/Flipper.json",
 );

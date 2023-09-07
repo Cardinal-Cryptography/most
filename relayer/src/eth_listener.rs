@@ -10,7 +10,7 @@ use thiserror::Error;
 
 use crate::{
     config::Config,
-    eth_contracts::{FlipFilter, Flipper},
+    eth_contracts::{Flipper, FlipperEvents},
     helpers::chunks,
 };
 
@@ -73,8 +73,11 @@ pub async fn run(config: Arc<Config>) -> Result<(), EthListenerError> {
     Ok(())
 }
 
-fn handle_event(event: &FlipFilter) -> Result<(), EthListenerError> {
-    info!("handling eth contract event: {event:?}");
+fn handle_event(event: &FlipperEvents) -> Result<(), EthListenerError> {
+    if let FlipperEvents::FlipFilter(flip_event) = event {
+        info!("handling eth contract event: {flip_event:?}");
+    }
+
     Ok(())
 }
 
