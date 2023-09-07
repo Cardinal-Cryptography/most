@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use ethers::{
-    contract::abigen,
     core::types::Address,
     prelude::ContractError,
     providers::{Middleware, Provider, ProviderError, StreamExt, Ws},
@@ -9,7 +8,11 @@ use ethers::{
 use log::info;
 use thiserror::Error;
 
-use crate::{config::Config, helpers::chunks};
+use crate::{
+    config::Config,
+    eth_contracts::{FlipFilter, Flipper},
+    helpers::chunks,
+};
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -24,13 +27,6 @@ pub enum EthListenerError {
     #[error("contract error")]
     Contract(#[from] ContractError<Provider<Ws>>),
 }
-
-abigen!(
-    Flipper,
-    r#"[
-        event Flip(bool newValue)
-    ]"#,
-);
 
 pub async fn run(config: Arc<Config>) -> Result<(), EthListenerError> {
     let Config {
@@ -62,9 +58,14 @@ pub async fn run(config: Arc<Config>) -> Result<(), EthListenerError> {
             .try_for_each(|event| -> Result<(), EthListenerError> { handle_event(event) })?;
     }
 
+    info!("finished processing past events");
+
     // subscribe to new events
     let events = contract.events().from_block(last_block_number);
     let mut stream = events.stream().await?;
+
+    info!("subscribing to new events");
+
     while let Some(Ok(event)) = stream.next().await {
         handle_event(&event)?;
     }

@@ -14,8 +14,8 @@ use subxt::{events::Events, utils::H256};
 use thiserror::Error;
 
 use crate::{
+    azero_contracts::{ContractsError, FlipperInstance},
     config::Config,
-    contracts::{ContractsError, FlipperInstance},
     helpers::chunks,
 };
 
@@ -75,12 +75,16 @@ pub async fn run(config: Arc<Config>) -> Result<(), AzeroListenerError> {
         }
     }
 
+    info!("finished processing past events");
+
     // subscribe to new events
     let mut subscription = connection
         .as_client()
         .blocks()
         .subscribe_finalized()
         .await?;
+
+    info!("subscribing to new events");
 
     while let Some(Ok(block)) = subscription.next().await {
         let events = block.events().await?;
