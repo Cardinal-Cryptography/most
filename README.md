@@ -54,16 +54,19 @@ admin.peers
 
 ## Deploying contracts
 
-To deploy the ocntracts on the EVM chain:
+To deploy the contracts on the EVM chain:
 
 ```bash
 cd eth/
 truffle migrate --reset
 ```
 
+Open a console:
+
 ```bash
 truffle console 
 ```
+Interact with the deployed contracts instance:
 
 ```javascript
 let flipper = await Flipper.deployed()

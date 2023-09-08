@@ -10,7 +10,7 @@ use thiserror::Error;
 
 use crate::{
     config::Config,
-    connections::AzeroWsConnection,
+    connections::{AzeroWsConnection, EthWsConnection},
     eth_contracts::{Flipper, FlipperEvents},
     helpers::chunks,
 };
@@ -34,22 +34,22 @@ pub struct EthListener;
 impl EthListener {
     pub async fn run(
         config: Arc<Config>,
-        azero_connection: AzeroWsConnection,
+        _azero_connection: AzeroWsConnection,
+        eth_connection: EthWsConnection,
     ) -> Result<(), EthListenerError> {
         let Config {
-            eth_node_wss_url,
             eth_contract_address,
             eth_last_known_block,
             ..
         } = &*config;
 
-        let provider = connect(eth_node_wss_url).await?;
-        let client = Arc::new(provider);
+        // let provider = connect(eth_node_wss_url).await?;
+        // let client = Arc::new(eth_connection);
 
         let address = eth_contract_address.parse::<Address>()?;
-        let contract = Flipper::new(address, Arc::clone(&client));
+        let contract = Flipper::new(address, Arc::clone(&eth_connection));
 
-        let last_block_number = client.get_block_number().await?.as_u32();
+        let last_block_number = eth_connection.get_block_number().await?.as_u32();
 
         // replay past events from the last known block
         for (from, to) in chunks(*eth_last_known_block as u32, last_block_number, 1000) {
@@ -91,8 +91,4 @@ fn handle_event(event: &FlipperEvents, config: &Config) -> Result<(), EthListene
     }
 
     Ok(())
-}
-
-async fn connect(url: &str) -> Result<Provider<Ws>, EthListenerError> {
-    Ok(Provider::<Ws>::connect(url).await?)
 }

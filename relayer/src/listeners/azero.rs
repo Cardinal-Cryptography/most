@@ -16,7 +16,7 @@ use thiserror::Error;
 use crate::{
     azero_contracts::{ContractsError, FlipperInstance},
     config::Config,
-    connections::AzeroWsConnection,
+    connections::{AzeroWsConnection, EthWsConnection},
     helpers::chunks,
 };
 
@@ -42,7 +42,8 @@ pub struct AzeroListener;
 impl AzeroListener {
     pub async fn run(
         config: Arc<Config>,
-        connection: AzeroWsConnection,
+        azero_connection: AzeroWsConnection,
+        eth_connection: EthWsConnection,
     ) -> Result<(), AzeroListenerError> {
         let Config {
             azero_last_known_block,
@@ -52,7 +53,7 @@ impl AzeroListener {
         } = &*config;
 
         // replay past events from last known to the latest
-        let last_block_number = connection
+        let last_block_number = azero_connection
             .get_block_number_opt(None)
             .await?
             .ok_or(AzeroListenerError::BlockNotFound)?;
@@ -62,12 +63,12 @@ impl AzeroListener {
 
         for (from, to) in chunks(*azero_last_known_block as u32, last_block_number, 1000) {
             for block_number in from..to {
-                let block_hash = connection
+                let block_hash = azero_connection
                     .get_block_hash(block_number)
                     .await?
                     .ok_or(AzeroListenerError::BlockNotFound)?;
 
-                let events = connection
+                let events = azero_connection
                     .as_client()
                     .blocks()
                     .at(block_hash)
@@ -83,7 +84,7 @@ impl AzeroListener {
         info!("finished processing past events");
 
         // subscribe to new events
-        let mut subscription = connection
+        let mut subscription = azero_connection
             .as_client()
             .blocks()
             .subscribe_finalized()
