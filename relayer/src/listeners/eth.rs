@@ -43,9 +43,6 @@ impl EthListener {
             ..
         } = &*config;
 
-        // let provider = connect(eth_node_wss_url).await?;
-        // let client = Arc::new(eth_connection);
-
         let address = eth_contract_address.parse::<Address>()?;
         let contract = Flipper::new(address, Arc::clone(&eth_connection));
 
@@ -86,6 +83,7 @@ impl EthListener {
 fn handle_event(event: &FlipperEvents, config: &Config) -> Result<(), EthListenerError> {
     if let FlipperEvents::FlipFilter(flip_event) = event {
         info!("handling eth contract event: {flip_event:?}");
+        // let authority_conn = &sign(&conn, &authority);
 
         // TODO : send tx
     }

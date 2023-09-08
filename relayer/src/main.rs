@@ -8,7 +8,7 @@ use thiserror::Error;
 use tokio::runtime::Runtime;
 
 use crate::{
-    connections::{AzeroConnection, EthConnection},
+    connections::{azero, eth},
     listeners::{AzeroListener, AzeroListenerError, EthListener, EthListenerError},
 };
 
@@ -47,8 +47,8 @@ fn main() -> Result<()> {
     rt.block_on(async {
         let mut tasks = Vec::with_capacity(2);
 
-        let azero_connection = AzeroConnection::init(&config.azero_node_wss_url).await;
-        let eth_connection = EthConnection::init(&config.eth_node_wss_url)
+        let azero_connection = azero::init(&config.azero_node_wss_url).await;
+        let eth_connection = eth::init(&config.eth_node_wss_url)
             .await
             .expect("Connection could not be made");
 
