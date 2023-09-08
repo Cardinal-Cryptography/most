@@ -1,19 +1,22 @@
 use std::{env, sync::Arc};
 
-use azero_listener::AzeroListenerError;
 use config::{Config, Load};
-use eth_listener::EthListenerError;
 use eyre::Result;
 use log::info;
 use thiserror::Error;
 use tokio::runtime::Runtime;
 
+use crate::{
+    connections::AzeroConnection,
+    listeners::{AzeroListener, AzeroListenerError, EthListener, EthListenerError},
+};
+
 mod azero_contracts;
-mod azero_listener;
 mod config;
+mod connections;
 mod eth_contracts;
-mod eth_listener;
 mod helpers;
+mod listeners;
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -40,16 +43,20 @@ fn main() -> Result<()> {
     rt.block_on(async {
         let mut tasks = Vec::with_capacity(2);
 
+        let azero_connection = AzeroConnection::init(&config.azero_node_wss_url).await;
+
         let config_rc1 = Arc::clone(&config);
+        let azero_connection_rc1 = Arc::clone(&azero_connection);
         tasks.push(tokio::spawn(async {
-            eth_listener::run(config_rc1)
+            EthListener::run(config_rc1, azero_connection_rc1)
                 .await
                 .map_err(ListenerError::Eth)
         }));
 
         let config_rc2 = Arc::clone(&config);
+        let azero_connection_rc2 = Arc::clone(&azero_connection);
         tasks.push(tokio::spawn(async {
-            azero_listener::run(config_rc2)
+            AzeroListener::run(config_rc2, azero_connection_rc2)
                 .await
                 .map_err(ListenerError::Azero)
         }));
