@@ -9,8 +9,9 @@ use log::info;
 use thiserror::Error;
 
 use crate::{
+    azero_contracts::FlipperInstance,
     config::Config,
-    connections::{AzeroWsConnection, EthWsConnection},
+    connections::{azero::sign, AzeroWsConnection, EthWsConnection},
     eth_contracts::{Flipper, FlipperEvents},
     helpers::chunks,
 };
@@ -34,7 +35,7 @@ pub struct EthListener;
 impl EthListener {
     pub async fn run(
         config: Arc<Config>,
-        _azero_connection: AzeroWsConnection,
+        azero_connection: AzeroWsConnection,
         eth_connection: EthWsConnection,
     ) -> Result<(), EthListenerError> {
         let Config {
@@ -60,7 +61,7 @@ impl EthListener {
             past_events
                 .iter()
                 .try_for_each(|event| -> Result<(), EthListenerError> {
-                    handle_event(event, &config)
+                    handle_event(event, &config, Arc::clone(&azero_connection))
                 })?;
         }
 
@@ -73,17 +74,31 @@ impl EthListener {
         info!("subscribing to new events");
 
         while let Some(Ok(event)) = stream.next().await {
-            handle_event(&event, &config)?;
+            handle_event(&event, &config, Arc::clone(&azero_connection))?;
         }
 
         Ok(())
     }
 }
 
-fn handle_event(event: &FlipperEvents, config: &Config) -> Result<(), EthListenerError> {
+fn handle_event(
+    event: &FlipperEvents,
+    config: &Config,
+    azero_connection: AzeroWsConnection,
+) -> Result<(), EthListenerError> {
     if let FlipperEvents::FlipFilter(flip_event) = event {
+        let Config {
+            azero_sudo_seed,
+            azero_contract_address,
+            azero_contract_metadata,
+            ..
+        } = config;
+
         info!("handling eth contract event: {flip_event:?}");
-        // let authority_conn = &sign(&conn, &authority);
+
+        let authority = aleph_client::keypair_from_string(azero_sudo_seed);
+        let signed_connection = sign(azero_connection, &authority);
+        let contract = FlipperInstance::new(&azero_contract_address, &azero_contract_metadata);
 
         // TODO : send tx
     }
