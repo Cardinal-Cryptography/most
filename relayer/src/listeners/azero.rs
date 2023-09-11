@@ -8,6 +8,7 @@ use aleph_client::{
     utility::BlocksApi,
     AlephConfig,
 };
+use ethers::core::types::Address;
 use futures::StreamExt;
 use log::info;
 use subxt::{events::Events, utils::H256};
@@ -16,7 +17,7 @@ use thiserror::Error;
 use crate::{
     config::Config,
     connections::{eth::sign, AzeroWsConnection, EthWsConnection},
-    contracts::{AzeroContractError, FlipperInstance},
+    contracts::{AzeroContractError, Flipper, FlipperCalls, FlipperInstance},
     helpers::chunks,
 };
 
@@ -26,6 +27,9 @@ use crate::{
 pub enum AzeroListenerError {
     #[error("aleph-client error")]
     AlephClient(#[from] anyhow::Error),
+
+    #[error("error when parsing ethereum address")]
+    FromHex(#[from] rustc_hex::FromHexError),
 
     #[error("provider error")]
     Subxt(#[from] subxt::Error),
@@ -79,11 +83,13 @@ impl AzeroListener {
                 // filter contract events
                 handle_events(
                     Arc::clone(&eth_connection),
+                    &config,
                     events,
                     &contracts,
                     block_number,
                     block_hash,
-                )?;
+                )
+                .await?;
             }
         }
 
@@ -102,19 +108,22 @@ impl AzeroListener {
             let events = block.events().await?;
             handle_events(
                 Arc::clone(&eth_connection),
+                &config,
                 events,
                 &contracts,
                 block.number(),
                 block.hash(),
-            )?;
+            )
+            .await?;
         }
 
         Ok(())
     }
 }
 
-fn handle_events(
+async fn handle_events(
     eth_connection: EthWsConnection,
+    config: &Config,
     events: Events<AlephConfig>,
     contracts: &[&ContractInstance],
     block_number: u32,
@@ -128,23 +137,31 @@ fn handle_events(
             block_hash,
         }),
     ) {
-        handle_event(Arc::clone(&eth_connection), event?)?;
+        handle_event(Arc::clone(&eth_connection), config, event?).await?;
     }
     Ok(())
 }
 
-fn handle_event(
+async fn handle_event(
     eth_connection: EthWsConnection,
+    config: &Config,
     event: ContractEvent,
 ) -> Result<(), AzeroListenerError> {
+    let Config {
+        eth_contract_address,
+        ..
+    } = &*config;
+
     if let Some(name) = event.name {
         if name.eq("Flip") {
             info!("handling A0 contract event: {name}");
             // TODO: send evm tx
 
-            let signed_connection = sign(eth_connection);
+            let signed_connection = sign(eth_connection).await;
+
+            let address = eth_contract_address.parse::<Address>()?;
+            let contract = Flipper::new(address, Arc::new(signed_connection));
         }
     }
-
     Ok(())
 }
