@@ -8,7 +8,11 @@ use aleph_client::{
     utility::BlocksApi,
     AlephConfig,
 };
-use ethers::core::types::Address;
+use ethers::{
+    core::types::Address,
+    prelude::ContractError,
+    providers::{Provider, Ws},
+};
 use futures::StreamExt;
 use log::info;
 use subxt::{events::Events, utils::H256};
@@ -16,8 +20,11 @@ use thiserror::Error;
 
 use crate::{
     config::Config,
-    connections::{eth::sign, AzeroWsConnection, EthWsConnection},
-    contracts::{AzeroContractError, Flipper, FlipperCalls, FlipperInstance},
+    connections::{
+        eth::{sign, EthConnectionError},
+        AzeroWsConnection, EthWsConnection,
+    },
+    contracts::{AzeroContractError, Flipper, FlipperInstance},
     helpers::chunks,
 };
 
@@ -34,8 +41,14 @@ pub enum AzeroListenerError {
     #[error("provider error")]
     Subxt(#[from] subxt::Error),
 
-    #[error("contract error")]
+    #[error("azero contract error")]
     AzeroContract(#[from] AzeroContractError),
+
+    #[error("eth connection error")]
+    EthConnection(#[from] EthConnectionError),
+
+    #[error("eth contract error")]
+    EthContract(#[from] ContractError<Provider<Ws>>),
 
     #[error("no block found")]
     BlockNotFound,
@@ -150,17 +163,24 @@ async fn handle_event(
     let Config {
         eth_contract_address,
         ..
-    } = &*config;
+    } = config;
 
     if let Some(name) = event.name {
         if name.eq("Flip") {
             info!("handling A0 contract event: {name}");
-            // TODO: send evm tx
 
-            let signed_connection = sign(eth_connection).await;
+            let signed_connection = sign(eth_connection).await?;
 
             let address = eth_contract_address.parse::<Address>()?;
             let contract = Flipper::new(address, Arc::new(signed_connection));
+
+            // not called
+            // TODO: convert error
+            contract
+                .flop()
+                .call()
+                .await
+                .expect("error commiting eth tx");
         }
     }
     Ok(())
