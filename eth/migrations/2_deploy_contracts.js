@@ -13,15 +13,12 @@ module.exports = async function(deployer, network, accounts) {
         web3.eth.personal.unlockAccount(accounts[0], process.env.ACCOUNT_PASSWORD, 86400);
 
         await deployer.deploy(Flipper, opts);
-        let instance = await Flipper.deployed();
-       
-        let addresses = {
-            'flipper': instance.address
-        };
+        let flipperInstance = await Flipper.deployed();
+
+        let addresses = {'flipper': flipperInstance.address};
         fs.writeFileSync('addresses.json', JSON.stringify(addresses));
 
     } else {
         throw new Error('provide ACCOUNT_PASSWORD ev var');
     }
-
 };

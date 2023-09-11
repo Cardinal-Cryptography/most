@@ -5,6 +5,7 @@
   "author": "fbielejec",
   "license": "APACHE",
   "dependencies": {
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "openzeppelin-solidity": "3.4.2"
   }
 }
