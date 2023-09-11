@@ -9,10 +9,9 @@ use log::info;
 use thiserror::Error;
 
 use crate::{
-    azero_contracts::{AzeroContractError, FlipperInstance},
     config::Config,
     connections::{azero::sign, AzeroWsConnection, EthWsConnection},
-    eth_contracts::{Flipper, FlipperEvents},
+    contracts::{AzeroContractError, Flipper, FlipperEvents, FlipperInstance},
     helpers::chunks,
 };
 
@@ -99,7 +98,7 @@ async fn handle_event(
 
         let authority = aleph_client::keypair_from_string(azero_sudo_seed);
         let signed_connection = sign(azero_connection, &authority);
-        let contract = FlipperInstance::new(&azero_contract_address, &azero_contract_metadata)?;
+        let contract = FlipperInstance::new(azero_contract_address, azero_contract_metadata)?;
 
         // send tx
         contract.flop(&signed_connection).await?;

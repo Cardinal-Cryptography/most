@@ -6,7 +6,7 @@ use aleph_client::{
         ContractInstance,
     },
     utility::BlocksApi,
-    AlephConfig, Connection,
+    AlephConfig,
 };
 use futures::StreamExt;
 use log::info;
@@ -14,9 +14,9 @@ use subxt::{events::Events, utils::H256};
 use thiserror::Error;
 
 use crate::{
-    azero_contracts::{ContractsError, FlipperInstance},
     config::Config,
-    connections::{AzeroWsConnection, EthWsConnection},
+    connections::{eth::sign, AzeroWsConnection, EthWsConnection},
+    contracts::{AzeroContractError, FlipperInstance},
     helpers::chunks,
 };
 
@@ -31,7 +31,7 @@ pub enum AzeroListenerError {
     Subxt(#[from] subxt::Error),
 
     #[error("contract error")]
-    Contracts(#[from] ContractsError),
+    AzeroContract(#[from] AzeroContractError),
 
     #[error("no block found")]
     BlockNotFound,
@@ -77,7 +77,13 @@ impl AzeroListener {
                     .await?;
 
                 // filter contract events
-                handle_events(events, &contracts, block_number, block_hash)?;
+                handle_events(
+                    Arc::clone(&eth_connection),
+                    events,
+                    &contracts,
+                    block_number,
+                    block_hash,
+                )?;
             }
         }
 
@@ -94,7 +100,13 @@ impl AzeroListener {
 
         while let Some(Ok(block)) = subscription.next().await {
             let events = block.events().await?;
-            handle_events(events, &contracts, block.number(), block.hash())?;
+            handle_events(
+                Arc::clone(&eth_connection),
+                events,
+                &contracts,
+                block.number(),
+                block.hash(),
+            )?;
         }
 
         Ok(())
@@ -102,6 +114,7 @@ impl AzeroListener {
 }
 
 fn handle_events(
+    eth_connection: EthWsConnection,
     events: Events<AlephConfig>,
     contracts: &[&ContractInstance],
     block_number: u32,
@@ -115,12 +128,23 @@ fn handle_events(
             block_hash,
         }),
     ) {
-        handle_event(event?)?;
+        handle_event(Arc::clone(&eth_connection), event?)?;
     }
     Ok(())
 }
 
-fn handle_event(event: ContractEvent) -> Result<(), AzeroListenerError> {
-    info!("handling A0 contract event: {event:?}");
+fn handle_event(
+    eth_connection: EthWsConnection,
+    event: ContractEvent,
+) -> Result<(), AzeroListenerError> {
+    if let Some(name) = event.name {
+        if name.eq("Flip") {
+            info!("handling A0 contract event: {name}");
+            // TODO: send evm tx
+
+            let signed_connection = sign(eth_connection);
+        }
+    }
+
     Ok(())
 }

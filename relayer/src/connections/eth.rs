@@ -1,9 +1,16 @@
 use std::sync::Arc;
 
-use ethers::providers::{Provider, ProviderError, Ws};
+use ethers::{
+    prelude::SignerMiddleware,
+    providers::{Provider, ProviderError, Ws},
+    signers::LocalWallet,
+    utils::Anvil,
+};
 use thiserror::Error;
 
 pub type EthWsConnection = Arc<Provider<Ws>>;
+// pub type SignedEthWsConnection = SignerMiddleware<Provider<Ws>, LocalWallet>;
+pub type SignedEthWsConnection = SignerMiddleware<EthWsConnection, LocalWallet>;
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -13,10 +20,16 @@ pub enum EthConnectionError {
     Provider(#[from] ProviderError),
 }
 
+async fn connect(url: &str) -> Result<Provider<Ws>, EthConnectionError> {
+    Ok(Provider::<Ws>::connect(url).await?)
+}
+
 pub async fn init(url: &str) -> Result<EthWsConnection, EthConnectionError> {
     Ok(Arc::new(connect(url).await?))
 }
 
-async fn connect(url: &str) -> Result<Provider<Ws>, EthConnectionError> {
-    Ok(Provider::<Ws>::connect(url).await?)
+pub async fn sign(connection: EthWsConnection) -> SignedEthWsConnection {
+    let anvil = Anvil::new().spawn();
+    let wallet: LocalWallet = anvil.keys()[0].clone().into();
+    SignerMiddleware::new(connection, wallet)
 }

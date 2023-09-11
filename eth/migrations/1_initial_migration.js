@@ -11,7 +11,7 @@ module.exports = function(deployer, network, accounts) {
         const web3 = new Web3(new Web3.providers.HttpProvider('http://' + config.host + ':' + config.port));
         console.log('Unlocking account: ' + accounts[0]);
         web3.eth.personal.unlockAccount(accounts[0], process.env.ACCOUNT_PASSWORD, 86400);
-        // deployer.deploy(Migrations, opts);
+        deployer.deploy(Migrations, opts);
     } else {
         throw new Error('provide ACCOUNT_PASSWORD ev var');
     }

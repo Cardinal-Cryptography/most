@@ -12,10 +12,9 @@ use crate::{
     listeners::{AzeroListener, AzeroListenerError, EthListener, EthListenerError},
 };
 
-mod azero_contracts;
 mod config;
 mod connections;
-mod eth_contracts;
+mod contracts;
 mod helpers;
 mod listeners;
 
