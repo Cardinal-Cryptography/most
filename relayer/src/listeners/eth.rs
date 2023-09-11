@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use ethers::{
     core::types::Address,
@@ -9,7 +9,7 @@ use log::info;
 use thiserror::Error;
 
 use crate::{
-    azero_contracts::FlipperInstance,
+    azero_contracts::{AzeroContractError, FlipperInstance},
     config::Config,
     connections::{azero::sign, AzeroWsConnection, EthWsConnection},
     eth_contracts::{Flipper, FlipperEvents},
@@ -28,6 +28,9 @@ pub enum EthListenerError {
 
     #[error("contract error")]
     Contract(#[from] ContractError<Provider<Ws>>),
+
+    #[error("azero contract error")]
+    AzeroContract(#[from] AzeroContractError),
 }
 
 pub struct EthListener;
@@ -58,11 +61,9 @@ impl EthListener {
                 .query()
                 .await?;
 
-            past_events
-                .iter()
-                .try_for_each(|event| -> Result<(), EthListenerError> {
-                    handle_event(event, &config, Arc::clone(&azero_connection))
-                })?;
+            for event in past_events {
+                handle_event(&event, &config, Arc::clone(&azero_connection)).await?
+            }
         }
 
         info!("finished processing past events");
@@ -74,14 +75,14 @@ impl EthListener {
         info!("subscribing to new events");
 
         while let Some(Ok(event)) = stream.next().await {
-            handle_event(&event, &config, Arc::clone(&azero_connection))?;
+            handle_event(&event, &config, Arc::clone(&azero_connection)).await?;
         }
 
         Ok(())
     }
 }
 
-fn handle_event(
+async fn handle_event(
     event: &FlipperEvents,
     config: &Config,
     azero_connection: AzeroWsConnection,
@@ -98,9 +99,10 @@ fn handle_event(
 
         let authority = aleph_client::keypair_from_string(azero_sudo_seed);
         let signed_connection = sign(azero_connection, &authority);
-        let contract = FlipperInstance::new(&azero_contract_address, &azero_contract_metadata);
+        let contract = FlipperInstance::new(&azero_contract_address, &azero_contract_metadata)?;
 
-        // TODO : send tx
+        // send tx
+        contract.flop(&signed_connection).await?;
     }
 
     Ok(())
