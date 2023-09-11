@@ -72,17 +72,18 @@ contract BenchmarkSignatureVerification {
         bytes[] memory signatures
     ) public {
         require(tokenWhitelist[token], "Selected token cannot be bridged");
-        require(signatures.length == threshold, "Incorrect number of signatures");
         
         bytes32 dataHash = keccak256(abi.encodePacked(nonce, token, beneficiary, amount));
-        verifySignatures(dataHash, signatures);
+        verifyMultisig(dataHash, signatures);
 
         // Success, we can now transfer the tokens
 
         emit BridgeReceiveSuccess(token, beneficiary, amount, nonce++);
     }
 
-    function verifySignatures(bytes32 dataHash, bytes[] memory signatures) private view {
+    function verifyMultisig(bytes32 dataHash, bytes[] memory signatures) private view {
+        require(signatures.length == threshold, "Incorrect number of signatures");
+        
         bytes32 hashToSign = ECDSA.toEthSignedMessageHash(dataHash);
 
         bool[MAX_GUARDIAN_COUNT] memory signed;
