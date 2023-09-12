@@ -2,6 +2,7 @@ use std::{env, sync::Arc};
 
 use config::{Config, Load};
 use connections::EthConnectionError;
+use ethers::signers::{LocalWallet, WalletError};
 use eyre::Result;
 use log::info;
 use thiserror::Error;
@@ -28,6 +29,9 @@ pub enum ListenerError {
     #[error("eth provider connection error")]
     EthConnection(#[from] EthConnectionError),
 
+    #[error("eth wallet error")]
+    EthWallet(#[from] WalletError),
+
     #[error("eth listener error")]
     Azero(#[from] AzeroListenerError),
 }
@@ -46,10 +50,27 @@ fn main() -> Result<()> {
     rt.block_on(async {
         let mut tasks = Vec::with_capacity(2);
 
-        let azero_connection = azero::init(&config.azero_node_wss_url).await;
-        let eth_connection = eth::init(&config.eth_node_wss_url)
+        let keypair = aleph_client::keypair_from_string(&config.azero_sudo_seed);
+
+        let azero_connection = Arc::new(azero::sign(
+            &azero::init(&config.azero_node_wss_url).await,
+            &keypair,
+        ));
+
+        let wallet =
+            LocalWallet::decrypt_keystore(&config.eth_keystore_path, &config.eth_keystore_password)
+                .expect("Cannot decrypt eth wallet");
+
+        let eth_connection = Arc::new(
+            eth::sign(
+                eth::init(&config.eth_node_wss_url)
+                    .await
+                    .expect("Connection could not be made"),
+                wallet,
+            )
             .await
-            .expect("Connection could not be made");
+            .unwrap(),
+        );
 
         let config_rc1 = Arc::clone(&config);
         let azero_connection_rc1 = Arc::clone(&azero_connection);

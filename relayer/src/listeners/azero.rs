@@ -6,7 +6,7 @@ use aleph_client::{
         ContractInstance,
     },
     utility::BlocksApi,
-    AlephConfig,
+    AlephConfig, AsConnection,
 };
 use ethers::{
     core::types::Address,
@@ -21,8 +21,8 @@ use thiserror::Error;
 use crate::{
     config::Config,
     connections::{
-        eth::{sign, EthConnectionError},
-        AzeroWsConnection, EthWsConnection,
+        azero::SignedAzeroWsConnection,
+        eth::{EthConnectionError, SignedEthWsConnection},
     },
     contracts::{AzeroContractError, Flipper, FlipperInstance},
     helpers::chunks,
@@ -59,8 +59,8 @@ pub struct AzeroListener;
 impl AzeroListener {
     pub async fn run(
         config: Arc<Config>,
-        azero_connection: AzeroWsConnection,
-        eth_connection: EthWsConnection,
+        azero_connection: Arc<SignedAzeroWsConnection>,
+        eth_connection: Arc<SignedEthWsConnection>,
     ) -> Result<(), AzeroListenerError> {
         let Config {
             azero_last_known_block,
@@ -85,7 +85,8 @@ impl AzeroListener {
                     .await?
                     .ok_or(AzeroListenerError::BlockNotFound)?;
 
-                let events = azero_connection
+                let connection = azero_connection.as_connection();
+                let events = connection
                     .as_client()
                     .blocks()
                     .at(block_hash)
@@ -109,7 +110,8 @@ impl AzeroListener {
         info!("finished processing past events");
 
         // subscribe to new events
-        let mut subscription = azero_connection
+        let connection = azero_connection.as_connection();
+        let mut subscription = connection
             .as_client()
             .blocks()
             .subscribe_finalized()
@@ -135,7 +137,7 @@ impl AzeroListener {
 }
 
 async fn handle_events(
-    eth_connection: EthWsConnection,
+    eth_connection: Arc<SignedEthWsConnection>,
     config: &Config,
     events: Events<AlephConfig>,
     contracts: &[&ContractInstance],
@@ -156,7 +158,7 @@ async fn handle_events(
 }
 
 async fn handle_event(
-    eth_connection: EthWsConnection,
+    eth_connection: Arc<SignedEthWsConnection>,
     config: &Config,
     event: ContractEvent,
 ) -> Result<(), AzeroListenerError> {
@@ -169,13 +171,10 @@ async fn handle_event(
         if name.eq("Flip") {
             info!("handling A0 contract event: {name}");
 
-            let signed_connection = sign(eth_connection).await?;
-
             let address = eth_contract_address.parse::<Address>()?;
-            let contract = Flipper::new(address, Arc::new(signed_connection));
+            let contract = Flipper::new(address, Arc::new(&eth_connection));
 
-            // not called
-            // TODO: convert error
+            // TODO not executing
             contract
                 .flop()
                 .call()

@@ -1,17 +1,16 @@
-use std::sync::Arc;
-
 use aleph_client::{Connection, KeyPair, SignedConnection};
 
-pub type AzeroWsConnection = Arc<Connection>;
+pub type AzeroWsConnection = Connection;
+pub type SignedAzeroWsConnection = SignedConnection;
 
 pub async fn init(url: &str) -> AzeroWsConnection {
-    Arc::new(Connection::new(url).await)
+    Connection::new(url).await
 }
 
-pub fn sign(connection: AzeroWsConnection, keypair: &KeyPair) -> SignedConnection {
+pub fn sign(connection: &AzeroWsConnection, keypair: &KeyPair) -> SignedAzeroWsConnection {
     let signer = KeyPair::new(keypair.signer().clone());
     let connection = Connection {
         client: connection.client.clone(),
     };
-    SignedConnection { connection, signer }
+    SignedAzeroWsConnection { connection, signer }
 }

@@ -6,6 +6,8 @@ pub struct Config {
     pub eth_node_wss_url: String,
     // TODO : pass abi meta
     pub eth_contract_address: String,
+    pub eth_keystore_path: String,
+    pub eth_keystore_password: String,
     pub azero_node_wss_url: String,
     pub azero_sudo_seed: String,
     pub azero_contract_metadata: String,
@@ -34,7 +36,9 @@ impl Load for Config {
             azero_contract_metadata: get_env_var("FLIPPER_METADATA", Some(String::from("/home/filip/CloudStation/aleph/membrane-bridge/azero/contracts/flipper/target/ink/flipper.json"))),
             azero_contract_address: get_env_var("AZERO_CONTRACT_ADDRESS", None),
             azero_sudo_seed: get_env_var("AZERO_SUDO_SEED", Some(String::from("//Alice"))),
-            eth_node_wss_url: get_env_var("ETH_WSS_URL", Some(String::from("ws://127.0.0.1:8546"))),                        
+            eth_node_wss_url: get_env_var("ETH_WSS_URL", Some(String::from("ws://127.0.0.1:8546"))),
+            eth_keystore_path: get_env_var("ETH_KEYSTORE_PATH", Some(String::from("/home/filip/CloudStation/aleph/membrane-bridge/0xf2f0930c3b7bdf1734ee173272bd8cdc0a08f038/keystore/f2f0930c3b7bdf1734ee173272bd8cdc0a08f038"))),
+            eth_keystore_password: get_env_var("ETH_KEYSTORE_PASSWORD", Some(String::from("chaos555"))),
             eth_contract_address: get_env_var("ETH_CONTRACT_ADDRESS", None),
             eth_last_known_block: get_env_var("ETH_LAST_KNOWN_BLOCK", Some(String::from("0")))
                 .parse()
