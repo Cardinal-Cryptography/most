@@ -12,6 +12,7 @@ use ethers::{
     core::types::Address,
     prelude::ContractError,
     providers::{Provider, Ws},
+    signers::LocalWallet,
 };
 use futures::StreamExt;
 use log::info;
@@ -22,7 +23,7 @@ use crate::{
     config::Config,
     connections::{
         azero::SignedAzeroWsConnection,
-        eth::{EthConnectionError, SignedEthWsConnection},
+        eth::{self, EthConnectionError, SignedEthWsConnection},
     },
     contracts::{AzeroContractError, Flipper, FlipperInstance},
     helpers::chunks,
@@ -182,7 +183,7 @@ async fn handle_event(
                 .expect("error commiting eth tx");
 
             if let Ok(value) = contract.flop_value().call().await {
-                println!("value is {value:?}");
+                info!("value is {value:?}");
             }
         }
     }
