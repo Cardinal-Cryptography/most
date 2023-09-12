@@ -2,7 +2,7 @@ use std::env;
 
 #[derive(Default, Debug, Clone)]
 pub struct Config {
-    pub log_level: String,
+    pub rust_log: String,
     pub eth_node_wss_url: String,
     // TODO : pass abi meta
     pub eth_contract_address: String,
@@ -25,7 +25,7 @@ pub trait Load {
 impl Load for Config {
     fn load() -> Config {
         Config {
-            log_level: get_env_var("LOG_LEVEL", Some(String::from("info"))),
+            rust_log: get_env_var("RUST_LOG", Some(String::from("info"))),
             azero_node_wss_url: get_env_var(
                 "AZERO_WSS_URL",
                 Some(String::from("ws://127.0.0.1:9944")),

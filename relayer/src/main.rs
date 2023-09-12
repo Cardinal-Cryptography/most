@@ -39,7 +39,7 @@ pub enum ListenerError {
 fn main() -> Result<()> {
     let config = Arc::new(Config::load());
 
-    env::set_var("RUST_LOG", &config.log_level);
+    env::set_var("RUST_LOG", &config.rust_log);
     env_logger::init();
 
     info!("{:#?}", &config);
