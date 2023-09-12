@@ -172,12 +172,7 @@ async fn handle_event(
             info!("handling A0 contract event: {name}");
 
             let address = eth_contract_address.parse::<Address>()?;
-
-            println!("@1: {address:?}");
-
             let contract = Flipper::new(address, eth_connection);
-
-            println!("@2: {contract:?}");
 
             // TODO not executing
             contract
@@ -186,7 +181,9 @@ async fn handle_event(
                 .await
                 .expect("error commiting eth tx");
 
-            println!("@3");
+            if let Ok(value) = contract.flop_value().call().await {
+                println!("value is {value:?}");
+            }
         }
     }
     Ok(())
