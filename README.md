@@ -71,5 +71,20 @@ Interact with the deployed contracts instance:
 ```javascript
 let flipper = await Flipper.deployed()
 flipper.flip()
-flipper.value()
+flipper.flipValue()
+```
+
+To deploy the contracts on the azero chain:
+
+```bash
+cd azero
+./scripts/deploy.sh
+```
+
+## Running relayer process
+
+pass the addresses of both contracts to their respective ENV vars:
+
+```bash
+ AZERO_CONTRACT_ADDRESS="<address>" ETH_CONTRACT_ADDRESS="<address>" cargo run
 ```

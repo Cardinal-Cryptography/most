@@ -10,8 +10,8 @@ use aleph_client::{
 };
 use ethers::{
     core::types::Address,
-    prelude::ContractError,
-    providers::{Provider, Ws},
+    prelude::{ContractCall, ContractError},
+    providers::ProviderError,
 };
 use futures::StreamExt;
 use log::info;
@@ -22,7 +22,7 @@ use crate::{
     config::Config,
     connections::{
         azero::SignedAzeroWsConnection,
-        eth::{EthConnectionError, SignedEthWsConnection},
+        eth::{EthConnectionError, EthWsConnection, SignedEthWsConnection},
     },
     contracts::{AzeroContractError, Flipper, FlipperInstance},
     helpers::chunks,
@@ -38,8 +38,11 @@ pub enum AzeroListenerError {
     #[error("error when parsing ethereum address")]
     FromHex(#[from] rustc_hex::FromHexError),
 
-    #[error("provider error")]
+    #[error("subxt error")]
     Subxt(#[from] subxt::Error),
+
+    #[error("azero provider error")]
+    Provider(#[from] ProviderError),
 
     #[error("azero contract error")]
     AzeroContract(#[from] AzeroContractError),
@@ -48,10 +51,16 @@ pub enum AzeroListenerError {
     EthConnection(#[from] EthConnectionError),
 
     #[error("eth contract error")]
-    EthContract(#[from] ContractError<Provider<Ws>>),
+    EthContractListen(#[from] ContractError<EthWsConnection>),
+
+    #[error("eth contract error")]
+    EthContractTx(#[from] ContractError<SignedEthWsConnection>),
 
     #[error("no block found")]
     BlockNotFound,
+
+    #[error("no tx receipt")]
+    NoTxReceipt,
 }
 
 pub struct AzeroListener;
@@ -174,16 +183,15 @@ async fn handle_event(
             let address = eth_contract_address.parse::<Address>()?;
             let contract = Flipper::new(address, eth_connection);
 
-            // TODO not executing
-            contract
-                .flop()
-                .call()
-                .await
-                .expect("error commiting eth tx");
+            let call: ContractCall<SignedEthWsConnection, ()> = contract.flop();
 
-            if let Ok(value) = contract.flop_value().call().await {
-                info!("value is {value:?}");
-            }
+            let tx = call
+                .send()
+                .await?
+                .await?
+                .ok_or(AzeroListenerError::NoTxReceipt)?;
+
+            info!("eth tx confirmed: {tx:?}");
         }
     }
     Ok(())
