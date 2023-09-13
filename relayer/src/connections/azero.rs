@@ -9,8 +9,5 @@ pub async fn init(url: &str) -> AzeroWsConnection {
 
 pub fn sign(connection: &AzeroWsConnection, keypair: &KeyPair) -> SignedAzeroWsConnection {
     let signer = KeyPair::new(keypair.signer().clone());
-    let connection = Connection {
-        client: connection.client.clone(),
-    };
-    SignedAzeroWsConnection { connection, signer }
+    SignedAzeroWsConnection::from_connection(connection.clone(), signer)
 }

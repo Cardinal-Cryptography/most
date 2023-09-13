@@ -5,7 +5,7 @@ authors = ["fbielejec <filip.bielejec@cardinals.cc>"]
 edition = "2021"
 
 [dependencies]
-aleph_client = { path = "/home/filip/CloudStation/aleph/aleph-node/aleph-client" }
+aleph_client = { git = "https://github.com/Cardinal-Cryptography/aleph-node", rev = "f9bed6da17e2773fd3f8f41fdab1b86e70129758" }
 anyhow = "1.0.75"
 codec = { package = 'parity-scale-codec', version = "3.0.0", features = ['derive'] }
 env_logger = "0.10.0"
