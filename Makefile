@@ -11,7 +11,7 @@ compile-eth:
 	cd eth && truffle compile
 
 deploy-eth:
-	cd eth && truffle migrate
+	cd eth && truffle migrate --reset
 
 watch-azero:
 	cd azero/contracts/flipper && cargo watch -s 'cargo contract check' -c

@@ -12,7 +12,6 @@ use ethers::{
     core::types::Address,
     prelude::ContractError,
     providers::{Provider, Ws},
-    signers::LocalWallet,
 };
 use futures::StreamExt;
 use log::info;
@@ -23,7 +22,7 @@ use crate::{
     config::Config,
     connections::{
         azero::SignedAzeroWsConnection,
-        eth::{self, EthConnectionError, SignedEthWsConnection},
+        eth::{EthConnectionError, SignedEthWsConnection},
     },
     contracts::{AzeroContractError, Flipper, FlipperInstance},
     helpers::chunks,
