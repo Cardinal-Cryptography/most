@@ -21,7 +21,7 @@ make bootstrap
 Now you can start the bridge services:
 
 ```bash
-make bridgenet
+make bridge
 ```
 
 To clean up:
