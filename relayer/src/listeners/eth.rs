@@ -67,7 +67,6 @@ impl EthListener {
 
         info!("finished processing past events");
 
-        // subscribe to new events
         let events = contract.events().from_block(last_block_number);
         let mut stream = events.stream().await.unwrap();
 
