@@ -1,10 +1,10 @@
-use std::{env, sync::Arc};
+use std::{env, process, sync::Arc};
 
 use config::{Config, Load};
 use connections::EthConnectionError;
 use ethers::signers::{LocalWallet, WalletError};
 use eyre::Result;
-use log::info;
+use log::{error, info};
 use thiserror::Error;
 use tokio::runtime::Runtime;
 
@@ -44,7 +44,7 @@ fn main() -> Result<()> {
 
     info!("{:#?}", &config);
 
-    let rt = Runtime::new().unwrap();
+    let rt = Runtime::new()?;
 
     rt.block_on(async {
         let mut tasks = Vec::with_capacity(2);
@@ -68,7 +68,7 @@ fn main() -> Result<()> {
                 wallet,
             )
             .await
-            .unwrap(),
+            .expect("Cannot sign the connection"),
         );
 
         let config_rc1 = Arc::clone(&config);
@@ -90,9 +90,12 @@ fn main() -> Result<()> {
         }));
 
         for t in tasks {
-            let _ = t.await.expect("Ooops!");
+            let result = t.await.expect("Ooops!");
+            if let Err(why) = result {
+                error!("{why:?}");
+            }
         }
     });
 
-    Ok(())
+    process::exit(-1);
 }

@@ -29,6 +29,7 @@ To clean up:
 ```bash
 make clean
 ```
+
 Re-initialize the nodes and run them again from a fresh genesis block.
 
 ### Check eth nodes connectivity
@@ -57,15 +58,15 @@ admin.peers
 To deploy the contracts on the EVM chain:
 
 ```bash
-cd eth/
-truffle migrate --reset
+make deploy-eth
 ```
 
-Open a console:
+Open a Truffle console:
 
 ```bash
-truffle console 
+cd eth && truffle console 
 ```
+
 Interact with the deployed contracts instance:
 
 ```javascript
@@ -77,14 +78,17 @@ flipper.flipValue()
 To deploy the contracts on the azero chain:
 
 ```bash
-cd azero
-./scripts/deploy.sh
+make deploy-azero
 ```
 
-## Running relayer process
-
-pass the addresses of both contracts to their respective ENV vars:
+Interact with a deployed contract instance:
 
 ```bash
- AZERO_CONTRACT_ADDRESS="<address>" ETH_CONTRACT_ADDRESS="<address>" cargo run
+cd azero && ./scripts/interact.sh
+```
+
+## Running the relayer process
+
+```bash
+make run-relayer
 ```

@@ -10,7 +10,7 @@ module.exports = async function(deployer, network, accounts) {
     if (process.env.ACCOUNT_PASSWORD) {
         const web3 = new Web3(new Web3.providers.HttpProvider('http://' + config.host + ':' + config.port));
         console.log('Unlocking account: ' + accounts[0]);
-        web3.eth.personal.unlockAccount(accounts[0], process.env.ACCOUNT_PASSWORD, 86400);
+        await web3.eth.personal.unlockAccount(accounts[0], process.env.ACCOUNT_PASSWORD, 86400);
 
         await deployer.deploy(Flipper, opts);
         let instance = await Flipper.deployed();
