@@ -51,7 +51,6 @@ impl EthListener {
 
         let last_block_number = eth_connection.get_block_number().await.unwrap().as_u32();
 
-        // replay past events from the last known block
         for (from, to) in chunks(*eth_last_known_block as u32, last_block_number, 1000) {
             let past_events = contract
                 .events()
