@@ -46,7 +46,6 @@ fn main() -> Result<()> {
 
     let rt = Runtime::new().unwrap();
 
-    // Spawn the root task
     rt.block_on(async {
         let mut tasks = Vec::with_capacity(2);
 
