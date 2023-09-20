@@ -10,12 +10,12 @@ ADDRESSES_FILE=$(pwd)/contracts/addresses.json
 # --- FUNCTIONS
 
 function run_ink_dev() {
-  docker start ink_dev || docker run \
-                                 --network host \
-                                 -v "${PWD}:/sources" \
-                                 --name ink_dev \
-                                 --detach \
-                                 --rm $INK_DEV_IMAGE sleep 1d
+  docker inspect ink_dev || docker run \
+                                   --network host \
+                                   -v "${PWD}:/sources" \
+                                   --name ink_dev \
+                                   --detach \
+                                   --rm $INK_DEV_IMAGE sleep 1d
 }
 
 function cargo_contract() {

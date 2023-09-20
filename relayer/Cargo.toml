@@ -7,6 +7,7 @@ edition = "2021"
 [dependencies]
 aleph_client = { git = "https://github.com/Cardinal-Cryptography/aleph-node", rev = "f9bed6da17e2773fd3f8f41fdab1b86e70129758" }
 anyhow = "1.0.75"
+clap = { version = "4.3.4", features = ["derive"] }
 codec = { package = 'parity-scale-codec', version = "3.0.0", features = ['derive'] }
 env_logger = "0.10.0"
 ethers = { version = "2.0.9", features = ["abigen", "rustls", "ws", "ethers-solc"] }

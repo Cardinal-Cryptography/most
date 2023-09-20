@@ -1,6 +1,7 @@
 use std::{env, process, sync::Arc};
 
-use config::{Config, Load};
+use clap::Parser;
+use config::Config;
 use connections::EthConnectionError;
 use ethers::signers::{LocalWallet, WalletError};
 use eyre::Result;
@@ -37,9 +38,9 @@ pub enum ListenerError {
 }
 
 fn main() -> Result<()> {
-    let config = Arc::new(Config::load());
+    let config = Arc::new(Config::parse());
 
-    env::set_var("RUST_LOG", &config.rust_log);
+    env::set_var("RUST_LOG", config.rust_log.as_str());
     env_logger::init();
 
     info!("{:#?}", &config);

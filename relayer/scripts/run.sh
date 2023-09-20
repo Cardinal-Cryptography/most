@@ -18,4 +18,4 @@ function get_address {
 
 # --- RUN
 
-RUST_LOG=debug AZERO_CONTRACT_ADDRESS=$(get_address $AZERO_ADDRESSES_FILE flipper) ETH_CONTRACT_ADDRESS=$(get_address $ETH_ADDRESSES_FILE flipper) cargo run
+cargo run -- --rust-log=info --azero-contract-address=$(get_address $AZERO_ADDRESSES_FILE flipper) --eth-contract-address=$(get_address $ETH_ADDRESSES_FILE flipper)
