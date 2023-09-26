@@ -1,0 +1,10 @@
+{
+  "name": "eth",
+  "version": "1.0.0",
+  "description": "",
+  "author": "fbielejec",
+  "license": "APACHE",
+  "dependencies": {
+    "dotenv": "^16.3.1"
+  }
+}

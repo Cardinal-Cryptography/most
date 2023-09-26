@@ -5,57 +5,59 @@ services:
   EthereumBootnode:
     image: ethereum/client-go:release-1.12
     container_name: eth_bootnode
+    user: "${UID}:${GID}"
     volumes:
       - ./0x7f938fd203fcabc449312661ab1d36b7fdb45118:/root/.ethereum
+    network_mode: host
     command:
       - --datadir=/root/.ethereum
       - --networkid=123454321
-      - --nat=extip:172.28.1.1
+      - --nat=extip:127.0.0.1
+      - --port=30303
+      - --authrpc.port=8552
       - --nodekey=/root/.ethereum/boot.key
       - --snapshot=false
-    networks:
-      bridge_net:
-        ipv4_address: 172.28.1.1
 
   EthereumNode1:
     image: ethereum/client-go:release-1.12
     container_name: eth_node1
+    user: "${UID}:${GID}"
     volumes:
       - ./0x129b9daee478e7bc5edada471982e31fa7705622:/root/.ethereum
+    network_mode: host
     command:
       - --datadir=/root/.ethereum
-      - --bootnodes=enode://6123065904a25a07f830543b284bd0e0dc669955811788a3556fa1b7dd09df009a7ce96e552a711f41738937bb362073e99af233a5510a5c07773e9ee6fdee07@172.28.1.1:30303,enode://36e0db509a98009f4e1a3f33ee73d158ff174d063c5a4fe209fc235cb65ad9d9be5e19ce94cbb512e40a2699170cf5c72f85b53f3497f799117c694c9842e631@172.28.1.2:30303,enode://ce218fc5cfc9bcada6b56bf70a03c6491a98d2d027f0c76340c1b07978b0e1064601e6182d756e1b631c11f380c9660cb50123cd2faa090c6685bdd8c361dee4@172.28.1.3:30303
+      - --bootnodes=enode://6123065904a25a07f830543b284bd0e0dc669955811788a3556fa1b7dd09df009a7ce96e552a711f41738937bb362073e99af233a5510a5c07773e9ee6fdee07@127.0.0.1:30303,enode://36e0db509a98009f4e1a3f33ee73d158ff174d063c5a4fe209fc235cb65ad9d9be5e19ce94cbb512e40a2699170cf5c72f85b53f3497f799117c694c9842e631@127.0.0.1:30304,enode://ce218fc5cfc9bcada6b56bf70a03c6491a98d2d027f0c76340c1b07978b0e1064601e6182d756e1b631c11f380c9660cb50123cd2faa090c6685bdd8c361dee4@172.0.0.1:30305
       - --networkid=123454321
-      - --nat=extip:172.28.1.2
+      - --nat=extip:127.0.0.1
+      - --port=30304
+      - --authrpc.port=8553
       - --nodekey=/root/.ethereum/node.key
       - --unlock=0x129b9DAee478e7bc5edaDa471982E31FA7705622
       - --password=/root/.ethereum/password.txt
       - --mine
       - --miner.etherbase=0x129b9DAee478e7bc5edaDa471982E31FA7705622
       - --snapshot=false
-    networks:
-      bridge_net:
-        ipv4_address: 172.28.1.2
 
   EthereumNode2:
     image: ethereum/client-go:release-1.12
     container_name: eth_node2
-    ports:
-      - 30303:30303
-      - 30303:30303/udp
-      - 8545:8545
-      - 8546:8546
-      - 8551:8551
+    user: "${UID}:${GID}"
     volumes:
       - ./0xf2f0930c3b7bdf1734ee173272bd8cdc0a08f038:/root/.ethereum
+    network_mode: host
     command:
       - --datadir=/root/.ethereum
-      - --bootnodes=enode://6123065904a25a07f830543b284bd0e0dc669955811788a3556fa1b7dd09df009a7ce96e552a711f41738937bb362073e99af233a5510a5c07773e9ee6fdee07@172.28.1.1:30303,enode://36e0db509a98009f4e1a3f33ee73d158ff174d063c5a4fe209fc235cb65ad9d9be5e19ce94cbb512e40a2699170cf5c72f85b53f3497f799117c694c9842e631@172.28.1.2:30303,enode://ce218fc5cfc9bcada6b56bf70a03c6491a98d2d027f0c76340c1b07978b0e1064601e6182d756e1b631c11f380c9660cb50123cd2faa090c6685bdd8c361dee4@172.28.1.3:30303
+      - --bootnodes=enode://6123065904a25a07f830543b284bd0e0dc669955811788a3556fa1b7dd09df009a7ce96e552a711f41738937bb362073e99af233a5510a5c07773e9ee6fdee07@127.0.0.1:30303,enode://36e0db509a98009f4e1a3f33ee73d158ff174d063c5a4fe209fc235cb65ad9d9be5e19ce94cbb512e40a2699170cf5c72f85b53f3497f799117c694c9842e631@127.0.0.1:30304,enode://ce218fc5cfc9bcada6b56bf70a03c6491a98d2d027f0c76340c1b07978b0e1064601e6182d756e1b631c11f380c9660cb50123cd2faa090c6685bdd8c361dee4@172.0.0.1:30305
       - --networkid=123454321
-      - --nat=extip:172.28.1.3
+      - --nat=extip:127.0.0.1
+      - --port=30305
+      - --authrpc.port=8554
+      - --http.port=8545
+      - --ws.port=8546
       - --nodekey=/root/.ethereum/node.key
       - --http
-      - --http.api=eth,net,web3,engine,admin
+      - --http.api=eth,net,web3,engine,admin,personal
       - --http.addr=0.0.0.0
       - --http.vhosts=*
       - --http.corsdomain=*
@@ -72,17 +74,23 @@ services:
       - --authrpc.port=8551
       - --txlookuplimit=0
       - --snapshot=false
-    networks:
-      bridge_net:
-        ipv4_address: 172.28.1.3
+      - --allow-insecure-unlock
 
   # key derived from "//0"
   AlephBootnode:
-    image: public.ecr.aws/p6e8q1z1/aleph-node:6f3755a
+    image: public.ecr.aws/p6e8q1z1/aleph-node:r-11.3
     container_name: aleph_bootnode
+    user: "${UID}:${GID}"
     volumes:
       - ./5D34dL5prEUaGNQtPPZ3yN5Y6BnkfXunKXXz6fo7ZJbLwRRH:/data
+    network_mode: host
     environment:
+      - RPC_PORT=9933
+      - WS_PORT=9943
+      - PORT=30333
+      - VALIDATOR_PORT=30343
+      - PUBLIC_VALIDATOR_ADDRESS=127.0.0.1:30343
+      - BOOT_NODES=/ip4/127.0.0.1/tcp/30333/p2p/12D3KooWF8rAsEhfqTKhbRnKwZdsX4ZRCapyPE3ttFLkMiv4Jyfe
       - PURGE_BEFORE_START=false
       - RUST_LOG=info
       - BASE_PATH=/data
@@ -90,33 +98,24 @@ services:
       - NODE_KEY_PATH=/data/p2p_secret
       - ALLOW_PRIVATE_IPV4=true
       - DISCOVER_LOCAL=false
-      - UNIT_CREATION_DELAY=300
-      - RPC_PORT=9933
-      - WS_PORT=9943
-      - PORT=30333
-      - VALIDATOR_PORT=30343
-      - PUBLIC_VALIDATOR_ADDRESS=AlephBootnode:30343
+      - UNIT_CREATION_DELAY=500
       - NAME=AlephBootnode
-    networks:
-      bridge_net:
-        ipv4_address: 172.28.1.4
 
   # key derived from "//1"
   AlephNode1:
-    image: public.ecr.aws/p6e8q1z1/aleph-node:6f3755a
+    image: public.ecr.aws/p6e8q1z1/aleph-node:r-11.3
     container_name: aleph_node1
-    expose:
-      - 30333
-      - 9933
-      - 9943
-    ports:
-      - 0.0.0.0:30333:30333
-      - 0.0.0.0:9933:9933
-      - 0.0.0.0:9943:9943
-      - 0.0.0.0:9944:9943
+    user: "${UID}:${GID}"
     volumes:
       - ./5GBNeWRhZc2jXu7D55rBimKYDk8PGk8itRYFTPfC8RJLKG5o:/data
+    network_mode: host
     environment:
+      - RPC_PORT=9934
+      - WS_PORT=9944
+      - PORT=30334
+      - VALIDATOR_PORT=30344
+      - PUBLIC_VALIDATOR_ADDRESS=127.0.0.1:30344
+      - BOOT_NODES=/ip4/127.0.0.1/tcp/30333/p2p/12D3KooWF8rAsEhfqTKhbRnKwZdsX4ZRCapyPE3ttFLkMiv4Jyfe
       - PURGE_BEFORE_START=false
       - RUST_LOG=info
       - BASE_PATH=/data
@@ -124,20 +123,30 @@ services:
       - NODE_KEY_PATH=/data/p2p_secret
       - ALLOW_PRIVATE_IPV4=true
       - DISCOVER_LOCAL=false
-      - UNIT_CREATION_DELAY=300
-      - RPC_PORT=9933
-      - WS_PORT=9943
-      - PORT=30333
-      - VALIDATOR_PORT=30343
-      - PUBLIC_VALIDATOR_ADDRESS=AlephNode1:30343
+      - UNIT_CREATION_DELAY=500
       - NAME=AlephNode1
-      - BOOT_NODES=/dns4/AlephBootnode/tcp/30333/p2p/12D3KooWF8rAsEhfqTKhbRnKwZdsX4ZRCapyPE3ttFLkMiv4Jyfe
-    networks:
-      bridge_net:
-        ipv4_address: 172.28.1.5
 
-networks:
-  bridge_net:
-    ipam:
-      config:
-        - subnet: 172.28.0.0/16
+  # key derived from "//2"
+  AlephNode2:
+    image: public.ecr.aws/p6e8q1z1/aleph-node:r-11.3
+    container_name: aleph_node2
+    user: "${UID}:${GID}"
+    volumes:
+      - ./5Dfis6XL8J2P6JHUnUtArnFWndn62SydeP8ee8sG2ky9nfm9:/data
+    network_mode: host
+    environment:
+      - RPC_PORT=9935
+      - WS_PORT=9945
+      - PORT=30335
+      - VALIDATOR_PORT=30345
+      - PUBLIC_VALIDATOR_ADDRESS=127.0.0.1:30345
+      - BOOT_NODES=/ip4/127.0.0.1/tcp/30333/p2p/12D3KooWF8rAsEhfqTKhbRnKwZdsX4ZRCapyPE3ttFLkMiv4Jyfe
+      - PURGE_BEFORE_START=false
+      - RUST_LOG=info
+      - BASE_PATH=/data
+      - CHAIN=/data/chainspec.json
+      - NODE_KEY_PATH=/data/p2p_secret
+      - ALLOW_PRIVATE_IPV4=true
+      - DISCOVER_LOCAL=false
+      - UNIT_CREATION_DELAY=500
+      - NAME=AlephNode2

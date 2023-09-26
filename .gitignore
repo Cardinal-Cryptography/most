@@ -1,10 +1,28 @@
 # geth blockchain data
-
 geth/
 jwt.hex
 history
+genesis.json
 
 # aleph node blockchain data
-
 backup-stash/
 db/
+chainspec.json
+
+# sol compilation
+build/
+
+# rust compilation
+target/
+
+# env files
+.env
+
+# contracts
+addresses.json
+
+# half of the internet
+node_modules
+
+# emacs
+relayer/src/ markdown-code-fontification:rustic-mode
