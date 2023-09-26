@@ -1,0 +1,38 @@
+name: Build and push relayer
+
+on:
+  push:
+    branches:
+    - A0-3158-dockerise-relayer
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build
+    runs-on: [self-hosted, Linux, X64, large]
+    env:
+      RUST_BACKTRACE: full
+      RUSTC_WRAPPER: sccache
+    steps:
+      - name: Checkout Source code
+        uses: actions/checkout@v2
+
+      - name: Call action get-ref-properties
+        id: get-ref-properties
+        # yamllint disable-line rule:line-length
+        uses: Cardinal-Cryptography/github-actions/get-ref-properties@v1
+
+      - name: Install Rust toolchain
+        uses: Cardinal-Cryptography/github-actions/install-rust-toolchain@v1
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Build relayer
+        run: |
+          cd relayer
+          cargo build
+          ls -al
+          find .
