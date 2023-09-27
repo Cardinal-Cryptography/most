@@ -25,6 +25,21 @@ jobs:
         # yamllint disable-line rule:line-length
         uses: Cardinal-Cryptography/github-actions/get-ref-properties@v1
 
+      # If Flipper.json, which is required for building relayer, can be
+      # build with truffle from master branch then we have it out to
+      # a separate directory here (like 'master')
+      - name: Checkout Source code
+        uses: actions/checkout@v2
+        with:
+          ref: master
+          path: master
+
+      # Install truffle, npm is probably installed?
+      # Run truffle to generate that Flipper.json (and maybe other guys)
+      # It has to be run in the 'master' directory, hence 'cd master/'
+      # and then we probably need to copy it to our root directory, so
+      # something like 'cp -rf eth/build to ../eth/build'
+
       - name: Install Rust toolchain
         uses: Cardinal-Cryptography/github-actions/install-rust-toolchain@v1
         with:
@@ -36,3 +51,6 @@ jobs:
           cargo build
           ls -al
           find .
+
+      # Run docker build and if it runs then happy days
+      # Login to AWS and push to ECR as 'membrane-bridge-relayer'
