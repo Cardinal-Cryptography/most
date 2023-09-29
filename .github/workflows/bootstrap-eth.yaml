@@ -31,12 +31,8 @@ jobs:
           mv ${GETH_VER}/geth .
 
       - name: Configure AWS credentials for S3 AWS
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v3
         env:
-          AWS_ACCESS_KEY_ID: ""
-          AWS_SECRET_ACCESS_KEY: ""
-          AWS_SESSION_TOKEN: ""
-          AWS_DEFAULT_REGION: ""
           AWS_REGION: eu-central-1
         with:
           aws-access-key-id: ${{ secrets.AWS_DEVNET_ACCESS_KEY_ID }}
@@ -55,7 +51,7 @@ jobs:
           do
             for f in geth history jwt.hex geth.ipc; do
               rm -rf ${i}/${f};
-              aws s3 rm --recursive s3://${{ env.S3BUCKET_NAME }}/data/eth/${i}/${f}
+              aws s3 rm --recursive s3://${{ env.S3BUCKET_NAME }}/eth/${i}/${f}
             done;
           done
 
@@ -68,5 +64,5 @@ jobs:
             0xf2f0930c3b7bdf1734ee173272bd8cdc0a08f038;
           do
             ./.bin/geth init --datadir ./${i} ./eth_genesis.json;
-            aws s3 cp --recursive ${i} s3://${{ env.S3BUCKET_NAME }}/data/eth/${i}
+            aws s3 cp --recursive ${i} s3://${{ env.S3BUCKET_NAME }}/eth/${i}
           done
