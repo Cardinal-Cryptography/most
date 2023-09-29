@@ -17,7 +17,8 @@
     "clique": {
       "period": 5,
       "epoch": 30000
-    }
+    },
+    "ethash": {}
   },
   "difficulty": "1",
   "gasLimit": "800000000",

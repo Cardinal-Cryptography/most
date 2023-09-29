@@ -1,0 +1,41 @@
+name: Bootstrap eth on devnet
+
+on:
+  push:
+    branches:
+    - A0-3158-add-workflow-for-bootstrapping-eth-on-devnet
+
+concurrency:
+  group: "${{ github.ref }}-${{ github.workflow }}"
+  cancel-in-progress: false
+
+jobs:
+  main:
+    name: Bootstrap eth
+    runs-on: [self-hosted, Linux, X64, small]
+    steps:
+      - name: Checkout repo on master branch
+        uses: actions/checkout@v3
+        with:
+          ref: master
+
+      - name: Download geth
+        shell: bash
+        run: |
+          mkdir -p .bin
+          cd .bin
+          wget https://gethstore.blob.core.windows.net/builds/geth-linux-amd64-1.13.2-dc34fe82.tar.gz
+          tar -zxvf geth-linux-amd64-1.13.2-dc34fe82.tar.gz
+
+      - name: Run geth to bootstrap
+        shell: bash
+        run: |
+          for i in \
+            0x129b9daee478e7bc5edada471982e31fa7705622 \
+            0x7f938fd203fcabc449312661ab1d36b7fdb45118 \
+            0xf2f0930c3b7bdf1734ee173272bd8cdc0a08f038;
+          do
+            ./.bin/geth init --datadir ./${i} ./eth_genesis.json;
+          done
+
+          find . | grep -v '.git'
