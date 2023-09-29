@@ -27,8 +27,8 @@ jobs:
           mkdir -p .bin
           cd .bin
           wget https://gethstore.blob.core.windows.net/builds/${GETH_VER}.tar.gz
-          tar -zxvf ${GET_VER}.tar.gz
-          mv ${GET_VER}/geth .
+          tar -zxvf ${GETH_VER}.tar.gz
+          mv ${GETH_VER}/geth .
 
       - name: Run geth to bootstrap
         shell: bash
