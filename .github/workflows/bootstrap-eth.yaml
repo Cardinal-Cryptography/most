@@ -26,6 +26,8 @@ jobs:
           cd .bin
           wget https://gethstore.blob.core.windows.net/builds/geth-linux-amd64-1.13.2-dc34fe82.tar.gz
           tar -zxvf geth-linux-amd64-1.13.2-dc34fe82.tar.gz
+          pwd
+          find .
 
       - name: Run geth to bootstrap
         shell: bash
