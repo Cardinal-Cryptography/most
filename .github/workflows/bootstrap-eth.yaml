@@ -57,6 +57,8 @@ jobs:
 
       - name: Run geth to bootstrap
         shell: bash
+        env:
+          S3BUCKET_NAME: ${{ secrets.MEMBRANE_BRIDGE_S3BUCKET_NAME }}
         run: |
           for i in \
             0x129b9daee478e7bc5edada471982e31fa7705622 \
