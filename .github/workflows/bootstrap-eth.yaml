@@ -21,13 +21,14 @@ jobs:
 
       - name: Download geth
         shell: bash
+        env:
+          GETH_VER: geth-linux-amd64-1.13.2-dc34fe82 
         run: |
           mkdir -p .bin
           cd .bin
-          wget https://gethstore.blob.core.windows.net/builds/geth-linux-amd64-1.13.2-dc34fe82.tar.gz
-          tar -zxvf geth-linux-amd64-1.13.2-dc34fe82.tar.gz
-          pwd
-          find .
+          wget https://gethstore.blob.core.windows.net/builds/${GETH_VER}.tar.gz
+          tar -zxvf ${GET_VER}.tar.gz
+          mv ${GET_VER}/geth .
 
       - name: Run geth to bootstrap
         shell: bash
