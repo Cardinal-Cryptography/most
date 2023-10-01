@@ -39,6 +39,24 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_DEVNET_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3.2
+        with:
+          version: 'v1.23.6'
+
+      - name: Scale replicas to 0 and remove PVC's
+        shell: bash
+        run: |
+          namespace=membrane-bridge
+          aws eks --region eu-central-1 update-kubeconfig --name alephzero-devnet-eu-central-1-eks
+
+          kubectl scale --replicas=0 statefulset/eth-node2 -n ${namespace}
+          kubectl scale --replicas=0 statefulset/eth-node -n ${namespace}
+          kubectl scale --replicas=0 statefulset/eth-bootnode -n ${namespace}
+          kubectl delete pvc eth-node2-data -n ${namespace} --ignore-not-found=true
+          kubectl delete pvc eth-node1-data -n ${namespace} --ignore-not-found=true
+          kubectl delete pvc eth-bootnode-data -n ${namespace} --ignore-not-found=true
+
       - name: Remove existing bootstrapped data
         shell: bash
         env:
@@ -68,3 +86,13 @@ jobs:
             ./.bin/geth init --datadir ./${i} ./eth_genesis.json;
             aws s3 cp --recursive ${i} s3://${{ env.S3BUCKET_NAME }}/eth/${i}
           done
+
+      - name: Scale replicas back to 1
+        shell: bash
+        run: |
+          kubectl scale --replicas=1 statefulset/eth-bootnode -n ${namespace}
+          sleep 10
+          kubectl scale --replicas=1 statefulset/eth-node -n ${namespace}
+          sleep 10
+          kubectl scale --replicas=1 statefulset/eth-node2 -n ${namespace}
+          sleep 10
