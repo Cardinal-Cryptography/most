@@ -56,7 +56,6 @@ jobs:
         env:
           K8S_NAMESPACE: membrane-bridge
         run: |
-          namespace=membrane-bridge
           aws eks --region eu-central-1 update-kubeconfig --name alephzero-devnet-eu-central-1-eks
 
           kubectl scale --replicas=0 statefulset/eth-node2 -n ${{ env.K8S_NAMESPACE }}
