@@ -1,4 +1,4 @@
-name: Recreate eth nodes on devnet
+name: Devnet eth nodes - Re-create
 # This workflow re-creates ethereum nodes in devnet by doing the following
 # steps:
 # * stops all nodes by setting kubernetes statefulset's replicas to 0
@@ -10,9 +10,7 @@ name: Recreate eth nodes on devnet
 #   statefulset)
 
 on:
-  push:
-    branches:
-    - A0-3158-add-workflow-for-bootstrapping-eth-on-devnet
+  workflow_dispatch:
 
 concurrency:
   group: "${{ github.ref }}-${{ github.workflow }}"
