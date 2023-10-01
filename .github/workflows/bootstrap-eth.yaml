@@ -46,16 +46,18 @@ jobs:
 
       - name: Scale replicas to 0 and remove PVC's
         shell: bash
+        env:
+          K8S_NAMESPACE: membrane-bridge
         run: |
           namespace=membrane-bridge
           aws eks --region eu-central-1 update-kubeconfig --name alephzero-devnet-eu-central-1-eks
 
-          kubectl scale --replicas=0 statefulset/eth-node2 -n ${namespace}
-          kubectl scale --replicas=0 statefulset/eth-node -n ${namespace}
-          kubectl scale --replicas=0 statefulset/eth-bootnode -n ${namespace}
-          kubectl delete pvc eth-node2-data -n ${namespace} --ignore-not-found=true
-          kubectl delete pvc eth-node1-data -n ${namespace} --ignore-not-found=true
-          kubectl delete pvc eth-bootnode-data -n ${namespace} --ignore-not-found=true
+          kubectl scale --replicas=0 statefulset/eth-node2 -n ${{ env.K8S_NAMESPACE }}
+          kubectl scale --replicas=0 statefulset/eth-node -n ${{ env.K8S_NAMESPACE }}
+          kubectl scale --replicas=0 statefulset/eth-bootnode -n ${{ env.K8S_NAMESPACE }}
+          kubectl delete pvc eth-node2-data -n ${{ env.K8S_NAMESPACE }} --ignore-not-found=true
+          kubectl delete pvc eth-node1-data -n ${{ env.K8S_NAMESPACE }} --ignore-not-found=true
+          kubectl delete pvc eth-bootnode-data -n ${{ env.K8S_NAMESPACE }} --ignore-not-found=true
 
       - name: Remove existing bootstrapped data
         shell: bash
@@ -89,10 +91,12 @@ jobs:
 
       - name: Scale replicas back to 1
         shell: bash
+        env:
+          K8S_NAMESPACE: membrane-bridge
         run: |
-          kubectl scale --replicas=1 statefulset/eth-bootnode -n ${namespace}
+          kubectl scale --replicas=1 statefulset/eth-bootnode -n ${{ env.K8S_NAMESPACE }}
           sleep 10
-          kubectl scale --replicas=1 statefulset/eth-node -n ${namespace}
+          kubectl scale --replicas=1 statefulset/eth-node -n ${{ env.K8S_NAMESPACE }}
           sleep 10
-          kubectl scale --replicas=1 statefulset/eth-node2 -n ${namespace}
+          kubectl scale --replicas=1 statefulset/eth-node2 -n ${{ env.K8S_NAMESPACE }}
           sleep 10
