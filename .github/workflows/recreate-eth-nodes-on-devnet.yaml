@@ -64,9 +64,9 @@ jobs:
           kubectl scale --replicas=0 statefulset/eth-node2 -n ${{ env.K8S_NAMESPACE }}
           kubectl scale --replicas=0 statefulset/eth-node -n ${{ env.K8S_NAMESPACE }}
           kubectl scale --replicas=0 statefulset/eth-bootnode -n ${{ env.K8S_NAMESPACE }}
-          kubectl delete pvc eth-node2-data -n ${{ env.K8S_NAMESPACE }} --ignore-not-found=true
-          kubectl delete pvc eth-node1-data -n ${{ env.K8S_NAMESPACE }} --ignore-not-found=true
-          kubectl delete pvc eth-bootnode-data -n ${{ env.K8S_NAMESPACE }} --ignore-not-found=true
+          kubectl delete pvc -l app=eth-node2 -n ${{ env.K8S_NAMESPACE }} --ignore-not-found=true
+          kubectl delete pvc -l app=eth-node -n ${{ env.K8S_NAMESPACE }} --ignore-not-found=true
+          kubectl delete pvc -l app=eth-bootnode -n ${{ env.K8S_NAMESPACE }} --ignore-not-found=true
 
       - name: Remove existing bootstrapped data
         shell: bash
