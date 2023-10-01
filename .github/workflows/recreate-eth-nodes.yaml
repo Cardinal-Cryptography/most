@@ -1,4 +1,13 @@
-name: Bootstrap eth on devnet
+name: Recreate eth nodes on devnet
+# This workflow re-creates ethereum nodes in devnet by doing the following
+# steps:
+# * stops all nodes by setting kubernetes statefulset's replicas to 0
+# * removes all attached disks (kuberetes pvc's)
+# * remove data from membrane-bridge s3 bucket
+# * bootstraps new data
+# * uploads data to membrane-bridge s3 bucket
+# * starts the nodes by setting replicas to 1 (each node is separate 
+#   statefulset)
 
 on:
   push:
