@@ -68,21 +68,6 @@ jobs:
           git-commit-author: ${{ secrets.AUTOCOMMIT_AUTHOR }}
           git-commit-email: ${{ secrets.AUTOCOMMIT_EMAIL }}
 
-      - name: Deactivate deployed environment
-        uses: bobheadxi/deployments@v1
-        with:
-          step: deactivate-env
-          token: ${{ secrets.CI_GH_TOKEN }}
-          env: updnet-bridgenet
-          desc: Environment was deleted
-          debug: true
-
-      - name: Delete environment and deployments
-        uses: strumwolf/delete-deployment-environment@v2
-        with:
-          token: ${{ secrets.CI_GH_TOKEN }}
-          environment: updnet-bridgenet
-
       - name: Wait 3 minutes until all resources are removed
         shell: bash
         run: |

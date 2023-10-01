@@ -7,10 +7,18 @@ on:
     - A0-3158-add-workflows-for-bridgnet-mgmt
 
 jobs:
-  test:
+  create:
     name: Use workflow call
     uses: ./.github/workflows/bridgenet-recreate.yml
     secrets: inherit
     with:
       start: testnet
       destination: 273c805
+
+  update:
+    needs: [create]
+    name: Use workflow call
+    uses: ./.github/workflows/bridgenet-update.yml
+    secrets: inherit
+    with:
+      destination: 94ed410
