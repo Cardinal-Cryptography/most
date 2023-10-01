@@ -1,0 +1,16 @@
+---
+name: Test Bridgenet - re-create
+
+on:
+  push:
+    branches:
+    - A0-3158-add-workflows-for-bridgnet-mgmt
+
+jobs:
+  test:
+    name: Use workflow call
+    uses: ./.github/workflows/bridgenet-recreate.yml
+    secrets: inherit
+    with:
+      start: testnet
+      destination: 273c805
