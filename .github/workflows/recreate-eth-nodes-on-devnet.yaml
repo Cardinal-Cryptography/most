@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   main:
-    name: Bootstrap eth
+    name: Re-create eth nodes
     runs-on: [self-hosted, Linux, X64, small]
     steps:
       - name: Checkout repo on master branch
