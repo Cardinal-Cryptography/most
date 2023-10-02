@@ -71,7 +71,7 @@ jobs:
       - name: Wait 3 minutes until all resources are removed
         shell: bash
         run: |
-          echo "Waiting for 5 minutes until featurenet-watchman removes PVC's..."
+          echo "Waiting for 3 minutes until featurenet-watchman removes PVC's..."
           sleep 180
 
   create-bridgenet:
