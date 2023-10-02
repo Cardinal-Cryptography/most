@@ -102,7 +102,7 @@ jobs:
           featurenet-keys-s3bucket-name: ${{ secrets.FEATURENET_KEYS_S3BUCKET_NAME }}
           featurenet-name: updnet-bridgenet
           featurenet-aleph-node-image: ${{ inputs.start == 'mainnet' && 'mainnet' || 'testnet' }}
-          expiration: '999999h'
+          expiration: 'never'
           replicas: '5'
           internal: 'true'
           git-commit-author: ${{ secrets.AUTOCOMMIT_AUTHOR }}
