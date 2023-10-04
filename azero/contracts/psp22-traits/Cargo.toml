@@ -1,7 +1,7 @@
 [package]
-name = "membrane"
-version = "0.1.0"
-authors = ["fbielejec <filip.bielejec@cardinals.cc>"]
+name = "psp22-traits"
+version = "1.0.0"
+authors = ["filip.bielejec@cardinals.cc"]
 edition = "2021"
 
 [dependencies]
@@ -9,14 +9,13 @@ ink = { version = "=4.0.1", default-features = false }
 
 scale = { package = "parity-scale-codec", version = "3", default-features = false, features = ["derive"] }
 scale-info = { version = "2.3", default-features = false, features = ["derive"], optional = true }
-psp22-traits = { path = "../psp22-traits" , default-features = false }
 
 [lib]
-name = "membrane"
+name = "psp22_traits"
 path = "lib.rs"
 crate-type = [
-    # Used for normal contract Wasm blobs.
-    "cdylib",
+    # # Used for normal contract Wasm blobs.
+    # "cdylib",
     # Used for ABI generation.
     "rlib",
 ]

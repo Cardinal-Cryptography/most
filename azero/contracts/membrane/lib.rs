@@ -65,9 +65,20 @@ mod membrane {
             }
         }
 
+        /// Invoke this tx to transfer funds to the destination chain.
         #[ink(message)]
-        pub fn flip(&mut self) {
+        pub fn send_request(
+            &mut self,
+            src_token_address: AccountId,
+            src_token_amount: Balance,
+            dest_chain_id: [u8; 32],
+            dest_token_address: [u8; 32],
+            dest_token_amount: u128,
+            dest_receiver_address: [u8; 32],
+        ) {
             // Self::emit_event(self.env(), Event::Flip(Flip { value: self.flip }));
+            // TODO: psp22
+
             todo!()
         }
 
