@@ -30,6 +30,7 @@ mod membrane {
         request_nonce: u128,
         signature_threshold: u128,
         pending_requests: Mapping<[u8; 32], Request>,
+        request_signatures: Mapping<([u8; 32], AccountId), ()>,
         processed_requests: Mapping<[u8; 32], ()>,
         guardians: Mapping<AccountId, ()>,
     }
@@ -45,7 +46,6 @@ mod membrane {
         #[ink(message)]
         pub fn flip(&mut self) {
             // Self::emit_event(self.env(), Event::Flip(Flip { value: self.flip }));
-
             todo!()
         }
 
