@@ -15,6 +15,9 @@ watch-eth:
 compile-eth:
 	cd eth && truffle compile
 
+format-eth:
+	cd eth && npx prettier --write --plugin=prettier-plugin-solidity 'contracts/**/*.sol'
+
 deploy-eth:
 	cd eth && truffle migrate --reset
 
