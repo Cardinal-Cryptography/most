@@ -78,7 +78,7 @@ services:
 
   # key derived from "//0"
   AlephBootnode:
-    image: public.ecr.aws/p6e8q1z1/aleph-node:r-11.3
+    image: public.ecr.aws/p6e8q1z1/aleph-node:r-11.4
     container_name: aleph_bootnode
     user: "${UID}:${GID}"
     volumes:
@@ -103,7 +103,7 @@ services:
 
   # key derived from "//1"
   AlephNode1:
-    image: public.ecr.aws/p6e8q1z1/aleph-node:r-11.3
+    image: public.ecr.aws/p6e8q1z1/aleph-node:r-11.4
     container_name: aleph_node1
     user: "${UID}:${GID}"
     volumes:
@@ -128,7 +128,7 @@ services:
 
   # key derived from "//2"
   AlephNode2:
-    image: public.ecr.aws/p6e8q1z1/aleph-node:r-11.3
+    image: public.ecr.aws/p6e8q1z1/aleph-node:r-11.4
     container_name: aleph_node2
     user: "${UID}:${GID}"
     volumes:

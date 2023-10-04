@@ -10,6 +10,7 @@ mod membrane {
         reflect::ContractEventBase,
         storage::{traits::ManualKey, Mapping},
     };
+    use psp22_traits::{PSP22Error, PSP22};
     use scale::{Decode, Encode};
 
     #[ink(event)]
@@ -79,6 +80,8 @@ mod membrane {
             // Self::emit_event(self.env(), Event::Flip(Flip { value: self.flip }));
             // TODO: psp22
 
+            let sender = self.env().caller();
+
             todo!()
         }
 
@@ -92,6 +95,20 @@ mod membrane {
         // pub fn get(&self) -> (bool, bool) {
         //     (self.flip, self.flop)
         // }
+
+        /// Transfers a given amount of a PSP22 token on behalf of a specified account to another account
+        ///
+        /// Will revert if not enough allowance was given to the caller prior to executing this tx
+        fn transfer_from_tx(
+            &self,
+            token: AccountId,
+            from: AccountId,
+            to: AccountId,
+            amount: Balance,
+        ) -> Result<(), PSP22Error> {
+            let mut psp22: ink::contract_ref!(PSP22) = token.into();
+            psp22.transfer_from(from, to, amount, vec![])
+        }
 
         fn is_guardian(&self, account: AccountId) -> Result<(), MembraneError> {
             if self.guardians.contains(account) {
