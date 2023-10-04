@@ -9,6 +9,9 @@ bootstrap:
 bridge:
 	docker-compose -f bridge.compose.yml up
 
+watch-eth:
+	cd eth && gulp default
+
 compile-eth:
 	cd eth && truffle compile
 
