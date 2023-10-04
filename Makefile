@@ -22,7 +22,7 @@ deploy-eth:
 	cd eth && truffle migrate --reset
 
 watch-azero:
-	cd azero/contracts/flipper && cargo watch -s 'cargo contract check' -c
+	cd azero/contracts/membrane && cargo watch -s 'cargo contract check' -c
 
 deploy-azero:
 	cd azero && ./scripts/deploy.sh

@@ -1,7 +1,7 @@
 const Web3 = require('web3');
 const fs = require('fs');
 
-const Flipper = artifacts.require("Flipper");
+const Membrane = artifacts.require("Membrane");
 const TruffleConfig = require('../truffle-config.js');
 
 module.exports = async function(deployer, network, accounts) {
@@ -12,11 +12,11 @@ module.exports = async function(deployer, network, accounts) {
         console.log('Unlocking account: ' + accounts[0]);
         await web3.eth.personal.unlockAccount(accounts[0], process.env.ACCOUNT_PASSWORD, 86400);
 
-        await deployer.deploy(Flipper, opts);
-        let instance = await Flipper.deployed();
+        await deployer.deploy(Membrane, [accounts[0]], 1, opts);
+        let instance = await Membrane.deployed();
        
         let addresses = {
-            'flipper': instance.address
+            'membrane': instance.address
         };
         fs.writeFileSync('addresses.json', JSON.stringify(addresses));
 

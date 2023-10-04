@@ -10,6 +10,8 @@ contract Membrane {
 
     uint256 public signatureThreshold = 1;
 
+    // TODO : getter @ongoing transfer requests
+
     struct Request {
         bytes32 destTokenAddress;
         uint256 destTokenAmount;
@@ -42,6 +44,16 @@ contract Membrane {
         _;
     }
 
+    constructor(
+                address[] memory _guardians,
+                uint256 _signatureThreshold
+                ) {
+        signatureThreshold = _signatureThreshold;
+        for (uint256 i = 0; i < _guardians.length; i++) {
+            guardians[_guardians[i]] = true;
+        }
+    }
+
     function isGuardian(address sender) public view returns (bool) {
         return guardians[sender];
     }
@@ -50,8 +62,8 @@ contract Membrane {
         return address(uint160(uint256(data)));
     }
 
-    // Users invoke this tx to transfer funds to the destination chain.
-    // Account need to approve this contract to spend the srcTokenAmount
+    // Invoke this tx to transfer funds to the destination chain.
+    // Account needs to approve the Membrane contract to spend the srcTokenAmount
     // on their behalf before executing the tx.
     //
     // Tx emits a CrosschainTransferRequest event that the relayers listen to
@@ -111,6 +123,7 @@ contract Membrane {
 
         if (request.signatureCount >= signatureThreshold) {
             processedRequests[requestHash] = true;
+            delete pendingRequests[requestHash];
             ERC20PresetMinterPauser token = ERC20PresetMinterPauser(
                 bytes32toAddress(destTokenAddress)
             );
@@ -124,9 +137,9 @@ contract Membrane {
     // TODO introduce failure codes
     // TODO return funds for failed requests
     // TODO purge processed requests
-    function acknowledgeRequest() external onlyGuardian {
-        // TODO
-    }
+    // function acknowledgeRequest() external onlyGuardian {
+    //     // TODO
+    // }
 
     function addGuardian() external onlyGuardian {
         // TODO
