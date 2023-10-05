@@ -1,9 +1,7 @@
-#![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(not(feature = "std"), no_std, no_main)]
 
 #[ink::contract]
 mod membrane {
-    #[cfg(feature = "std")]
-    use ink::storage::traits::StorageLayout;
     use ink::{
         codegen::EmitEvent,
         prelude::{format, string::String, vec, vec::Vec},
@@ -15,14 +13,25 @@ mod membrane {
 
     #[ink(event)]
     #[derive(Debug)]
-    pub struct CrosschainTransferRequest {}
+    pub struct CrosschainTransferRequest {
+        sender: [u8; 32],
+        src_token_address: [u8; 32],
+        src_token_amount: u128,
+        dest_chain_id: u32,
+        dest_token_address: [u8; 32],
+        dest_token_amount: u128,
+        dest_receiver_address: [u8; 32],
+    }
 
     #[ink(event)]
     #[derive(Debug)]
     pub struct RequestProcessed {}
 
     #[derive(Debug, Encode, Decode, Clone, Copy, PartialEq, Eq)]
-    #[cfg_attr(feature = "std", derive(scale_info::TypeInfo, StorageLayout))]
+    #[cfg_attr(
+        feature = "std",
+        derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout)
+    )]
     pub struct Request {
         dest_token_address: AccountId,
         dest_token_amount: Balance,
@@ -46,6 +55,13 @@ mod membrane {
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub enum MembraneError {
         NotGuardian,
+        PSP22(PSP22Error),
+    }
+
+    impl From<PSP22Error> for MembraneError {
+        fn from(inner: PSP22Error) -> Self {
+            MembraneError::PSP22(inner)
+        }
     }
 
     impl Membrane {
@@ -72,29 +88,37 @@ mod membrane {
             &mut self,
             src_token_address: AccountId,
             src_token_amount: Balance,
-            dest_chain_id: [u8; 32],
+            dest_chain_id: u32,
             dest_token_address: [u8; 32],
             dest_token_amount: u128,
             dest_receiver_address: [u8; 32],
-        ) {
-            // Self::emit_event(self.env(), Event::Flip(Flip { value: self.flip }));
-            // TODO: psp22
-
+        ) -> Result<(), MembraneError> {
             let sender = self.env().caller();
 
-            todo!()
+            self.transfer_from_tx(
+                src_token_address,
+                sender,
+                self.env().account_id(),
+                src_token_amount,
+            )?;
+
+            Self::emit_event(
+                self.env(),
+                Event::CrosschainTransferRequest(CrosschainTransferRequest {
+                    sender: *sender.as_ref(),
+                    src_token_address: *src_token_address.as_ref(),
+                    src_token_amount,
+                    dest_chain_id,
+                    dest_token_address,
+                    dest_token_amount,
+                    dest_receiver_address,
+                }),
+            );
+
+            self.request_nonce += 1;
+
+            Ok(())
         }
-
-        // #[ink(message)]
-        // pub fn flop(&mut self) {
-        //     self.flop = !self.flop;
-        //     Self::emit_event(self.env(), Event::Flop(Flop { value: self.flop }));
-        // }
-
-        // #[ink(message)]
-        // pub fn get(&self) -> (bool, bool) {
-        //     (self.flip, self.flop)
-        // }
 
         /// Transfers a given amount of a PSP22 token on behalf of a specified account to another account
         ///

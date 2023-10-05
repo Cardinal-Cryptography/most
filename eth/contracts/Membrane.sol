@@ -27,10 +27,10 @@ contract Membrane {
     mapping(address => bool) private guardians;
 
     event CrosschainTransferRequest(
-        address sender,
-        address indexed srcTokenAddress,
+        bytes32 sender,
+        bytes32 indexed srcTokenAddress,
         uint256 srcTokenAmount,
-        bytes32 indexed destChainId,
+        int32 indexed destChainId,
         bytes32 indexed destTokenAddress,
         uint256 destTokenAmount,
         bytes32 destReceiverAddress,
@@ -62,6 +62,10 @@ contract Membrane {
         return address(uint160(uint256(data)));
     }
 
+    function addressToBytes32(address addr) public pure returns (bytes32) {
+        return bytes32(uint256(uint160(addr)) << 96);
+    }
+
     // Invoke this tx to transfer funds to the destination chain.
     // Account needs to approve the Membrane contract to spend the srcTokenAmount
     // on their behalf before executing the tx.
@@ -71,7 +75,7 @@ contract Membrane {
     function sendRequest(
         address srcTokenAddress,
         uint256 srcTokenAmount,
-        bytes32 destChainId,
+        int32 destChainId,
         bytes32 destTokenAddress,
         uint256 destTokenAmount,
         bytes32 destReceiverAddress
@@ -84,8 +88,8 @@ contract Membrane {
         token.transferFrom(sender, address(this), srcTokenAmount);
 
         emit CrosschainTransferRequest(
-            sender,
-            srcTokenAddress,
+            addressToBytes32(sender),
+            addressToBytes32(srcTokenAddress),
             srcTokenAmount,
             destChainId,
             destTokenAddress,
