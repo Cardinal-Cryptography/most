@@ -4,11 +4,11 @@
 mod membrane {
     use ink::{
         codegen::EmitEvent,
-        prelude::{format, string::String, vec, vec::Vec},
+        prelude::{vec, vec::Vec},
         reflect::ContractEventBase,
-        storage::{traits::ManualKey, Mapping},
+        storage::Mapping,
     };
-    use psp22_traits::{PSP22Error, PSP22};
+    use psp22_traits::{Mintable, PSP22Error, PSP22};
     use scale::{Decode, Encode};
 
     #[ink(event)]
@@ -25,7 +25,16 @@ mod membrane {
 
     #[ink(event)]
     #[derive(Debug)]
-    pub struct RequestProcessed {}
+    pub struct RequestProcessed {
+        request_hash: [u8; 32],
+    }
+
+    #[ink(event)]
+    #[derive(Debug)]
+    pub struct SignatureTallied {
+        signer: AccountId,
+        request_hash: [u8; 32],
+    }
 
     #[derive(Debug, Encode, Decode, Clone, Copy, PartialEq, Eq)]
     #[cfg_attr(
@@ -33,9 +42,9 @@ mod membrane {
         derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout)
     )]
     pub struct Request {
-        dest_token_address: AccountId,
-        dest_token_amount: Balance,
-        dest_receiver_address: AccountId,
+        dest_token_address: [u8; 32],
+        dest_token_amount: u128,
+        dest_receiver_address: [u8; 32],
         signature_count: u128,
     }
 
@@ -44,7 +53,7 @@ mod membrane {
         request_nonce: u128,
         signature_threshold: u128,
         pending_requests: Mapping<[u8; 32], Request>,
-        request_signatures: Mapping<([u8; 32], AccountId), ()>,
+        signatures: Mapping<([u8; 32], AccountId), ()>,
         processed_requests: Mapping<[u8; 32], ()>,
         guardians: Mapping<AccountId, ()>,
     }
@@ -56,6 +65,7 @@ mod membrane {
     pub enum MembraneError {
         NotGuardian,
         PSP22(PSP22Error),
+        RequestAlreadyProcessed,
     }
 
     impl From<PSP22Error> for MembraneError {
@@ -76,13 +86,13 @@ mod membrane {
                 request_nonce: 0,
                 signature_threshold,
                 pending_requests: Mapping::new(),
-                request_signatures: Mapping::new(),
+                signatures: Mapping::new(),
                 processed_requests: Mapping::new(),
                 guardians: guardians_set,
             }
         }
 
-        /// Invoke this tx to transfer funds to the destination chain.
+        /// Invoke this tx to initiate funds transfer to the destination chain.
         #[ink(message)]
         pub fn send_request(
             &mut self,
@@ -120,6 +130,70 @@ mod membrane {
             Ok(())
         }
 
+        // TODO
+        #[ink(message)]
+        pub fn receive_request(
+            &mut self,
+            dest_token_address: [u8; 32],
+            dest_token_amount: u128,
+            dest_receiver_address: [u8; 32],
+            request_hash: [u8; 32],
+        ) -> Result<(), MembraneError> {
+            let caller = self.env().caller();
+            self.is_guardian(caller)?;
+
+            if self.processed_requests.contains(request_hash) {
+                return Err(MembraneError::RequestAlreadyProcessed);
+            }
+
+            match self.pending_requests.get(request_hash) {
+                None => {
+                    self.pending_requests.insert(
+                        request_hash,
+                        &Request {
+                            dest_token_address,
+                            dest_token_amount,
+                            dest_receiver_address,
+                            signature_count: 0,
+                        },
+                    );
+                }
+                Some(mut request) => {
+                    self.signatures.insert((request_hash, caller), &());
+                    request.signature_count += 1;
+
+                    Self::emit_event(
+                        self.env(),
+                        Event::SignatureTallied(SignatureTallied {
+                            signer: caller,
+                            request_hash,
+                        }),
+                    );
+
+                    if request.signature_count >= self.signature_threshold {
+                        self.processed_requests.insert(request_hash, &());
+                        self.signatures.remove((request_hash, caller));
+                        self.pending_requests.remove(request_hash);
+
+                        self.mint_to(
+                            dest_token_address.into(),
+                            dest_receiver_address.into(),
+                            dest_token_amount,
+                        )?;
+                    }
+
+                    self.pending_requests.insert(request_hash, &request);
+
+                    Self::emit_event(
+                        self.env(),
+                        Event::RequestProcessed(RequestProcessed { request_hash }),
+                    );
+                }
+            }
+
+            Ok(())
+        }
+
         /// Transfers a given amount of a PSP22 token on behalf of a specified account to another account
         ///
         /// Will revert if not enough allowance was given to the caller prior to executing this tx
@@ -132,6 +206,19 @@ mod membrane {
         ) -> Result<(), PSP22Error> {
             let mut psp22: ink::contract_ref!(PSP22) = token.into();
             psp22.transfer_from(from, to, amount, vec![])
+        }
+
+        /// Mints the specified amount of token to the designated account
+        ///
+        /// Membrane contract needs to have a Minter role on the token contract
+        fn mint_to(
+            &self,
+            token: AccountId,
+            to: AccountId,
+            amount: Balance,
+        ) -> Result<(), PSP22Error> {
+            let mut psp22: ink::contract_ref!(Mintable) = token.into();
+            psp22.mint(to, amount)
         }
 
         fn is_guardian(&self, account: AccountId) -> Result<(), MembraneError> {
