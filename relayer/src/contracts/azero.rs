@@ -1,4 +1,7 @@
-use std::str::FromStr;
+use std::{
+    str,
+    str::{FromStr, Utf8Error},
+};
 
 use aleph_client::{contract::ContractInstance, AccountId, Balance, SignedConnection, TxInfo};
 use thiserror::Error;
@@ -14,6 +17,9 @@ pub enum AzeroContractError {
 
     #[error("not account id")]
     NotAccountId(String),
+
+    #[error("Invalid UTF-8 sequence")]
+    InvalidUTF8(#[from] Utf8Error),
 }
 
 #[derive(Debug)]
@@ -38,20 +44,18 @@ impl MembraneInstance {
         dest_receiver_address: [u8; 32],
         request_hash: [u8; 32],
     ) -> Result<TxInfo, AzeroContractError> {
-        // Ok(self
-        //     .contract
-        //     .contract_exec(
-        //         signed_connection,
-        //         "receive_request",
-        //         &[
-        //             dest_token_address,
-        //             pad_zeroes(dest_token_amount.to_le_bytes()),
-        //             dest_receiver_address,
-        //             request_hash,
-        //         ],
-        //     )
-        //     .await?)
-
-        todo!()
+        Ok(self
+            .contract
+            .contract_exec(
+                signed_connection,
+                "receive_request",
+                &[
+                    str::from_utf8(&dest_token_address)?,
+                    &dest_token_amount.to_string(),
+                    str::from_utf8(&dest_receiver_address)?,
+                    str::from_utf8(&request_hash)?,
+                ],
+            )
+            .await?)
     }
 }

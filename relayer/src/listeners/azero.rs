@@ -5,6 +5,7 @@ use aleph_client::{
         event::{translate_events, BlockDetails, ContractEvent},
         ContractInstance,
     },
+    contract_transcode::Value,
     utility::BlocksApi,
     AlephConfig, AsConnection,
 };
@@ -61,6 +62,12 @@ pub enum AzeroListenerError {
 
     #[error("no tx receipt")]
     NoTxReceipt,
+
+    #[error("missing data from event")]
+    MissingEventData(String),
+
+    #[error("unexpected error")]
+    OhShit,
 }
 
 pub struct AzeroListener;
@@ -78,6 +85,7 @@ impl AzeroListener {
         } = &*config;
 
         let instance = MembraneInstance::new(azero_contract_address, azero_contract_metadata)?;
+
         let contracts = vec![&instance.contract];
 
         // subscribe to new events
@@ -138,16 +146,53 @@ async fn handle_event(
         ..
     } = config;
 
-    if let Some(name) = event.name {
-        if name.eq("Flip") {
-            info!("handling A0 contract event: {name}");
+    if let Some(name) = &event.name {
+        if name.eq("CrosschainTransferRequest") {
+            info!("handling A0 contract event: {event:?}");
+
+            let data = event.data;
+
+            // TODO: decode event data
+
+            // sender: *sender.as_ref(),
+            // src_token_address: *src_token_address.as_ref(),
+            // src_token_amount,
+            // dest_chain_id,
+            // dest_token_address,
+            // dest_token_amount,
+            // dest_receiver_address,
+
+            let sender = match data
+                .get("sender")
+                .ok_or(AzeroListenerError::MissingEventData("sender".into()))?
+            {
+                Value::Hex(hex) => hex.bytes(),
+                _ => return Err(AzeroListenerError::OhShit),
+            };
+
+            let src_token_address =
+                match data
+                    .get("src_token_address")
+                    .ok_or(AzeroListenerError::MissingEventData(
+                        "src_token_address".into(),
+                    ))? {
+                    Value::Hex(hex) => hex.bytes(),
+                    _ => return Err(AzeroListenerError::OhShit),
+                };
+
+            // TODO: hash event data
 
             let address = eth_contract_address.parse::<Address>()?;
             let contract = Membrane::new(address, eth_connection);
 
             // TODO forward transfer & vote
 
-            // let call: ContractCall<SignedEthWsConnection, ()> = contract.flop();
+            // let call: ContractCall<SignedEthWsConnection, ()> = contract.receive_request(
+            //     request_hash,
+            //     dest_token_address,
+            //     dest_token_amount,
+            //     dest_receiver_address,
+            // );
 
             // let tx = call
             //     .send()

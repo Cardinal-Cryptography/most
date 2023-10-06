@@ -24,6 +24,9 @@ deploy-eth:
 watch-azero:
 	cd azero/contracts/membrane && cargo watch -s 'cargo contract check' -c
 
+compile-azero:
+	cd azero/contracts/membrane && cargo contract build --release
+
 deploy-azero:
 	cd azero && ./scripts/deploy.sh
 

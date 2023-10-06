@@ -1,10 +1,9 @@
-use std::{os::unix::prelude::OsStrExt, sync::Arc};
+use std::sync::Arc;
 
-use aleph_client::sp_core::U256;
 use ethers::{
     abi::{self, EncodePackedError, Token},
     core::types::Address,
-    prelude::{k256::schnorr::signature::SignatureEncoding, ContractError},
+    prelude::ContractError,
     providers::{Middleware, Provider, ProviderError, StreamExt, Ws},
     utils::keccak256,
 };
@@ -18,7 +17,6 @@ use crate::{
         AzeroContractError, CrosschainTransferRequestFilter, Membrane, MembraneEvents,
         MembraneInstance,
     },
-    helpers::chunks,
 };
 
 #[derive(Debug, Error)]
@@ -77,14 +75,8 @@ async fn handle_event(
     config: &Config,
     azero_connection: Arc<SignedAzeroWsConnection>,
 ) -> Result<(), EthListenerError> {
-    if let MembraneEvents::CrosschainTransferRequestFilter(crosschain_transfer_event) = event {
-        let Config {
-            azero_contract_address,
-            azero_contract_metadata,
-            ..
-        } = config;
-
-        let CrosschainTransferRequestFilter {
+    if let MembraneEvents::CrosschainTransferRequestFilter(
+        crosschain_transfer_event @ CrosschainTransferRequestFilter {
             sender,
             src_token_address,
             src_token_amount,
@@ -93,7 +85,14 @@ async fn handle_event(
             dest_token_amount,
             dest_receiver_address,
             request_nonce,
-        } = crosschain_transfer_event;
+        },
+    ) = event
+    {
+        let Config {
+            azero_contract_address,
+            azero_contract_metadata,
+            ..
+        } = config;
 
         info!("handling eth contract event: {crosschain_transfer_event:?}");
 
@@ -108,11 +107,9 @@ async fn handle_event(
             Token::FixedBytes(dest_receiver_address.to_vec()),
             Token::Int(*request_nonce),
         ])?;
-
         trace!("ABI event encoding: {bytes:?}");
 
         let request_hash = keccak256(bytes);
-
         debug!("hashed event encoding: {request_hash:?}");
 
         let contract = MembraneInstance::new(azero_contract_address, azero_contract_metadata)?;

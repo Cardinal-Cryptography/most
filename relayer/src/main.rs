@@ -81,14 +81,14 @@ fn main() -> Result<()> {
                 .map_err(ListenerError::Eth)
         }));
 
-        // let config_rc2 = Arc::clone(&config);
-        // let azero_connection_rc2 = Arc::clone(&azero_connection);
-        // let eth_connection_rc2 = Arc::clone(&eth_connection);
-        // tasks.push(tokio::spawn(async {
-        //     AzeroListener::run(config_rc2, azero_connection_rc2, eth_connection_rc2)
-        //         .await
-        //         .map_err(ListenerError::Azero)
-        // }));
+        let config_rc2 = Arc::clone(&config);
+        let azero_connection_rc2 = Arc::clone(&azero_connection);
+        let eth_connection_rc2 = Arc::clone(&eth_connection);
+        tasks.push(tokio::spawn(async {
+            AzeroListener::run(config_rc2, azero_connection_rc2, eth_connection_rc2)
+                .await
+                .map_err(ListenerError::Azero)
+        }));
 
         for t in tasks {
             let result = t.await.expect("Ooops!");

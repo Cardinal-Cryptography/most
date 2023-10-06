@@ -135,6 +135,7 @@ contract Membrane {
             ERC20PresetMinterPauser token = ERC20PresetMinterPauser(
                 bytes32toAddress(destTokenAddress)
             );
+            // TODO : transfer
             token.mint(bytes32toAddress(destReceiverAddress), destTokenAmount);
             emit RequestProcessed(requestHash);
         }
