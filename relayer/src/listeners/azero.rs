@@ -24,7 +24,7 @@ use crate::{
         azero::SignedAzeroWsConnection,
         eth::{EthConnectionError, EthWsConnection, SignedEthWsConnection},
     },
-    contracts::{AzeroContractError, Flipper, FlipperInstance},
+    contracts::{AzeroContractError, Membrane, MembraneInstance},
     helpers::chunks,
 };
 
@@ -72,51 +72,13 @@ impl AzeroListener {
         eth_connection: Arc<SignedEthWsConnection>,
     ) -> Result<(), AzeroListenerError> {
         let Config {
-            azero_last_known_block,
             azero_contract_metadata,
             azero_contract_address,
             ..
         } = &*config;
 
-        // replay past events from last known to the latest
-        let last_block_number = azero_connection
-            .get_block_number_opt(None)
-            .await?
-            .ok_or(AzeroListenerError::BlockNotFound)?;
-
-        let instance = FlipperInstance::new(azero_contract_address, azero_contract_metadata)?;
+        let instance = MembraneInstance::new(azero_contract_address, azero_contract_metadata)?;
         let contracts = vec![&instance.contract];
-
-        for (from, to) in chunks(*azero_last_known_block as u32, last_block_number, 1000) {
-            for block_number in from..to {
-                let block_hash = azero_connection
-                    .get_block_hash(block_number)
-                    .await?
-                    .ok_or(AzeroListenerError::BlockNotFound)?;
-
-                let connection = azero_connection.as_connection();
-                let events = connection
-                    .as_client()
-                    .blocks()
-                    .at(block_hash)
-                    .await?
-                    .events()
-                    .await?;
-
-                // filter contract events
-                handle_events(
-                    Arc::clone(&eth_connection),
-                    &config,
-                    events,
-                    &contracts,
-                    block_number,
-                    block_hash,
-                )
-                .await?;
-            }
-        }
-
-        info!("finished processing past events");
 
         // subscribe to new events
         let connection = azero_connection.as_connection();
@@ -181,17 +143,19 @@ async fn handle_event(
             info!("handling A0 contract event: {name}");
 
             let address = eth_contract_address.parse::<Address>()?;
-            let contract = Flipper::new(address, eth_connection);
+            let contract = Membrane::new(address, eth_connection);
 
-            let call: ContractCall<SignedEthWsConnection, ()> = contract.flop();
+            // TODO forward transfer & vote
 
-            let tx = call
-                .send()
-                .await?
-                .await?
-                .ok_or(AzeroListenerError::NoTxReceipt)?;
+            // let call: ContractCall<SignedEthWsConnection, ()> = contract.flop();
 
-            info!("eth tx confirmed: {tx:?}");
+            // let tx = call
+            //     .send()
+            //     .await?
+            //     .await?
+            //     .ok_or(AzeroListenerError::NoTxReceipt)?;
+
+            // info!("eth tx confirmed: {tx:?}");
         }
     }
     Ok(())

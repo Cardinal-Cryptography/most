@@ -15,6 +15,13 @@ pub fn chunks(from: u32, to: u32, step: u32) -> Vec<(u32, u32)> {
     intervals
 }
 
+pub fn pad_zeroes<const A: usize, const B: usize>(arr: [u8; A]) -> [u8; B] {
+    assert!(B >= A); //just for a nicer error message, adding #[track_caller] to the function may also be desirable
+    let mut b = [0; B];
+    b[..A].copy_from_slice(&arr);
+    b
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

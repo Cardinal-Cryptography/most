@@ -130,7 +130,7 @@ mod membrane {
             Ok(())
         }
 
-        // TODO
+        /// Aggregates request votes cast by guardians and mints/burns tokens
         #[ink(message)]
         pub fn receive_request(
             &mut self,

@@ -140,15 +140,6 @@ contract Membrane {
         }
     }
 
-    // TODO aggregates sigs
-    // TODO handle successful or failed requests
-    // TODO introduce failure codes
-    // TODO return funds for failed requests
-    // TODO purge processed requests
-    // function acknowledgeRequest() external onlyGuardian {
-    //     // TODO
-    // }
-
     function addGuardian() external onlyGuardian {
         // TODO
     }

@@ -1,17 +1,23 @@
-use std::sync::Arc;
+use std::{os::unix::prelude::OsStrExt, sync::Arc};
 
+use aleph_client::sp_core::U256;
 use ethers::{
+    abi::{self, EncodePackedError, Token},
     core::types::Address,
-    prelude::ContractError,
+    prelude::{k256::schnorr::signature::SignatureEncoding, ContractError},
     providers::{Middleware, Provider, ProviderError, StreamExt, Ws},
+    utils::keccak256,
 };
-use log::info;
+use log::{debug, info, trace};
 use thiserror::Error;
 
 use crate::{
     config::Config,
     connections::{azero::SignedAzeroWsConnection, eth::SignedEthWsConnection},
-    contracts::{AzeroContractError, Flipper, FlipperEvents, FlipperInstance},
+    contracts::{
+        AzeroContractError, CrosschainTransferRequestFilter, Membrane, MembraneEvents,
+        MembraneInstance,
+    },
     helpers::chunks,
 };
 
@@ -30,6 +36,9 @@ pub enum EthListenerError {
 
     #[error("azero contract error")]
     AzeroContract(#[from] AzeroContractError),
+
+    #[error("error when creating an ABI data encoding")]
+    AbiEncode(#[from] EncodePackedError),
 }
 
 pub struct EthListener;
@@ -42,30 +51,13 @@ impl EthListener {
     ) -> Result<(), EthListenerError> {
         let Config {
             eth_contract_address,
-            eth_last_known_block,
             ..
         } = &*config;
 
         let address = eth_contract_address.parse::<Address>()?;
-        let contract = Flipper::new(address, Arc::clone(&eth_connection));
+        let contract = Membrane::new(address, Arc::clone(&eth_connection));
 
         let last_block_number = eth_connection.get_block_number().await.unwrap().as_u32();
-
-        for (from, to) in chunks(*eth_last_known_block as u32, last_block_number, 1000) {
-            let past_events = contract
-                .events()
-                .from_block(from)
-                .to_block(to)
-                .query()
-                .await
-                .unwrap();
-
-            for event in past_events {
-                handle_event(&event, &config, Arc::clone(&azero_connection)).await?
-            }
-        }
-
-        info!("finished processing past events");
 
         let events = contract.events().from_block(last_block_number);
         let mut stream = events.stream().await.unwrap();
@@ -81,22 +73,60 @@ impl EthListener {
 }
 
 async fn handle_event(
-    event: &FlipperEvents,
+    event: &MembraneEvents,
     config: &Config,
     azero_connection: Arc<SignedAzeroWsConnection>,
 ) -> Result<(), EthListenerError> {
-    if let FlipperEvents::FlipFilter(flip_event) = event {
+    if let MembraneEvents::CrosschainTransferRequestFilter(crosschain_transfer_event) = event {
         let Config {
             azero_contract_address,
             azero_contract_metadata,
             ..
         } = config;
 
-        info!("handling eth contract event: {flip_event:?}");
+        let CrosschainTransferRequestFilter {
+            sender,
+            src_token_address,
+            src_token_amount,
+            dest_chain_id,
+            dest_token_address,
+            dest_token_amount,
+            dest_receiver_address,
+            request_nonce,
+        } = crosschain_transfer_event;
 
-        let contract = FlipperInstance::new(azero_contract_address, azero_contract_metadata)?;
+        info!("handling eth contract event: {crosschain_transfer_event:?}");
 
-        contract.flop(&azero_connection).await?;
+        // compute event hash
+        let bytes = abi::encode_packed(&[
+            Token::FixedBytes(sender.to_vec()),
+            Token::FixedBytes(src_token_address.to_vec()),
+            Token::Int(*src_token_amount),
+            Token::Int((*dest_chain_id).into()),
+            Token::FixedBytes(dest_token_address.to_vec()),
+            Token::Int(*dest_token_amount),
+            Token::FixedBytes(dest_receiver_address.to_vec()),
+            Token::Int(*request_nonce),
+        ])?;
+
+        trace!("ABI event encoding: {bytes:?}");
+
+        let request_hash = keccak256(bytes);
+
+        debug!("hashed event encoding: {request_hash:?}");
+
+        let contract = MembraneInstance::new(azero_contract_address, azero_contract_metadata)?;
+
+        // send vote
+        contract
+            .receive_request(
+                &azero_connection,
+                *dest_token_address,
+                dest_token_amount.as_u128(),
+                *dest_receiver_address,
+                request_hash,
+            )
+            .await?;
     }
 
     Ok(())

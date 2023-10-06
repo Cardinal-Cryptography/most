@@ -1,7 +1,9 @@
 use std::str::FromStr;
 
-use aleph_client::{contract::ContractInstance, AccountId, SignedConnection, TxInfo};
+use aleph_client::{contract::ContractInstance, AccountId, Balance, SignedConnection, TxInfo};
 use thiserror::Error;
+
+use crate::helpers::pad_zeroes;
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -15,11 +17,11 @@ pub enum AzeroContractError {
 }
 
 #[derive(Debug)]
-pub struct FlipperInstance {
+pub struct MembraneInstance {
     pub contract: ContractInstance,
 }
 
-impl FlipperInstance {
+impl MembraneInstance {
     pub fn new(address: &str, metadata_path: &str) -> Result<Self, AzeroContractError> {
         let address = AccountId::from_str(address)
             .map_err(|why| AzeroContractError::NotAccountId(why.to_string()))?;
@@ -28,13 +30,28 @@ impl FlipperInstance {
         })
     }
 
-    pub async fn flop(
+    pub async fn receive_request(
         &self,
         signed_connection: &SignedConnection,
+        dest_token_address: [u8; 32],
+        dest_token_amount: u128,
+        dest_receiver_address: [u8; 32],
+        request_hash: [u8; 32],
     ) -> Result<TxInfo, AzeroContractError> {
-        Ok(self
-            .contract
-            .contract_exec0(signed_connection, "flop")
-            .await?)
+        // Ok(self
+        //     .contract
+        //     .contract_exec(
+        //         signed_connection,
+        //         "receive_request",
+        //         &[
+        //             dest_token_address,
+        //             pad_zeroes(dest_token_amount.to_le_bytes()),
+        //             dest_receiver_address,
+        //             request_hash,
+        //         ],
+        //     )
+        //     .await?)
+
+        todo!()
     }
 }

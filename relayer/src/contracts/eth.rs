@@ -1,3 +1,3 @@
 use ethers::contract::abigen;
 
-abigen!(Flipper, "../eth/build/contracts/Flipper.json");
+abigen!(Membrane, "../eth/build/contracts/Membrane.json");
