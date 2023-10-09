@@ -1,23 +1,19 @@
 // ./test/ContractFactory.js
 const BenchmarkSignatureAggregation = artifacts.require("BenchmarkSignatureAggregation");
+const SimpleToken = artifacts.require("SimpleToken");
 
 contract("BenchmarkSignatureAggregation", accounts => {
   it(" deploy + estimate gas cost and successfully call bridgeTransfer and bridgeReceive.", async () => {
 
-    await web3.eth.accounts.wallet.create(10)
-    
-    let addresses = [...Array(10).keys()].map(x => web3.eth.accounts.wallet[x].address);
-    let keys = [...Array(10).keys()].map(x => web3.eth.accounts.wallet[x].privateKey);
-
-    let tokenWhitelist = addresses.slice(0, 2);
-    let guardianAddresses = addresses.slice(2, 10);
-    let guardianKeys = keys.slice(2, 10);
+    let guardianAddresses = accounts.slice(1, 9);
     let nonce = 1;
     let external_nonce = 1;
     let thereshold = 5;
 
+    const simpleTokenInstance = await SimpleToken.new({from: accounts[0]});
+    const tokenAddress = simpleTokenInstance.address;
     const aggregationBenchmarkInstance = await BenchmarkSignatureAggregation.new(
-        tokenWhitelist, 
+        [tokenAddress], 
         guardianAddresses, 
         nonce,
         external_nonce,
@@ -28,10 +24,13 @@ contract("BenchmarkSignatureAggregation", accounts => {
     // Gas estimate for bridgeTransfer
     let azAccount = "5DRbk3BimLzBzQtzUYUP35c57iwXtpqyjbnfY6AX48vbGMQC";
 
+    // Allow the contract to spend 1000 tokens
+    await simpleTokenInstance.approve(aggregationBenchmarkInstance.address, 1000, {from: accounts[0]});
+
     const gasEstimateTransfer = await aggregationBenchmarkInstance
         .bridgeTransfer
         .estimateGas(
-            tokenWhitelist[0],
+            tokenAddress,
             azAccount,
             1000,
             {from: accounts[0]}
@@ -40,7 +39,7 @@ contract("BenchmarkSignatureAggregation", accounts => {
     console.log("Gas estimate for bridgeTransfer: ", gasEstimateTransfer);
 
     const bridgeTransferTx = await aggregationBenchmarkInstance.bridgeTransfer(
-        tokenWhitelist[0],
+        tokenAddress,
         azAccount,
         1000,
         {gas: gasEstimateTransfer, from: accounts[0]}
@@ -49,35 +48,22 @@ contract("BenchmarkSignatureAggregation", accounts => {
 
     // Gas estimate for bridgeReceive
 
-    // Transfer some ether to the guardian addresses
-    for (let i = 0; i < thereshold; i++) {
-        await web3.eth.sendTransaction({
-            from: accounts[0],
-            to: guardianAddresses[i],
-            value: web3.utils.toWei('0.05', 'ether')
-        });
-
-        // Important to add account and unlock it
-        await web3.eth.personal.importRawKey(guardianKeys[i].slice(2), process.env.ACCOUNT_PASSWORD);
-        await web3.eth.personal.unlockAccount(guardianAddresses[i], process.env.ACCOUNT_PASSWORD, 10000);
-    }
-
     // Estimate gas for each signature
     let gasEstimates = [...Array(thereshold).keys()];
     for (let i = 0; i < thereshold; i++) {
         gasEstimates[i] = await aggregationBenchmarkInstance
             .bridgeReceive
             .estimateGas(
-                tokenWhitelist[0],
-                accounts[0],
+                tokenAddress,
+                accounts[9],
                 1000,
                 nonce,
                 {from: guardianAddresses[i]}
             );
         
         const bridgeReceiveTx = await aggregationBenchmarkInstance.bridgeReceive(
-            tokenWhitelist[0],
-            accounts[0],
+            tokenAddress,
+            accounts[9],
             1000,
             nonce,
             {gas: gasEstimates[i], from: guardianAddresses[i]}
@@ -90,10 +76,5 @@ contract("BenchmarkSignatureAggregation", accounts => {
     // Sum gas estimates
     let sum = gasEstimates.reduce((a, b) => a + b, 0);
     console.log("Sum of gas estimates for bridgeReceive: ", sum);
-
-    // Remove temporary accounts
-    for (let i = 0; i < thereshold; i++) {
-        await web3.eth.accounts.wallet.remove(guardianAddresses[i]);
-    }
   });
 });

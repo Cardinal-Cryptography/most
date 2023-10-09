@@ -5,7 +5,8 @@
 pragma solidity >=0.6.0;
 pragma experimental ABIEncoderV2;
 
-import {ECDSA} from "openzeppelin-solidity/contracts/cryptography/ECDSA.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract BenchmarkSignatureVerification {
     mapping(address => bool) private tokenWhitelist;
@@ -35,7 +36,7 @@ contract BenchmarkSignatureVerification {
         uint _nonce,
         uint _external_nonce, 
         uint _threshold
-    ) public {
+    ) {
         require(_guardians.length > 0, "Must have at least one guardian");
         require(_threshold > 0 && _threshold <= _guardians.length, "Invalid threshold");
         require(_guardians.length <= MAX_GUARDIAN_COUNT, "Too many guardians");
@@ -59,10 +60,9 @@ contract BenchmarkSignatureVerification {
         uint amount
     ) external {
         require(tokenWhitelist[token], "Selected token cannot be bridged");
-        
-        // transferFrom here
 
         emit BridgeTransferSuccess(token, to, amount, external_nonce++);
+        IERC20(token).transferFrom(msg.sender, address(this), amount);
     }
 
     function bridgeReceive (
@@ -77,8 +77,8 @@ contract BenchmarkSignatureVerification {
         verifyMultisig(dataHash, signatures);
 
         // Success, we can now transfer the tokens
-
         emit BridgeReceiveSuccess(token, beneficiary, amount, nonce++);
+        IERC20(token).transfer(beneficiary, amount);
     }
 
     function verifyMultisig(bytes32 dataHash, bytes[] memory signatures) private view {

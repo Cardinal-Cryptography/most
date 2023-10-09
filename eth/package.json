@@ -6,6 +6,7 @@
   "license": "APACHE",
   "dependencies": {
     "dotenv": "^16.3.1",
-    "openzeppelin-solidity": "3.4.2"
+    "openzeppelin-solidity": "3.4.2",
+    "@openzeppelin/contracts": "^4.9.3"
   }
 }
