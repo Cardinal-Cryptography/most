@@ -16,6 +16,11 @@ on:
         type: string
 
 jobs:
+  check-vars-and-secrets:
+    name: Check vars and secrets
+    uses: ./.github/workflows/_check-vars-and-secrets.yml
+    secrets: inherit
+
   check-inputs:
     name: Check inputs
     runs-on: ubuntu-20.04
@@ -34,46 +39,12 @@ jobs:
   update-bridgenet:
     needs: [check-inputs]
     name: Update new bridgenet
-    runs-on: [self-hosted, Linux, X64, small]
-    steps:
-      - name: Start bridgenet Deployment
-        uses: bobheadxi/deployments@v1.1.0
-        id: deployment
-        with:
-          step: start
-          token: ${{ secrets.CI_GH_TOKEN }}
-          env: updnet-bridgenet
-          override: true
-
-      - name: Update bridgenet data, app and deploy it
-        uses: Cardinal-Cryptography/github-actions/create-featurenet@v2
-        id: create-featurenet
-        with:
-          gh-ci-token: ${{ secrets.CI_GH_TOKEN }}
-          argo-sync-user-token: ${{ secrets.ARGO_SYNC_USER_TOKEN }}
-          repo-featurenets-name: ${{ secrets.REPO_OPS_FEATURENETS_NAME }}
-          repo-featurenet-template-name: ${{ secrets.REPO_FEATURENET_TEMPLATE_NAME }}
-          argo-host: ${{ secrets.ARGOCD_DEVNET_HOST }}
-          ecr-public-registry: ${{ vars.ECR_PUBLIC_REGISTRY }}
-          featurenet-keys-s3bucket-name: ${{ secrets.FEATURENET_KEYS_S3BUCKET_NAME }}
-          featurenet-name: updnet-bridgenet
-          featurenet-aleph-node-image: ${{ inputs.destination }}
-          rolling-update-partition: '0'
-          replicas: '5'
-          internal: 'true'
-          git-commit-author: ${{ secrets.AUTOCOMMIT_AUTHOR }}
-          git-commit-email: ${{ secrets.AUTOCOMMIT_EMAIL }}
-          hard-refresh: 'true'
-          wait-for-finalized-heads: "true"
-
-      - name: Finish updatenet Deployment
-        uses: bobheadxi/deployments@v1
-        if: always()
-        with:
-          step: finish
-          token: ${{ secrets.CI_GH_TOKEN }}
-          status: ${{ job.status }}
-          env: updnet-bridgenet
-          deployment_id: ${{ steps.deployment.outputs.deployment_id }}
-          # yamllint disable-line rule:line-length
-          env_url: https://dev.azero.dev/?rpc=wss%3A%2F%2F${{ steps.create-featurenet.outputs.ws-hostname }}#/explorer
+    # yamllint disable-line rule:line-length
+    uses: Cardinal-Cryptography/github-actions/.github/workflows/_featurenet-update.yml@v3
+    secrets: inherit
+    with:
+      featurenet-name: updnet-bridgenet
+      destination: ${{ inputs.destination }}
+      rolling-update-partition: '0'
+      replicas: '5'
+      internal: true
