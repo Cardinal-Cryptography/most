@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use aleph_client::{
     contract::{
@@ -10,12 +10,15 @@ use aleph_client::{
     AlephConfig, AsConnection,
 };
 use ethers::{
+    abi::{self, EncodePackedError, Token},
     core::types::Address,
     prelude::{ContractCall, ContractError},
     providers::ProviderError,
+    types::U256,
+    utils::keccak256,
 };
 use futures::StreamExt;
-use log::info;
+use log::{debug, info, trace};
 use subxt::{events::Events, utils::H256};
 use thiserror::Error;
 
@@ -65,6 +68,9 @@ pub enum AzeroListenerError {
 
     #[error("missing data from event")]
     MissingEventData(String),
+
+    #[error("error when creating an ABI data encoding")]
+    AbiEncode(#[from] EncodePackedError),
 
     #[error("unexpected error")]
     OhShit,
@@ -136,6 +142,20 @@ async fn handle_events(
     Ok(())
 }
 
+fn get_event_data(
+    data: &HashMap<String, Value>,
+    field: &str,
+) -> Result<[u8; 32], AzeroListenerError> {
+    match data.get(field) {
+        Some(Value::Hex(hex)) => {
+            let mut result = [0u8; 32];
+            result.copy_from_slice(hex.bytes());
+            Ok(result)
+        }
+        _ => Err(AzeroListenerError::OhShit),
+    }
+}
+
 async fn handle_event(
     eth_connection: Arc<SignedEthWsConnection>,
     config: &Config,
@@ -152,55 +172,55 @@ async fn handle_event(
 
             let data = event.data;
 
-            // TODO: decode event data
+            // decode event data
+            let sender = get_event_data(&data, "sender")?;
+            let src_token_address = get_event_data(&data, "src_token_address")?;
+            let src_token_amount = get_event_data(&data, "src_token_amount")?;
+            let dest_chain_id = get_event_data(&data, "dest_chain_id")?;
+            let dest_token_address = get_event_data(&data, "dest_token_address")?;
+            let dest_token_amount = get_event_data(&data, "dest_token_amount")?;
+            let dest_receiver_address = get_event_data(&data, "dest_receiver_address")?;
+            let request_nonce = get_event_data(&data, "request_nonce")?;
 
-            // sender: *sender.as_ref(),
-            // src_token_address: *src_token_address.as_ref(),
-            // src_token_amount,
-            // dest_chain_id,
-            // dest_token_address,
-            // dest_token_amount,
-            // dest_receiver_address,
+            let dest_token_amount = U256::from_little_endian(&dest_token_amount);
 
-            let sender = match data
-                .get("sender")
-                .ok_or(AzeroListenerError::MissingEventData("sender".into()))?
-            {
-                Value::Hex(hex) => hex.bytes(),
-                _ => return Err(AzeroListenerError::OhShit),
-            };
+            let bytes = abi::encode_packed(&[
+                Token::FixedBytes(sender.to_vec()),
+                Token::FixedBytes(src_token_address.to_vec()),
+                Token::Int(U256::from_little_endian(&src_token_amount)),
+                Token::Int((dest_chain_id).into()),
+                Token::FixedBytes(dest_token_address.to_vec()),
+                Token::Int(dest_token_amount),
+                Token::FixedBytes(dest_receiver_address.to_vec()),
+                Token::Int(U256::from_little_endian(&request_nonce)),
+            ])?;
 
-            let src_token_address =
-                match data
-                    .get("src_token_address")
-                    .ok_or(AzeroListenerError::MissingEventData(
-                        "src_token_address".into(),
-                    ))? {
-                    Value::Hex(hex) => hex.bytes(),
-                    _ => return Err(AzeroListenerError::OhShit),
-                };
+            trace!("ABI event encoding: {bytes:?}");
 
-            // TODO: hash event data
+            // hash event data
+
+            let request_hash = keccak256(bytes);
+            debug!("hashed event encoding: {request_hash:?}");
 
             let address = eth_contract_address.parse::<Address>()?;
             let contract = Membrane::new(address, eth_connection);
 
-            // TODO forward transfer & vote
+            //  forward transfer & vote
 
-            // let call: ContractCall<SignedEthWsConnection, ()> = contract.receive_request(
-            //     request_hash,
-            //     dest_token_address,
-            //     dest_token_amount,
-            //     dest_receiver_address,
-            // );
+            let call: ContractCall<SignedEthWsConnection, ()> = contract.receive_request(
+                request_hash,
+                dest_token_address,
+                dest_token_amount,
+                dest_receiver_address,
+            );
 
-            // let tx = call
-            //     .send()
-            //     .await?
-            //     .await?
-            //     .ok_or(AzeroListenerError::NoTxReceipt)?;
+            let tx = call
+                .send()
+                .await?
+                .await?
+                .ok_or(AzeroListenerError::NoTxReceipt)?;
 
-            // info!("eth tx confirmed: {tx:?}");
+            info!("eth tx confirmed: {tx:?}");
         }
     }
     Ok(())
