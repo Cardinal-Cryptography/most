@@ -6,7 +6,6 @@ use aleph_client::{
         ContractInstance,
     },
     contract_transcode::Value,
-    utility::BlocksApi,
     AlephConfig, AsConnection,
 };
 use ethers::{
@@ -29,7 +28,6 @@ use crate::{
         eth::{EthConnectionError, EthWsConnection, SignedEthWsConnection},
     },
     contracts::{AzeroContractError, Membrane, MembraneInstance},
-    helpers::chunks,
 };
 
 #[derive(Debug, Error)]

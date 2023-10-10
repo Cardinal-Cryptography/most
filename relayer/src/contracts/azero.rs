@@ -3,10 +3,8 @@ use std::{
     str::{FromStr, Utf8Error},
 };
 
-use aleph_client::{contract::ContractInstance, AccountId, Balance, SignedConnection, TxInfo};
+use aleph_client::{contract::ContractInstance, AccountId, SignedConnection, TxInfo};
 use thiserror::Error;
-
-use crate::helpers::pad_zeroes;
 
 #[derive(Debug, Error)]
 #[error(transparent)]
