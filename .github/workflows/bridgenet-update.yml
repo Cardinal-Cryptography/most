@@ -1,0 +1,50 @@
+---
+name: Bridgenet - Update
+
+on:
+  workflow_dispatch:
+    inputs:
+      destination:
+        description: Node image tag, ie 7-byte SHA of some existing ECR aleph-node image tag
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      destination:
+        description: Node image tag, ie 7-byte SHA of some existing ECR aleph-node image tag
+        required: true
+        type: string
+
+jobs:
+  check-vars-and-secrets:
+    name: Check vars and secrets
+    uses: ./.github/workflows/_check-vars-and-secrets.yml
+    secrets: inherit
+
+  check-inputs:
+    name: Check inputs
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Validate inputs
+        shell: bash
+        run: |
+          if [[
+            "${{ inputs.destination }}" != "" && \
+            ! "${{ inputs.destination }}" =~ ^[a-f0-9]{7}$
+          ]]; then
+            echo "!!! Expected a 7-byte SHA in destination parameter"
+            exit 1
+          fi
+
+  update-bridgenet:
+    needs: [check-inputs]
+    name: Update new bridgenet
+    # yamllint disable-line rule:line-length
+    uses: Cardinal-Cryptography/github-actions/.github/workflows/_featurenet-update.yml@v3
+    secrets: inherit
+    with:
+      featurenet-name: updnet-bridgenet
+      destination: ${{ inputs.destination }}
+      rolling-update-partition: '0'
+      replicas: '5'
+      internal: true
