@@ -78,7 +78,7 @@ fn main() -> Result<()> {
         tasks.push(tokio::spawn(async {
             EthListener::run(config_rc1, azero_connection_rc1, eth_connection_rc1)
                 .await
-                .map_err(ListenerError::Eth)
+                .unwrap()
         }));
 
         let config_rc2 = Arc::clone(&config);
@@ -87,14 +87,11 @@ fn main() -> Result<()> {
         tasks.push(tokio::spawn(async {
             AzeroListener::run(config_rc2, azero_connection_rc2, eth_connection_rc2)
                 .await
-                .map_err(ListenerError::Azero)
+                .unwrap()
         }));
 
         for t in tasks {
-            let result = t.await.expect("Ooops!");
-            if let Err(why) = result {
-                error!("{why:?}");
-            }
+            t.await.unwrap();
         }
     });
 

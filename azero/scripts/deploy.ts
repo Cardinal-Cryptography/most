@@ -11,29 +11,29 @@ async function main(): Promise<void> {
     const api = await ApiPromise.create({ provider: wsProvider });
     const deployer = keyring.addFromUri(process.env.AUTHORITY_SEED!);
 
-    const membraneCodeHash = "0x4320907a9497a71c7a5b87b9e395d81eea6d3d6500fa213c7f6400fa9af16922"; //await uploadCode(api, deployer, "membrane.contract");
+    // const membraneCodeHash = "0x4320907a9497a71c7a5b87b9e395d81eea6d3d6500fa213c7f6400fa9af16922";
+
+    const membraneCodeHash = await uploadCode(api, deployer, "membrane.contract");
     console.log('membrane code hash:', membraneCodeHash);
 
     const membraneConstructors = new MembraneConstructors(api, deployer);
 
-    // const { address: membraneAddress } = await membraneConstructors.new(
-    //   [process.env.AUTHORITY!],
-    //   process.env.SIGNATURE_THRESHOLD!
-    // );
-
-    const membraneAddress = "5CVf2YP2FcjrNhf16uz3tEWH87771QDAGudVaioPLxtWiDh6";
+    const { address: membraneAddress } = await membraneConstructors.new(
+      [process.env.AUTHORITY!],
+      process.env.SIGNATURE_THRESHOLD!
+    );
 
     console.log('membrane address:', membraneAddress);
 
     // TODO : PSP22 token
 
     const addresses: Addresses = {
-      membraneCodeHash: membraneCodeHash,        
-      membraneAddress: membraneAddress
+      membraneCodeHash: membraneCodeHash,
+      membrane: membraneAddress
     };
 
     console.log('addresses:', addresses);
-    
+
     storeAddresses(addresses);
 
     await api.disconnect();

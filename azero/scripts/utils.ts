@@ -11,7 +11,7 @@ import {
 
 export type Addresses = {
   membraneCodeHash: string;
-  membraneAddress: string;
+  membrane: string;
 };
 
 /**
