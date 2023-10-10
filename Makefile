@@ -1,4 +1,5 @@
 NETWORK ?= development
+NODE ?= ws://127.0.0.1:9944
 
 .PHONY: help
 help: # Show help for each of the Makefile recipes.
@@ -8,6 +9,11 @@ help: # Show help for each of the Makefile recipes.
 clean: # Remove node data
 clean:
 	rm -rf 0x129b9daee478e7bc5edada471982e31fa7705622/geth 0x129b9daee478e7bc5edada471982e31fa7705622/geth.ipc 0x129b9daee478e7bc5edada471982e31fa7705622/history 0x129b9daee478e7bc5edada471982e31fa7705622/jwt.hex 0x7f938fd203fcabc449312661ab1d36b7fdb45118/geth 0x7f938fd203fcabc449312661ab1d36b7fdb45118/geth.ipc 0x7f938fd203fcabc449312661ab1d36b7fdb45118/history 0x7f938fd203fcabc449312661ab1d36b7fdb45118/jwt.hex 0xf2f0930c3b7bdf1734ee173272bd8cdc0a08f038/geth 0xf2f0930c3b7bdf1734ee173272bd8cdc0a08f038/history 0xf2f0930c3b7bdf1734ee173272bd8cdc0a08f038/jwt.hex 5D34dL5prEUaGNQtPPZ3yN5Y6BnkfXunKXXz6fo7ZJbLwRRH/chains/a0dnet1/db 5D34dL5prEUaGNQtPPZ3yN5Y6BnkfXunKXXz6fo7ZJbLwRRH/chains/a0dnet1/network 5D34dL5prEUaGNQtPPZ3yN5Y6BnkfXunKXXz6fo7ZJbLwRRH/backup-stash 5D34dL5prEUaGNQtPPZ3yN5Y6BnkfXunKXXz6fo7ZJbLwRRH/chainspec.json 5GBNeWRhZc2jXu7D55rBimKYDk8PGk8itRYFTPfC8RJLKG5o/chains/a0dnet1/db 5GBNeWRhZc2jXu7D55rBimKYDk8PGk8itRYFTPfC8RJLKG5o/chains/a0dnet1/network 5GBNeWRhZc2jXu7D55rBimKYDk8PGk8itRYFTPfC8RJLKG5o/backup-stash 5GBNeWRhZc2jXu7D55rBimKYDk8PGk8itRYFTPfC8RJLKG5o/chainspec.json 5Dfis6XL8J2P6JHUnUtArnFWndn62SydeP8ee8sG2ky9nfm9/backup-stash 5Dfis6XL8J2P6JHUnUtArnFWndn62SydeP8ee8sG2ky9nfm9/chains/a0dnet1/db 5Dfis6XL8J2P6JHUnUtArnFWndn62SydeP8ee8sG2ky9nfm9/chains/a0dnet1/network 5Dfis6XL8J2P6JHUnUtArnFWndn62SydeP8ee8sG2ky9nfm9/backup-stash 5Dfis6XL8J2P6JHUnUtArnFWndn62SydeP8ee8sG2ky9nfm9/chainspec.json && echo "Done"
+
+.PHONY: stop-ink-dev
+stop-ink-dev: # Stop the helper container
+stop-ink-dev:
+	docker kill ink_dev || true
 
 .PHONY: bootstrap
 bootstrap: # Bootstrap the node data

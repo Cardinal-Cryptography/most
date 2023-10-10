@@ -1,0 +1,23 @@
+---
+name: Bridgenet - deploy azero contracts
+
+on:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  compile:
+    name: Compile and deploy contracts
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Stop any existing instance of ink_dev
+        shell: bash
+        run: make stop-ink-dev
+
+      - name: Deploy contracts
+        shell: bash
+        run: make deploy-azero NODE=wss://ws-fe-updnet-bridgenet.dev.azero.dev

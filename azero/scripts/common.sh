@@ -2,7 +2,6 @@
 
 CONTRACTS_PATH=$(pwd)/contracts
 INK_DEV_IMAGE=public.ecr.aws/p6e8q1z1/ink-dev:1.0.0
-NODE=ws://127.0.0.1:9944
 AUTHORITY=5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY
 AUTHORITY_SEED=//Alice
 ADDRESSES_FILE=$(pwd)/contracts/addresses.json
