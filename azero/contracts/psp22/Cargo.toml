@@ -1,7 +1,7 @@
 [package]
 name = "psp22"
 version = "1.0.0"
-authors = ["filip.bielejec@cardinals.cc"]
+authors = ["fbielejec <filip.bielejec@cardinals.cc>"]
 edition = "2021"
 
 [dependencies]
@@ -20,5 +20,5 @@ path = "lib.rs"
 
 [features]
 default = ["std"]
-std = ["ink/std", "scale/std", "scale-info/std"]
+std = ["ink/std", "scale/std", "scale-info/std", "psp22-traits/std"]
 ink-as-dependency = []

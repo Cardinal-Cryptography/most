@@ -1,6 +1,6 @@
 [package]
 name = "membrane"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["fbielejec <filip.bielejec@cardinals.cc>"]
 edition = "2021"
 
@@ -20,5 +20,5 @@ path = "lib.rs"
 
 [features]
 default = ["std"]
-std = ["ink/std", "scale/std", "scale-info/std"]
+std = ["ink/std", "scale/std", "scale-info/std", "psp22-traits/std"]
 ink-as-dependency = []

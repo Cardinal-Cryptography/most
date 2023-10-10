@@ -64,13 +64,13 @@ mod membrane {
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub enum MembraneError {
         NotGuardian,
-        PSP22,
+        PSP22(PSP22Error),
         RequestAlreadyProcessed,
     }
 
     impl From<PSP22Error> for MembraneError {
-        fn from(_inner: PSP22Error) -> Self {
-            MembraneError::PSP22
+        fn from(inner: PSP22Error) -> Self {
+            MembraneError::PSP22(inner)
         }
     }
 
