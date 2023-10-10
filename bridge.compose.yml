@@ -5,7 +5,6 @@ services:
   EthereumBootnode:
     image: ethereum/client-go:release-1.12
     container_name: eth_bootnode
-    user: "${UID}:${GID}"
     volumes:
       - ./0x7f938fd203fcabc449312661ab1d36b7fdb45118:/root/.ethereum
     network_mode: host
@@ -21,7 +20,6 @@ services:
   EthereumNode1:
     image: ethereum/client-go:release-1.12
     container_name: eth_node1
-    user: "${UID}:${GID}"
     volumes:
       - ./0x129b9daee478e7bc5edada471982e31fa7705622:/root/.ethereum
     network_mode: host
@@ -42,7 +40,6 @@ services:
   EthereumNode2:
     image: ethereum/client-go:release-1.12
     container_name: eth_node2
-    user: "${UID}:${GID}"
     volumes:
       - ./0xf2f0930c3b7bdf1734ee173272bd8cdc0a08f038:/root/.ethereum
     network_mode: host
@@ -105,7 +102,6 @@ services:
   AlephNode1:
     image: public.ecr.aws/p6e8q1z1/aleph-node:r-11.4
     container_name: aleph_node1
-    user: "${UID}:${GID}"
     volumes:
       - ./5GBNeWRhZc2jXu7D55rBimKYDk8PGk8itRYFTPfC8RJLKG5o:/data
     network_mode: host
@@ -130,7 +126,6 @@ services:
   AlephNode2:
     image: public.ecr.aws/p6e8q1z1/aleph-node:r-11.4
     container_name: aleph_node2
-    user: "${UID}:${GID}"
     volumes:
       - ./5Dfis6XL8J2P6JHUnUtArnFWndn62SydeP8ee8sG2ky9nfm9:/data
     network_mode: host

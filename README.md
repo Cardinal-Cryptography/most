@@ -64,15 +64,15 @@ make deploy-eth
 Open a Truffle console:
 
 ```bash
-cd eth && truffle console 
+cd eth && truffle console
 ```
 
 Interact with the deployed contracts instance:
 
 ```javascript
-let flipper = await Flipper.deployed()
-flipper.flip()
-flipper.flipValue()
+let membrane = await Membrane.deployed()
+membrane.address
+membrane.isGuardian(accounts[0])
 ```
 
 To deploy the contracts on the azero chain:

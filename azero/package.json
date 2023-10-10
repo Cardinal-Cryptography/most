@@ -1,0 +1,29 @@
+{
+    "name": "membrane-bridge",
+    "version": "1.0.0",
+    "author": "fbielejec",
+    "license": "MIT",
+    "description": "azero membrane bridge",
+    "scripts": {
+        "compile": "typechain-compiler --release --toolchain nightly-2023-05-31",
+        "deploy": "npm config set script-shell \"/bin/bash\"; source env/dev && ts-node scripts/deploy.ts"
+    },
+    "dependencies": {
+        "@727-ventures/typechain-compiler": "^1.1.0",
+        "@727-ventures/typechain-types": "^1.1.0",
+        "@typescript-eslint/eslint-plugin": "^4.8.2",
+        "@typescript-eslint/parser": "^4.8.2",
+        "@polkadot/api": "^10.9.1",
+        "@polkadot/api-contract": "^10.9.1",
+        "eslint": "^7.26.0",
+        "eslint-config-prettier": "^8.6.0",
+        "eslint-plugin-import": "^2.22.1",
+        "eslint-plugin-node": "^11.1.0",
+        "eslint-plugin-prettier": "^4.2.1",
+        "eslint-plugin-promise": "^5.1.0"
+    },
+    "devDependencies": {
+        "ts-node": "^10.9.1",
+        "typescript": "^5.1.3"
+    }
+}

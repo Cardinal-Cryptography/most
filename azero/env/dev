@@ -1,0 +1,3 @@
+export WS_NODE=ws://127.0.0.1:9944
+export AUTHORITY=5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY
+export AUTHORITY_SEED=//Alice

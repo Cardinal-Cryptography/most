@@ -1,9 +1,9 @@
 {
-  "name": "eth",
+  "name": "membrane-bridge",
   "version": "1.0.0",
-  "description": "",
+  "description": "evm membrane bridge contracts",
   "author": "fbielejec",
-  "license": "APACHE",
+  "license": "MIT",
   "dependencies": {
     "@openzeppelin/contracts": "^4.9.3",
     "dotenv": "^16.3.1"

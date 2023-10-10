@@ -20,6 +20,8 @@ target/
 
 # contracts
 addresses.json
+azero/artifacts/
+azero/types/
 
 # half of the internet
 node_modules
