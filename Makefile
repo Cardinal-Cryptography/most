@@ -28,7 +28,7 @@ compile-azero:
 	cd azero/contracts/membrane && cargo contract build --release
 
 deploy-azero:
-	cd azero && npm run deploy
+	cd azero && npm run compile && npm run deploy
 
 watch-relayer:
 	cd relayer && cargo watch -s 'cargo clippy' -c
