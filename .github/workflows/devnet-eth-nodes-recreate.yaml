@@ -6,7 +6,7 @@ name: Devnet eth nodes - Re-create
 # * remove data from membrane-bridge s3 bucket
 # * bootstraps new data
 # * uploads data to membrane-bridge s3 bucket
-# * starts the nodes by setting replicas to 1 (each node is separate 
+# * starts the nodes by setting replicas to 1 (each node is separate
 #   statefulset)
 
 on:
@@ -22,15 +22,13 @@ jobs:
     name: Re-create eth nodes
     runs-on: [self-hosted, Linux, X64, small]
     steps:
-      - name: Checkout repo on master branch
+      - name: Checkout code
         uses: actions/checkout@v3
-        with:
-          ref: master
 
       - name: Download geth
         shell: bash
         env:
-          GETH_VER: geth-linux-amd64-1.13.2-dc34fe82 
+          GETH_VER: geth-linux-amd64-1.13.2-dc34fe82
         run: |
           mkdir -p .bin
           cd .bin

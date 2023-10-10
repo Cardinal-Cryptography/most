@@ -1,0 +1,30 @@
+---
+name: Bridgenet - deploy eth contracts
+
+on:
+  push:
+    branches:
+      - 'master'
+
+jobs:
+  compile:
+    name: Compile and deploy contracts
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup node
+        uses: asdf-vm/actions/install@v2
+
+      - name: Install dependencies
+        shell: bash
+        run: make eth-deps
+
+      - name: Compile contracts
+        shell: bash
+        run: make compile-eth
+
+      - name: Deploy contracts
+        shell: bash
+        run: make deploy-eth NETWORK=bridgenet
