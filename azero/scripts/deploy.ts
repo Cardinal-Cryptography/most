@@ -1,16 +1,11 @@
 import { ApiPromise, WsProvider, Keyring } from '@polkadot/api';
 import MembraneConstructors from '../types/constructors/membrane';
-import { uploadCode } from './utils';
+import { uploadCode, Addresses, storeAddresses } from './utils';
 import 'dotenv/config';
 import '@polkadot/api-augment';
 
 const wsProvider = new WsProvider(process.env.WS_NODE);
 const keyring = new Keyring({ type: 'sr25519' });
-
-type Addresses = {
-  membraneCodeHash: string;
-  membraneAddress: string;
-};
 
 async function main(): Promise<void> {
     const api = await ApiPromise.create({ provider: wsProvider });
@@ -32,15 +27,15 @@ async function main(): Promise<void> {
 
     // TODO : PSP22 token
 
-    // const addresses: Addresses = {
-    //   pairCodeHash: pairHash,
-    //   factoryAddress: factoryAddress,
-    //   wnativeAddress: wnativeAddress,
-    //   routerAddress: routerAddress,
-    // };
+    const addresses: Addresses = {
+      membraneCodeHash: membraneCodeHash,        
+      membraneAddress: membraneAddress
+    };
 
-    // storeAddresses(addresses);
-    // console.log('addresses stored');
+    console.log('addresses:', addresses);
+    
+    storeAddresses(addresses);
+
     await api.disconnect();
 }
 
