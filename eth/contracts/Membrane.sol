@@ -3,7 +3,6 @@
 pragma solidity ^0.8;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/presets/ERC20PresetMinterPauser.sol";
 
 contract Membrane {
     uint256 public requestNonce;
@@ -80,7 +79,7 @@ contract Membrane {
         address sender = msg.sender;
 
         IERC20 token = IERC20(srcTokenAddress);
-
+        // lock tokens in this contract
         // message sender needs to give approval else this tx will revert
         token.transferFrom(sender, address(this), srcTokenAmount);
 
@@ -124,7 +123,7 @@ contract Membrane {
             _requestHash == requestHash,
             "Hash does not match the data"
         );
- 
+
         Request storage request = pendingRequests[requestHash];
         if (request.signatureCount == 0) {
             request.destTokenAddress = destTokenAddress;
@@ -142,11 +141,11 @@ contract Membrane {
         if (request.signatureCount >= signatureThreshold) {
             processedRequests[requestHash] = true;
             delete pendingRequests[requestHash];
-            ERC20PresetMinterPauser token = ERC20PresetMinterPauser(
-                bytes32toAddress(destTokenAddress)
-            );
-            // TODO : transfer
-            token.mint(bytes32toAddress(destReceiverAddress), destTokenAmount);
+
+            // returns the locked tokens
+            IERC20 token = IERC20(bytes32toAddress(destTokenAddress));
+
+            token.transfer(bytes32toAddress(destReceiverAddress), destTokenAmount);
             emit RequestProcessed(requestHash);
         }
     }
