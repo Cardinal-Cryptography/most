@@ -4,6 +4,9 @@
     "description": "evm membrane bridge contracts",
     "author": "fbielejec",
     "license": "MIT",
+    "scripts": {
+        "watch": "gulp default"
+    },
     "dependencies": {
         "@openzeppelin/contracts": "^4.9.3",
         "@truffle/hdwallet-provider": "^2.1.15",

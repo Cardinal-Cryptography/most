@@ -25,6 +25,11 @@ eth-deps:
 	npm install -g truffle
 	cd eth && npm install
 
+.PHONY: eth-deps
+watch-eth: # watcher on the eth contracts
+watch-eth:
+	cd eth && npm run watch
+
 .PHONY: compile-eth
 compile-eth: # Compile eth contracts
 compile-eth:

@@ -11,8 +11,6 @@ async function main(): Promise<void> {
     const api = await ApiPromise.create({ provider: wsProvider });
     const deployer = keyring.addFromUri(process.env.AUTHORITY_SEED!);
 
-    // const membraneCodeHash = "0x4320907a9497a71c7a5b87b9e395d81eea6d3d6500fa213c7f6400fa9af16922";
-
     const membraneCodeHash = await uploadCode(api, deployer, "membrane.contract");
     console.log('membrane code hash:', membraneCodeHash);
 
@@ -25,7 +23,7 @@ async function main(): Promise<void> {
 
     console.log('membrane address:', membraneAddress);
 
-    // TODO : PSP22 token
+    // TODO : deploy PSP22 token
 
     const addresses: Addresses = {
       membraneCodeHash: membraneCodeHash,
