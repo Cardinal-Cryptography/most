@@ -42,7 +42,7 @@ deploy-eth:
 
 .PHONY: watch-azero
 watch-azero:
-	cd azero/contracts/flipper && cargo watch -s 'cargo contract check' -c
+	cd azero/contracts/membrane && cargo watch -s 'cargo contract check' -c
 
 .PHONY: deploy-azero
 deploy-azero: # Deploy azero contracts

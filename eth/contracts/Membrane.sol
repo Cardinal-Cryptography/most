@@ -6,11 +6,8 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/presets/ERC20PresetMinterPauser.sol";
 
 contract Membrane {
-    uint256 public requestNonce = 0;
-
-    uint256 public signatureThreshold = 1;
-
-    // TODO : getter @ongoing transfer requests
+    uint256 public requestNonce;
+    uint256 public signatureThreshold;
 
     struct Request {
         bytes32 destTokenAddress;
@@ -30,7 +27,6 @@ contract Membrane {
         bytes32 sender,
         bytes32 indexed srcTokenAddress,
         uint256 srcTokenAmount,
-        int32 indexed destChainId,
         bytes32 indexed destTokenAddress,
         uint256 destTokenAmount,
         bytes32 destReceiverAddress,
@@ -77,7 +73,6 @@ contract Membrane {
     function sendRequest(
         address srcTokenAddress,
         uint256 srcTokenAmount,
-        int32 destChainId,
         bytes32 destTokenAddress,
         uint256 destTokenAmount,
         bytes32 destReceiverAddress
@@ -93,7 +88,6 @@ contract Membrane {
             addressToBytes32(sender),
             addressToBytes32(srcTokenAddress),
             srcTokenAmount,
-            destChainId,
             destTokenAddress,
             destTokenAmount,
             destReceiverAddress,
@@ -105,16 +99,32 @@ contract Membrane {
 
     // aggregates relayer signatures and burns/mints the token
     function receiveRequest(
-        bytes32 requestHash,
+        bytes32 _requestHash,
+        bytes32 sender,
+        bytes32 srcTokenAddress,
+        uint256 srcTokenAmount,
         bytes32 destTokenAddress,
         uint256 destTokenAmount,
-        bytes32 destReceiverAddress
+        bytes32 destReceiverAddress,
+        uint256 requestNonce
     ) external onlyGuardian {
         require(
-            !processedRequests[requestHash],
+            !processedRequests[_requestHash],
             "This request has already been processed"
         );
 
+        bytes32 requestHash = keccak256(abi.encodePacked(sender,
+                                                         srcTokenAddress,
+                                                         srcTokenAmount,
+                                                         destTokenAddress,
+                                                         destReceiverAddress,
+                                                         requestNonce));
+
+        require(
+            _requestHash == requestHash,
+            "Hash does not match the data"
+        );
+ 
         Request storage request = pendingRequests[requestHash];
         if (request.signatureCount == 0) {
             request.destTokenAddress = destTokenAddress;

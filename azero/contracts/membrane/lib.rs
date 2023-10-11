@@ -4,6 +4,10 @@
 mod membrane {
     use ink::{
         codegen::EmitEvent,
+        env::{
+            hash::{HashOutput, Keccak256},
+            hash_bytes,
+        },
         prelude::{vec, vec::Vec},
         reflect::ContractEventBase,
         storage::Mapping,
@@ -17,10 +21,10 @@ mod membrane {
         sender: [u8; 32],
         src_token_address: [u8; 32],
         src_token_amount: u128,
-        dest_chain_id: u32,
         dest_token_address: [u8; 32],
         dest_token_amount: u128,
         dest_receiver_address: [u8; 32],
+        request_nonce: u128,
     }
 
     #[ink(event)]
@@ -64,6 +68,7 @@ mod membrane {
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub enum MembraneError {
         NotGuardian,
+        HashDoesNotMatchData,
         PSP22(PSP22Error),
         RequestAlreadyProcessed,
     }
@@ -98,7 +103,6 @@ mod membrane {
             &mut self,
             src_token_address: AccountId,
             src_token_amount: Balance,
-            dest_chain_id: u32,
             dest_token_address: [u8; 32],
             dest_token_amount: u128,
             dest_receiver_address: [u8; 32],
@@ -118,10 +122,10 @@ mod membrane {
                     sender: *sender.as_ref(),
                     src_token_address: *src_token_address.as_ref(),
                     src_token_amount,
-                    dest_chain_id,
                     dest_token_address,
                     dest_token_amount,
                     dest_receiver_address,
+                    request_nonce: self.request_nonce,
                 }),
             );
 
@@ -134,16 +138,37 @@ mod membrane {
         #[ink(message)]
         pub fn receive_request(
             &mut self,
+            request_hash: [u8; 32],
+            sender: [u8; 32],
+            src_token_address: [u8; 32],
+            src_token_amount: u128,
             dest_token_address: [u8; 32],
             dest_token_amount: u128,
             dest_receiver_address: [u8; 32],
-            request_hash: [u8; 32],
+            request_nonce: u128,
         ) -> Result<(), MembraneError> {
             let caller = self.env().caller();
             self.is_guardian(caller)?;
 
             if self.processed_requests.contains(request_hash) {
                 return Err(MembraneError::RequestAlreadyProcessed);
+            }
+
+            // TODO : check hash
+            let bytes = Self::concat_u8_arrays(vec![
+                &sender,
+                &src_token_address,
+                &src_token_amount.to_le_bytes(),
+                &dest_token_address,
+                &dest_token_amount.to_le_bytes(),
+                &dest_receiver_address,
+                &request_nonce.to_le_bytes(),
+            ]);
+
+            let hash = Self::keccak256(&bytes);
+
+            if !request_hash.eq(&hash) {
+                return Err(MembraneError::HashDoesNotMatchData);
             }
 
             match self.pending_requests.get(request_hash) {
@@ -227,6 +252,20 @@ mod membrane {
             } else {
                 Err(MembraneError::NotGuardian)
             }
+        }
+
+        fn concat_u8_arrays(arrays: Vec<&[u8]>) -> Vec<u8> {
+            let mut result = Vec::new();
+            for array in arrays {
+                result.extend_from_slice(array);
+            }
+            result
+        }
+
+        pub fn keccak256(input: &[u8]) -> [u8; 32] {
+            let mut output = <Keccak256 as HashOutput>::Type::default();
+            hash_bytes::<Keccak256>(input, &mut output);
+            output
         }
 
         fn emit_event<EE>(emitter: EE, event: Event)

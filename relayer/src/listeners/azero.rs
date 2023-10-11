@@ -180,17 +180,19 @@ async fn handle_event(
             let dest_receiver_address = get_event_data(&data, "dest_receiver_address")?;
             let request_nonce = get_event_data(&data, "request_nonce")?;
 
+            let src_token_amount = U256::from_little_endian(&src_token_amount);
             let dest_token_amount = U256::from_little_endian(&dest_token_amount);
+            let request_nonce = U256::from_little_endian(&request_nonce);
 
             let bytes = abi::encode_packed(&[
                 Token::FixedBytes(sender.to_vec()),
                 Token::FixedBytes(src_token_address.to_vec()),
-                Token::Int(U256::from_little_endian(&src_token_amount)),
+                Token::Int(src_token_amount),
                 Token::Int((dest_chain_id).into()),
                 Token::FixedBytes(dest_token_address.to_vec()),
                 Token::Int(dest_token_amount),
                 Token::FixedBytes(dest_receiver_address.to_vec()),
-                Token::Int(U256::from_little_endian(&request_nonce)),
+                Token::Int(request_nonce),
             ])?;
 
             trace!("ABI event encoding: {bytes:?}");
@@ -207,9 +209,13 @@ async fn handle_event(
 
             let call: ContractCall<SignedEthWsConnection, ()> = contract.receive_request(
                 request_hash,
+                sender,
+                src_token_address,
+                src_token_amount,
                 dest_token_address,
                 dest_token_amount,
                 dest_receiver_address,
+                request_nonce,
             );
 
             let tx = call
