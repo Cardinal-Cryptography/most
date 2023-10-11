@@ -34,13 +34,18 @@ impl MembraneInstance {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn receive_request(
         &self,
         signed_connection: &SignedConnection,
+        request_hash: [u8; 32],
+        sender: [u8; 32],
+        src_token_address: [u8; 32],
+        src_token_amount: u128,
         dest_token_address: [u8; 32],
         dest_token_amount: u128,
         dest_receiver_address: [u8; 32],
-        request_hash: [u8; 32],
+        request_nonce: u128,
     ) -> Result<TxInfo, AzeroContractError> {
         Ok(self
             .contract
@@ -48,10 +53,14 @@ impl MembraneInstance {
                 signed_connection,
                 "receive_request",
                 &[
+                    str::from_utf8(&request_hash)?,
+                    str::from_utf8(&sender)?,
+                    str::from_utf8(&src_token_address)?,
+                    &src_token_amount.to_string(),
                     str::from_utf8(&dest_token_address)?,
                     &dest_token_amount.to_string(),
                     str::from_utf8(&dest_receiver_address)?,
-                    str::from_utf8(&request_hash)?,
+                    &request_nonce.to_string(),
                 ],
             )
             .await?)

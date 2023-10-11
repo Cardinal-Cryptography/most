@@ -116,10 +116,14 @@ async fn handle_event(
         contract
             .receive_request(
                 &azero_connection,
+                request_hash,
+                *sender,
+                *src_token_address,
+                src_token_amount.as_u128(),
                 *dest_token_address,
                 dest_token_amount.as_u128(),
                 *dest_receiver_address,
-                request_hash,
+                request_nonce.as_u128(),
             )
             .await?;
     }

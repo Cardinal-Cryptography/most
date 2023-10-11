@@ -154,7 +154,6 @@ mod membrane {
                 return Err(MembraneError::RequestAlreadyProcessed);
             }
 
-            // TODO : check hash
             let bytes = Self::concat_u8_arrays(vec![
                 &sender,
                 &src_token_address,
