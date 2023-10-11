@@ -45,6 +45,11 @@ watch-azero:
 	cd azero/contracts/membrane && cargo watch -s 'cargo contract check' -c
 
 .PHONY: deploy-azero
+compile-azero: # compile azero contracts and generate artifacts
+compile-azero:
+	cd azero && npm run compile
+
+.PHONY: deploy-azero
 deploy-azero: # Deploy azero contracts
 deploy-azero:
 	cd azero && npm run compile && npm run deploy
