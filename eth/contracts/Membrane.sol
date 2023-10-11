@@ -33,7 +33,7 @@ contract Membrane {
         uint256 requestNonce
     );
 
-    event RequestProcessed(bytes32 requestHash, address signer);
+    event RequestSigned(bytes32 requestHash, address signer);
 
     event RequestProcessed(bytes32 requestHash);
 
@@ -137,7 +137,7 @@ contract Membrane {
         request.signatures[msg.sender] = true;
         request.signatureCount++;
 
-        emit RequestProcessed(requestHash, msg.sender);
+        emit RequestSigned(requestHash, msg.sender);
 
         if (request.signatureCount >= signatureThreshold) {
             processedRequests[requestHash] = true;
