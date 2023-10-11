@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use ethers::{
-    abi::{self, EncodePackedError, Token},
+    abi::EncodePackedError,
     core::types::Address,
     prelude::ContractError,
     providers::{Middleware, Provider, ProviderError, StreamExt, Ws},
@@ -17,6 +17,7 @@ use crate::{
         AzeroContractError, CrosschainTransferRequestFilter, Membrane, MembraneEvents,
         MembraneInstance,
     },
+    helpers::concat_u8_arrays,
 };
 
 #[derive(Debug, Error)]
@@ -95,17 +96,18 @@ async fn handle_event(
 
         info!("handling eth contract event: {crosschain_transfer_event:?}");
 
-        // compute event hash
-        let bytes = abi::encode_packed(&[
-            Token::FixedBytes(sender.to_vec()),
-            Token::FixedBytes(src_token_address.to_vec()),
-            Token::Int(*src_token_amount),
-            Token::FixedBytes(dest_token_address.to_vec()),
-            Token::Int(*dest_token_amount),
-            Token::FixedBytes(dest_receiver_address.to_vec()),
-            Token::Int(*request_nonce),
-        ])?;
-        trace!("ABI event encoding: {bytes:?}");
+        // concat bytes
+        let bytes = concat_u8_arrays(vec![
+            sender,
+            src_token_address,
+            &src_token_amount.as_u128().to_le_bytes(),
+            dest_token_address,
+            &dest_token_amount.as_u128().to_le_bytes(),
+            dest_receiver_address,
+            &request_nonce.as_u128().to_le_bytes(),
+        ]);
+
+        trace!("event concatenated bytes: {bytes:?}");
 
         let request_hash = keccak256(bytes);
         debug!("hashed event encoding: {request_hash:?}");

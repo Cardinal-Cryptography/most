@@ -78,7 +78,7 @@ fn main() -> Result<()> {
         tasks.push(tokio::spawn(async {
             EthListener::run(config_rc1, azero_connection_rc1, eth_connection_rc1)
                 .await
-                .unwrap()
+                .expect("Ethereum listener task has failed")
         }));
 
         let config_rc2 = Arc::clone(&config);
@@ -87,11 +87,11 @@ fn main() -> Result<()> {
         tasks.push(tokio::spawn(async {
             AzeroListener::run(config_rc2, azero_connection_rc2, eth_connection_rc2)
                 .await
-                .unwrap()
+                .expect("AlephZero listener task has failed")
         }));
 
         for t in tasks {
-            t.await.unwrap();
+            t.await.expect("task failure");
         }
     });
 

@@ -71,7 +71,7 @@ pub enum AzeroListenerError {
     AbiEncode(#[from] EncodePackedError),
 
     #[error("unexpected error")]
-    OhShit,
+    Unexpected,
 }
 
 pub struct AzeroListener;
@@ -150,7 +150,7 @@ fn get_event_data(
             result.copy_from_slice(hex.bytes());
             Ok(result)
         }
-        _ => Err(AzeroListenerError::OhShit),
+        _ => Err(AzeroListenerError::Unexpected),
     }
 }
 
