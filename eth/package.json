@@ -6,8 +6,8 @@
     "license": "MIT",
     "dependencies": {
         "@openzeppelin/contracts": "^4.9.3",
-        "@truffle/hdwallet-provider": "^2.1.15"
-        "dotenv": "^16.3.1",
+        "@truffle/hdwallet-provider": "^2.1.15",
+        "dotenv": "^16.3.1"
     },
     "devDependencies": {
         "gulp": "^4.0.2",
