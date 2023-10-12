@@ -173,24 +173,17 @@ async fn handle_event(
             // decode event data
             let sender = get_event_data(&data, "sender")?;
             let src_token_address = get_event_data(&data, "src_token_address")?;
-            let src_token_amount = get_event_data(&data, "src_token_amount")?;
-            let dest_chain_id = get_event_data(&data, "dest_chain_id")?;
-            let dest_token_address = get_event_data(&data, "dest_token_address")?;
-            let dest_token_amount = get_event_data(&data, "dest_token_amount")?;
+            let amount = get_event_data(&data, "amount")?;
             let dest_receiver_address = get_event_data(&data, "dest_receiver_address")?;
             let request_nonce = get_event_data(&data, "request_nonce")?;
 
-            let src_token_amount = U256::from_little_endian(&src_token_amount);
-            let dest_token_amount = U256::from_little_endian(&dest_token_amount);
+            let amount = U256::from_little_endian(&amount);
             let request_nonce = U256::from_little_endian(&request_nonce);
 
             let bytes = abi::encode_packed(&[
                 Token::FixedBytes(sender.to_vec()),
                 Token::FixedBytes(src_token_address.to_vec()),
-                Token::Int(src_token_amount),
-                Token::Int((dest_chain_id).into()),
-                Token::FixedBytes(dest_token_address.to_vec()),
-                Token::Int(dest_token_amount),
+                Token::Int(amount),
                 Token::FixedBytes(dest_receiver_address.to_vec()),
                 Token::Int(request_nonce),
             ])?;
@@ -211,9 +204,7 @@ async fn handle_event(
                 request_hash,
                 sender,
                 src_token_address,
-                src_token_amount,
-                dest_token_address,
-                dest_token_amount,
+                amount,
                 dest_receiver_address,
                 request_nonce,
             );

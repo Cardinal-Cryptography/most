@@ -80,9 +80,7 @@ async fn handle_event(
         crosschain_transfer_event @ CrosschainTransferRequestFilter {
             sender,
             src_token_address,
-            src_token_amount,
-            dest_token_address,
-            dest_token_amount,
+            amount,
             dest_receiver_address,
             request_nonce,
         },
@@ -100,9 +98,7 @@ async fn handle_event(
         let bytes = concat_u8_arrays(vec![
             sender,
             src_token_address,
-            &src_token_amount.as_u128().to_le_bytes(),
-            dest_token_address,
-            &dest_token_amount.as_u128().to_le_bytes(),
+            &amount.as_u128().to_le_bytes(),
             dest_receiver_address,
             &request_nonce.as_u128().to_le_bytes(),
         ]);
@@ -121,9 +117,7 @@ async fn handle_event(
                 request_hash,
                 *sender,
                 *src_token_address,
-                src_token_amount.as_u128(),
-                *dest_token_address,
-                dest_token_amount.as_u128(),
+                amount.as_u128(),
                 *dest_receiver_address,
                 request_nonce.as_u128(),
             )
