@@ -9,12 +9,12 @@ contract Membrane {
     uint256 public signatureThreshold;
 
     struct Request {
-        bytes32 destTokenAddress;
-        uint256 destTokenAmount;
-        bytes32 destReceiverAddress;
         uint256 signatureCount;
         mapping(address => bool) signatures;
     }
+
+    // from -> to mapping
+    mapping(bytes32 => bytes32) public supportedPairs;
 
     mapping(bytes32 => Request) public pendingRequests;
 
@@ -25,9 +25,7 @@ contract Membrane {
     event CrosschainTransferRequest(
         bytes32 sender,
         bytes32 indexed srcTokenAddress,
-        uint256 srcTokenAmount,
-        bytes32 indexed destTokenAddress,
-        uint256 destTokenAmount,
+        uint256 amount,
         bytes32 destReceiverAddress,
         uint256 requestNonce
     );
@@ -45,6 +43,7 @@ contract Membrane {
                 address[] memory _guardians,
                 uint256 _signatureThreshold
                 ) {
+        require(_guardians.length >= _signatureThreshold, "Not enough guardians specified");
         signatureThreshold = _signatureThreshold;
         for (uint256 i = 0; i < _guardians.length; i++) {
             guardians[_guardians[i]] = true;
@@ -54,6 +53,12 @@ contract Membrane {
     function isGuardian(address sender) public view returns (bool) {
         return guardians[sender];
     }
+
+    function addPair(bytes32 from, bytes32 to) public {
+         supportedPairs[from] = to;
+    }
+
+    // TODO: remove pair
 
     function bytes32toAddress(bytes32 data) internal pure returns (address) {
         return address(uint160(uint256(data)));
@@ -71,9 +76,7 @@ contract Membrane {
     // & forward to the destination chain.
     function sendRequest(
         address srcTokenAddress,
-        uint256 srcTokenAmount,
-        bytes32 destTokenAddress,
-        uint256 destTokenAmount,
+        uint256 amount,
         bytes32 destReceiverAddress
     ) external {
         address sender = msg.sender;
@@ -81,14 +84,12 @@ contract Membrane {
         IERC20 token = IERC20(srcTokenAddress);
         // lock tokens in this contract
         // message sender needs to give approval else this tx will revert
-        token.transferFrom(sender, address(this), srcTokenAmount);
+        token.transferFrom(sender, address(this), amount);
 
         emit CrosschainTransferRequest(
             addressToBytes32(sender),
             addressToBytes32(srcTokenAddress),
-            srcTokenAmount,
-            destTokenAddress,
-            destTokenAmount,
+            amount,
             destReceiverAddress,
             requestNonce
         );
@@ -101,11 +102,9 @@ contract Membrane {
         bytes32 _requestHash,
         bytes32 sender,
         bytes32 srcTokenAddress,
-        uint256 srcTokenAmount,
-        bytes32 destTokenAddress,
-        uint256 destTokenAmount,
+        uint256 amount,
         bytes32 destReceiverAddress,
-        uint256 requestNonce
+        uint256 _requestNonce
     ) external onlyGuardian {
         require(
             !processedRequests[_requestHash],
@@ -114,22 +113,19 @@ contract Membrane {
 
         bytes32 requestHash = keccak256(abi.encodePacked(sender,
                                                          srcTokenAddress,
-                                                         srcTokenAmount,
-                                                         destTokenAddress,
+                                                         amount,
                                                          destReceiverAddress,
-                                                         requestNonce));
+                                                         _requestNonce));
 
         require(
             _requestHash == requestHash,
             "Hash does not match the data"
         );
 
+       bytes32 destTokenAddress = supportedPairs[srcTokenAddress];
+       require(destTokenAddress != 0x0, "Unsupported pair");
+        
         Request storage request = pendingRequests[requestHash];
-        if (request.signatureCount == 0) {
-            request.destTokenAddress = destTokenAddress;
-            request.destTokenAmount = destTokenAmount;
-            request.destReceiverAddress = destReceiverAddress;
-        }
 
         require(!request.signatures[msg.sender], "Already signed this request");
 
@@ -145,7 +141,7 @@ contract Membrane {
             // returns the locked tokens
             IERC20 token = IERC20(bytes32toAddress(destTokenAddress));
 
-            token.transfer(bytes32toAddress(destReceiverAddress), destTokenAmount);
+            token.transfer(bytes32toAddress(destReceiverAddress), amount);
             emit RequestProcessed(requestHash);
         }
     }

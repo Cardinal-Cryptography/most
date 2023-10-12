@@ -20,9 +20,7 @@ mod membrane {
     pub struct CrosschainTransferRequest {
         sender: [u8; 32],
         src_token_address: [u8; 32],
-        src_token_amount: u128,
-        dest_token_address: [u8; 32],
-        dest_token_amount: u128,
+        amount: u128,
         dest_receiver_address: [u8; 32],
         request_nonce: u128,
     }
@@ -35,7 +33,7 @@ mod membrane {
 
     #[ink(event)]
     #[derive(Debug)]
-    pub struct SignatureTallied {
+    pub struct RequestSigned {
         signer: AccountId,
         request_hash: [u8; 32],
     }
@@ -46,9 +44,6 @@ mod membrane {
         derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout)
     )]
     pub struct Request {
-        dest_token_address: [u8; 32],
-        dest_token_amount: u128,
-        dest_receiver_address: [u8; 32],
         signature_count: u128,
     }
 
@@ -60,6 +55,7 @@ mod membrane {
         signatures: Mapping<([u8; 32], AccountId), ()>,
         processed_requests: Mapping<[u8; 32], ()>,
         guardians: Mapping<AccountId, ()>,
+        supported_pairs: Mapping<[u8; 32], [u8; 32]>,
     }
 
     pub type Event = <Membrane as ContractEventBase>::Type;
@@ -71,6 +67,7 @@ mod membrane {
         HashDoesNotMatchData,
         PSP22(PSP22Error),
         RequestAlreadyProcessed,
+        UnsupportedPair,
     }
 
     impl From<PSP22Error> for MembraneError {
@@ -94,6 +91,7 @@ mod membrane {
                 signatures: Mapping::new(),
                 processed_requests: Mapping::new(),
                 guardians: guardians_set,
+                supported_pairs: Mapping::new(),
             }
         }
 
@@ -102,28 +100,19 @@ mod membrane {
         pub fn send_request(
             &mut self,
             src_token_address: AccountId,
-            src_token_amount: Balance,
-            dest_token_address: [u8; 32],
-            dest_token_amount: u128,
+            amount: Balance,
             dest_receiver_address: [u8; 32],
         ) -> Result<(), MembraneError> {
             let sender = self.env().caller();
 
-            self.transfer_from_tx(
-                src_token_address,
-                sender,
-                self.env().account_id(),
-                src_token_amount,
-            )?;
+            self.transfer_from_tx(src_token_address, sender, self.env().account_id(), amount)?;
 
             Self::emit_event(
                 self.env(),
                 Event::CrosschainTransferRequest(CrosschainTransferRequest {
                     sender: *sender.as_ref(),
                     src_token_address: *src_token_address.as_ref(),
-                    src_token_amount,
-                    dest_token_address,
-                    dest_token_amount,
+                    amount,
                     dest_receiver_address,
                     request_nonce: self.request_nonce,
                 }),
@@ -141,9 +130,7 @@ mod membrane {
             request_hash: [u8; 32],
             sender: [u8; 32],
             src_token_address: [u8; 32],
-            src_token_amount: u128,
-            dest_token_address: [u8; 32],
-            dest_token_amount: u128,
+            amount: u128,
             dest_receiver_address: [u8; 32],
             request_nonce: u128,
         ) -> Result<(), MembraneError> {
@@ -157,9 +144,7 @@ mod membrane {
             let bytes = Self::concat_u8_arrays(vec![
                 &sender,
                 &src_token_address,
-                &src_token_amount.to_le_bytes(),
-                &dest_token_address,
-                &dest_token_amount.to_le_bytes(),
+                &amount.to_le_bytes(),
                 &dest_receiver_address,
                 &request_nonce.to_le_bytes(),
             ]);
@@ -170,17 +155,15 @@ mod membrane {
                 return Err(MembraneError::HashDoesNotMatchData);
             }
 
+            let dest_token_address = self
+                .supported_pairs
+                .get(src_token_address)
+                .ok_or(MembraneError::UnsupportedPair)?;
+
             match self.pending_requests.get(request_hash) {
                 None => {
-                    self.pending_requests.insert(
-                        request_hash,
-                        &Request {
-                            dest_token_address,
-                            dest_token_amount,
-                            dest_receiver_address,
-                            signature_count: 0,
-                        },
-                    );
+                    self.pending_requests
+                        .insert(request_hash, &Request { signature_count: 0 });
                 }
                 Some(mut request) => {
                     self.signatures.insert((request_hash, caller), &());
@@ -188,7 +171,7 @@ mod membrane {
 
                     Self::emit_event(
                         self.env(),
-                        Event::SignatureTallied(SignatureTallied {
+                        Event::RequestSigned(RequestSigned {
                             signer: caller,
                             request_hash,
                         }),
@@ -202,7 +185,7 @@ mod membrane {
                         self.mint_to(
                             dest_token_address.into(),
                             dest_receiver_address.into(),
-                            dest_token_amount,
+                            amount,
                         )?;
                     }
 
