@@ -48,7 +48,7 @@ watch-azero:
 .PHONY: deploy-azero
 deploy-azero: # Deploy azero contracts
 deploy-azero:
-	cd azero && ./scripts/deploy.sh
+	cd azero && NODE=$(NODE) ./scripts/deploy.sh
 
 .PHONY: watch-relayer
 watch-relayer:

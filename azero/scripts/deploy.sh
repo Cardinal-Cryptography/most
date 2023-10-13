@@ -17,8 +17,12 @@ run_ink_dev
 
 cd "$CONTRACTS_PATH"/flipper
 cargo_contract build --release
-FLIPPER_CODE_HASH=$(cargo_contract upload --url "$NODE" --suri "$AUTHORITY_SEED" --output-json --skip-confirm  | jq -s . | jq -r '.[1].code_hash')
-FLIPPER=$(cargo_contract instantiate --url "$NODE" --constructor new --suri "$AUTHORITY_SEED" --skip-confirm --output-json | jq -r '.contract')
+
+FLIPPER_CODE_HASH=$(cargo_contract upload --url "$NODE" --suri "$AUTHORITY_SEED" --output-json --skip-confirm --dry-run | jq -s . | jq -r '.[0].code_hash')
+cargo_contract upload --url "$NODE" --suri "$AUTHORITY_SEED" --output-json --skip-confirm || true
+
+SALT=$(openssl rand -hex 32)
+FLIPPER=$(cargo_contract instantiate --url "$NODE" --salt "$SALT" --constructor new --suri "$AUTHORITY_SEED" --skip-confirm --output-json | jq -r '.contract')
 
 # spit adresses to a JSON file
 cd "$CONTRACTS_PATH"
