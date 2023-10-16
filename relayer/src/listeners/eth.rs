@@ -1,18 +1,23 @@
 use std::sync::Arc;
 
 use ethers::{
+    abi::EncodePackedError,
     core::types::Address,
     prelude::ContractError,
     providers::{Middleware, Provider, ProviderError, StreamExt, Ws},
+    utils::keccak256,
 };
-use log::info;
+use log::{debug, info, trace};
 use thiserror::Error;
 
 use crate::{
     config::Config,
     connections::{azero::SignedAzeroWsConnection, eth::SignedEthWsConnection},
-    contracts::{AzeroContractError, Flipper, FlipperEvents, FlipperInstance},
-    helpers::chunks,
+    contracts::{
+        AzeroContractError, CrosschainTransferRequestFilter, Membrane, MembraneEvents,
+        MembraneInstance,
+    },
+    helpers::concat_u8_arrays,
 };
 
 #[derive(Debug, Error)]
@@ -30,6 +35,9 @@ pub enum EthListenerError {
 
     #[error("azero contract error")]
     AzeroContract(#[from] AzeroContractError),
+
+    #[error("error when creating an ABI data encoding")]
+    AbiEncode(#[from] EncodePackedError),
 }
 
 pub struct EthListener;
@@ -42,30 +50,13 @@ impl EthListener {
     ) -> Result<(), EthListenerError> {
         let Config {
             eth_contract_address,
-            eth_last_known_block,
             ..
         } = &*config;
 
         let address = eth_contract_address.parse::<Address>()?;
-        let contract = Flipper::new(address, Arc::clone(&eth_connection));
+        let contract = Membrane::new(address, Arc::clone(&eth_connection));
 
         let last_block_number = eth_connection.get_block_number().await.unwrap().as_u32();
-
-        for (from, to) in chunks(*eth_last_known_block as u32, last_block_number, 1000) {
-            let past_events = contract
-                .events()
-                .from_block(from)
-                .to_block(to)
-                .query()
-                .await
-                .unwrap();
-
-            for event in past_events {
-                handle_event(&event, &config, Arc::clone(&azero_connection)).await?
-            }
-        }
-
-        info!("finished processing past events");
 
         let events = contract.events().from_block(last_block_number);
         let mut stream = events.stream().await.unwrap();
@@ -81,22 +72,56 @@ impl EthListener {
 }
 
 async fn handle_event(
-    event: &FlipperEvents,
+    event: &MembraneEvents,
     config: &Config,
     azero_connection: Arc<SignedAzeroWsConnection>,
 ) -> Result<(), EthListenerError> {
-    if let FlipperEvents::FlipFilter(flip_event) = event {
+    if let MembraneEvents::CrosschainTransferRequestFilter(
+        crosschain_transfer_event @ CrosschainTransferRequestFilter {
+            sender,
+            src_token_address,
+            amount,
+            dest_receiver_address,
+            request_nonce,
+        },
+    ) = event
+    {
         let Config {
             azero_contract_address,
             azero_contract_metadata,
             ..
         } = config;
 
-        info!("handling eth contract event: {flip_event:?}");
+        info!("handling eth contract event: {crosschain_transfer_event:?}");
 
-        let contract = FlipperInstance::new(azero_contract_address, azero_contract_metadata)?;
+        // concat bytes
+        let bytes = concat_u8_arrays(vec![
+            sender,
+            src_token_address,
+            &amount.as_u128().to_le_bytes(),
+            dest_receiver_address,
+            &request_nonce.as_u128().to_le_bytes(),
+        ]);
 
-        contract.flop(&azero_connection).await?;
+        trace!("event concatenated bytes: {bytes:?}");
+
+        let request_hash = keccak256(bytes);
+        debug!("hashed event encoding: {request_hash:?}");
+
+        let contract = MembraneInstance::new(azero_contract_address, azero_contract_metadata)?;
+
+        // send vote
+        contract
+            .receive_request(
+                &azero_connection,
+                request_hash,
+                *sender,
+                *src_token_address,
+                amount.as_u128(),
+                *dest_receiver_address,
+                request_nonce.as_u128(),
+            )
+            .await?;
     }
 
     Ok(())

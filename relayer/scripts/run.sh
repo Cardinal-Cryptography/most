@@ -6,7 +6,7 @@ set -eo pipefail
 # --- GLOBAL CONSTANTS
 
 ETH_ADDRESSES_FILE=$(pwd)/../eth/addresses.json
-AZERO_ADDRESSES_FILE=$(pwd)/../azero/contracts/addresses.json
+AZERO_ADDRESSES_FILE=$(pwd)/../azero/addresses.json
 
 # --- FUNCTIONS
 
@@ -18,4 +18,4 @@ function get_address {
 
 # --- RUN
 
-cargo run -- --rust-log=info --azero-contract-address=$(get_address $AZERO_ADDRESSES_FILE flipper) --eth-contract-address=$(get_address $ETH_ADDRESSES_FILE flipper)
+cargo run -- --rust-log=info --azero-contract-address=$(get_address $AZERO_ADDRESSES_FILE membrane) --eth-contract-address=$(get_address $ETH_ADDRESSES_FILE membrane)

@@ -1,4 +1,7 @@
-use std::str::FromStr;
+use std::{
+    str,
+    str::{FromStr, Utf8Error},
+};
 
 use aleph_client::{contract::ContractInstance, AccountId, SignedConnection, TxInfo};
 use thiserror::Error;
@@ -12,14 +15,17 @@ pub enum AzeroContractError {
 
     #[error("not account id")]
     NotAccountId(String),
+
+    #[error("Invalid UTF-8 sequence")]
+    InvalidUTF8(#[from] Utf8Error),
 }
 
 #[derive(Debug)]
-pub struct FlipperInstance {
+pub struct MembraneInstance {
     pub contract: ContractInstance,
 }
 
-impl FlipperInstance {
+impl MembraneInstance {
     pub fn new(address: &str, metadata_path: &str) -> Result<Self, AzeroContractError> {
         let address = AccountId::from_str(address)
             .map_err(|why| AzeroContractError::NotAccountId(why.to_string()))?;
@@ -28,13 +34,31 @@ impl FlipperInstance {
         })
     }
 
-    pub async fn flop(
+    #[allow(clippy::too_many_arguments)]
+    pub async fn receive_request(
         &self,
         signed_connection: &SignedConnection,
+        request_hash: [u8; 32],
+        sender: [u8; 32],
+        src_token_address: [u8; 32],
+        amount: u128,
+        dest_receiver_address: [u8; 32],
+        request_nonce: u128,
     ) -> Result<TxInfo, AzeroContractError> {
         Ok(self
             .contract
-            .contract_exec0(signed_connection, "flop")
+            .contract_exec(
+                signed_connection,
+                "receive_request",
+                &[
+                    str::from_utf8(&request_hash)?,
+                    str::from_utf8(&sender)?,
+                    str::from_utf8(&src_token_address)?,
+                    &amount.to_string(),
+                    str::from_utf8(&dest_receiver_address)?,
+                    &request_nonce.to_string(),
+                ],
+            )
             .await?)
     }
 }
