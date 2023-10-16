@@ -10,12 +10,12 @@ psp22 = { git = "https://github.com/Cardinal-Cryptography/PSP22.git", default-fe
     "mintable",
     "burnable",
 ]}
-psp22-traits = { path = "../psp22-traits" , default-features = false }
+psp22-traits = { path = "../psp22-traits", default-features = false }
 
 scale = { package = "parity-scale-codec", version = "3", default-features = false, features = [
 "derive",
 ] }
-scale-info = { version = "2.5", default-features = false, features = [
+scale-info = { version = "2.9", default-features = false, features = [
 "derive",
 ], optional = true }
 
@@ -29,5 +29,6 @@ std = [
   "scale/std",
   "scale-info/std",
   "psp22/std",
+  "psp22-traits/std",
 ]
 ink-as-dependency = []

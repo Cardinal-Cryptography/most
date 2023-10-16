@@ -618,6 +618,7 @@ dependencies = [
  "ink",
  "parity-scale-codec",
  "psp22",
+ "scale-info",
 ]
 
 [[package]]
