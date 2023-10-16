@@ -81,12 +81,6 @@ To deploy the contracts on the azero chain:
 make deploy-azero
 ```
 
-Interact with a deployed contract instance:
-
-```bash
-cd azero && ./scripts/interact.sh
-```
-
 ## Running the relayer process
 
 ```bash
