@@ -1,4 +1,5 @@
 NETWORK ?= development
+AZERO_ENV ?= dev
 
 .PHONY: help
 help: # Show help for each of the Makefile recipes.
@@ -48,6 +49,7 @@ watch-azero:
 azero-deps: # Install azero dependencies
 azero-deps:
 	cd azero && npm install
+	cargo install cargo-contract --version 2.0.0
 
 .PHONY: compile-azero
 compile-azero: # compile azero contracts and generate artifacts
