@@ -8,6 +8,7 @@ use ethers::{
     utils::keccak256,
 };
 use log::{debug, info, trace};
+use redis::aio::Connection as RedisConnection;
 use thiserror::Error;
 
 use crate::{
@@ -47,6 +48,7 @@ impl EthListener {
         config: Arc<Config>,
         azero_connection: Arc<SignedAzeroWsConnection>,
         eth_connection: Arc<SignedEthWsConnection>,
+        redis_connection: Arc<RedisConnection>,
     ) -> Result<(), EthListenerError> {
         let Config {
             eth_contract_address,

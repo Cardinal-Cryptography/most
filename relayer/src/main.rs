@@ -6,6 +6,7 @@ use connections::EthConnectionError;
 use ethers::signers::{LocalWallet, WalletError};
 use eyre::Result;
 use log::{error, info};
+use redis::Client as RedisClient;
 use thiserror::Error;
 use tokio::runtime::Runtime;
 
@@ -50,6 +51,9 @@ fn main() -> Result<()> {
     rt.block_on(async {
         let mut tasks = Vec::with_capacity(2);
 
+        let client = RedisClient::open(config.redis_node.clone()).unwrap();
+        let redis_connection = Arc::new(client.get_async_connection().await.unwrap());
+
         let keypair = aleph_client::keypair_from_string(&config.azero_sudo_seed);
 
         let azero_connection = Arc::new(azero::sign(
@@ -75,19 +79,33 @@ fn main() -> Result<()> {
         let config_rc1 = Arc::clone(&config);
         let azero_connection_rc1 = Arc::clone(&azero_connection);
         let eth_connection_rc1 = Arc::clone(&eth_connection);
+        let redis_connection_rc1 = Arc::clone(&redis_connection);
+
         tasks.push(tokio::spawn(async {
-            EthListener::run(config_rc1, azero_connection_rc1, eth_connection_rc1)
-                .await
-                .expect("Ethereum listener task has failed")
+            EthListener::run(
+                config_rc1,
+                azero_connection_rc1,
+                eth_connection_rc1,
+                redis_connection_rc1,
+            )
+            .await
+            .expect("Ethereum listener task has failed")
         }));
 
         let config_rc2 = Arc::clone(&config);
         let azero_connection_rc2 = Arc::clone(&azero_connection);
         let eth_connection_rc2 = Arc::clone(&eth_connection);
+        let redis_connection_rc2 = Arc::clone(&redis_connection);
+
         tasks.push(tokio::spawn(async {
-            AzeroListener::run(config_rc2, azero_connection_rc2, eth_connection_rc2)
-                .await
-                .expect("AlephZero listener task has failed")
+            AzeroListener::run(
+                config_rc2,
+                azero_connection_rc2,
+                eth_connection_rc2,
+                redis_connection_rc2,
+            )
+            .await
+            .expect("AlephZero listener task has failed")
         }));
 
         for t in tasks {

@@ -18,6 +18,7 @@ use ethers::{
 };
 use futures::StreamExt;
 use log::{debug, info, trace};
+use redis::aio::Connection as RedisConnection;
 use subxt::{events::Events, utils::H256};
 use thiserror::Error;
 
@@ -81,6 +82,7 @@ impl AzeroListener {
         config: Arc<Config>,
         azero_connection: Arc<SignedAzeroWsConnection>,
         eth_connection: Arc<SignedEthWsConnection>,
+        redis_connection: Arc<RedisConnection>,
     ) -> Result<(), AzeroListenerError> {
         let Config {
             azero_contract_metadata,
