@@ -602,11 +602,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "psp22"
+version = "0.1.0"
+source = "git+https://github.com/Cardinal-Cryptography/PSP22.git#c6744743e645f8120ceef84e2dbadf8f194fdb4f"
+dependencies = [
+ "ink",
+ "parity-scale-codec",
+ "scale-info",
+]
+
+[[package]]
 name = "psp22-traits"
 version = "1.0.0"
 dependencies = [
  "ink",
  "parity-scale-codec",
+ "psp22",
  "scale-info",
 ]
 

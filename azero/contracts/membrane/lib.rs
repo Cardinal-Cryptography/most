@@ -12,7 +12,8 @@ mod membrane {
         reflect::ContractEventBase,
         storage::Mapping,
     };
-    use psp22_traits::{Mintable, PSP22Error, PSP22};
+    use psp22::{PSP22Error, PSP22};
+    use psp22_traits::Mintable;
     use scale::{Decode, Encode};
 
     #[ink(event)]
