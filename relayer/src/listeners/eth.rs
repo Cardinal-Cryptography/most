@@ -60,6 +60,7 @@ impl EthPastEventsListener {
         let Config {
             eth_contract_address,
             name,
+            sync_step,
             ..
         } = &*config;
 
@@ -76,7 +77,7 @@ impl EthPastEventsListener {
 
         info!("retrieved last known block number: {last_known_block_number}");
 
-        for (from, to) in chunks(last_known_block_number, last_block_number, 1000) {
+        for (from, to) in chunks(last_known_block_number, last_block_number, *sync_step) {
             let past_events = contract
                 .events()
                 .from_block(from)

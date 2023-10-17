@@ -30,6 +30,9 @@ pub struct Config {
     #[arg(long, default_value = "ws://127.0.0.1:8546")]
     pub eth_node_wss_url: String,
 
+    #[arg(long, default_value = "1000")]
+    pub sync_step: u32,
+
     #[arg(long, default_value = "redis://127.0.0.1:6379")]
     pub redis_node: String,
 

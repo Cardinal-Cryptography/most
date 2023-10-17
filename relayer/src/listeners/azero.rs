@@ -85,7 +85,6 @@ pub enum AzeroListenerError {
 
 pub struct AlephZeroPastEventsListener;
 
-// TODO
 impl AlephZeroPastEventsListener {
     pub async fn run(
         config: Arc<Config>,
@@ -97,6 +96,7 @@ impl AlephZeroPastEventsListener {
             azero_contract_metadata,
             azero_contract_address,
             name,
+            sync_step,
             ..
         } = &*config;
 
@@ -115,7 +115,7 @@ impl AlephZeroPastEventsListener {
         let instance = MembraneInstance::new(azero_contract_address, azero_contract_metadata)?;
         let contracts = vec![&instance.contract];
 
-        for (from, to) in chunks(last_known_block_number, last_block_number, 1000) {
+        for (from, to) in chunks(last_known_block_number, last_block_number, *sync_step) {
             for block_number in from..to {
                 let block_hash = azero_connection
                     .get_block_hash(block_number)
