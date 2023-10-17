@@ -8,7 +8,7 @@ use ethers::{
     signers::Wallet,
     utils::keccak256,
 };
-use log::{debug, info, trace};
+use log::{debug, info, trace, warn};
 use redis::{aio::Connection as RedisConnection, AsyncCommands, RedisError};
 use thiserror::Error;
 use tokio::sync::Mutex;
@@ -69,9 +69,14 @@ impl EthPastEventsListener {
 
         let mut connection = redis_connection.lock().await;
 
-        let last_known_block_number: u32 = connection
-            .get(format!("{name}:{ETH_LAST_BLOCK_KEY}"))
-            .await?;
+        let last_known_block_number: u32 =
+            match connection.get(format!("{name}:{ETH_LAST_BLOCK_KEY}")).await {
+                Ok(value) => value,
+                Err(why) => {
+                    warn!("Redis connection error {why:?}");
+                    0u32
+                }
+            };
 
         let last_block_number = eth_connection.get_block_number().await.unwrap().as_u32();
 

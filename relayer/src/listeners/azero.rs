@@ -18,7 +18,7 @@ use ethers::{
     utils::keccak256,
 };
 use futures::StreamExt;
-use log::{debug, info, trace};
+use log::{debug, info, trace, warn};
 use redis::{aio::Connection as RedisConnection, AsyncCommands, RedisError};
 use subxt::{events::Events, utils::H256};
 use thiserror::Error;
@@ -102,9 +102,16 @@ impl AlephZeroPastEventsListener {
 
         let mut connection = redis_connection.lock().await;
 
-        let last_known_block_number: u32 = connection
+        let last_known_block_number: u32 = match connection
             .get(format!("{name}:{ALEPH_LAST_BLOCK_KEY}"))
-            .await?;
+            .await
+        {
+            Ok(value) => value,
+            Err(why) => {
+                warn!("Redis connection error {why:?}");
+                0u32
+            }
+        };
 
         // replay past events from last known to the latest
         let last_block_number = azero_connection
@@ -208,7 +215,6 @@ impl AlephZeroListener {
 
 async fn handle_events(
     eth_connection: Arc<SignedEthWsConnection>,
-    // redis_connection: Arc<Mutex<RedisConnection>>,
     config: &Config,
     events: Events<AlephConfig>,
     contracts: &[&ContractInstance],
@@ -223,13 +229,7 @@ async fn handle_events(
             block_hash,
         }),
     ) {
-        handle_event(
-            Arc::clone(&eth_connection),
-            // Arc::clone(&redis_connection),
-            config,
-            event?,
-        )
-        .await?;
+        handle_event(Arc::clone(&eth_connection), config, event?).await?;
     }
     Ok(())
 }
