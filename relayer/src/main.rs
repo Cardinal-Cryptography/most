@@ -13,7 +13,7 @@ use tokio::{runtime::Runtime, sync::Mutex};
 use crate::{
     connections::{azero, eth},
     listeners::{
-        AzeroListener, AzeroListenerError, EthListener, EthListenerError, EthPastEventsListener,
+        AlephZeroListener, AzeroListenerError, EthListener, EthListenerError, EthPastEventsListener,
     },
 };
 
@@ -117,7 +117,7 @@ fn main() -> Result<()> {
         let redis_connection_rc4 = Arc::clone(&redis_connection);
 
         tasks.push(tokio::spawn(async {
-            AzeroListener::run(
+            AlephZeroListener::run(
                 config_rc4,
                 azero_connection_rc4,
                 eth_connection_rc4,

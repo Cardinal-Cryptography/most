@@ -81,9 +81,11 @@ pub enum AzeroListenerError {
     Unexpected,
 }
 
-pub struct AzeroListener;
+// pub struct AlephPastEventsListener;
 
-impl AzeroListener {
+pub struct AlephZeroListener;
+
+impl AlephZeroListener {
     pub async fn run(
         config: Arc<Config>,
         azero_connection: Arc<SignedAzeroWsConnection>,
@@ -117,7 +119,6 @@ impl AzeroListener {
             let events = block.events().await?;
             handle_events(
                 Arc::clone(&eth_connection),
-                // Arc::clone(&redis_connection),
                 &config,
                 events,
                 &contracts,
@@ -182,7 +183,6 @@ fn get_event_data(
 
 async fn handle_event(
     eth_connection: Arc<SignedEthWsConnection>,
-    // redis_connection: Arc<Mutex<RedisConnection>>,
     config: &Config,
     event: ContractEvent,
 ) -> Result<(), AzeroListenerError> {
@@ -207,6 +207,7 @@ async fn handle_event(
             let amount = U256::from_little_endian(&amount);
             let request_nonce = U256::from_little_endian(&request_nonce);
 
+            // hash event data
             let bytes = abi::encode_packed(&[
                 Token::FixedBytes(sender.to_vec()),
                 Token::FixedBytes(src_token_address.to_vec()),
@@ -217,16 +218,14 @@ async fn handle_event(
 
             trace!("ABI event encoding: {bytes:?}");
 
-            // hash event data
-
             let request_hash = keccak256(bytes);
+
             debug!("hashed event encoding: {request_hash:?}");
 
             let address = eth_contract_address.parse::<Address>()?;
             let contract = Membrane::new(address, eth_connection);
 
             //  forward transfer & vote
-
             let call: ContractCall<SignedEthWsConnection, ()> = contract.receive_request(
                 request_hash,
                 sender,
