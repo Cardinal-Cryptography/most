@@ -29,10 +29,10 @@ async function main(): Promise<void> {
     console.log('membrane address:', membraneAddress);
 
     const { address: wethAddress } = await tokenConstructors.new(
-        0,
-        "wETH",
-        "wETH",
-        12
+        0, // initial supply
+        "wETH", // name
+        "wETH", // symbol
+        12 // decimals
     );
 
     console.log('token address:', wethAddress);
