@@ -13,7 +13,8 @@ use tokio::{runtime::Runtime, sync::Mutex};
 use crate::{
     connections::{azero, eth},
     listeners::{
-        AlephZeroListener, AzeroListenerError, EthListener, EthListenerError, EthPastEventsListener,
+        AlephZeroListener, AlephZeroPastEventsListener, AzeroListenerError, EthListener,
+        EthListenerError, EthPastEventsListener,
     },
 };
 
@@ -92,7 +93,7 @@ fn main() -> Result<()> {
                 redis_connection_rc1,
             )
             .await
-            .expect("Ethereum listener task has failed")
+            .expect("Ethereum past events listener task has failed")
         }));
 
         let config_rc2 = Arc::clone(&config);
@@ -109,6 +110,22 @@ fn main() -> Result<()> {
             )
             .await
             .expect("Ethereum listener task has failed")
+        }));
+
+        let config_rc3 = Arc::clone(&config);
+        let azero_connection_rc3 = Arc::clone(&azero_connection);
+        let eth_connection_rc3 = Arc::clone(&eth_connection);
+        let redis_connection_rc3 = Arc::clone(&redis_connection);
+
+        tasks.push(tokio::spawn(async {
+            AlephZeroPastEventsListener::run(
+                config_rc3,
+                azero_connection_rc3,
+                eth_connection_rc3,
+                redis_connection_rc3,
+            )
+            .await
+            .expect("AlephZero past events listener task has failed")
         }));
 
         let config_rc4 = Arc::clone(&config);
