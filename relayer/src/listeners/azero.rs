@@ -32,6 +32,8 @@ use crate::{
     contracts::{AzeroContractError, Membrane, MembraneInstance},
 };
 
+const AZERO_LAST_BLOCK_KEY: &str = "alephzero_last_known_block_number";
+
 #[derive(Debug, Error)]
 #[error(transparent)]
 #[non_exhaustive]
@@ -91,6 +93,7 @@ impl AzeroListener {
         let Config {
             azero_contract_metadata,
             azero_contract_address,
+            name,
             ..
         } = &*config;
 
@@ -109,17 +112,26 @@ impl AzeroListener {
         info!("subscribing to new events");
 
         while let Some(Ok(block)) = subscription.next().await {
+            let block_number = block.number();
+
             let events = block.events().await?;
             handle_events(
                 Arc::clone(&eth_connection),
-                Arc::clone(&redis_connection),
+                // Arc::clone(&redis_connection),
                 &config,
                 events,
                 &contracts,
-                block.number(),
+                block_number,
                 block.hash(),
             )
             .await?;
+
+            let mut connection = redis_connection.lock().await;
+            connection
+                .set(format!("{name}:{AZERO_LAST_BLOCK_KEY}"), block_number)
+                .await?;
+
+            info!("persisted last_block_number: {block_number}");
         }
 
         Ok(())
@@ -128,7 +140,7 @@ impl AzeroListener {
 
 async fn handle_events(
     eth_connection: Arc<SignedEthWsConnection>,
-    redis_connection: Arc<Mutex<RedisConnection>>,
+    // redis_connection: Arc<Mutex<RedisConnection>>,
     config: &Config,
     events: Events<AlephConfig>,
     contracts: &[&ContractInstance],
@@ -145,7 +157,7 @@ async fn handle_events(
     ) {
         handle_event(
             Arc::clone(&eth_connection),
-            Arc::clone(&redis_connection),
+            // Arc::clone(&redis_connection),
             config,
             event?,
         )
@@ -170,7 +182,7 @@ fn get_event_data(
 
 async fn handle_event(
     eth_connection: Arc<SignedEthWsConnection>,
-    redis_connection: Arc<Mutex<RedisConnection>>,
+    // redis_connection: Arc<Mutex<RedisConnection>>,
     config: &Config,
     event: ContractEvent,
 ) -> Result<(), AzeroListenerError> {
@@ -231,19 +243,6 @@ async fn handle_event(
                 .ok_or(AzeroListenerError::NoTxReceipt)?;
 
             info!("eth tx confirmed: {tx:?}");
-
-            if let Some(meta) = event.block_details {
-                let block_number = meta.block_number;
-                let mut connection = redis_connection.lock().await;
-                connection
-                    .set(
-                        format!("{name}:azero_last_block_number:{block_number}"),
-                        block_number,
-                    )
-                    .await?;
-
-                info!("persisted last_block_number: {block_number}");
-            };
         }
     }
     Ok(())
