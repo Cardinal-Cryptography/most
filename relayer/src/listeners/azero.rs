@@ -18,9 +18,10 @@ use ethers::{
 };
 use futures::StreamExt;
 use log::{debug, info, trace};
-use redis::aio::Connection as RedisConnection;
+use redis::{aio::Connection as RedisConnection, AsyncCommands, RedisError};
 use subxt::{events::Events, utils::H256};
 use thiserror::Error;
+use tokio::sync::Mutex;
 
 use crate::{
     config::Config,
@@ -71,6 +72,9 @@ pub enum AzeroListenerError {
     #[error("error when creating an ABI data encoding")]
     AbiEncode(#[from] EncodePackedError),
 
+    #[error("redis connection error")]
+    Redis(#[from] RedisError),
+
     #[error("unexpected error")]
     Unexpected,
 }
@@ -82,7 +86,7 @@ impl AzeroListener {
         config: Arc<Config>,
         azero_connection: Arc<SignedAzeroWsConnection>,
         eth_connection: Arc<SignedEthWsConnection>,
-        redis_connection: Arc<RedisConnection>,
+        redis_connection: Arc<Mutex<RedisConnection>>,
     ) -> Result<(), AzeroListenerError> {
         let Config {
             azero_contract_metadata,
@@ -108,6 +112,7 @@ impl AzeroListener {
             let events = block.events().await?;
             handle_events(
                 Arc::clone(&eth_connection),
+                Arc::clone(&redis_connection),
                 &config,
                 events,
                 &contracts,
@@ -123,6 +128,7 @@ impl AzeroListener {
 
 async fn handle_events(
     eth_connection: Arc<SignedEthWsConnection>,
+    redis_connection: Arc<Mutex<RedisConnection>>,
     config: &Config,
     events: Events<AlephConfig>,
     contracts: &[&ContractInstance],
@@ -137,7 +143,13 @@ async fn handle_events(
             block_hash,
         }),
     ) {
-        handle_event(Arc::clone(&eth_connection), config, event?).await?;
+        handle_event(
+            Arc::clone(&eth_connection),
+            Arc::clone(&redis_connection),
+            config,
+            event?,
+        )
+        .await?;
     }
     Ok(())
 }
@@ -158,6 +170,7 @@ fn get_event_data(
 
 async fn handle_event(
     eth_connection: Arc<SignedEthWsConnection>,
+    redis_connection: Arc<Mutex<RedisConnection>>,
     config: &Config,
     event: ContractEvent,
 ) -> Result<(), AzeroListenerError> {
@@ -218,6 +231,20 @@ async fn handle_event(
                 .ok_or(AzeroListenerError::NoTxReceipt)?;
 
             info!("eth tx confirmed: {tx:?}");
+
+            match event.block_details {
+                Some(meta) => {
+                    let block_number = meta.block_number;
+                    let mut connection = redis_connection.lock().await;
+                    connection
+                        .set(
+                            format!("{name}:ethereum_last_block_number:{block_number}"),
+                            block_number,
+                        )
+                        .await?;
+                }
+                None => todo!(),
+            }
         }
     }
     Ok(())

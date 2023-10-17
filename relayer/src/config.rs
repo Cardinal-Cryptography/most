@@ -1,6 +1,9 @@
 #[derive(Debug, clap::Parser)]
 pub struct Config {
     #[arg(long)]
+    pub name: String,
+
+    #[arg(long)]
     pub azero_contract_address: String,
 
     #[arg(long, default_value = "../azero/artifacts/membrane.json")]

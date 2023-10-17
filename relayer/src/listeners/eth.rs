@@ -3,13 +3,15 @@ use std::sync::Arc;
 use ethers::{
     abi::EncodePackedError,
     core::types::Address,
-    prelude::ContractError,
+    prelude::{k256::ecdsa::SigningKey, ContractError, SignerMiddleware},
     providers::{Middleware, Provider, ProviderError, StreamExt, Ws},
+    signers::Wallet,
     utils::keccak256,
 };
 use log::{debug, info, trace};
-use redis::aio::Connection as RedisConnection;
+use redis::{aio::Connection as RedisConnection, AsyncCommands, RedisError};
 use thiserror::Error;
+use tokio::sync::Mutex;
 
 use crate::{
     config::Config,
@@ -32,13 +34,16 @@ pub enum EthListenerError {
     FromHex(#[from] rustc_hex::FromHexError),
 
     #[error("contract error")]
-    Contract(#[from] ContractError<Provider<Ws>>),
+    Contract(#[from] ContractError<SignerMiddleware<Provider<Ws>, Wallet<SigningKey>>>),
 
     #[error("azero contract error")]
     AzeroContract(#[from] AzeroContractError),
 
     #[error("error when creating an ABI data encoding")]
     AbiEncode(#[from] EncodePackedError),
+
+    #[error("redis connection error")]
+    Redis(#[from] RedisError),
 }
 
 pub struct EthListener;
@@ -48,7 +53,7 @@ impl EthListener {
         config: Arc<Config>,
         azero_connection: Arc<SignedAzeroWsConnection>,
         eth_connection: Arc<SignedEthWsConnection>,
-        redis_connection: Arc<RedisConnection>,
+        redis_connection: Arc<Mutex<RedisConnection>>,
     ) -> Result<(), EthListenerError> {
         let Config {
             eth_contract_address,
@@ -61,12 +66,21 @@ impl EthListener {
         let last_block_number = eth_connection.get_block_number().await.unwrap().as_u32();
 
         let events = contract.events().from_block(last_block_number);
-        let mut stream = events.stream().await.unwrap();
+        let mut stream = events.stream().await?.with_meta();
 
         info!("subscribing to new events");
 
-        while let Some(Ok(event)) = stream.next().await {
-            handle_event(&event, &config, Arc::clone(&azero_connection)).await?;
+        while let Some(Ok((event, meta))) = stream.next().await {
+            let block_number = meta.block_number.as_u32();
+
+            handle_event(
+                block_number,
+                &event,
+                &config,
+                Arc::clone(&azero_connection),
+                Arc::clone(&redis_connection),
+            )
+            .await?;
         }
 
         Ok(())
@@ -74,9 +88,12 @@ impl EthListener {
 }
 
 async fn handle_event(
+    block_number: u32,
     event: &MembraneEvents,
     config: &Config,
     azero_connection: Arc<SignedAzeroWsConnection>,
+    // redis_connection: &mut RedisConnection,
+    redis_connection: Arc<Mutex<RedisConnection>>,
 ) -> Result<(), EthListenerError> {
     if let MembraneEvents::CrosschainTransferRequestFilter(
         crosschain_transfer_event @ CrosschainTransferRequestFilter {
@@ -91,6 +108,7 @@ async fn handle_event(
         let Config {
             azero_contract_address,
             azero_contract_metadata,
+            name,
             ..
         } = config;
 
@@ -122,6 +140,15 @@ async fn handle_event(
                 amount.as_u128(),
                 *dest_receiver_address,
                 request_nonce.as_u128(),
+            )
+            .await?;
+
+        // persist the last seen block no
+        let mut connection = redis_connection.lock().await;
+        connection
+            .set(
+                format!("{name}:ethereum_last_block_number:{block_number}"),
+                block_number,
             )
             .await?;
     }

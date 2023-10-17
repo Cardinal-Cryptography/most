@@ -8,7 +8,7 @@ use eyre::Result;
 use log::{error, info};
 use redis::Client as RedisClient;
 use thiserror::Error;
-use tokio::runtime::Runtime;
+use tokio::{runtime::Runtime, sync::Mutex};
 
 use crate::{
     connections::{azero, eth},
@@ -51,8 +51,9 @@ fn main() -> Result<()> {
     rt.block_on(async {
         let mut tasks = Vec::with_capacity(2);
 
-        let client = RedisClient::open(config.redis_node.clone()).unwrap();
-        let redis_connection = Arc::new(client.get_async_connection().await.unwrap());
+        let client = RedisClient::open(config.redis_node.clone())
+            .expect("Cannot connect to the redis cluster instance");
+        let redis_connection = Arc::new(Mutex::new(client.get_async_connection().await.unwrap()));
 
         let keypair = aleph_client::keypair_from_string(&config.azero_sudo_seed);
 
