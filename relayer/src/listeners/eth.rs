@@ -20,8 +20,10 @@ use crate::{
         AzeroContractError, CrosschainTransferRequestFilter, Membrane, MembraneEvents,
         MembraneInstance,
     },
-    helpers::concat_u8_arrays,
+    helpers::{chunks, concat_u8_arrays},
 };
+
+const ETH_LAST_BLOCK_KEY: &str = "ethereum_last_known_block_number";
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -46,6 +48,54 @@ pub enum EthListenerError {
     Redis(#[from] RedisError),
 }
 
+pub struct EthPastEventsListener;
+
+impl EthPastEventsListener {
+    pub async fn run(
+        config: Arc<Config>,
+        azero_connection: Arc<SignedAzeroWsConnection>,
+        eth_connection: Arc<SignedEthWsConnection>,
+        redis_connection: Arc<Mutex<RedisConnection>>,
+    ) -> Result<(), EthListenerError> {
+        let Config {
+            eth_contract_address,
+            name,
+            ..
+        } = &*config;
+
+        let address = eth_contract_address.parse::<Address>()?;
+        let contract = Membrane::new(address, Arc::clone(&eth_connection));
+
+        let mut connection = redis_connection.lock().await;
+
+        let last_known_block_number: u32 = connection
+            .get(format!("{name}:{ETH_LAST_BLOCK_KEY}"))
+            .await?;
+
+        let last_block_number = eth_connection.get_block_number().await.unwrap().as_u32();
+
+        info!("retrieved last known block number: {last_known_block_number}");
+
+        for (from, to) in chunks(last_known_block_number, last_block_number, 1000) {
+            let past_events = contract
+                .events()
+                .from_block(from)
+                .to_block(to)
+                .query()
+                .await
+                .unwrap();
+
+            for event in past_events {
+                handle_event(&event, &config, Arc::clone(&azero_connection)).await?
+            }
+        }
+
+        info!("finished processing past events");
+
+        Ok(())
+    }
+}
+
 pub struct EthListener;
 
 impl EthListener {
@@ -57,6 +107,7 @@ impl EthListener {
     ) -> Result<(), EthListenerError> {
         let Config {
             eth_contract_address,
+            name,
             ..
         } = &*config;
 
@@ -71,16 +122,16 @@ impl EthListener {
         info!("subscribing to new events");
 
         while let Some(Ok((event, meta))) = stream.next().await {
-            let block_number = meta.block_number.as_u32();
+            handle_event(&event, &config, Arc::clone(&azero_connection)).await?;
 
-            handle_event(
-                block_number,
-                &event,
-                &config,
-                Arc::clone(&azero_connection),
-                Arc::clone(&redis_connection),
-            )
-            .await?;
+            // persist the last seen block number
+            let block_number = meta.block_number.as_u32();
+            let mut connection = redis_connection.lock().await;
+            connection
+                .set(format!("{name}:{ETH_LAST_BLOCK_KEY}"), block_number)
+                .await?;
+
+            info!("persisted last known block number: {block_number}");
         }
 
         Ok(())
@@ -88,12 +139,9 @@ impl EthListener {
 }
 
 async fn handle_event(
-    block_number: u32,
     event: &MembraneEvents,
     config: &Config,
     azero_connection: Arc<SignedAzeroWsConnection>,
-    // redis_connection: &mut RedisConnection,
-    redis_connection: Arc<Mutex<RedisConnection>>,
 ) -> Result<(), EthListenerError> {
     if let MembraneEvents::CrosschainTransferRequestFilter(
         crosschain_transfer_event @ CrosschainTransferRequestFilter {
@@ -108,7 +156,6 @@ async fn handle_event(
         let Config {
             azero_contract_address,
             azero_contract_metadata,
-            name,
             ..
         } = config;
 
@@ -142,17 +189,6 @@ async fn handle_event(
                 request_nonce.as_u128(),
             )
             .await?;
-
-        // persist the last seen block no
-        let mut connection = redis_connection.lock().await;
-        connection
-            .set(
-                format!("{name}:ethereum_last_block_number:{block_number}"),
-                block_number,
-            )
-            .await?;
-
-        info!("persisted last_block_number: {block_number}");
     }
 
     Ok(())

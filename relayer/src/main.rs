@@ -12,7 +12,9 @@ use tokio::{runtime::Runtime, sync::Mutex};
 
 use crate::{
     connections::{azero, eth},
-    listeners::{AzeroListener, AzeroListenerError, EthListener, EthListenerError},
+    listeners::{
+        AzeroListener, AzeroListenerError, EthListener, EthListenerError, EthPastEventsListener,
+    },
 };
 
 mod config;
@@ -49,7 +51,7 @@ fn main() -> Result<()> {
     let rt = Runtime::new()?;
 
     rt.block_on(async {
-        let mut tasks = Vec::with_capacity(2);
+        let mut tasks = Vec::with_capacity(4);
 
         let client = RedisClient::open(config.redis_node.clone())
             .expect("Cannot connect to the redis cluster instance");
@@ -83,7 +85,7 @@ fn main() -> Result<()> {
         let redis_connection_rc1 = Arc::clone(&redis_connection);
 
         tasks.push(tokio::spawn(async {
-            EthListener::run(
+            EthPastEventsListener::run(
                 config_rc1,
                 azero_connection_rc1,
                 eth_connection_rc1,
@@ -99,11 +101,27 @@ fn main() -> Result<()> {
         let redis_connection_rc2 = Arc::clone(&redis_connection);
 
         tasks.push(tokio::spawn(async {
-            AzeroListener::run(
+            EthListener::run(
                 config_rc2,
                 azero_connection_rc2,
                 eth_connection_rc2,
                 redis_connection_rc2,
+            )
+            .await
+            .expect("Ethereum listener task has failed")
+        }));
+
+        let config_rc4 = Arc::clone(&config);
+        let azero_connection_rc4 = Arc::clone(&azero_connection);
+        let eth_connection_rc4 = Arc::clone(&eth_connection);
+        let redis_connection_rc4 = Arc::clone(&redis_connection);
+
+        tasks.push(tokio::spawn(async {
+            AzeroListener::run(
+                config_rc4,
+                azero_connection_rc4,
+                eth_connection_rc4,
+                redis_connection_rc4,
             )
             .await
             .expect("AlephZero listener task has failed")
