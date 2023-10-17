@@ -171,8 +171,7 @@ async fn handle_event(
             let data = event.data;
 
             // decode event data
-            let sender = get_event_data(&data, "sender")?;
-            let src_token_address = get_event_data(&data, "src_token_address")?;
+            let dest_token_address = get_event_data(&data, "dest_token_address")?;
             let amount = get_event_data(&data, "amount")?;
             let dest_receiver_address = get_event_data(&data, "dest_receiver_address")?;
             let request_nonce = get_event_data(&data, "request_nonce")?;
@@ -181,8 +180,7 @@ async fn handle_event(
             let request_nonce = U256::from_little_endian(&request_nonce);
 
             let bytes = abi::encode_packed(&[
-                Token::FixedBytes(sender.to_vec()),
-                Token::FixedBytes(src_token_address.to_vec()),
+                Token::FixedBytes(dest_token_address.to_vec()),
                 Token::Int(amount),
                 Token::FixedBytes(dest_receiver_address.to_vec()),
                 Token::Int(request_nonce),
@@ -202,8 +200,7 @@ async fn handle_event(
 
             let call: ContractCall<SignedEthWsConnection, ()> = contract.receive_request(
                 request_hash,
-                sender,
-                src_token_address,
+                dest_token_address,
                 amount,
                 dest_receiver_address,
                 request_nonce,

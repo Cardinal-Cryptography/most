@@ -23,8 +23,7 @@ contract Membrane {
     mapping(address => bool) private guardians;
 
     event CrosschainTransferRequest(
-        bytes32 sender,
-        bytes32 indexed srcTokenAddress,
+        bytes32 indexed destTokenAddress,
         uint256 amount,
         bytes32 destReceiverAddress,
         uint256 requestNonce
@@ -60,12 +59,12 @@ contract Membrane {
 
     // TODO: remove pair
 
-    function bytes32toAddress(bytes32 data) internal pure returns (address) {
+    function bytes32ToAddress(bytes32 data) internal pure returns (address) {
         return address(uint160(uint256(data)));
     }
 
-    function addressToBytes32(address addr) public pure returns (bytes32) {
-        return bytes32(uint256(uint160(addr)) << 96);
+    function addressToBytes32(address addr) internal pure returns (bytes32) {
+        return bytes32(uint256(uint160(addr)));
     }
 
     // Invoke this tx to transfer funds to the destination chain.
@@ -75,20 +74,22 @@ contract Membrane {
     // Tx emits a CrosschainTransferRequest event that the relayers listen to
     // & forward to the destination chain.
     function sendRequest(
-        address srcTokenAddress,
+        bytes32 srcTokenAddress,
         uint256 amount,
         bytes32 destReceiverAddress
     ) external {
         address sender = msg.sender;
 
-        IERC20 token = IERC20(srcTokenAddress);
+        IERC20 token = IERC20(bytes32ToAddress(srcTokenAddress));
         // lock tokens in this contract
         // message sender needs to give approval else this tx will revert
         token.transferFrom(sender, address(this), amount);
 
+        bytes32 destTokenAddress = supportedPairs[srcTokenAddress];
+        require(destTokenAddress != 0x0, "Unsupported pair");
+
         emit CrosschainTransferRequest(
-            addressToBytes32(sender),
-            addressToBytes32(srcTokenAddress),
+            destTokenAddress,
             amount,
             destReceiverAddress,
             requestNonce
@@ -100,8 +101,7 @@ contract Membrane {
     // aggregates relayer signatures and burns/mints the token
     function receiveRequest(
         bytes32 _requestHash,
-        bytes32 sender,
-        bytes32 srcTokenAddress,
+        bytes32 destTokenAddress,
         uint256 amount,
         bytes32 destReceiverAddress,
         uint256 _requestNonce
@@ -111,8 +111,7 @@ contract Membrane {
             "This request has already been processed"
         );
 
-        bytes32 requestHash = keccak256(abi.encodePacked(sender,
-                                                         srcTokenAddress,
+        bytes32 requestHash = keccak256(abi.encodePacked(destTokenAddress,
                                                          amount,
                                                          destReceiverAddress,
                                                          _requestNonce));
@@ -121,9 +120,6 @@ contract Membrane {
             _requestHash == requestHash,
             "Hash does not match the data"
         );
-
-       bytes32 destTokenAddress = supportedPairs[srcTokenAddress];
-       require(destTokenAddress != 0x0, "Unsupported pair");
         
         Request storage request = pendingRequests[requestHash];
 
@@ -139,9 +135,9 @@ contract Membrane {
             delete pendingRequests[requestHash];
 
             // returns the locked tokens
-            IERC20 token = IERC20(bytes32toAddress(destTokenAddress));
+            IERC20 token = IERC20(bytes32ToAddress(destTokenAddress));
 
-            token.transfer(bytes32toAddress(destReceiverAddress), amount);
+            token.transfer(bytes32ToAddress(destReceiverAddress), amount);
             emit RequestProcessed(requestHash);
         }
     }
