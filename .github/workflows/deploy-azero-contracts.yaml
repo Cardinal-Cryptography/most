@@ -4,7 +4,7 @@ name: Bridgenet - deploy azero contracts
 on:
   push:
     branches:
-      - '**'
+      - 'main'
 
 jobs:
   compile:
@@ -14,20 +14,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Install rust toolchain
-        uses: Cardinal-Cryptography/aleph-node/.github/actions/install-rust-toolchain@5eda3cd85e7e3aec3f2db7a26631c65d52c4b9ea
-
       - name: Setup node
         uses: asdf-vm/actions/install@v2
 
-      - name: Install dependencies
+      - name: Compile and deploy contracts
         shell: bash
-        run: make azero-deps
-
-      - name: Compile contracts
-        shell: bash
-        run: make compile-azero
-
-      - name: Deploy contracts
-        shell: bash
-        run: AZERO_ENV=bridgenet make deploy-azero
+        run: AZERO_ENV=bridgenet make deploy-azero-docker
