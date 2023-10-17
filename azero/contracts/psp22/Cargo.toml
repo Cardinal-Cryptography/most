@@ -1,18 +1,22 @@
 [package]
-name = "psp22"
+name = "token"
 version = "1.0.0"
-authors = ["fbielejec <filip.bielejec@cardinals.cc>"]
+authors = ["Cardinal Cryptography"]
 edition = "2021"
 
 [dependencies]
 ink = { version = "=4.3.0", default-features = false }
-psp22-traits = { path = "../psp22-traits" , default-features = false }
+psp22 = { git = "https://github.com/Cardinal-Cryptography/PSP22.git", default-features = false, features = [
+      "mintable",
+      "burnable",
+]}
+psp22-traits = { path = "../psp22-traits", default-features = false }
 
 scale = { package = "parity-scale-codec", version = "3", default-features = false, features = [
-    "derive",
+      "derive",
 ] }
 scale-info = { version = "2.5", default-features = false, features = [
-    "derive",
+      "derive",
 ], optional = true }
 
 [lib]
@@ -20,5 +24,11 @@ path = "lib.rs"
 
 [features]
 default = ["std"]
-std = ["ink/std", "scale/std", "scale-info/std", "psp22-traits/std"]
+std = [
+    "ink/std",
+    "scale/std",
+    "scale-info/std",
+    "psp22/std",
+    "psp22-traits/std",
+]
 ink-as-dependency = []
