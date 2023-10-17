@@ -6,6 +6,7 @@ use aleph_client::{
         ContractInstance,
     },
     contract_transcode::Value,
+    utility::BlocksApi,
     AlephConfig, AsConnection,
 };
 use ethers::{
@@ -30,9 +31,10 @@ use crate::{
         eth::{EthConnectionError, EthWsConnection, SignedEthWsConnection},
     },
     contracts::{AzeroContractError, Membrane, MembraneInstance},
+    helpers::chunks,
 };
 
-const AZERO_LAST_BLOCK_KEY: &str = "alephzero_last_known_block_number";
+const ALEPH_LAST_BLOCK_KEY: &str = "alephzero_last_known_block_number";
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -81,7 +83,72 @@ pub enum AzeroListenerError {
     Unexpected,
 }
 
-// pub struct AlephPastEventsListener;
+pub struct AlephZeroPastEventsListener;
+
+// TODO
+impl AlephZeroPastEventsListener {
+    pub async fn run(
+        config: Arc<Config>,
+        azero_connection: Arc<SignedAzeroWsConnection>,
+        eth_connection: Arc<SignedEthWsConnection>,
+        redis_connection: Arc<Mutex<RedisConnection>>,
+    ) -> Result<(), AzeroListenerError> {
+        let Config {
+            azero_contract_metadata,
+            azero_contract_address,
+            name,
+            ..
+        } = &*config;
+
+        let mut connection = redis_connection.lock().await;
+
+        let last_known_block_number: u32 = connection
+            .get(format!("{name}:{ALEPH_LAST_BLOCK_KEY}"))
+            .await?;
+
+        // replay past events from last known to the latest
+        let last_block_number = azero_connection
+            .get_block_number_opt(None)
+            .await?
+            .ok_or(AzeroListenerError::BlockNotFound)?;
+
+        let instance = MembraneInstance::new(azero_contract_address, azero_contract_metadata)?;
+        let contracts = vec![&instance.contract];
+
+        for (from, to) in chunks(last_known_block_number, last_block_number, 1000) {
+            for block_number in from..to {
+                let block_hash = azero_connection
+                    .get_block_hash(block_number)
+                    .await?
+                    .ok_or(AzeroListenerError::BlockNotFound)?;
+
+                let connection = azero_connection.as_connection();
+                let events = connection
+                    .as_client()
+                    .blocks()
+                    .at(block_hash)
+                    .await?
+                    .events()
+                    .await?;
+
+                // filter contract events
+                handle_events(
+                    Arc::clone(&eth_connection),
+                    &config,
+                    events,
+                    &contracts,
+                    block_number,
+                    block_hash,
+                )
+                .await?;
+            }
+        }
+
+        info!("finished processing past events");
+
+        Ok(())
+    }
+}
 
 pub struct AlephZeroListener;
 
@@ -129,7 +196,7 @@ impl AlephZeroListener {
 
             let mut connection = redis_connection.lock().await;
             connection
-                .set(format!("{name}:{AZERO_LAST_BLOCK_KEY}"), block_number)
+                .set(format!("{name}:{ALEPH_LAST_BLOCK_KEY}"), block_number)
                 .await?;
 
             info!("persisted last_block_number: {block_number}");
