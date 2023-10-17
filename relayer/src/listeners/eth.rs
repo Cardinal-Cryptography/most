@@ -151,6 +151,8 @@ async fn handle_event(
                 block_number,
             )
             .await?;
+
+        info!("persisted last_block_number: {block_number}");
     }
 
     Ok(())

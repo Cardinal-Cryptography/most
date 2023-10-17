@@ -232,19 +232,18 @@ async fn handle_event(
 
             info!("eth tx confirmed: {tx:?}");
 
-            match event.block_details {
-                Some(meta) => {
-                    let block_number = meta.block_number;
-                    let mut connection = redis_connection.lock().await;
-                    connection
-                        .set(
-                            format!("{name}:ethereum_last_block_number:{block_number}"),
-                            block_number,
-                        )
-                        .await?;
-                }
-                None => todo!(),
-            }
+            if let Some(meta) = event.block_details {
+                let block_number = meta.block_number;
+                let mut connection = redis_connection.lock().await;
+                connection
+                    .set(
+                        format!("{name}:azero_last_block_number:{block_number}"),
+                        block_number,
+                    )
+                    .await?;
+
+                info!("persisted last_block_number: {block_number}");
+            };
         }
     }
     Ok(())
