@@ -60,6 +60,7 @@ impl EthPastEventsListener {
         let Config {
             eth_contract_address,
             name,
+            default_sync_from_block,
             sync_step,
             ..
         } = &*config;
@@ -74,7 +75,7 @@ impl EthPastEventsListener {
                 Ok(value) => value,
                 Err(why) => {
                     warn!("Redis connection error {why:?}");
-                    0u32
+                    *default_sync_from_block
                 }
             };
 

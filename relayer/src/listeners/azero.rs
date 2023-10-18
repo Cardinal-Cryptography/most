@@ -97,6 +97,7 @@ impl AlephZeroPastEventsListener {
             azero_contract_address,
             name,
             sync_step,
+            default_sync_from_block,
             ..
         } = &*config;
 
@@ -109,7 +110,7 @@ impl AlephZeroPastEventsListener {
             Ok(value) => value,
             Err(why) => {
                 warn!("Redis connection error {why:?}");
-                0u32
+                *default_sync_from_block
             }
         };
 
