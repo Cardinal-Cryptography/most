@@ -4,7 +4,7 @@ name: Bridgenet - deploy azero contracts
 on:
   push:
     branches:
-      - 'main'
+      - '**'
 
 jobs:
   compile:
