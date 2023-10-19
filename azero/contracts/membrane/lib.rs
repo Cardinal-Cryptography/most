@@ -19,8 +19,7 @@ mod membrane {
     #[ink(event)]
     #[derive(Debug)]
     pub struct CrosschainTransferRequest {
-        sender: [u8; 32],
-        src_token_address: [u8; 32],
+        dest_token_address: [u8; 32],
         amount: u128,
         dest_receiver_address: [u8; 32],
         request_nonce: u128,
@@ -100,19 +99,27 @@ mod membrane {
         #[ink(message)]
         pub fn send_request(
             &mut self,
-            src_token_address: AccountId,
+            src_token_address: [u8; 32],
             amount: Balance,
             dest_receiver_address: [u8; 32],
         ) -> Result<(), MembraneError> {
             let sender = self.env().caller();
+            self.transfer_from_tx(
+                src_token_address.into(),
+                sender,
+                self.env().account_id(),
+                amount,
+            )?;
 
-            self.transfer_from_tx(src_token_address, sender, self.env().account_id(), amount)?;
+            let dest_token_address = self
+                .supported_pairs
+                .get(src_token_address)
+                .ok_or(MembraneError::UnsupportedPair)?;
 
             Self::emit_event(
                 self.env(),
                 Event::CrosschainTransferRequest(CrosschainTransferRequest {
-                    sender: *sender.as_ref(),
-                    src_token_address: *src_token_address.as_ref(),
+                    dest_token_address,
                     amount,
                     dest_receiver_address,
                     request_nonce: self.request_nonce,
@@ -129,8 +136,7 @@ mod membrane {
         pub fn receive_request(
             &mut self,
             request_hash: [u8; 32],
-            sender: [u8; 32],
-            src_token_address: [u8; 32],
+            dest_token_address: [u8; 32],
             amount: u128,
             dest_receiver_address: [u8; 32],
             request_nonce: u128,
@@ -143,8 +149,7 @@ mod membrane {
             }
 
             let bytes = Self::concat_u8_arrays(vec![
-                &sender,
-                &src_token_address,
+                &dest_token_address,
                 &amount.to_le_bytes(),
                 &dest_receiver_address,
                 &request_nonce.to_le_bytes(),
@@ -155,11 +160,6 @@ mod membrane {
             if !request_hash.eq(&hash) {
                 return Err(MembraneError::HashDoesNotMatchData);
             }
-
-            let dest_token_address = self
-                .supported_pairs
-                .get(src_token_address)
-                .ok_or(MembraneError::UnsupportedPair)?;
 
             match self.pending_requests.get(request_hash) {
                 None => {

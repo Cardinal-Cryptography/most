@@ -78,8 +78,7 @@ async fn handle_event(
 ) -> Result<(), EthListenerError> {
     if let MembraneEvents::CrosschainTransferRequestFilter(
         crosschain_transfer_event @ CrosschainTransferRequestFilter {
-            sender,
-            src_token_address,
+            dest_token_address,
             amount,
             dest_receiver_address,
             request_nonce,
@@ -96,8 +95,7 @@ async fn handle_event(
 
         // concat bytes
         let bytes = concat_u8_arrays(vec![
-            sender,
-            src_token_address,
+            dest_token_address,
             &amount.as_u128().to_le_bytes(),
             dest_receiver_address,
             &request_nonce.as_u128().to_le_bytes(),
@@ -115,8 +113,7 @@ async fn handle_event(
             .receive_request(
                 &azero_connection,
                 request_hash,
-                *sender,
-                *src_token_address,
+                *dest_token_address,
                 amount.as_u128(),
                 *dest_receiver_address,
                 request_nonce.as_u128(),
