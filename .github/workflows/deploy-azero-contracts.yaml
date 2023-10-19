@@ -1,0 +1,22 @@
+---
+name: Bridgenet - deploy azero contracts
+
+on:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  compile:
+    name: Compile and deploy contracts
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup node
+        uses: asdf-vm/actions/install@v2
+
+      - name: Compile and deploy contracts
+        shell: bash
+        run: AZERO_ENV=bridgenet make deploy-azero-docker

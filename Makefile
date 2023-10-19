@@ -1,4 +1,5 @@
 NETWORK ?= development
+AZERO_ENV ?= dev
 
 .PHONY: help
 help: # Show help for each of the Makefile recipes.
@@ -43,6 +44,26 @@ deploy-eth:
 .PHONY: watch-azero
 watch-azero:
 	cd azero/contracts/membrane && cargo watch -s 'cargo contract check' -c
+
+.PHONY: membrane-builder
+membrane-builder: # Build an image in which contracts can be built
+membrane-builder:
+	docker build -t membrane-builder -f docker/membrane_builder.dockerfile .
+
+.PHONY: compile-azero-docker
+compile-azero-docker: # Compile azero contracts in docker
+compile-azero-docker: azero-deps membrane-builder
+	docker run --rm --network host \
+		--volume "$(shell pwd)":/code \
+		--workdir /code \
+		--name membrane-builder \
+		membrane-builder \
+		make compile-azero
+
+.PHONY: deploy-azero-docker
+deploy-azero-docker: # Deploy azero contracts compiling in docker
+deploy-azero-docker: azero-deps compile-azero-docker
+	cd azero && npm run deploy
 
 .PHONY: azero-deps
 azero-deps: # Install azero dependencies

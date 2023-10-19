@@ -6,7 +6,7 @@
     "description": "azero membrane bridge",
     "scripts": {
         "compile": "typechain-compiler --release --toolchain nightly-2023-05-31",
-        "deploy": "npm config set script-shell \"/bin/bash\"; source env/dev && ts-node scripts/deploy.ts"
+        "deploy": "npm config set script-shell \"/bin/bash\"; ts-node scripts/deploy.ts"
     },
     "dependencies": {
         "@727-ventures/typechain-compiler": "^1.1.0",
