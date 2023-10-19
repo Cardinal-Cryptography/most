@@ -145,3 +145,11 @@ services:
       - DISCOVER_LOCAL=false
       - UNIT_CREATION_DELAY=500
       - NAME=AlephNode2
+
+  Redis:
+    image: redis:latest
+    container_name: redis
+    expose:
+      - 6379
+    ports:
+      - 127.0.0.1:6379:6379

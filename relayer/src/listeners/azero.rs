@@ -6,6 +6,7 @@ use aleph_client::{
         ContractInstance,
     },
     contract_transcode::Value,
+    utility::BlocksApi,
     AlephConfig, AsConnection,
 };
 use ethers::{
@@ -17,9 +18,11 @@ use ethers::{
     utils::keccak256,
 };
 use futures::StreamExt;
-use log::{debug, info, trace};
+use log::{debug, info, trace, warn};
+use redis::{aio::Connection as RedisConnection, AsyncCommands, RedisError};
 use subxt::{events::Events, utils::H256};
 use thiserror::Error;
+use tokio::sync::Mutex;
 
 use crate::{
     config::Config,
@@ -28,7 +31,10 @@ use crate::{
         eth::{EthConnectionError, EthWsConnection, SignedEthWsConnection},
     },
     contracts::{AzeroContractError, Membrane, MembraneInstance},
+    helpers::chunks,
 };
+
+const ALEPH_LAST_BLOCK_KEY: &str = "alephzero_last_known_block_number";
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -70,21 +76,101 @@ pub enum AzeroListenerError {
     #[error("error when creating an ABI data encoding")]
     AbiEncode(#[from] EncodePackedError),
 
+    #[error("redis connection error")]
+    Redis(#[from] RedisError),
+
     #[error("unexpected error")]
     Unexpected,
 }
 
-pub struct AzeroListener;
+pub struct AlephZeroPastEventsListener;
 
-impl AzeroListener {
+impl AlephZeroPastEventsListener {
     pub async fn run(
         config: Arc<Config>,
         azero_connection: Arc<SignedAzeroWsConnection>,
         eth_connection: Arc<SignedEthWsConnection>,
+        redis_connection: Arc<Mutex<RedisConnection>>,
     ) -> Result<(), AzeroListenerError> {
         let Config {
             azero_contract_metadata,
             azero_contract_address,
+            name,
+            sync_step,
+            default_sync_from_block,
+            ..
+        } = &*config;
+
+        let mut connection = redis_connection.lock().await;
+
+        let last_known_block_number: u32 = match connection
+            .get(format!("{name}:{ALEPH_LAST_BLOCK_KEY}"))
+            .await
+        {
+            Ok(value) => value,
+            Err(why) => {
+                warn!("Redis connection error {why:?}");
+                *default_sync_from_block
+            }
+        };
+
+        // replay past events from last known to the latest
+        let last_block_number = azero_connection
+            .get_block_number_opt(None)
+            .await?
+            .ok_or(AzeroListenerError::BlockNotFound)?;
+
+        let instance = MembraneInstance::new(azero_contract_address, azero_contract_metadata)?;
+        let contracts = vec![&instance.contract];
+
+        for (from, to) in chunks(last_known_block_number, last_block_number, *sync_step) {
+            for block_number in from..to {
+                let block_hash = azero_connection
+                    .get_block_hash(block_number)
+                    .await?
+                    .ok_or(AzeroListenerError::BlockNotFound)?;
+
+                let connection = azero_connection.as_connection();
+                let events = connection
+                    .as_client()
+                    .blocks()
+                    .at(block_hash)
+                    .await?
+                    .events()
+                    .await?;
+
+                // filter contract events
+                handle_events(
+                    Arc::clone(&eth_connection),
+                    &config,
+                    events,
+                    &contracts,
+                    block_number,
+                    block_hash,
+                )
+                .await?;
+            }
+        }
+
+        info!("finished processing past events");
+
+        Ok(())
+    }
+}
+
+pub struct AlephZeroListener;
+
+impl AlephZeroListener {
+    pub async fn run(
+        config: Arc<Config>,
+        azero_connection: Arc<SignedAzeroWsConnection>,
+        eth_connection: Arc<SignedEthWsConnection>,
+        redis_connection: Arc<Mutex<RedisConnection>>,
+    ) -> Result<(), AzeroListenerError> {
+        let Config {
+            azero_contract_metadata,
+            azero_contract_address,
+            name,
             ..
         } = &*config;
 
@@ -103,16 +189,25 @@ impl AzeroListener {
         info!("subscribing to new events");
 
         while let Some(Ok(block)) = subscription.next().await {
+            let block_number = block.number();
+
             let events = block.events().await?;
             handle_events(
                 Arc::clone(&eth_connection),
                 &config,
                 events,
                 &contracts,
-                block.number(),
+                block_number,
                 block.hash(),
             )
             .await?;
+
+            let mut connection = redis_connection.lock().await;
+            connection
+                .set(format!("{name}:{ALEPH_LAST_BLOCK_KEY}"), block_number)
+                .await?;
+
+            info!("persisted last_block_number: {block_number}");
         }
 
         Ok(())
@@ -179,6 +274,7 @@ async fn handle_event(
             let amount = U256::from_little_endian(&amount);
             let request_nonce = U256::from_little_endian(&request_nonce);
 
+            // hash event data
             let bytes = abi::encode_packed(&[
                 Token::FixedBytes(dest_token_address.to_vec()),
                 Token::Int(amount),
@@ -188,16 +284,14 @@ async fn handle_event(
 
             trace!("ABI event encoding: {bytes:?}");
 
-            // hash event data
-
             let request_hash = keccak256(bytes);
+
             debug!("hashed event encoding: {request_hash:?}");
 
             let address = eth_contract_address.parse::<Address>()?;
             let contract = Membrane::new(address, eth_connection);
 
             //  forward transfer & vote
-
             let call: ContractCall<SignedEthWsConnection, ()> = contract.receive_request(
                 request_hash,
                 dest_token_address,

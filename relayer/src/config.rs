@@ -1,6 +1,9 @@
 #[derive(Debug, clap::Parser)]
 pub struct Config {
     #[arg(long)]
+    pub name: String,
+
+    #[arg(long)]
     pub azero_contract_address: String,
 
     #[arg(long, default_value = "../azero/artifacts/membrane.json")]
@@ -26,6 +29,15 @@ pub struct Config {
 
     #[arg(long, default_value = "ws://127.0.0.1:8546")]
     pub eth_node_wss_url: String,
+
+    #[arg(long, default_value = "0")]
+    pub default_sync_from_block: u32,
+
+    #[arg(long, default_value = "1000")]
+    pub sync_step: u32,
+
+    #[arg(long, default_value = "redis://127.0.0.1:6379")]
+    pub redis_node: String,
 
     #[arg(long, default_value = "info")]
     pub rust_log: log::Level,
