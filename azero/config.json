@@ -1,5 +1,5 @@
 {
-  "projectFiles": ["contracts/membrane/*","contracts/psp22/*"],
+  "projectFiles": ["contracts/membrane/*", "contracts/psp22/*", "contracts/governance/*"],
   "typechainGeneratedPath": "types",
   "workspacePath": "./contracts"
 }

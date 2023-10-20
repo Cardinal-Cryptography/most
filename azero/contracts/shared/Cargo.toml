@@ -1,0 +1,8 @@
+[package]
+name = "shared"
+version = "1.0.0"
+authors = ["Cardinal Cryptography"]
+edition = "2021"
+
+[lib]
+path = "src/lib.rs"
