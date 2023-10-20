@@ -3,9 +3,12 @@
 name: Solidity tests
 
 on:
+  pull_request:
+    branches:
+    - master
   push:
     branches:
-      - 'master'
+    - master
 
 jobs:
   test:
