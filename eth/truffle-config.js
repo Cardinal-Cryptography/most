@@ -90,6 +90,14 @@ module.exports = {
       network_id: "123454321", // Any network (default: none)
     },
 
+    testing: {
+      port: 8545,
+      network_id: "*",
+      host: "127.0.0.1",
+      gas: 4000000, // Gas limit
+      gasPrice: 20e9, // 20 gwei, default for ganache
+    },
+
     //
     // An additional network, but with some advanced options…
     // advanced: {

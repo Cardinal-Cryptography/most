@@ -1,0 +1,23 @@
+# Runs a local ethereum network and tests contracts.
+
+name: Solidity tests
+
+on:
+  push:
+    branches:
+      - 'master'
+
+jobs:
+  test:
+    name: Test solidity contracts
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Truffle
+        uses: ethereum-actions/setup-truffle@v1
+
+      - name: Run tests
+        shell: bash
+        run: make test-solidity

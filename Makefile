@@ -88,3 +88,8 @@ watch-relayer:
 run-relayer: # Run the relayer
 run-relayer:
 	cd relayer && ./scripts/run.sh
+
+.PHONY: test-solidity
+test-solidity: # Run solidity tests
+test-solidity: 
+	cd eth && npm install && ./scripts/test_contracts.sh
