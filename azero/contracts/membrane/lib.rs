@@ -5,16 +5,19 @@ mod membrane {
     use ink::{
         codegen::EmitEvent,
         env::{
+            call::{build_call, ExecutionInput},
             hash::{HashOutput, Keccak256},
-            hash_bytes,
+            hash_bytes, set_code_hash, DefaultEnvironment, Error as InkEnvError,
         },
-        prelude::{vec, vec::Vec},
+        prelude::{format, string::String, vec, vec::Vec},
         reflect::ContractEventBase,
         storage::Mapping,
     };
     use psp22::{PSP22Error, PSP22};
     use psp22_traits::Mintable;
     use scale::{Decode, Encode};
+
+    pub type Selector = [u8; 4];
 
     #[ink(event)]
     #[derive(Debug)]
@@ -49,6 +52,7 @@ mod membrane {
 
     #[ink(storage)]
     pub struct Membrane {
+        owner: AccountId,
         request_nonce: u128,
         signature_threshold: u128,
         pending_requests: Mapping<[u8; 32], Request>,
@@ -68,6 +72,14 @@ mod membrane {
         PSP22(PSP22Error),
         RequestAlreadyProcessed,
         UnsupportedPair,
+        InkEnvError(String),
+        NotOwner(AccountId),
+    }
+
+    impl From<InkEnvError> for MembraneError {
+        fn from(why: InkEnvError) -> Self {
+            Self::InkEnvError(format!("{:?}", why))
+        }
     }
 
     impl From<PSP22Error> for MembraneError {
@@ -85,6 +97,7 @@ mod membrane {
             });
 
             Self {
+                owner: Self::env().caller(),
                 request_nonce: 0,
                 signature_threshold,
                 pending_requests: Mapping::new(),
@@ -93,6 +106,63 @@ mod membrane {
                 guardians: guardians_set,
                 supported_pairs: Mapping::new(),
             }
+        }
+
+        #[ink(message)]
+        pub fn set_owner(&mut self) -> Result<(), MembraneError> {
+            self.only_owner()?;
+            todo!("")
+        }
+
+        #[ink(message)]
+        pub fn add_guardian(&mut self) -> Result<(), MembraneError> {
+            self.only_owner()?;
+            todo!("")
+        }
+
+        #[ink(message)]
+        pub fn remove_guardian(&mut self) -> Result<(), MembraneError> {
+            self.only_owner()?;
+            todo!("")
+        }
+
+        #[ink(message)]
+        pub fn add_pair(&mut self) -> Result<(), MembraneError> {
+            self.only_owner()?;
+            todo!("")
+        }
+
+        #[ink(message)]
+        pub fn remove_pair(&mut self) -> Result<(), MembraneError> {
+            self.only_owner()?;
+            todo!("")
+        }
+
+        /// Upgrades contract code
+        #[ink(message)]
+        pub fn set_code(
+            &mut self,
+            code_hash: [u8; 32],
+            callback: Option<Selector>,
+        ) -> Result<(), MembraneError> {
+            self.only_owner()?;
+            set_code_hash(&code_hash)?;
+
+            // Optionally call a callback function in the new contract that performs the storage data migration.
+            // By convention this function should be called `migrate`, it should take no arguments
+            // and be call-able only by `this` contract's instance address.
+            // To ensure the latter the `migrate` in the updated contract can e.g. check if it has an Admin role on self.
+            //
+            // `delegatecall` ensures that the target contract is called within the caller contracts context.
+            if let Some(selector) = callback {
+                build_call::<DefaultEnvironment>()
+                    .delegate(Hash::from(code_hash))
+                    .exec_input(ExecutionInput::new(ink::env::call::Selector::new(selector)))
+                    .returns::<Result<(), MembraneError>>()
+                    .invoke()?;
+            }
+
+            Ok(())
         }
 
         /// Invoke this tx to initiate funds transfer to the destination chain.
@@ -200,6 +270,14 @@ mod membrane {
             }
 
             Ok(())
+        }
+
+        fn only_owner(&mut self) -> Result<(), MembraneError> {
+            let caller = self.env().caller();
+            match caller.eq(&self.owner) {
+                true => Ok(()),
+                false => Err(MembraneError::NotOwner(caller)),
+            }
         }
 
         /// Transfers a given amount of a PSP22 token on behalf of a specified account to another account
