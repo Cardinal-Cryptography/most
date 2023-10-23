@@ -23,7 +23,6 @@ bridge:
 .PHONY: eth-deps
 eth-deps: # Install eth dependencies
 eth-deps:
-	npm install -g truffle
 	cd eth && npm install
 
 .PHONY: watch-eth
@@ -34,12 +33,12 @@ watch-eth:
 .PHONY: compile-eth
 compile-eth: # Compile eth contracts
 compile-eth:
-	cd eth && truffle compile
+	cd eth && npx truffle compile
 
 .PHONY: deploy-eth
 deploy-eth: # Deploy eth contracts
 deploy-eth:
-	cd eth && truffle migrate --network $(NETWORK)
+	cd eth && npx truffle migrate --network $(NETWORK)
 
 .PHONY: watch-azero
 watch-azero:
@@ -88,3 +87,8 @@ watch-relayer:
 run-relayer: # Run the relayer
 run-relayer:
 	cd relayer && ./scripts/run.sh
+
+.PHONY: test-solidity
+test-solidity: # Run solidity tests
+test-solidity: eth-deps
+	cd eth && ./scripts/test_contracts.sh
