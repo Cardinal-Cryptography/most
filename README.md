@@ -61,18 +61,23 @@ To deploy the contracts on the EVM chain:
 make deploy-eth
 ```
 
-Open a Truffle console:
+This command will deploy the contracts and print out the contract addresses.
+
+Now, open a Hardhat console:
 
 ```bash
-cd eth && truffle console
+cd eth && npx hardhat console --network development
 ```
 
 Interact with the deployed contracts instance:
 
 ```javascript
-let membrane = await Membrane.deployed()
-membrane.address
-membrane.isGuardian(accounts[0])
+let Membrane = await ethers.getContractFactory("Membrane")
+let membrane = Membrane.attach("insert contract address here")
+let accounts = await ethers.getSigners();
+
+await membrane.isGuardian(accounts[0])
+await membrane.isGuardian(accounts[1])
 ```
 
 To deploy the contracts on the azero chain:
