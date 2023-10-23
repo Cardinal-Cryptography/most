@@ -5,8 +5,7 @@ mod membrane {
     use ink::{
         env::{
             call::{build_call, ExecutionInput},
-            hash::{HashOutput, Keccak256},
-            hash_bytes, set_code_hash, DefaultEnvironment, Error as InkEnvError,
+            set_code_hash, DefaultEnvironment, Error as InkEnvError,
         },
         prelude::{format, string::String, vec, vec::Vec},
         storage::Mapping,
@@ -14,7 +13,7 @@ mod membrane {
     use psp22::{PSP22Error, PSP22};
     use psp22_traits::Mintable;
     use scale::{Decode, Encode};
-    use shared::Selector;
+    use shared::{keccak256, Keccak256HashOutput as HashedRequest, Selector};
 
     #[ink(event)]
     #[derive(Debug)]
@@ -28,14 +27,14 @@ mod membrane {
     #[ink(event)]
     #[derive(Debug)]
     pub struct RequestProcessed {
-        request_hash: [u8; 32],
+        request_hash: HashedRequest,
     }
 
     #[ink(event)]
     #[derive(Debug)]
     pub struct RequestSigned {
         signer: AccountId,
-        request_hash: [u8; 32],
+        request_hash: HashedRequest,
     }
 
     #[derive(Debug, Encode, Decode, Clone, Copy, PartialEq, Eq)]
@@ -52,8 +51,8 @@ mod membrane {
         owner: AccountId,
         request_nonce: u128,
         signature_threshold: u128,
-        pending_requests: Mapping<[u8; 32], Request>,
-        signatures: Mapping<([u8; 32], AccountId), ()>,
+        pending_requests: Mapping<HashedRequest, Request>,
+        signatures: Mapping<(HashedRequest, AccountId), ()>,
         processed_requests: Mapping<[u8; 32], ()>,
         guardians: Mapping<AccountId, ()>,
         supported_pairs: Mapping<[u8; 32], [u8; 32]>,
@@ -69,6 +68,7 @@ mod membrane {
         UnsupportedPair,
         InkEnvError(String),
         NotOwner(AccountId),
+        RequestAlreadySigned,
     }
 
     impl From<InkEnvError> for MembraneError {
@@ -197,7 +197,7 @@ mod membrane {
         #[ink(message)]
         pub fn receive_request(
             &mut self,
-            request_hash: [u8; 32],
+            request_hash: HashedRequest,
             dest_token_address: [u8; 32],
             amount: u128,
             dest_receiver_address: [u8; 32],
@@ -217,19 +217,31 @@ mod membrane {
                 &request_nonce.to_le_bytes(),
             ]);
 
-            let hash = Self::keccak256(&bytes);
+            let hash = keccak256(&bytes);
 
             if !request_hash.eq(&hash) {
                 return Err(MembraneError::HashDoesNotMatchData);
             }
 
+            if self.signatures.contains((request_hash, caller)) {
+                return Err(MembraneError::RequestAlreadySigned);
+            }
+
             match self.pending_requests.get(request_hash) {
                 None => {
                     self.pending_requests
-                        .insert(request_hash, &Request { signature_count: 0 });
+                        .insert(request_hash, &Request { signature_count: 1 });
+
+                    self.signatures.insert((request_hash, caller), &());
+
+                    self.env().emit_event(RequestSigned {
+                        signer: caller,
+                        request_hash,
+                    });
                 }
                 Some(mut request) => {
                     self.signatures.insert((request_hash, caller), &());
+
                     request.signature_count += 1;
 
                     self.env().emit_event(RequestSigned {
@@ -309,11 +321,11 @@ mod membrane {
             result
         }
 
-        pub fn keccak256(input: &[u8]) -> [u8; 32] {
-            let mut output = <Keccak256 as HashOutput>::Type::default();
-            hash_bytes::<Keccak256>(input, &mut output);
-            output
-        }
+        // pub fn keccak256(input: &[u8]) -> HashedRequest {
+        //     let mut output = <Keccak256 as HashOutput>::Type::default();
+        //     hash_bytes::<Keccak256>(input, &mut output);
+        //     output
+        // }
 
         // fn emit_event<EE>(emitter: EE, event: Event)
         // where

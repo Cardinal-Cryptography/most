@@ -3,23 +3,21 @@
 #[ink::contract]
 mod governance {
     use ink::{
-        codegen::EmitEvent,
         env::{
             call::{build_call, utils::ArgumentList, ExecutionInput},
             hash::{HashOutput, Keccak256},
             hash_bytes, set_code_hash, DefaultEnvironment, Error as InkEnvError,
         },
         prelude::{format, string::String, vec, vec::Vec},
-        reflect::ContractEventBase,
         storage::Mapping,
     };
     use scale::{Decode, Encode};
-    use shared::{CallInput, Selector};
+    use shared::{CallInput, Keccak256HashOutput as HashedProposal, Selector};
 
     #[ink(event)]
     #[derive(Debug)]
     pub struct ProposalExecuted {
-        hash: [u8; 32],
+        hash: HashedProposal,
         result: Vec<u8>,
     }
 
@@ -30,22 +28,23 @@ mod governance {
     )]
     pub struct Proposal {
         signature_count: u64,
+        /// The address of the contract
         destination: AccountId,
+        /// The selector bytes that identify the contracts function        
         selector: Selector,
+        /// The SCALE encoded arguments of the contracts function.        
         args: Vec<u8>,
     }
 
     #[ink(storage)]
-    pub struct Governance
-    where
-        T: scale::Encode,
-    {
+    pub struct Governance {
         members: Mapping<AccountId, ()>,
+        /// Minimum number of members that have to confirm a proposal before it can be executed.
         quorum: u128,
-        pending_proposals: Mapping<[u8; 32], Proposal>,
+        pending_proposals: Mapping<HashedProposal, Proposal>,
+        signatures: Mapping<(HashedProposal, AccountId), ()>,
+        processed_proposals: Mapping<HashedProposal, ()>,
     }
-
-    // pub type Event = <Governance as ContractEventBase>::Type;
 
     #[derive(Debug, PartialEq, Eq, Encode, Decode)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
@@ -59,18 +58,6 @@ mod governance {
             Self::InkEnvError(format!("{:?}", why))
         }
     }
-
-    // impl From<InkEnvError> for MembraneError {
-    //     fn from(why: InkEnvError) -> Self {
-    //         Self::InkEnvError(format!("{:?}", why))
-    //     }
-    // }
-
-    // impl From<PSP22Error> for MembraneError {
-    //     fn from(inner: PSP22Error) -> Self {
-    //         MembraneError::PSP22(inner)
-    //     }
-    // }
 
     impl Governance {
         #[ink(constructor)]
@@ -91,7 +78,7 @@ mod governance {
         #[ink(message)]
         pub fn execute_proposal(
             &mut self,
-            proposal_hash: [u8; 32],
+            proposal_hash: HashedProposal,
         ) -> Result<Vec<u8>, GovernanceError> {
             // TOOD : timelock
 
