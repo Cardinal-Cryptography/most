@@ -13,7 +13,7 @@ mod membrane {
     use psp22::{PSP22Error, PSP22};
     use psp22_traits::Mintable;
     use scale::{Decode, Encode};
-    use shared::{keccak256, Keccak256HashOutput as HashedRequest, Selector};
+    use shared::{concat_u8_arrays, keccak256, Keccak256HashOutput as HashedRequest, Selector};
 
     #[ink(event)]
     #[derive(Debug)]
@@ -210,7 +210,7 @@ mod membrane {
                 return Err(MembraneError::RequestAlreadyProcessed);
             }
 
-            let bytes = Self::concat_u8_arrays(vec![
+            let bytes = concat_u8_arrays(vec![
                 &dest_token_address,
                 &amount.to_le_bytes(),
                 &dest_receiver_address,
@@ -312,26 +312,5 @@ mod membrane {
                 Err(MembraneError::NotGuardian)
             }
         }
-
-        fn concat_u8_arrays(arrays: Vec<&[u8]>) -> Vec<u8> {
-            let mut result = Vec::new();
-            for array in arrays {
-                result.extend_from_slice(array);
-            }
-            result
-        }
-
-        // pub fn keccak256(input: &[u8]) -> HashedRequest {
-        //     let mut output = <Keccak256 as HashOutput>::Type::default();
-        //     hash_bytes::<Keccak256>(input, &mut output);
-        //     output
-        // }
-
-        // fn emit_event<EE>(emitter: EE, event: Event)
-        // where
-        //     EE: EmitEvent<Self>,
-        // {
-        //     emitter.emit_event(event);
-        // }
     }
 }

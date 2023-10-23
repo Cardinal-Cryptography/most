@@ -38,6 +38,7 @@ mod governance {
 
     #[ink(storage)]
     pub struct Governance {
+        /// whitelised accounts that can propose & vote on proposals
         members: Mapping<AccountId, ()>,
         /// Minimum number of members that have to confirm a proposal before it can be executed.
         quorum: u128,
@@ -51,6 +52,7 @@ mod governance {
     pub enum GovernanceError {
         InkEnvError(String),
         ExecuteProposalFailed,
+        NotMember,
     }
 
     impl From<InkEnvError> for GovernanceError {
@@ -66,7 +68,12 @@ mod governance {
         }
 
         #[ink(message)]
-        pub fn submit_proposal(&mut self) -> Result<(), GovernanceError> {
+        pub fn submit_proposal(&mut self, proposal: Proposal) -> Result<(), GovernanceError> {
+            let caller = self.env().caller();
+            self.is_guardian(caller)?;
+
+            // self.pending_proposals.insert(key, value)
+
             todo!("")
         }
 
@@ -80,7 +87,7 @@ mod governance {
             &mut self,
             proposal_hash: HashedProposal,
         ) -> Result<Vec<u8>, GovernanceError> {
-            // TOOD : timelock
+            // TODO : timelock
 
             let proposal = self.pending_proposals.get(proposal_hash).unwrap();
 
@@ -102,6 +109,13 @@ mod governance {
                     Ok(result)
                 }
                 _ => Err(GovernanceError::ExecuteProposalFailed),
+            }
+        }
+
+        fn is_guardian(&self, account: AccountId) -> Result<(), GovernanceError> {
+            match self.members.contains(&account) {
+                true => Ok(()),
+                false => Err(GovernanceError::NotMember),
             }
         }
     }
