@@ -2,4 +2,4 @@
 
 mod types;
 
-pub use types::Selector;
+pub use types::{CallInput, Selector};

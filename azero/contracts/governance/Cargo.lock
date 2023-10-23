@@ -842,6 +842,9 @@ dependencies = [
 [[package]]
 name = "shared"
 version = "1.0.0"
+dependencies = [
+ "parity-scale-codec",
+]
 
 [[package]]
 name = "smallvec"

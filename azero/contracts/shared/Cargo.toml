@@ -4,5 +4,10 @@ version = "1.0.0"
 authors = ["Cardinal Cryptography"]
 edition = "2021"
 
+[dependencies]
+scale = { package = "parity-scale-codec", version = "3", default-features = false, features = [
+    "derive",
+] }
+
 [lib]
 path = "src/lib.rs"

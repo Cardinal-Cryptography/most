@@ -5,7 +5,7 @@ mod governance {
     use ink::{
         codegen::EmitEvent,
         env::{
-            call::{build_call, ExecutionInput},
+            call::{build_call, utils::ArgumentList, ExecutionInput},
             hash::{HashOutput, Keccak256},
             hash_bytes, set_code_hash, DefaultEnvironment, Error as InkEnvError,
         },
@@ -14,37 +14,50 @@ mod governance {
         storage::Mapping,
     };
     use scale::{Decode, Encode};
-    use shared::Selector;
+    use shared::{CallInput, Selector};
 
     #[ink(event)]
     #[derive(Debug)]
-    pub struct Fu {
-        bar: [u8; 32],
+    pub struct ProposalExecuted {
+        hash: [u8; 32],
+        result: Vec<u8>,
     }
 
-    #[derive(Debug, Encode, Decode, Clone, Copy, PartialEq, Eq)]
+    #[derive(Debug, Encode, Decode, Clone, PartialEq, Eq)]
     #[cfg_attr(
         feature = "std",
         derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout)
     )]
     pub struct Proposal {
-        // signature_count: u128,
+        signature_count: u64,
         destination: AccountId,
         selector: Selector,
+        args: Vec<u8>,
     }
 
     #[ink(storage)]
-    pub struct Governance {
+    pub struct Governance
+    where
+        T: scale::Encode,
+    {
         members: Mapping<AccountId, ()>,
         quorum: u128,
+        pending_proposals: Mapping<[u8; 32], Proposal>,
     }
 
-    pub type Event = <Governance as ContractEventBase>::Type;
+    // pub type Event = <Governance as ContractEventBase>::Type;
 
     #[derive(Debug, PartialEq, Eq, Encode, Decode)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub enum GovernanceError {
-        Fu,
+        InkEnvError(String),
+        ExecuteProposalFailed,
+    }
+
+    impl From<InkEnvError> for GovernanceError {
+        fn from(why: InkEnvError) -> Self {
+            Self::InkEnvError(format!("{:?}", why))
+        }
     }
 
     // impl From<InkEnvError> for MembraneError {
@@ -76,15 +89,31 @@ mod governance {
         }
 
         #[ink(message)]
-        pub fn execute_proposal(&mut self) -> Result<(), GovernanceError> {
-            todo!("")
-        }
+        pub fn execute_proposal(
+            &mut self,
+            proposal_hash: [u8; 32],
+        ) -> Result<Vec<u8>, GovernanceError> {
+            let proposal = self.pending_proposals.get(proposal_hash).unwrap();
 
-        fn emit_event<EE>(emitter: EE, event: Event)
-        where
-            EE: EmitEvent<Self>,
-        {
-            emitter.emit_event(event);
+            match build_call::<<Self as ::ink::env::ContractEnv>::Env>()
+                .call(proposal.destination)
+                .exec_input(
+                    ExecutionInput::new(ink::env::call::Selector::new(proposal.selector))
+                        .push_arg(CallInput(&proposal.args)),
+                )
+                .returns::<Vec<u8>>()
+                .try_invoke()
+            {
+                Ok(Ok(result)) => {
+                    self.env().emit_event(ProposalExecuted {
+                        hash: proposal_hash,
+                        result: result.clone(),
+                    });
+
+                    Ok(result)
+                }
+                _ => Err(GovernanceError::ExecuteProposalFailed),
+            }
         }
     }
 }
