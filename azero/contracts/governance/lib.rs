@@ -93,6 +93,8 @@ mod governance {
             &mut self,
             proposal_hash: [u8; 32],
         ) -> Result<Vec<u8>, GovernanceError> {
+            // TOOD : timelock
+
             let proposal = self.pending_proposals.get(proposal_hash).unwrap();
 
             match build_call::<<Self as ::ink::env::ContractEnv>::Env>()

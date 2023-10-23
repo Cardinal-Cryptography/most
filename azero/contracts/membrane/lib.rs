@@ -3,14 +3,12 @@
 #[ink::contract]
 mod membrane {
     use ink::{
-        codegen::EmitEvent,
         env::{
             call::{build_call, ExecutionInput},
             hash::{HashOutput, Keccak256},
             hash_bytes, set_code_hash, DefaultEnvironment, Error as InkEnvError,
         },
         prelude::{format, string::String, vec, vec::Vec},
-        reflect::ContractEventBase,
         storage::Mapping,
     };
     use psp22::{PSP22Error, PSP22};
@@ -60,8 +58,6 @@ mod membrane {
         guardians: Mapping<AccountId, ()>,
         supported_pairs: Mapping<[u8; 32], [u8; 32]>,
     }
-
-    pub type Event = <Membrane as ContractEventBase>::Type;
 
     #[derive(Debug, PartialEq, Eq, Encode, Decode)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
@@ -185,15 +181,12 @@ mod membrane {
                 .get(src_token_address)
                 .ok_or(MembraneError::UnsupportedPair)?;
 
-            Self::emit_event(
-                self.env(),
-                Event::CrosschainTransferRequest(CrosschainTransferRequest {
-                    dest_token_address,
-                    amount,
-                    dest_receiver_address,
-                    request_nonce: self.request_nonce,
-                }),
-            );
+            self.env().emit_event(CrosschainTransferRequest {
+                dest_token_address,
+                amount,
+                dest_receiver_address,
+                request_nonce: self.request_nonce,
+            });
 
             self.request_nonce += 1;
 
@@ -239,13 +232,10 @@ mod membrane {
                     self.signatures.insert((request_hash, caller), &());
                     request.signature_count += 1;
 
-                    Self::emit_event(
-                        self.env(),
-                        Event::RequestSigned(RequestSigned {
-                            signer: caller,
-                            request_hash,
-                        }),
-                    );
+                    self.env().emit_event(RequestSigned {
+                        signer: caller,
+                        request_hash,
+                    });
 
                     if request.signature_count >= self.signature_threshold {
                         self.processed_requests.insert(request_hash, &());
@@ -261,10 +251,7 @@ mod membrane {
 
                     self.pending_requests.insert(request_hash, &request);
 
-                    Self::emit_event(
-                        self.env(),
-                        Event::RequestProcessed(RequestProcessed { request_hash }),
-                    );
+                    self.env().emit_event(RequestProcessed { request_hash });
                 }
             }
 
@@ -328,11 +315,11 @@ mod membrane {
             output
         }
 
-        fn emit_event<EE>(emitter: EE, event: Event)
-        where
-            EE: EmitEvent<Self>,
-        {
-            emitter.emit_event(event);
-        }
+        // fn emit_event<EE>(emitter: EE, event: Event)
+        // where
+        //     EE: EmitEvent<Self>,
+        // {
+        //     emitter.emit_event(event);
+        // }
     }
 }
