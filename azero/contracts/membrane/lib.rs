@@ -69,6 +69,7 @@ mod membrane {
         InkEnvError(String),
         NotOwner(AccountId),
         RequestAlreadySigned,
+        Arithmetic,
     }
 
     impl From<InkEnvError> for MembraneError {
@@ -188,7 +189,10 @@ mod membrane {
                 request_nonce: self.request_nonce,
             });
 
-            self.request_nonce += 1;
+            self.request_nonce = self
+                .request_nonce
+                .checked_add(1)
+                .ok_or(MembraneError::Arithmetic)?;
 
             Ok(())
         }

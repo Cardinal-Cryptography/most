@@ -12,7 +12,9 @@ mod governance {
         storage::Mapping,
     };
     use scale::{Decode, Encode};
-    use shared::{CallInput, Keccak256HashOutput as HashedProposal, Selector};
+    use shared::{
+        concat_u8_arrays, keccak256, CallInput, Keccak256HashOutput as HashedProposal, Selector,
+    };
 
     #[ink(event)]
     #[derive(Debug)]
@@ -34,6 +36,10 @@ mod governance {
         selector: Selector,
         /// The SCALE encoded arguments of the contracts function.        
         args: Vec<u8>,
+        /// unique nonce
+        nonce: u128,
+        /// proposal can be executed only after block with this number
+        execute_after: Option<BlockNumber>,
     }
 
     #[ink(storage)]
@@ -45,6 +51,9 @@ mod governance {
         pending_proposals: Mapping<HashedProposal, Proposal>,
         signatures: Mapping<(HashedProposal, AccountId), ()>,
         processed_proposals: Mapping<HashedProposal, ()>,
+        /// number of blocks that has to elapse before a voted in proposal can be executed
+        vacation_legis: BlockNumber,
+        next_nonce: u128,
     }
 
     #[derive(Debug, PartialEq, Eq, Encode, Decode)]
@@ -53,6 +62,11 @@ mod governance {
         InkEnvError(String),
         ExecuteProposalFailed,
         NotMember,
+        ProposalAlreadyProcessed,
+        DuplicateProposal,
+        Arithmetic,
+        NonExistingProposal,
+        TimelockedProposal,
     }
 
     impl From<InkEnvError> for GovernanceError {
@@ -67,16 +81,59 @@ mod governance {
             todo!("")
         }
 
+        /// submits & casts a vote on a proposal
+        ///
+        /// Can only be called by a member of the governing comittee        
         #[ink(message)]
-        pub fn submit_proposal(&mut self, proposal: Proposal) -> Result<(), GovernanceError> {
+        pub fn submit_proposal(
+            &mut self,
+            destination: AccountId,
+            selector: Selector,
+            args: Vec<u8>,
+        ) -> Result<(), GovernanceError> {
             let caller = self.env().caller();
             self.is_guardian(caller)?;
 
-            // self.pending_proposals.insert(key, value)
+            let nonce = self.next_nonce;
 
-            todo!("")
+            let bytes = concat_u8_arrays(vec![
+                destination.as_ref(),
+                &selector,
+                &args,
+                &nonce.to_le_bytes(),
+            ]);
+            let hash = keccak256(&bytes);
+
+            if self.processed_proposals.contains(hash) {
+                return Err(GovernanceError::ProposalAlreadyProcessed);
+            }
+
+            if self.pending_proposals.contains(hash) {
+                return Err(GovernanceError::DuplicateProposal);
+            }
+
+            self.pending_proposals.insert(
+                hash,
+                &Proposal {
+                    signature_count: 1,
+                    destination,
+                    selector,
+                    args,
+                    nonce,
+                    execute_after: None,
+                },
+            );
+
+            self.signatures.insert((hash, caller), &());
+
+            self.next_nonce = nonce.checked_add(1).ok_or(GovernanceError::Arithmetic)?;
+
+            Ok(())
         }
 
+        /// Cast a vote for a transaction
+        ///
+        /// Can only be called by a member of the governing comittee
         #[ink(message)]
         pub fn vote(&mut self) -> Result<(), GovernanceError> {
             todo!("")
@@ -87,9 +144,14 @@ mod governance {
             &mut self,
             proposal_hash: HashedProposal,
         ) -> Result<Vec<u8>, GovernanceError> {
-            // TODO : timelock
+            let proposal = self
+                .pending_proposals
+                .get(proposal_hash)
+                .ok_or(GovernanceError::NonExistingProposal)?;
 
-            let proposal = self.pending_proposals.get(proposal_hash).unwrap();
+            if proposal.execute_after.expect("must be some") < self.env().block_number() {
+                return Err(GovernanceError::TimelockedProposal);
+            }
 
             match build_call::<<Self as ::ink::env::ContractEnv>::Env>()
                 .call(proposal.destination)
@@ -113,7 +175,7 @@ mod governance {
         }
 
         fn is_guardian(&self, account: AccountId) -> Result<(), GovernanceError> {
-            match self.members.contains(&account) {
+            match self.members.contains(account) {
                 true => Ok(()),
                 false => Err(GovernanceError::NotMember),
             }
