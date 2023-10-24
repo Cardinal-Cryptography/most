@@ -52,13 +52,13 @@ async function main(): Promise<void> {
   );
   console.log('token address:', wethAddress);
 
-  const { address: governanceAddress } = await GovernanceConstructors.new(
+  const { address: governanceAddress } = await governanceConstructors.new(
     2 // quorum
   );
   console.log('governance address:', governanceAddress);
 
   const addresses: Addresses = {
-    governance: governance,
+    governance: governanceAddress,
     membrane: membraneAddress,
     weth: wethAddress
   };
