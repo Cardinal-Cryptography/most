@@ -53,7 +53,7 @@ mod membrane {
         signature_threshold: u128,
         pending_requests: Mapping<HashedRequest, Request>,
         signatures: Mapping<(HashedRequest, AccountId), ()>,
-        processed_requests: Mapping<[u8; 32], ()>,
+        processed_requests: Mapping<HashedRequest, ()>,
         guardians: Mapping<AccountId, ()>,
         supported_pairs: Mapping<[u8; 32], [u8; 32]>,
     }

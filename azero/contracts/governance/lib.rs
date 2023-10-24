@@ -102,7 +102,6 @@ mod governance {
                 signatures: Mapping::new(),
                 signature_count: Mapping::new(),
                 pending_proposals: Mapping::new(),
-                // pending_proposal_ids: Vec::new(),
                 next_proposal_id: 0,
             }
         }
@@ -217,7 +216,7 @@ mod governance {
 
         /// Has this proposal reached a quorum yet?
         ///
-        /// Reverts if proposal does not exist
+        /// Returns an error if proposal does not exist
         pub fn has_quorum(&self, proposal_id: ProposalId) -> Result<bool, GovernanceError> {
             if self.get_signature_count(proposal_id)? < self.quorum {
                 return Ok(false);
@@ -246,17 +245,17 @@ mod governance {
 
         /// Removes a member from governance whitelist
         ///
-        /// Can only be called by contracts owner (typically the contract itself)
+        /// Can only be called by the contracts owner (typically the contract itself)
         pub fn remove_member(&mut self, account: AccountId) -> Result<(), GovernanceError> {
             self.ensure_owner()?;
             self.members.remove(account);
             Ok(())
         }
 
-        /// Clean up past & ongoing signatures and get back some storage deposits in return
+        /// Clean up past & ongoing signatures and get back storage deposit in return
         ///
-        /// Can be called by anyone but will revert if the account in question is a present member of the governing comittee
-        /// Separate tx and nt part of e.g. `remove_member` as there are no guarantess it will fit within a block
+        /// Can be called by anyone but will revert if the account in question is a present member of the governing comittee.
+        /// This message is a separate tx and not part of e.g. `remove_member` tx as there are no guarantess it will fit within one block
         pub fn clean_signatures(&mut self, account: AccountId) -> Result<(), GovernanceError> {
             if self.is_member(account) {
                 return Err(GovernanceError::MemberAccount);
@@ -271,7 +270,7 @@ mod governance {
 
         /// Sets a new owner account
         ///
-        /// Can only be called by contracts owner
+        /// Can only be called by the contracts owner (typically the contract itself)        
         pub fn set_owner(&mut self, new_owner: AccountId) -> Result<(), GovernanceError> {
             self.ensure_owner()?;
             self.owner = new_owner;
@@ -280,7 +279,7 @@ mod governance {
 
         /// Sets a new threshold for quorum
         ///
-        /// Can only be called by contracts owner (typically the contract itself)
+        /// Can only be called by the contracts owner (typically the contract itself)
         pub fn set_quorum(&mut self, new_quorum: u32) -> Result<(), GovernanceError> {
             self.ensure_owner()?;
             self.quorum = new_quorum;
@@ -289,7 +288,7 @@ mod governance {
 
         /// Upgrades contract code
         ///
-        /// Can only be called by contracts owner (typically the contract itself)
+        /// Can only be called by the contracts owner (typically the contract itself)
         #[ink(message)]
         pub fn set_code(
             &mut self,
