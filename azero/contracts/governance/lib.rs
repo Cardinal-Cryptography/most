@@ -269,6 +269,15 @@ mod governance {
             Ok(())
         }
 
+        /// Sets a new owner account
+        ///
+        /// Can only be called by contracts owner
+        pub fn set_owner(&mut self, new_owner: AccountId) -> Result<(), GovernanceError> {
+            self.ensure_owner()?;
+            self.owner = new_owner;
+            Ok(())
+        }
+
         /// Sets a new threshold for quorum
         ///
         /// Can only be called by contracts owner (typically the contract itself)

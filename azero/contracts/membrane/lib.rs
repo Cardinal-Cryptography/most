@@ -104,34 +104,53 @@ mod membrane {
             }
         }
 
-        #[ink(message)]
-        pub fn set_owner(&mut self) -> Result<(), MembraneError> {
+        /// Sets a new owner account
+        ///
+        /// Can only be called by contracts owner
+        pub fn set_owner(&mut self, new_owner: AccountId) -> Result<(), MembraneError> {
             self.ensure_owner()?;
-            todo!("")
+            self.owner = new_owner;
+            Ok(())
         }
 
+        /// Adds a guardian account to the whitelist
+        ///
+        /// Can only be called by the contracts owner
         #[ink(message)]
-        pub fn add_guardian(&mut self) -> Result<(), MembraneError> {
+        pub fn add_guardian(&mut self, account: AccountId) -> Result<(), MembraneError> {
             self.ensure_owner()?;
-            todo!("")
+            self.guardians.insert(account, &());
+            Ok(())
         }
 
+        /// Removes a guardian account from the whitelist
+        ///
+        /// Can only be called by the contracts owner        
         #[ink(message)]
-        pub fn remove_guardian(&mut self) -> Result<(), MembraneError> {
+        pub fn remove_guardian(&mut self, account: AccountId) -> Result<(), MembraneError> {
             self.ensure_owner()?;
-            todo!("")
+            self.guardians.remove(account);
+            Ok(())
         }
 
+        /// Adds a supported pair for bridging
+        ///
+        /// Can only be called by the contracts owner                
         #[ink(message)]
-        pub fn add_pair(&mut self) -> Result<(), MembraneError> {
+        pub fn add_pair(&mut self, from: [u8; 32], to: [u8; 32]) -> Result<(), MembraneError> {
             self.ensure_owner()?;
-            todo!("")
+            self.supported_pairs.insert(from, &to);
+            Ok(())
         }
 
+        /// Removes a supported pair from bridging
+        ///
+        /// Can only be called by the contracts owner                        
         #[ink(message)]
-        pub fn remove_pair(&mut self) -> Result<(), MembraneError> {
+        pub fn remove_pair(&mut self, from: [u8; 32]) -> Result<(), MembraneError> {
             self.ensure_owner()?;
-            todo!("")
+            self.supported_pairs.remove(from);
+            Ok(())
         }
 
         /// Upgrades contract code
