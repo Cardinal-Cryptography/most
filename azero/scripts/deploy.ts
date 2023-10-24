@@ -1,6 +1,7 @@
 import { ApiPromise, WsProvider, Keyring } from '@polkadot/api';
 import MembraneConstructors from '../types/constructors/membrane';
 import TokenConstructors from '../types/constructors/token';
+import GovernanceConstructors from '../types/constructors/governance';
 import { uploadCode, Addresses, storeAddresses } from './utils';
 import 'dotenv/config';
 import '@polkadot/api-augment';
@@ -30,6 +31,10 @@ async function main(): Promise<void> {
   const membraneCodeHash = await uploadCode(api, deployer, "membrane.contract");
   console.log('membrane code hash:', membraneCodeHash);
 
+  const governanceCodeHash = await uploadCode(api, deployer, "governance.contract");
+  console.log('governance code hash:', governanceCodeHash);
+
+  const governanceConstructors = new GovernanceConstructors(api, deployer);
   const membraneConstructors = new MembraneConstructors(api, deployer);
   const tokenConstructors = new TokenConstructors(api, deployer);
 
@@ -47,8 +52,13 @@ async function main(): Promise<void> {
   );
   console.log('token address:', wethAddress);
 
+  const { address: governanceAddress } = await GovernanceConstructors.new(
+    2 // quorum
+  );
+  console.log('governance address:', governanceAddress);
+
   const addresses: Addresses = {
-    membraneCodeHash: membraneCodeHash,
+    governance: governance,
     membrane: membraneAddress,
     weth: wethAddress
   };
