@@ -106,31 +106,31 @@ mod membrane {
 
         #[ink(message)]
         pub fn set_owner(&mut self) -> Result<(), MembraneError> {
-            self.only_owner()?;
+            self.ensure_owner()?;
             todo!("")
         }
 
         #[ink(message)]
         pub fn add_guardian(&mut self) -> Result<(), MembraneError> {
-            self.only_owner()?;
+            self.ensure_owner()?;
             todo!("")
         }
 
         #[ink(message)]
         pub fn remove_guardian(&mut self) -> Result<(), MembraneError> {
-            self.only_owner()?;
+            self.ensure_owner()?;
             todo!("")
         }
 
         #[ink(message)]
         pub fn add_pair(&mut self) -> Result<(), MembraneError> {
-            self.only_owner()?;
+            self.ensure_owner()?;
             todo!("")
         }
 
         #[ink(message)]
         pub fn remove_pair(&mut self) -> Result<(), MembraneError> {
-            self.only_owner()?;
+            self.ensure_owner()?;
             todo!("")
         }
 
@@ -141,7 +141,7 @@ mod membrane {
             code_hash: [u8; 32],
             callback: Option<Selector>,
         ) -> Result<(), MembraneError> {
-            self.only_owner()?;
+            self.ensure_owner()?;
             set_code_hash(&code_hash)?;
 
             // Optionally call a callback function in the new contract that performs the storage data migration.
@@ -274,7 +274,7 @@ mod membrane {
             Ok(())
         }
 
-        fn only_owner(&mut self) -> Result<(), MembraneError> {
+        fn ensure_owner(&mut self) -> Result<(), MembraneError> {
             let caller = self.env().caller();
             match caller.eq(&self.owner) {
                 true => Ok(()),

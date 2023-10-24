@@ -4,22 +4,37 @@
 mod governance {
     use ink::{
         env::{
-            call::{build_call, utils::ArgumentList, ExecutionInput},
-            hash::{HashOutput, Keccak256},
-            hash_bytes, set_code_hash, DefaultEnvironment, Error as InkEnvError,
+            call::{build_call, ExecutionInput},
+            set_code_hash, DefaultEnvironment, Error as InkEnvError,
         },
-        prelude::{format, string::String, vec, vec::Vec},
+        prelude::{format, string::String, vec::Vec},
         storage::Mapping,
     };
     use scale::{Decode, Encode};
-    use shared::{
-        concat_u8_arrays, keccak256, CallInput, Keccak256HashOutput as HashedProposal, Selector,
-    };
+    use shared::{CallInput, Selector};
+
+    type ProposalId = u128;
+
+    #[ink(event)]
+    #[derive(Debug)]
+    pub struct ProposalSubmitted {
+        by: AccountId,
+        id: ProposalId,
+        proposal: Proposal,
+    }
+
+    #[ink(event)]
+    #[derive(Debug)]
+    pub struct Vote {
+        by: AccountId,
+        proposal: ProposalId,
+    }
 
     #[ink(event)]
     #[derive(Debug)]
     pub struct ProposalExecuted {
-        hash: HashedProposal,
+        by: AccountId,
+        id: ProposalId,
         result: Vec<u8>,
     }
 
@@ -29,31 +44,32 @@ mod governance {
         derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout)
     )]
     pub struct Proposal {
-        signature_count: u64,
         /// The address of the contract
         destination: AccountId,
-        /// The selector bytes that identify the contracts function        
+        /// The selector bytes that identify the contracts function
         selector: Selector,
-        /// The SCALE encoded arguments of the contracts function.        
+        /// The SCALE encoded arguments of the contracts function.
         args: Vec<u8>,
-        /// unique nonce
-        nonce: u128,
-        /// proposal can be executed only after block with this number
-        execute_after: Option<BlockNumber>,
     }
 
     #[ink(storage)]
     pub struct Governance {
-        /// whitelised accounts that can propose & vote on proposals
+        /// owner, typicaly set to be the governance contract itself
+        owner: AccountId,
+        /// The whitelised accounts that can propose & vote on proposals
         members: Mapping<AccountId, ()>,
-        /// Minimum number of members that have to confirm a proposal before it can be executed.
-        quorum: u128,
-        pending_proposals: Mapping<HashedProposal, Proposal>,
-        signatures: Mapping<(HashedProposal, AccountId), ()>,
-        processed_proposals: Mapping<HashedProposal, ()>,
-        /// number of blocks that has to elapse before a voted in proposal can be executed
-        vacation_legis: BlockNumber,
-        next_nonce: u128,
+        /// The Minimum number of members that have to confirm a proposal before it can be executed
+        quorum: u32,
+        /// The set of votes cast by the members
+        signatures: Mapping<(ProposalId, AccountId), ()>,
+        /// The amount of votes per proposal
+        signature_count: Mapping<ProposalId, u32>,
+        /// non-executed transactions
+        pending_proposals: Mapping<ProposalId, Proposal>,
+        /// list of all pending ids for book keeping
+        pending_proposal_ids: Vec<ProposalId>,
+        /// next id
+        next_proposal_id: u128,
     }
 
     #[derive(Debug, PartialEq, Eq, Encode, Decode)]
@@ -62,11 +78,11 @@ mod governance {
         InkEnvError(String),
         ExecuteProposalFailed,
         NotMember,
-        ProposalAlreadyProcessed,
-        DuplicateProposal,
         Arithmetic,
-        NonExistingProposal,
-        TimelockedProposal,
+        NonExistentProposal,
+        NoQuorum,
+        NotOwner,
+        Unexpected,
     }
 
     impl From<InkEnvError> for GovernanceError {
@@ -76,14 +92,26 @@ mod governance {
     }
 
     impl Governance {
+        /// Constructs a new instance of the governance contract
+        ///
+        /// Caller becomes the owner, typically you'd want to set the owner to be the contract itself immediately after instantiating
         #[ink(constructor)]
-        pub fn new() -> Self {
-            todo!("")
+        pub fn new(quorum: u32) -> Self {
+            Self {
+                owner: Self::env().caller(),
+                members: Mapping::new(),
+                quorum,
+                signatures: Mapping::new(),
+                signature_count: Mapping::new(),
+                pending_proposals: Mapping::new(),
+                pending_proposal_ids: Vec::new(),
+                next_proposal_id: 0,
+            }
         }
 
         /// submits & casts a vote on a proposal
         ///
-        /// Can only be called by a member of the governing comittee        
+        /// Can only be called by a member of the governing comittee
         #[ink(message)]
         pub fn submit_proposal(
             &mut self,
@@ -92,41 +120,28 @@ mod governance {
             args: Vec<u8>,
         ) -> Result<(), GovernanceError> {
             let caller = self.env().caller();
-            self.is_guardian(caller)?;
+            self.ensure_member(caller)?;
 
-            let nonce = self.next_nonce;
+            let id = self.next_proposal_id;
 
-            let bytes = concat_u8_arrays(vec![
-                destination.as_ref(),
-                &selector,
-                &args,
-                &nonce.to_le_bytes(),
-            ]);
-            let hash = keccak256(&bytes);
+            let proposal = Proposal {
+                destination,
+                selector,
+                args,
+            };
 
-            if self.processed_proposals.contains(hash) {
-                return Err(GovernanceError::ProposalAlreadyProcessed);
-            }
+            self.pending_proposal_ids.push(id);
+            self.pending_proposals.insert(id, &proposal);
+            self.signatures.insert((id, caller), &());
+            self.signature_count.insert(id, &1);
 
-            if self.pending_proposals.contains(hash) {
-                return Err(GovernanceError::DuplicateProposal);
-            }
+            self.next_proposal_id = id.checked_add(1).ok_or(GovernanceError::Arithmetic)?;
 
-            self.pending_proposals.insert(
-                hash,
-                &Proposal {
-                    signature_count: 1,
-                    destination,
-                    selector,
-                    args,
-                    nonce,
-                    execute_after: None,
-                },
-            );
-
-            self.signatures.insert((hash, caller), &());
-
-            self.next_nonce = nonce.checked_add(1).ok_or(GovernanceError::Arithmetic)?;
+            self.env().emit_event(ProposalSubmitted {
+                by: caller,
+                id,
+                proposal,
+            });
 
             Ok(())
         }
@@ -135,23 +150,46 @@ mod governance {
         ///
         /// Can only be called by a member of the governing comittee
         #[ink(message)]
-        pub fn vote(&mut self) -> Result<(), GovernanceError> {
-            todo!("")
+        pub fn vote(&mut self, proposal_id: ProposalId) -> Result<(), GovernanceError> {
+            let caller = self.env().caller();
+            self.ensure_member(caller)?;
+
+            if !self.pending_proposal_ids.contains(&proposal_id) {
+                return Err(GovernanceError::NonExistentProposal);
+            }
+
+            let count = self
+                .signature_count
+                .get(proposal_id)
+                .ok_or(GovernanceError::NonExistentProposal)?
+                .checked_add(1)
+                .ok_or(GovernanceError::Arithmetic)?;
+
+            self.signatures.insert((proposal_id, caller), &());
+            self.signature_count.insert(proposal_id, &count);
+
+            self.env().emit_event(Vote {
+                by: caller,
+                proposal: proposal_id,
+            });
+
+            Ok(())
         }
 
+        /// Execute a proposal if it has reached a quorum
+        ///
+        /// Can be called by anyone
         #[ink(message)]
         pub fn execute_proposal(
             &mut self,
-            proposal_hash: HashedProposal,
+            proposal_id: ProposalId,
         ) -> Result<Vec<u8>, GovernanceError> {
+            self.ensure_quorum(proposal_id)?;
+
             let proposal = self
                 .pending_proposals
-                .get(proposal_hash)
-                .ok_or(GovernanceError::NonExistingProposal)?;
-
-            if proposal.execute_after.expect("must be some") < self.env().block_number() {
-                return Err(GovernanceError::TimelockedProposal);
-            }
+                .get(proposal_id)
+                .ok_or(GovernanceError::NonExistentProposal)?;
 
             match build_call::<<Self as ::ink::env::ContractEnv>::Env>()
                 .call(proposal.destination)
@@ -164,9 +202,13 @@ mod governance {
             {
                 Ok(Ok(result)) => {
                     self.env().emit_event(ProposalExecuted {
-                        hash: proposal_hash,
+                        by: self.env().caller(),
+                        id: proposal_id,
                         result: result.clone(),
                     });
+
+                    self.pending_proposals.remove(proposal_id);
+                    self.signature_count.remove(proposal_id);
 
                     Ok(result)
                 }
@@ -174,10 +216,104 @@ mod governance {
             }
         }
 
-        fn is_guardian(&self, account: AccountId) -> Result<(), GovernanceError> {
-            match self.members.contains(account) {
+        /// Is this account a member of the governing comittee?
+        pub fn is_member(&self, account: AccountId) -> bool {
+            self.members.contains(account)
+        }
+
+        /// Has this proposal reached a quorum yet?
+        ///
+        /// Reverts if proposal does not exist
+        pub fn has_quorum(&self, proposal_id: ProposalId) -> Result<bool, GovernanceError> {
+            if self.get_signature_count(proposal_id)? < self.quorum {
+                return Ok(false);
+            }
+            Ok(true)
+        }
+
+        /// Returns a vote count for a given proposal
+        ///
+        /// Reverts if proposal does not exist
+        pub fn get_signature_count(&self, proposal_id: ProposalId) -> Result<u32, GovernanceError> {
+            match self.signature_count.get(proposal_id) {
+                Some(count) => Ok(count),
+                None => Err(GovernanceError::NonExistentProposal),
+            }
+        }
+
+        /// Adds a member to the governance whitelist
+        ///
+        /// Can only be called by contracts owner (typically the contract itself)
+        pub fn add_member(&mut self, account: AccountId) -> Result<(), GovernanceError> {
+            self.ensure_owner()?;
+            self.members.insert(account, &());
+            Ok(())
+        }
+
+        /// Removes a member from governance whitelist
+        ///
+        /// Can only be called by contracts owner (typically the contract itself)
+        pub fn remove_member(&mut self, account: AccountId) -> Result<(), GovernanceError> {
+            self.ensure_owner()?;
+            self.members.remove(account);
+            Ok(())
+        }
+
+        /// Sets a new threshold for quorum
+        ///
+        /// Can only be called by contracts owner (typically the contract itself)
+        pub fn set_quorum(&mut self, new_quorum: u32) -> Result<(), GovernanceError> {
+            self.ensure_owner()?;
+            self.quorum = new_quorum;
+            Ok(())
+        }
+
+        /// Upgrades contract code
+        ///
+        /// Can only be called by contracts owner (typically the contract itself)
+        #[ink(message)]
+        pub fn set_code(
+            &mut self,
+            code_hash: [u8; 32],
+            callback: Option<Selector>,
+        ) -> Result<(), GovernanceError> {
+            self.ensure_owner()?;
+            set_code_hash(&code_hash)?;
+
+            // Optionally call a callback function in the new contract that performs the storage data migration.
+            // By convention this function should be called `migrate`, it should take no arguments
+            // and be call-able only by `this` contract's instance address.
+            // To ensure the latter the `migrate` in the updated contract can e.g. check if it has an Admin role on self.
+            //
+            // `delegatecall` ensures that the target contract is called within the caller contracts context.
+            if let Some(selector) = callback {
+                build_call::<DefaultEnvironment>()
+                    .delegate(Hash::from(code_hash))
+                    .exec_input(ExecutionInput::new(ink::env::call::Selector::new(selector)))
+                    .returns::<Result<(), GovernanceError>>()
+                    .invoke()?;
+            }
+
+            Ok(())
+        }
+
+        fn ensure_member(&self, account: AccountId) -> Result<(), GovernanceError> {
+            match self.is_member(account) {
                 true => Ok(()),
                 false => Err(GovernanceError::NotMember),
+            }
+        }
+
+        fn ensure_quorum(&self, proposal_id: ProposalId) -> Result<(), GovernanceError> {
+            self.has_quorum(proposal_id)?;
+            Ok(())
+        }
+
+        fn ensure_owner(&mut self) -> Result<(), GovernanceError> {
+            let caller = self.env().caller();
+            match caller.eq(&self.owner) {
+                true => Ok(()),
+                false => Err(GovernanceError::NotOwner),
             }
         }
     }
