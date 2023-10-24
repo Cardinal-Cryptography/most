@@ -60,14 +60,12 @@ mod governance {
         members: Mapping<AccountId, ()>,
         /// The Minimum number of members that have to confirm a proposal before it can be executed
         quorum: u32,
-        /// The set of votes cast by the members
+        /// The set of votes cast by the members of governing comittee
         signatures: Mapping<(ProposalId, AccountId), ()>,
         /// The amount of votes per proposal
         signature_count: Mapping<ProposalId, u32>,
         /// non-executed transactions
         pending_proposals: Mapping<ProposalId, Proposal>,
-        /// list of all pending ids for book keeping
-        pending_proposal_ids: Vec<ProposalId>,
         /// next id
         next_proposal_id: u128,
     }
@@ -77,12 +75,12 @@ mod governance {
     pub enum GovernanceError {
         InkEnvError(String),
         ExecuteProposalFailed,
+        MemberAccount,
         NotMember,
         Arithmetic,
         NonExistentProposal,
         NoQuorum,
         NotOwner,
-        Unexpected,
     }
 
     impl From<InkEnvError> for GovernanceError {
@@ -104,7 +102,7 @@ mod governance {
                 signatures: Mapping::new(),
                 signature_count: Mapping::new(),
                 pending_proposals: Mapping::new(),
-                pending_proposal_ids: Vec::new(),
+                // pending_proposal_ids: Vec::new(),
                 next_proposal_id: 0,
             }
         }
@@ -130,7 +128,6 @@ mod governance {
                 args,
             };
 
-            self.pending_proposal_ids.push(id);
             self.pending_proposals.insert(id, &proposal);
             self.signatures.insert((id, caller), &());
             self.signature_count.insert(id, &1);
@@ -153,10 +150,6 @@ mod governance {
         pub fn vote(&mut self, proposal_id: ProposalId) -> Result<(), GovernanceError> {
             let caller = self.env().caller();
             self.ensure_member(caller)?;
-
-            if !self.pending_proposal_ids.contains(&proposal_id) {
-                return Err(GovernanceError::NonExistentProposal);
-            }
 
             let count = self
                 .signature_count
@@ -207,6 +200,7 @@ mod governance {
                         result: result.clone(),
                     });
 
+                    // clean up
                     self.pending_proposals.remove(proposal_id);
                     self.signature_count.remove(proposal_id);
 
@@ -259,6 +253,22 @@ mod governance {
             Ok(())
         }
 
+        /// Clean up past & ongoing signatures and get back some storage deposits in return
+        ///
+        /// Can be called by anyone but will revert if the account in question is a present member of the governing comittee
+        /// Separate tx and nt part of e.g. `remove_member` as there are no guarantess it will fit within a block
+        pub fn clean_signatures(&mut self, account: AccountId) -> Result<(), GovernanceError> {
+            if self.is_member(account) {
+                return Err(GovernanceError::MemberAccount);
+            }
+
+            (0..self.next_proposal_id).for_each(|id| {
+                self.signatures.remove((id, account));
+            });
+
+            Ok(())
+        }
+
         /// Sets a new threshold for quorum
         ///
         /// Can only be called by contracts owner (typically the contract itself)
@@ -305,7 +315,9 @@ mod governance {
         }
 
         fn ensure_quorum(&self, proposal_id: ProposalId) -> Result<(), GovernanceError> {
-            self.has_quorum(proposal_id)?;
+            if !self.has_quorum(proposal_id)? {
+                return Err(GovernanceError::NoQuorum);
+            }
             Ok(())
         }
 
