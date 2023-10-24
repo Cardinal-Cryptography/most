@@ -34,7 +34,7 @@ contract Membrane {
     event RequestProcessed(bytes32 requestHash);
 
     modifier onlyGuardian() {
-        require(isGuardian(msg.sender), "Can only be called by a signer");
+        require(isGuardian(msg.sender), "Can only be called by a guardian");
         _;
     }
 
@@ -42,6 +42,7 @@ contract Membrane {
                 address[] memory _guardians,
                 uint256 _signatureThreshold
                 ) {
+        require(_signatureThreshold > 0, "Signature threshold must be greater than 0");
         require(_guardians.length >= _signatureThreshold, "Not enough guardians specified");
         signatureThreshold = _signatureThreshold;
         for (uint256 i = 0; i < _guardians.length; i++) {
@@ -54,7 +55,7 @@ contract Membrane {
     }
 
     function addPair(bytes32 from, bytes32 to) public {
-         supportedPairs[from] = to;
+        supportedPairs[from] = to;
     }
 
     // TODO: remove pair
@@ -123,7 +124,7 @@ contract Membrane {
         
         Request storage request = pendingRequests[requestHash];
 
-        require(!request.signatures[msg.sender], "Already signed this request");
+        require(!request.signatures[msg.sender], "This guardian has already signed this request");
 
         request.signatures[msg.sender] = true;
         request.signatureCount++;
