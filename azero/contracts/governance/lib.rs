@@ -79,6 +79,7 @@ mod governance {
         NotMember,
         Arithmetic,
         NonExistentProposal,
+        ProposalAlreadySigned,
         NoQuorum,
         NotOwner,
     }
@@ -149,6 +150,10 @@ mod governance {
         pub fn vote(&mut self, proposal_id: ProposalId) -> Result<(), GovernanceError> {
             let caller = self.env().caller();
             self.ensure_member(caller)?;
+
+            if self.signatures.contains((proposal_id, caller)) {
+                return Err(GovernanceError::ProposalAlreadySigned);
+            }
 
             let count = self
                 .signature_count
