@@ -10,7 +10,7 @@ import {
 } from '@polkadot/types/interfaces';
 
 export type Addresses = {
-  membraneCodeHash: string;
+  governance: string;
   membrane: string;
   weth: string;
 };
