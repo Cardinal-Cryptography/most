@@ -33,12 +33,14 @@ watch-eth:
 .PHONY: compile-eth
 compile-eth: # Compile eth contracts
 compile-eth:
-	cd eth && npx truffle compile
+	cd eth && npx hardhat compile
 
 .PHONY: deploy-eth
 deploy-eth: # Deploy eth contracts
 deploy-eth:
-	cd eth && npx truffle migrate --network $(NETWORK)
+	cd eth && \
+	npx hardhat run --network $(NETWORK) scripts/1_initial_migration.js && \
+	npx hardhat run --network $(NETWORK) scripts/2_deploy_contracts.js
 
 .PHONY: watch-azero
 watch-azero:
@@ -91,4 +93,4 @@ run-relayer:
 .PHONY: test-solidity
 test-solidity: # Run solidity tests
 test-solidity: eth-deps
-	cd eth && ./scripts/test_contracts.sh
+	cd eth && npx hardhat test

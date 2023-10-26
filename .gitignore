@@ -11,6 +11,9 @@ chainspec.json
 
 # sol compilation
 build/
+eth/artifacts
+eth/build/
+eth/cache/
 
 # rust compilation
 target/
