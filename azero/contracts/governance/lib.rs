@@ -220,6 +220,7 @@ mod governance {
         }
 
         /// Is this account a member of the governing comittee?
+        #[ink(message)]
         pub fn is_member(&self, account: AccountId) -> bool {
             self.members.contains(account)
         }
@@ -227,6 +228,7 @@ mod governance {
         /// Has this proposal reached a quorum yet?
         ///
         /// Returns an error if proposal does not exist
+        #[ink(message)]
         pub fn has_quorum(&self, proposal_id: ProposalId) -> Result<bool, GovernanceError> {
             Ok(self.get_signature_count(proposal_id)? >= self.quorum)
         }
@@ -234,6 +236,7 @@ mod governance {
         /// Returns a vote count for a given proposal
         ///
         /// Reverts if proposal does not exist
+        #[ink(message)]
         pub fn get_signature_count(&self, proposal_id: ProposalId) -> Result<u32, GovernanceError> {
             self.signature_count
                 .get(proposal_id)
@@ -243,6 +246,7 @@ mod governance {
         /// Adds a member to the governance whitelist
         ///
         /// Can only be called by contracts owner (typically the contract itself)
+        #[ink(message)]
         pub fn add_member(&mut self, account: AccountId) -> Result<(), GovernanceError> {
             self.ensure_owner()?;
             self.members.insert(account, &());
@@ -252,31 +256,17 @@ mod governance {
         /// Removes a member from governance whitelist
         ///
         /// Can only be called by the contracts owner (typically the contract itself)
+        #[ink(message)]
         pub fn remove_member(&mut self, account: AccountId) -> Result<(), GovernanceError> {
             self.ensure_owner()?;
             self.members.remove(account);
             Ok(())
         }
 
-        /// Clean up past & ongoing signatures and get back storage deposit in return
-        ///
-        /// Can be called by anyone but will revert if the account in question is a present member of the governing comittee.
-        /// This message is a separate tx and not part of e.g. `remove_member` tx as there are no guarantess it will fit within one block
-        pub fn clean_signatures(&mut self, account: AccountId) -> Result<(), GovernanceError> {
-            if self.is_member(account) {
-                return Err(GovernanceError::MemberAccount);
-            }
-
-            (0..self.next_proposal_id).for_each(|id| {
-                self.signatures.remove((id, account));
-            });
-
-            Ok(())
-        }
-
         /// Sets a new owner account
         ///
         /// Can only be called by the contracts owner (typically the contract itself)        
+        #[ink(message)]
         pub fn set_owner(&mut self, new_owner: AccountId) -> Result<(), GovernanceError> {
             self.ensure_owner()?;
             self.owner = new_owner;
@@ -286,6 +276,7 @@ mod governance {
         /// Sets a new threshold for quorum
         ///
         /// Can only be called by the contracts owner (typically the contract itself)
+        #[ink(message)]
         pub fn set_quorum(&mut self, new_quorum: u32) -> Result<(), GovernanceError> {
             self.ensure_owner()?;
             self.quorum = new_quorum;
