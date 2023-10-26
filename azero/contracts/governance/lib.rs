@@ -223,10 +223,7 @@ mod governance {
         ///
         /// Returns an error if proposal does not exist
         pub fn has_quorum(&self, proposal_id: ProposalId) -> Result<bool, GovernanceError> {
-            if self.get_signature_count(proposal_id)? < self.quorum {
-                return Ok(false);
-            }
-            Ok(true)
+            Ok(self.get_signature_count(proposal_id)? >= self.quorum)
         }
 
         /// Returns a vote count for a given proposal
