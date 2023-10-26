@@ -3,7 +3,6 @@
 pragma solidity ^0.8;
 
 contract Governance {
-
   address public owner;
   uint256 public quorum;
   uint256 public nextId;
@@ -17,7 +16,7 @@ contract Governance {
     mapping(address => bool) signatures;
   }
 
-    event ProposalSubmitted(address by, uint256 id);
+  event ProposalSubmitted(address by, uint256 id);
 
   event Vote(address by, uint256 id);
 

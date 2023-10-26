@@ -5,6 +5,7 @@ pragma solidity ^0.8;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract Membrane {
+    address public owner;
     uint256 public requestNonce;
     uint256 public signatureThreshold;
 
@@ -33,7 +34,12 @@ contract Membrane {
 
     event RequestProcessed(bytes32 requestHash);
 
-    modifier onlyGuardian() {
+    modifier _onlyOwner() {
+      require(msg.sender == owner);
+      _;
+    }
+
+    modifier _onlyGuardian() {
         require(isGuardian(msg.sender), "Can only be called by a signer");
         _;
     }
@@ -52,12 +58,6 @@ contract Membrane {
     function isGuardian(address sender) public view returns (bool) {
         return guardians[sender];
     }
-
-    function addPair(bytes32 from, bytes32 to) external {
-         supportedPairs[from] = to;
-    }
-
-    // TODO: remove pair
 
     function bytes32ToAddress(bytes32 data) internal pure returns (address) {
         return address(uint160(uint256(data)));
@@ -105,7 +105,7 @@ contract Membrane {
         uint256 amount,
         bytes32 destReceiverAddress,
         uint256 _requestNonce
-    ) external onlyGuardian {
+    ) external _onlyGuardian {
         require(
             !processedRequests[_requestHash],
             "This request has already been processed"
@@ -120,7 +120,7 @@ contract Membrane {
             _requestHash == requestHash,
             "Hash does not match the data"
         );
-        
+
         Request storage request = pendingRequests[requestHash];
 
         require(!request.signatures[msg.sender], "Already signed this request");
@@ -142,11 +142,24 @@ contract Membrane {
         }
     }
 
-    function addGuardian() external onlyGuardian {
-        // TODO
+    function addGuardian(address guardian) external _onlyOwner {
+      guardians[guardian] = true;
     }
 
-    function removeGuardian() external onlyGuardian {
-        // TODO
+    function removeGuardian(address guardian) external _onlyOwner {
+      guardians[guardian] = false;
     }
+
+    function setOwner(address _owner) external _onlyOwner {
+      owner = _owner;
+    }
+
+    function addPair(bytes32 from, bytes32 to) external _onlyOwner {
+         supportedPairs[from] = to;
+    }
+
+    function removePair(bytes32 from) external _onlyOwner {
+         delete supportedPairs[from];
+    }
+
 }
