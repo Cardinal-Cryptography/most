@@ -326,7 +326,7 @@ mod governance {
             Ok(())
         }
 
-        fn ensure_owner(&mut self) -> Result<(), GovernanceError> {
+        fn ensure_owner(&self) -> Result<(), GovernanceError> {
             let caller = self.env().caller();
             match caller.eq(&self.owner) {
                 true => Ok(()),
