@@ -233,10 +233,7 @@ mod governance {
         ///
         /// Reverts if proposal does not exist
         pub fn get_signature_count(&self, proposal_id: ProposalId) -> Result<u32, GovernanceError> {
-            match self.signature_count.get(proposal_id) {
-                Some(count) => Ok(count),
-                None => Err(GovernanceError::NonExistentProposal),
-            }
+            self.signature_count.get(proposal_id).ok_or(GovernanceError::NonExistentProposal)
         }
 
         /// Adds a member to the governance whitelist
