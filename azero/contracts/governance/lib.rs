@@ -5,7 +5,7 @@ mod governance {
     use ink::{
         env::{
             call::{build_call, ExecutionInput},
-            set_code_hash, DefaultEnvironment, Error as InkEnvError,
+            set_code_hash, CallFlags, DefaultEnvironment, Error as InkEnvError,
         },
         prelude::{format, string::String, vec::Vec},
         storage::Mapping,
@@ -45,11 +45,13 @@ mod governance {
     )]
     pub struct Proposal {
         /// The address of the contract
-        destination: AccountId,
+        pub destination: AccountId,
         /// The selector bytes that identify the contracts function
-        selector: Selector,
+        pub selector: Selector,
         /// The SCALE encoded arguments of the contracts function.
-        args: Vec<u8>,
+        pub args: Vec<u8>,
+        /// Whether the proposal should be allowed to reenter the contract during execution.
+        pub allow_reentry: bool,
     }
 
     #[ink(storage)]
@@ -116,6 +118,7 @@ mod governance {
             destination: AccountId,
             selector: Selector,
             args: Vec<u8>,
+            allow_reentry: bool,
         ) -> Result<(), GovernanceError> {
             let caller = self.env().caller();
             self.ensure_member(caller)?;
@@ -126,6 +129,7 @@ mod governance {
                 destination,
                 selector,
                 args,
+                allow_reentry,
             };
 
             self.pending_proposals.insert(id, &proposal);
@@ -190,6 +194,7 @@ mod governance {
 
             match build_call::<<Self as ::ink::env::ContractEnv>::Env>()
                 .call(proposal.destination)
+                .call_flags(CallFlags::default().set_allow_reentry(proposal.allow_reentry))
                 .exec_input(
                     ExecutionInput::new(ink::env::call::Selector::new(proposal.selector))
                         .push_arg(CallInput(&proposal.args)),
@@ -230,7 +235,9 @@ mod governance {
         ///
         /// Reverts if proposal does not exist
         pub fn get_signature_count(&self, proposal_id: ProposalId) -> Result<u32, GovernanceError> {
-            self.signature_count.get(proposal_id).ok_or(GovernanceError::NonExistentProposal)
+            self.signature_count
+                .get(proposal_id)
+                .ok_or(GovernanceError::NonExistentProposal)
         }
 
         /// Adds a member to the governance whitelist
