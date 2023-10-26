@@ -1,38 +1,42 @@
-const Membrane = artifacts.require("Membrane");
-const TestToken = artifacts.require("TestToken");
+const hre = require("hardhat");
 
 // Import utils
-const addressToBytes32 = require("./TestUtils").addressToBytes32;
+const { addressToBytes32, getRandomAlephAccount } = require("./TestUtils");
 
-contract("Membrane", accounts => {
+describe("MembraneBenchmark", function () {
     it(" deploy + estimate gas cost and successfully call sendRequest and receiveRequest.", async () => {
+        const accounts = await hre.ethers.getSigners();
+
         // Transfer some eth to other accounts
         for (let i = 1; i < 10; i++) {
-            await web3.eth.sendTransaction({
-                from: accounts[0],
-                to: accounts[i],
-                value: web3.utils.toWei("1", "ether"),
+            await accounts[0].sendTransaction({
+                to: accounts[i].address,
+                value: hre.ethers.parseEther("1"),
             });
         }
 
-        let guardianAddresses = accounts.slice(1, 9);
+        let guardianKeys = accounts.slice(1, 9);
+        let guardianAddresses = guardianKeys.map((x) => x.address);
         let threshold = 5;
 
-        const testTokenInstance = await TestToken.new({ from: accounts[0] });
-        const tokenAddress = testTokenInstance.address;
+        const TestToken = await hre.ethers.getContractFactory("TestToken");
+        const testTokenInstance = await TestToken.deploy();
+        const tokenAddress = await testTokenInstance.getAddress();
 
-        const membraneInstance = await Membrane.new(
+        const Membrane = await hre.ethers.getContractFactory("Membrane");
+        const membraneInstance = await Membrane.deploy(
             guardianAddresses,
             threshold,
             { from: accounts[0] }
         );
+        const membraneInstanceAddress = await membraneInstance.getAddress();
 
         // Easy way to get a "random" bytes32 value
-        let azContract = web3.utils.soliditySha3(42);
+        let azContract = getRandomAlephAccount(42);
         let tokenAddressBytes32 = addressToBytes32(tokenAddress);
 
         // Add pair of linked contracts
-        await membraneInstance.addPair(
+        let addPairResult = await membraneInstance.addPair(
             tokenAddressBytes32,
             azContract,
             { from: accounts[0] }
@@ -41,10 +45,10 @@ contract("Membrane", accounts => {
         // Gas estimate for sendRequest
 
         // bytes32 "address" of account on Aleph
-        let azAccount = web3.utils.soliditySha3(0);
+        let azAccount = getRandomAlephAccount(0);
 
         // Allow Membrane to spend tokens
-        await testTokenInstance.approve(membraneInstance.address, 1000, { from: accounts[0] });
+        await testTokenInstance.approve(membraneInstanceAddress, 1000, { from: accounts[0] });
 
         const gasEstimateSend = await membraneInstance
             .sendRequest
@@ -55,7 +59,7 @@ contract("Membrane", accounts => {
                 { from: accounts[0] }
             );
 
-        console.log("Gas estimate for sendRequest: ", gasEstimateSend);
+        console.log("Gas estimate for sendRequest: ", Number(gasEstimateSend));
 
         const sendRequestTx = await membraneInstance.sendRequest(
             tokenAddressBytes32,
@@ -63,36 +67,41 @@ contract("Membrane", accounts => {
             azAccount,
             { gas: gasEstimateSend, from: accounts[0] }
         );
-        assert(sendRequestTx.receipt.status == true, "sendRequest failed");
 
 
         // Gas estimate for bridgeReceive
-        let ethAccount = web3.utils.soliditySha3(1);
-        let requestHash = web3.utils.soliditySha3(tokenAddressBytes32, 1000, ethAccount, 1);
+        let ethAccount = addressToBytes32(accounts[9].address);
+        let requestHash = hre.ethers.solidityPackedKeccak256(
+            ["bytes32", "uint256", "bytes32", "uint256"],
+            [tokenAddressBytes32, 1000, ethAccount, 1]
+        );
 
         // Estimate gas for each signature
         let gasEstimates = [...Array(threshold).keys()];
         for (let i = 0; i < threshold; i++) {
-            gasEstimates[i] = await membraneInstance
+
+            gasEstimates[i] = Number(await membraneInstance
+                .connect(guardianKeys[i])
                 .receiveRequest
                 .estimateGas(
                     requestHash,
                     tokenAddressBytes32,
                     1000,
                     ethAccount,
-                    1,
-                    { from: guardianAddresses[i] }
-                );
+                    1
+                ));
 
-            const receiveRequestTx = await membraneInstance.receiveRequest(
-                requestHash,
-                tokenAddressBytes32,
-                1000,
-                ethAccount,
-                1,
-                { gas: gasEstimates[i], from: guardianAddresses[i] }
-            );
-            assert(receiveRequestTx.receipt.status == true, "receiveRequest failed");
+            // Check if gas estimate is high enough
+            await membraneInstance
+                .connect(guardianKeys[i])
+                .receiveRequest(
+                    requestHash,
+                    tokenAddressBytes32,
+                    1000,
+                    ethAccount,
+                    1,
+                    { gas: gasEstimates[i] }
+                );
         }
 
         console.log("Gas estimates for receiveRequest: ", gasEstimates);
@@ -101,4 +110,4 @@ contract("Membrane", accounts => {
         let sum = gasEstimates.reduce((a, b) => a + b, 0);
         console.log("Sum of gas estimates for receiveRequest: ", sum);
     });
-});
+});  
