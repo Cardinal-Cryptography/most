@@ -53,7 +53,7 @@ contract Membrane {
         return guardians[sender];
     }
 
-    function addPair(bytes32 from, bytes32 to) public {
+    function addPair(bytes32 from, bytes32 to) external {
          supportedPairs[from] = to;
     }
 
