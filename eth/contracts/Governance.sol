@@ -77,6 +77,8 @@ contract Governance {
 
   function executeProposal(uint256 id) external {
 
+    require(proposalExists(id), "NonExistentProposal");
+
     Proposal storage proposal = pendingProposals[id];
 
     require(hasQuorum(id), "NoQuorum");
