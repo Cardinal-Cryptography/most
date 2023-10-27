@@ -1,7 +1,7 @@
 {
   "name": "Aleph Zero Development",
   "id": "a0dnet1",
-  "chainType": "Live",
+  "chainType": "Development",
   "bootNodes": [],
   "telemetryEndpoints": null,
   "protocolId": null,
@@ -55,19 +55,13 @@
         "multiplier": "1000000000000000000"
       },
       "staking": {
-        "validatorCount": 3,
-        "minimumValidatorCount": 3,
+        "validatorCount": 2,
+        "minimumValidatorCount": 2,
         "invulnerables": [],
         "forceEra": "NotForcing",
         "slashRewardFraction": 100000000,
         "canceledPayout": 0,
         "stakers": [
-          [
-            "5D34dL5prEUaGNQtPPZ3yN5Y6BnkfXunKXXz6fo7ZJbLwRRH",
-            "5DUEzBS54Yq2Gre3LQRpfgTJngAW9oLSpNvaiGfRbUXe4ZWV",
-            25000000000000000,
-            "Validator"
-          ],
           [
             "5GBNeWRhZc2jXu7D55rBimKYDk8PGk8itRYFTPfC8RJLKG5o",
             "5DUojEPGSE3HAhYuosg4C773ZUtFR6HabE4NPaXNhykbUM3r",
@@ -88,14 +82,6 @@
       },
       "session": {
         "keys": [
-          [
-            "5D34dL5prEUaGNQtPPZ3yN5Y6BnkfXunKXXz6fo7ZJbLwRRH",
-            "5D34dL5prEUaGNQtPPZ3yN5Y6BnkfXunKXXz6fo7ZJbLwRRH",
-            {
-              "aura": "5EjbcPfjAQTyBKxCNSydCRTDziNTMjyyoYFA6hq4u2qGBNSv",
-              "aleph": "5DoE5q4e2mv2EgakEkTjo6Lubtmxh9WyeBJ4n6nvKjttDZaD"
-            }
-          ],
           [
             "5GBNeWRhZc2jXu7D55rBimKYDk8PGk8itRYFTPfC8RJLKG5o",
             "5GBNeWRhZc2jXu7D55rBimKYDk8PGk8itRYFTPfC8RJLKG5o",
@@ -121,12 +107,11 @@
       "elections": {
         "nonReservedValidators": [],
         "reservedValidators": [
-          "5D34dL5prEUaGNQtPPZ3yN5Y6BnkfXunKXXz6fo7ZJbLwRRH",
           "5GBNeWRhZc2jXu7D55rBimKYDk8PGk8itRYFTPfC8RJLKG5o",
           "5Dfis6XL8J2P6JHUnUtArnFWndn62SydeP8ee8sG2ky9nfm9"
         ],
         "committeeSeats": {
-          "reserved_seats": 4,
+          "reserved_seats": 2,
           "non_reserved_seats": 0,
           "non_reserved_finality_seats": 0
         }
@@ -154,7 +139,6 @@
         },
         "sessionValidators": {
           "committee": [
-            "5D34dL5prEUaGNQtPPZ3yN5Y6BnkfXunKXXz6fo7ZJbLwRRH",
             "5GBNeWRhZc2jXu7D55rBimKYDk8PGk8itRYFTPfC8RJLKG5o",
             "5Dfis6XL8J2P6JHUnUtArnFWndn62SydeP8ee8sG2ky9nfm9"
           ],
