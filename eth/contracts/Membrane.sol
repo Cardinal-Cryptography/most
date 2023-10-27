@@ -16,9 +16,7 @@ contract Membrane {
 
     // from -> to mapping
     mapping(bytes32 => bytes32) public supportedPairs;
-
     mapping(bytes32 => Request) public pendingRequests;
-
     mapping(bytes32 => bool) public processedRequests;
 
     mapping(address => bool) private guardians;
@@ -44,29 +42,16 @@ contract Membrane {
         _;
     }
 
-    constructor(
-                address[] memory _guardians,
-                uint256 _signatureThreshold
-                ) {
+    constructor(address[] memory _guardians,
+                uint256 _signatureThreshold) {
         require(_guardians.length >= _signatureThreshold, "Not enough guardians specified");
 
         owner = msg.sender;
         signatureThreshold = _signatureThreshold;
+
         for (uint256 i = 0; i < _guardians.length; i++) {
             guardians[_guardians[i]] = true;
         }
-    }
-
-    function isGuardian(address sender) public view returns (bool) {
-        return guardians[sender];
-    }
-
-    function bytes32ToAddress(bytes32 data) internal pure returns (address) {
-        return address(uint160(uint256(data)));
-    }
-
-    function addressToBytes32(address addr) internal pure returns (bytes32) {
-        return bytes32(uint256(uint160(addr)));
     }
 
     // Invoke this tx to transfer funds to the destination chain.
@@ -142,6 +127,22 @@ contract Membrane {
             token.transfer(bytes32ToAddress(destReceiverAddress), amount);
             emit RequestProcessed(requestHash);
         }
+    }
+
+    function hasSignedRequest(address guardian, bytes32 hash) external view returns (bool) {
+      return pendingRequests[hash].signatures[guardian];
+    }
+
+    function isGuardian(address sender) public view returns (bool) {
+        return guardians[sender];
+    }
+
+    function bytes32ToAddress(bytes32 data) internal pure returns (address) {
+        return address(uint160(uint256(data)));
+    }
+
+    function addressToBytes32(address addr) internal pure returns (bytes32) {
+        return bytes32(uint256(uint160(addr)));
     }
 
     function addGuardian(address guardian) external _onlyOwner {

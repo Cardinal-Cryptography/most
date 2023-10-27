@@ -3,11 +3,10 @@
 pragma solidity ^0.8;
 
 contract Governance {
+
   address public owner;
   uint256 public quorum;
   uint256 public nextId;
-  mapping(address => bool) members;
-  mapping(uint256 => Proposal) pendingProposals;
 
   struct Proposal {
     address destination;
@@ -15,6 +14,10 @@ contract Governance {
     uint256 signatureCount;
     mapping(address => bool) signatures;
   }
+
+  mapping(uint256 => Proposal) public pendingProposals;
+
+  mapping(address => bool) private members;
 
   event ProposalSubmitted(address by, uint256 id);
 
@@ -32,9 +35,16 @@ contract Governance {
     _;
   }
 
-  constructor(uint256 _quorum) {
+  constructor(address[] memory _members,
+              uint256 _quorum) {
+    require(_members.length >= _quorum, "Not enough members specified");
+
     owner = msg.sender;
     quorum = _quorum;
+
+    for (uint256 i = 0; i < _members.length; i++) {
+      members[_members[i]] = true;
+    }
   }
 
   function submitProposal(address destination,
@@ -52,6 +62,8 @@ contract Governance {
   }
 
   function vote(uint256 id) external _onlyMember {
+
+    require(proposalExists(id), "NonExistentProposal");
 
     Proposal storage proposal = pendingProposals[id];
 
@@ -86,8 +98,12 @@ contract Governance {
     return members[_address];
   }
 
-  function getSignatureCount(uint256 id) external view returns (uint256) {
-    return pendingProposals[id].signatureCount;
+  function proposalExists(uint256 id) internal view returns (bool) {
+    return pendingProposals[id].signatureCount > 0;
+  }
+
+  function hasSignedProposal(address member, uint256 id) external view returns (bool) {
+    return pendingProposals[id].signatures[member];
   }
 
   function setQuorum(uint256 _quorum) external _onlyOwner {
