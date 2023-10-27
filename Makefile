@@ -9,29 +9,16 @@ help: # Show help for each of the Makefile recipes.
 clean-azero: # Remove azero node data
 clean-azero:
 	cd devnet-azero && rm -rf \
-	5D34dL5prEUaGNQtPPZ3yN5Y6BnkfXunKXXz6fo7ZJbLwRRH/chains/a0dnet1/db \
-	5D34dL5prEUaGNQtPPZ3yN5Y6BnkfXunKXXz6fo7ZJbLwRRH/chains/a0dnet1/network \
-	5D34dL5prEUaGNQtPPZ3yN5Y6BnkfXunKXXz6fo7ZJbLwRRH/backup-stash \
-	5D34dL5prEUaGNQtPPZ3yN5Y6BnkfXunKXXz6fo7ZJbLwRRH/chainspec.json \
-	5GBNeWRhZc2jXu7D55rBimKYDk8PGk8itRYFTPfC8RJLKG5o/chains/a0dnet1/db \
-	5GBNeWRhZc2jXu7D55rBimKYDk8PGk8itRYFTPfC8RJLKG5o/chains/a0dnet1/network \
-	5GBNeWRhZc2jXu7D55rBimKYDk8PGk8itRYFTPfC8RJLKG5o/backup-stash \
-	5GBNeWRhZc2jXu7D55rBimKYDk8PGk8itRYFTPfC8RJLKG5o/chainspec.json \
-	5Dfis6XL8J2P6JHUnUtArnFWndn62SydeP8ee8sG2ky9nfm9/backup-stash \
-	5Dfis6XL8J2P6JHUnUtArnFWndn62SydeP8ee8sG2ky9nfm9/chains/a0dnet1/db \
-	5Dfis6XL8J2P6JHUnUtArnFWndn62SydeP8ee8sG2ky9nfm9/chains/a0dnet1/network \
-	5Dfis6XL8J2P6JHUnUtArnFWndn62SydeP8ee8sG2ky9nfm9/backup-stash \
-	5Dfis6XL8J2P6JHUnUtArnFWndn62SydeP8ee8sG2ky9nfm9/chainspec.json \
+	5*/chains/a0dnet1/db \
+	5*/chains/a0dnet1/network \
+	5*/backup-stash \
+	5*/chainspec.json \
 	&& echo "Done azero clean"
-
-.PHONY: clean-eth
-clean-eth: # Remove eth node data
-clean-eth:
-	cd devnet-eth && ./clean.sh && echo "Done eth clean"
 
 .PHONY: clean
 clean: # Remove all node data
-clean: clean-azero clean-eth
+clean: clean-azero
+	cd devnet-eth && ./clean.sh && echo "Done clean"
 
 .PHONY: bootstrap-azero
 bootstrap-azero: # Bootstrap the node data
@@ -51,9 +38,14 @@ devnet-eth: # Run eth devnet
 devnet-eth:
 	docker-compose -f ./devnet-eth/devnet-eth-compose.yml up -d
 
-.PHONY: bridge
-bridge: # Run whole local bridge setup
-bridge: devnet-azero devnet-eth
+.PHONY: redis-instance
+redis-instance: # Run a redis instance
+redis-instance:
+	docker-compose -f ./relayer/scripts/redis-compose.yml up -d
+
+.PHONY: local-bridgenet
+local-bridgenet: # Run both devnets + a redis instance
+local-bridgenet: devnet-azero devnet-eth redis-instance
 
 .PHONY: eth-deps
 eth-deps: # Install eth dependencies
@@ -67,12 +59,12 @@ watch-eth:
 
 .PHONY: compile-eth
 compile-eth: # Compile eth contracts
-compile-eth:
+compile-eth: eth-deps
 	cd eth && npx hardhat compile
 
 .PHONY: deploy-eth
 deploy-eth: # Deploy eth contracts
-deploy-eth:
+deploy-eth: compile-eth
 	cd eth && \
 	npx hardhat run --network $(NETWORK) scripts/1_initial_migration.js && \
 	npx hardhat run --network $(NETWORK) scripts/2_deploy_contracts.js
@@ -114,8 +106,12 @@ compile-azero:
 
 .PHONY: deploy-azero
 deploy-azero: # Deploy azero contracts
-deploy-azero:
-	cd azero && npm run compile && npm run deploy
+deploy-azero: compile-azero
+	cd azero && npm run deploy
+
+.PHONY: deploy
+deploy: # Deploy all contracts
+deploy: deploy-azero deploy-eth
 
 .PHONY: watch-relayer
 watch-relayer:
@@ -125,6 +121,10 @@ watch-relayer:
 run-relayer: # Run the relayer
 run-relayer:
 	cd relayer && ./scripts/run.sh
+
+.PHONY: make bridge
+bridge: # Run the bridge
+bridge: local-bridgenet deploy run-relayer
 
 .PHONY: test-solidity
 test-solidity: # Run solidity tests
