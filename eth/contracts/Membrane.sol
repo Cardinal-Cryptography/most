@@ -49,6 +49,8 @@ contract Membrane {
                 uint256 _signatureThreshold
                 ) {
         require(_guardians.length >= _signatureThreshold, "Not enough guardians specified");
+
+        owner = msg.sender;
         signatureThreshold = _signatureThreshold;
         for (uint256 i = 0; i < _guardians.length; i++) {
             guardians[_guardians[i]] = true;
