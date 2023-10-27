@@ -15,7 +15,7 @@ contract Governance {
     mapping(address => bool) signatures;
   }
 
-  mapping(uint256 => Proposal) public pendingProposals;
+    mapping(uint256 => Proposal) public pendingProposals;
 
   mapping(address => bool) private members;
 
