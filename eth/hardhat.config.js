@@ -23,7 +23,7 @@ module.exports = {
         accounts: {
             mnemonic: DEV_MNEMONIC,
         },
-        chainId: 123454321,
+        chainId: 12345,
         gas: 25e6, // Gas limit
         gasPrice: 20e9,
       }
