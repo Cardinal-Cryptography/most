@@ -110,8 +110,9 @@ contract Membrane {
             "Hash does not match the data"
             );
 
-    require(!request.signatures[msg.sender], "This guardian has already signed this request");
+
     Request storage request = pendingRequests[requestHash];
+    require(!request.signatures[msg.sender], "This guardian has already signed this request");
 
     request.signatures[msg.sender] = true;
     request.signatureCount++;
