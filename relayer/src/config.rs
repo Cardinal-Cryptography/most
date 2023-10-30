@@ -18,12 +18,12 @@ pub struct Config {
     #[arg(long)]
     pub eth_contract_address: String,
 
-    #[arg(long, default_value = "chaos555")]
+    #[arg(long, default_value = "")]
     pub eth_keystore_password: String,
 
     #[arg(
         long,
-        default_value = "../0xf2f0930c3b7bdf1734ee173272bd8cdc0a08f038/keystore/f2f0930c3b7bdf1734ee173272bd8cdc0a08f038"
+        default_value = "../devnet-eth/execution/keystore/123463a4b065722e99115d6c222f267d9cabb524"
     )]
     pub eth_keystore_path: String,
 

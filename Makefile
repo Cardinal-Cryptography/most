@@ -5,20 +5,47 @@ AZERO_ENV ?= dev
 help: # Show help for each of the Makefile recipes.
 	@grep -E '^[a-zA-Z0-9 -]+:.*#'  Makefile | sort | while read -r l; do printf "\033[1;32m$$(echo $$l | cut -f 1 -d':')\033[00m:$$(echo $$l | cut -f 2- -d'#')\n"; done
 
+.PHONY: clean-azero
+clean-azero: # Remove azero node data
+clean-azero:
+	cd devnet-azero && rm -rf \
+	5*/chains/a0dnet1/db \
+	5*/chains/a0dnet1/network \
+	5*/backup-stash \
+	5*/chainspec.json \
+	&& echo "Done azero clean"
+
 .PHONY: clean
-clean: # Remove node data
-clean:
-	rm -rf 0x129b9daee478e7bc5edada471982e31fa7705622/geth 0x129b9daee478e7bc5edada471982e31fa7705622/geth.ipc 0x129b9daee478e7bc5edada471982e31fa7705622/history 0x129b9daee478e7bc5edada471982e31fa7705622/jwt.hex 0x7f938fd203fcabc449312661ab1d36b7fdb45118/geth 0x7f938fd203fcabc449312661ab1d36b7fdb45118/geth.ipc 0x7f938fd203fcabc449312661ab1d36b7fdb45118/history 0x7f938fd203fcabc449312661ab1d36b7fdb45118/jwt.hex 0xf2f0930c3b7bdf1734ee173272bd8cdc0a08f038/geth 0xf2f0930c3b7bdf1734ee173272bd8cdc0a08f038/history 0xf2f0930c3b7bdf1734ee173272bd8cdc0a08f038/jwt.hex 5D34dL5prEUaGNQtPPZ3yN5Y6BnkfXunKXXz6fo7ZJbLwRRH/chains/a0dnet1/db 5D34dL5prEUaGNQtPPZ3yN5Y6BnkfXunKXXz6fo7ZJbLwRRH/chains/a0dnet1/network 5D34dL5prEUaGNQtPPZ3yN5Y6BnkfXunKXXz6fo7ZJbLwRRH/backup-stash 5D34dL5prEUaGNQtPPZ3yN5Y6BnkfXunKXXz6fo7ZJbLwRRH/chainspec.json 5GBNeWRhZc2jXu7D55rBimKYDk8PGk8itRYFTPfC8RJLKG5o/chains/a0dnet1/db 5GBNeWRhZc2jXu7D55rBimKYDk8PGk8itRYFTPfC8RJLKG5o/chains/a0dnet1/network 5GBNeWRhZc2jXu7D55rBimKYDk8PGk8itRYFTPfC8RJLKG5o/backup-stash 5GBNeWRhZc2jXu7D55rBimKYDk8PGk8itRYFTPfC8RJLKG5o/chainspec.json 5Dfis6XL8J2P6JHUnUtArnFWndn62SydeP8ee8sG2ky9nfm9/backup-stash 5Dfis6XL8J2P6JHUnUtArnFWndn62SydeP8ee8sG2ky9nfm9/chains/a0dnet1/db 5Dfis6XL8J2P6JHUnUtArnFWndn62SydeP8ee8sG2ky9nfm9/chains/a0dnet1/network 5Dfis6XL8J2P6JHUnUtArnFWndn62SydeP8ee8sG2ky9nfm9/backup-stash 5Dfis6XL8J2P6JHUnUtArnFWndn62SydeP8ee8sG2ky9nfm9/chainspec.json && echo "Done"
+clean: # Remove all node data
+clean: clean-azero
+	cd devnet-eth && ./clean.sh && echo "Done clean"
 
-.PHONY: bootstrap
-bootstrap: # Bootstrap the node data
-bootstrap:
-	cp eth_genesis.json 0x7f938fd203fcabc449312661ab1d36b7fdb45118/genesis.json && docker run -u "${UID}:${GID}" -v ./0x7f938fd203fcabc449312661ab1d36b7fdb45118:/root/.ethereum ethereum/client-go:release-1.12 init --datadir /root/.ethereum /root/.ethereum/genesis.json && cp eth_genesis.json 0x129b9daee478e7bc5edada471982e31fa7705622/genesis.json && docker run -u "${UID}:${GID}" -v ./0x129b9daee478e7bc5edada471982e31fa7705622:/root/.ethereum ethereum/client-go:release-1.12 init --datadir /root/.ethereum /root/.ethereum/genesis.json && cp eth_genesis.json 0xf2f0930c3b7bdf1734ee173272bd8cdc0a08f038/genesis.json && docker run -u "${UID}:${GID}" -v ./0xf2f0930c3b7bdf1734ee173272bd8cdc0a08f038:/root/.ethereum ethereum/client-go:release-1.12 init --datadir /root/.ethereum /root/.ethereum/genesis.json && cp azero_chainspec.json 5D34dL5prEUaGNQtPPZ3yN5Y6BnkfXunKXXz6fo7ZJbLwRRH/chainspec.json && cp azero_chainspec.json 5GBNeWRhZc2jXu7D55rBimKYDk8PGk8itRYFTPfC8RJLKG5o/chainspec.json && cp azero_chainspec.json 5Dfis6XL8J2P6JHUnUtArnFWndn62SydeP8ee8sG2ky9nfm9/chainspec.json && echo "Done"
+.PHONY: bootstrap-azero
+bootstrap-azero: # Bootstrap the node data
+bootstrap-azero:
+	cd devnet-azero && \
+	cp azero_chainspec.json 5D34dL5prEUaGNQtPPZ3yN5Y6BnkfXunKXXz6fo7ZJbLwRRH/chainspec.json && \
+	cp azero_chainspec.json 5GBNeWRhZc2jXu7D55rBimKYDk8PGk8itRYFTPfC8RJLKG5o/chainspec.json && \
+	cp azero_chainspec.json 5Dfis6XL8J2P6JHUnUtArnFWndn62SydeP8ee8sG2ky9nfm9/chainspec.json && echo "Done"
 
-.PHONY: bridge
-bridge: # Run eth and aleph nodes in docker
-bridge:
-	docker-compose -f bridge.compose.yml up
+.PHONY: devnet-azero
+devnet-azero: # Run azero devnet
+devnet-azero: bootstrap-azero
+	docker-compose -f ./devnet-azero/devnet-azero-compose.yml up -d
+
+.PHONY: devnet-eth
+devnet-eth: # Run eth devnet
+devnet-eth:
+	docker-compose -f ./devnet-eth/devnet-eth-compose.yml up -d
+
+.PHONY: redis-instance
+redis-instance: # Run a redis instance
+redis-instance:
+	docker-compose -f ./relayer/scripts/redis-compose.yml up -d
+
+.PHONY: local-bridgenet
+local-bridgenet: # Run both devnets + a redis instance
+local-bridgenet: devnet-azero devnet-eth redis-instance
 
 .PHONY: eth-deps
 eth-deps: # Install eth dependencies
@@ -32,19 +59,15 @@ watch-eth:
 
 .PHONY: compile-eth
 compile-eth: # Compile eth contracts
-compile-eth:
+compile-eth: eth-deps
 	cd eth && npx hardhat compile
 
 .PHONY: deploy-eth
 deploy-eth: # Deploy eth contracts
-deploy-eth:
+deploy-eth: compile-eth
 	cd eth && \
 	npx hardhat run --network $(NETWORK) scripts/1_initial_migration.js && \
 	npx hardhat run --network $(NETWORK) scripts/2_deploy_contracts.js
-
-.PHONY: watch-azero
-watch-azero:
-	cd azero/contracts/membrane && cargo watch -s 'cargo contract check' -c
 
 .PHONY: membrane-builder
 membrane-builder: # Build an image in which contracts can be built
@@ -83,8 +106,12 @@ compile-azero:
 
 .PHONY: deploy-azero
 deploy-azero: # Deploy azero contracts
-deploy-azero:
-	cd azero && npm run compile && npm run deploy
+deploy-azero: compile-azero
+	cd azero && npm run deploy
+
+.PHONY: deploy
+deploy: # Deploy all contracts
+deploy: deploy-azero deploy-eth
 
 .PHONY: watch-relayer
 watch-relayer:
@@ -94,6 +121,10 @@ watch-relayer:
 run-relayer: # Run the relayer
 run-relayer:
 	cd relayer && ./scripts/run.sh
+
+.PHONY: make bridge
+bridge: # Run the bridge
+bridge: local-bridgenet deploy run-relayer
 
 .PHONY: test-solidity
 test-solidity: # Run solidity tests

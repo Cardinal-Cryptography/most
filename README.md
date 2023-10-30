@@ -6,33 +6,40 @@
 
 Have docker and docker-compose installed.
 
-## Development
+## Running the local development environment
 
-This section describes how set up a private PoA ethereum network.
-
-`Node1` service is specified in the genesis as the authority (signer) for block creation.
-`Node2` is an archiver and has it's ws/http ports exposed to the host for e.g. using it with `remix`
-Both nodes connect to a common `bootnode`.
-
-To run the setup start by bootstrapping the nodes to the common genesis:
-
-```bash
-make bootstrap
-```
-
-Now you can start the bridge services:
+To run a local development environment, run:
 
 ```bash
 make bridge
 ```
 
-To clean up:
+This will start a local development environment with the following components:
+* Aleph Zero Development chain
+* Ethereum PoS Development chain
+* Bridge contracts deployed on both chains
+* Redis instance
+* Relayer process
+
+## Running local development chains
+
+To run the development chain without deploying the contracts or running the relayer, run:
+    
+```bash
+make devnet-eth
+```
+or
+```bash
+make devnet-azero
+```
+
+## Cleaning up
+
+To stop the networks (and redis) and clean up:
 
 ```bash
 make clean
 ```
-
-Re-initialize the nodes and run them again from a fresh genesis block.
 
 ### Check eth nodes connectivity
 
