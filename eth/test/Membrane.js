@@ -62,7 +62,7 @@ describe("Membrane", function () {
         });
 
         it("Reverts if token is not approved", async () => {
-            const { membrane, _token, tokenAddressBytes32, _membraneAddress } = await loadFixture(deployEightGuardianMembraneFixture);
+            const { membrane, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
 
             await membrane.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
             await expect(
@@ -110,7 +110,7 @@ describe("Membrane", function () {
 
     describe("receiveRequest", function () {
         it("Reverts if caller is not a guardian", async () => {
-            const { membrane, token, tokenAddressBytes32, _membraneAddress } = await loadFixture(deployEightGuardianMembraneFixture);
+            const { membrane, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
             const accounts = await hre.ethers.getSigners();
             const ethAddress = addressToBytes32(accounts[10].address);
             const requestHash = hre.ethers.solidityPackedKeccak256(
@@ -130,7 +130,7 @@ describe("Membrane", function () {
         });
 
         it("Reverts if request has already been signed by a guardian", async () => {
-            const { membrane, _token, tokenAddressBytes32, _membraneAddress } = await loadFixture(deployEightGuardianMembraneFixture);
+            const { membrane, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
             const accounts = await hre.ethers.getSigners();
             const ethAddress = addressToBytes32(accounts[10].address);
             const requestHash = hre.ethers.solidityPackedKeccak256(
@@ -157,7 +157,7 @@ describe("Membrane", function () {
         });
 
         it("Reverts if request has already been executed", async () => {
-            const { membrane, token, tokenAddressBytes32, _membraneAddress } = await loadFixture(deployEightGuardianMembraneFixture);
+            const { membrane, token, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
             const accounts = await hre.ethers.getSigners();
             const ethAddress = addressToBytes32(accounts[10].address);
             const requestHash = hre.ethers.solidityPackedKeccak256(
@@ -190,7 +190,7 @@ describe("Membrane", function () {
         });
 
         it("Unlocks tokens for the user", async () => {
-            const { membrane, token, tokenAddressBytes32, _membraneAddress } = await loadFixture(deployEightGuardianMembraneFixture);
+            const { membrane, token, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
             const accounts = await hre.ethers.getSigners();
             const ethAddress = addressToBytes32(accounts[10].address);
             const requestHash = hre.ethers.solidityPackedKeccak256(
@@ -215,7 +215,7 @@ describe("Membrane", function () {
         });
 
         it("Reverts on non-matching hash", async () => {
-            const { membrane, token, tokenAddressBytes32, _membraneAddress } = await loadFixture(deployEightGuardianMembraneFixture);
+            const { membrane, token, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
             const accounts = await hre.ethers.getSigners();
             const ethAddress = addressToBytes32(accounts[10].address);
             const requestHash = hre.ethers.solidityPackedKeccak256(
