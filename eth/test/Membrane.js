@@ -58,6 +58,7 @@ describe("Membrane", function () {
                 )
             ).to.be.revertedWith("Unsupported pair");
         });
+
         it("Reverts if token is not approved", async () => {
             const { membrane, token } = await loadFixture(deployEightGuardianMembraneFixture);
             const alephAccountBytes = getRandomAlephAccount(3);
@@ -73,6 +74,7 @@ describe("Membrane", function () {
                 )
             ).to.be.revertedWith("ERC20: insufficient allowance");
         });
+
         it("Transfers tokens to Membrane", async () => {
             const { membrane, token } = await loadFixture(deployEightGuardianMembraneFixture);
             const alephAccountBytes = getRandomAlephAccount(3);
@@ -90,6 +92,7 @@ describe("Membrane", function () {
 
             expect(await token.balanceOf(membraneAddress)).to.equal(amount);
         });
+
         it("Emits correct event", async () => {
             const { membrane, token } = await loadFixture(deployEightGuardianMembraneFixture);
             const alephAccountBytes = getRandomAlephAccount(3);
@@ -137,6 +140,7 @@ describe("Membrane", function () {
                 )
             ).to.be.revertedWith("Can only be called by a guardian");
         });
+
         it("Reverts if request has already been signed by a guardian", async () => {
             const { membrane, token } = await loadFixture(deployEightGuardianMembraneFixture);
             const accounts = await hre.ethers.getSigners();
@@ -165,6 +169,7 @@ describe("Membrane", function () {
                 )
             ).to.be.revertedWith("This guardian has already signed this request");
         });
+
         it("Reverts if request has already been executed", async () => {
             const { membrane, token } = await loadFixture(deployEightGuardianMembraneFixture);
             const accounts = await hre.ethers.getSigners();
@@ -199,6 +204,7 @@ describe("Membrane", function () {
                 )
             ).to.be.revertedWith("This request has already been processed");
         });
+
         it("Unlocks tokens for the user", async () => {
             const { membrane, token } = await loadFixture(deployEightGuardianMembraneFixture);
             const accounts = await hre.ethers.getSigners();
@@ -225,6 +231,7 @@ describe("Membrane", function () {
 
             expect(await token.balanceOf(accounts[10].address)).to.equal(amount);
         });
+        
         it("Reverts on non-matching hash", async () => {
             const { membrane, token } = await loadFixture(deployEightGuardianMembraneFixture);
             const accounts = await hre.ethers.getSigners();
