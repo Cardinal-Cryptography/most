@@ -71,6 +71,11 @@ azero-deps: # Install azero dependencies
 azero-deps:
 	cd azero && npm install
 
+.PHONY: watch-azero
+watch-azero: # watch azero contracts and generate artifacts
+watch-azero:
+	cd azero && npm run watch
+
 .PHONY: compile-azero
 compile-azero: # compile azero contracts and generate artifacts
 compile-azero:
