@@ -38,17 +38,19 @@ contract Membrane {
   }
 
   modifier _onlyGuardian() {
-    require(isGuardian(msg.sender), "Can only be called by a signer");
+    require(isGuardian(msg.sender), "Can only be called by a guardian");
     _;
   }
 
-  constructor(address[] memory _guardians,
-              uint256 _signatureThreshold) {
+  constructor(
+              address[] memory _guardians,
+              uint256 _signatureThreshold
+              ) {
+    require(_signatureThreshold > 0, "Signature threshold must be greater than 0");
     require(_guardians.length >= _signatureThreshold, "Not enough guardians specified");
-
+        
     owner = msg.sender;
     signatureThreshold = _signatureThreshold;
-
     for (uint256 i = 0; i < _guardians.length; i++) {
       guardians[_guardians[i]] = true;
     }
@@ -108,9 +110,9 @@ contract Membrane {
             "Hash does not match the data"
             );
 
-    Request storage request = pendingRequests[requestHash];
 
-    require(!request.signatures[msg.sender], "Already signed this request");
+    Request storage request = pendingRequests[requestHash];
+    require(!request.signatures[msg.sender], "This guardian has already signed this request");
 
     request.signatures[msg.sender] = true;
     request.signatureCount++;
