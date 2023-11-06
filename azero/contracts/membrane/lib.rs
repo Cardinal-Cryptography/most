@@ -87,6 +87,15 @@ mod membrane {
     impl Membrane {
         #[ink(constructor)]
         pub fn new(guardians: Vec<AccountId>, signature_threshold: u128) -> Self {
+            assert!(
+                signature_threshold > 0,
+                "Signature threshold must be greater than 0"
+            );
+            assert!(
+                guardians.len() as u128 >= signature_threshold,
+                "Signature threshold must be less than or equal to the number of guardians"
+            );
+
             let mut guardians_set = Mapping::new();
             guardians.into_iter().for_each(|account| {
                 guardians_set.insert(account, &());
@@ -335,5 +344,145 @@ mod membrane {
                 Err(MembraneError::NotGuardian)
             }
         }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use ink::env::{
+            test::{default_accounts, set_caller},
+            DefaultEnvironment, Environment,
+        };
+
+        use super::*;
+
+        const THRESHOLD: u128 = 3;
+        type DefEnv = DefaultEnvironment;
+        type AccountId = <DefEnv as Environment>::AccountId;
+
+        fn guardian_accounts() -> Vec<AccountId> {
+            let accounts = default_accounts::<DefEnv>();
+            vec![
+                accounts.bob,
+                accounts.charlie,
+                accounts.django,
+                accounts.eve,
+                accounts.frank,
+            ]
+        }
+
+        #[ink::test]
+        fn new_sets_caller_as_owner() {
+            let mut membrane = Membrane::new(guardian_accounts(), THRESHOLD);
+            assert_eq!(membrane.ensure_owner(), Ok(()));
+            set_caller::<DefEnv>(guardian_accounts()[0]);
+            assert_eq!(
+                membrane.ensure_owner(),
+                Err(MembraneError::NotOwner(guardian_accounts()[0]))
+            );
+        }
+
+        #[ink::test]
+        fn new_sets_correct_guardians() {
+            let membrane = Membrane::new(guardian_accounts(), THRESHOLD);
+            for account in guardian_accounts() {
+                assert_eq!(membrane.is_guardian(account), Ok(()));
+            }
+            assert_eq!(
+                membrane.is_guardian(default_accounts::<DefEnv>().alice),
+                Err(MembraneError::NotGuardian)
+            );
+        }
+
+        #[ink::test]
+        fn set_owner_works() {
+            let mut membrane = Membrane::new(guardian_accounts(), THRESHOLD);
+            let accounts = default_accounts::<DefEnv>();
+            set_caller::<DefEnv>(accounts.bob);
+            assert_eq!(
+                membrane.ensure_owner(),
+                Err(MembraneError::NotOwner(accounts.bob))
+            );
+            set_caller::<DefEnv>(accounts.alice);
+            assert_eq!(membrane.ensure_owner(), Ok(()));
+            assert_eq!(membrane.set_owner(accounts.bob), Ok(()));
+            set_caller::<DefEnv>(accounts.bob);
+            assert_eq!(membrane.ensure_owner(), Ok(()));
+        }
+
+        #[ink::test]
+        fn add_guardian_works() {
+            let mut membrane = Membrane::new(guardian_accounts(), THRESHOLD);
+            let accounts = default_accounts::<DefEnv>();
+            assert_eq!(
+                membrane.is_guardian(accounts.alice),
+                Err(MembraneError::NotGuardian)
+            );
+            assert_eq!(membrane.add_guardian(accounts.alice), Ok(()));
+            assert_eq!(membrane.is_guardian(accounts.alice), Ok(()));
+        }
+
+        #[ink::test]
+        fn remove_guardian_works() {
+            let mut membrane = Membrane::new(guardian_accounts(), THRESHOLD);
+            let accounts = default_accounts::<DefEnv>();
+            assert_eq!(membrane.is_guardian(accounts.bob), Ok(()));
+            assert_eq!(membrane.remove_guardian(accounts.bob), Ok(()));
+            assert_eq!(
+                membrane.is_guardian(accounts.bob),
+                Err(MembraneError::NotGuardian)
+            );
+        }
+    }
+
+    #[cfg(all(test, feature = "e2e-tests"))]
+    mod e2e_tests {
+        use super::*;
+        use std::error::Error;
+        use ink_e2e::{account_id, AccountKeyring};
+
+        fn guardian_ids() -> Vec<AccountId> {
+            vec![
+                account_id(AccountKeyring::Bob),
+                account_id(AccountKeyring::Charlie),
+                account_id(AccountKeyring::Dave),
+                account_id(AccountKeyring::Eve),
+                account_id(AccountKeyring::Ferdie)
+            ]
+        }
+
+        #[ink_e2e::test]
+        fn simple_deploy_works(
+            mut client: ink_e2e::Client<C, E>,
+        ) -> Result<(), Box<dyn Error>> {
+            println!("guardians: {:?}", guardian_ids());
+
+            let membrane_constructor = MembraneRef::new(guardian_ids(), 3);
+
+            let _membrane_address = client
+                .instantiate("membrane", &ink_e2e::alice(), membrane_constructor, 0, None)
+                .await
+                .expect("instantiate failed")
+                .account_id;
+            Ok(())
+        }
+
+        /*#[ink_e2e::test]
+        fn adding_pair_works(
+            mut client: ink_e2e::Client<C, E>,
+        ) -> Result<(), Box<dyn Error>> {
+            let membrane_constructor = MembraneRef::new(guardian_ids(), 3);
+
+            let membrane_address = client
+                .instantiate("membrane", &ink_e2e::alice(), membrane_constructor, 0, None)
+                .await
+                .expect("instantiate failed")
+                .account_id;
+
+            let token_constructor = PSP22Ref::new(10000, None, None, 8);
+
+            //let token_address = client
+            //    .instantiate("psp22")
+            Ok(())
+        }*/
     }
 }

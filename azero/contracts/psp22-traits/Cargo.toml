@@ -20,7 +20,6 @@ scale-info = { version = "2.5", default-features = false, features = [
 
 [lib]
 path = "lib.rs"
-crate-type = ["rlib"]
 
 [features]
 default = ["std"]

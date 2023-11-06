@@ -20,6 +20,10 @@ scale-info = { version = "2.5", default-features = false, features = [
     "derive",
 ], optional = true }
 
+[dev-dependencies]
+ink_e2e = { version = "4.3.0" }
+# ink_e2e = { git = "https://github.com/paritytech/ink.git", rev = "7d0e0c8451b71eeb50f6f27e67f60cab5430d3f8"}
+
 [lib]
 path = "lib.rs"
 
@@ -27,3 +31,4 @@ path = "lib.rs"
 default = ["std"]
 std = ["ink/std", "scale/std", "scale-info/std", "psp22/std", "psp22-traits/std"]
 ink-as-dependency = []
+e2e-tests = []
