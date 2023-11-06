@@ -31,3 +31,6 @@ node_modules
 
 # emacs
 relayer/src/ markdown-code-fontification:rustic-mode
+
+# idea
+/.idea/
