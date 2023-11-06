@@ -16,6 +16,7 @@
         "ethers": "^6.8.0",
         "gulp": "^4.0.2",
         "gulp-shell": "^0.8.0",
+        "hardhat": "^2.19.0",
         "prettier": "^3.0.3",
         "prettier-plugin-solidity": "^1.1.3"
     }
