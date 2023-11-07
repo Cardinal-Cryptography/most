@@ -94,6 +94,7 @@ mod membrane {
         NotOwner(AccountId),
         RequestAlreadySigned,
         Arithmetic,
+        NoRewards,
     }
 
     impl From<InkEnvError> for MembraneError {
@@ -145,6 +146,7 @@ mod membrane {
         /// Sets a new owner account
         ///
         /// Can only be called by contracts owner
+        #[ink(message)]
         pub fn set_owner(&mut self, new_owner: AccountId) -> Result<(), MembraneError> {
             self.ensure_owner()?;
             self.owner = new_owner;
@@ -345,6 +347,21 @@ mod membrane {
                 .ok_or(MembraneError::Arithmetic)?;
             self.rewards
                 .insert((caller, dest_token_address), &updated_rewards);
+
+            Ok(())
+        }
+
+        /// Request payout of rewards for signing and relaying cross chain transer requests
+        ///
+        /// Can be caled by anyone on behalf of the relayer
+        #[ink(message)]
+        pub fn payout_rewards(&self, to: AccountId, token: [u8; 32]) -> Result<(), MembraneError> {
+            let amount = self
+                .rewards
+                .get((to, token))
+                .ok_or(MembraneError::NoRewards)?;
+
+            self.mint_to(token.into(), to, amount)?;
 
             Ok(())
         }
