@@ -1,4 +1,5 @@
 require("@nomicfoundation/hardhat-ethers");
+require("@nomicfoundation/hardhat-chai-matchers");
 
 // The default account generated from this mnemonic is Ee88da44b4901d7F86970c52dC5139Af80C83edD.
 // This account is pre-seeded with money locally and on bridgenet.
