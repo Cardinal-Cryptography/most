@@ -129,9 +129,13 @@ test-solidity: # Run solidity tests
 test-solidity: eth-deps
 	cd eth && npx hardhat test
 
+.PHONY: install-contracts-node
+install-contracts-node: # Install substrate-contracts-node
+install-contracts-node:
+	cargo install contracts-node
+
 .PHONY: test-ink
 test-ink: # Run ink tests
-test-ink: azero-deps bootstrap-azero
-	export CONTRACTS_NODE="../../scripts/azero_contracts_node.sh" && \
-	cd azero/contracts/membrane && \
-	cargo test --features e2e-tests
+test-ink: install-contracts-node
+	cd azero/contracts/tests && \
+	cargo test --features e2e-tests 2>.ink-test.log

@@ -1,5 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
 
+pub use self::membrane::MembraneRef;
+
 #[ink::contract]
 mod membrane {
     use ink::{
@@ -432,57 +434,5 @@ mod membrane {
                 Err(MembraneError::NotGuardian)
             );
         }
-    }
-
-    #[cfg(all(test, feature = "e2e-tests"))]
-    mod e2e_tests {
-        use super::*;
-        use std::error::Error;
-        use ink_e2e::{account_id, AccountKeyring};
-
-        fn guardian_ids() -> Vec<AccountId> {
-            vec![
-                account_id(AccountKeyring::Bob),
-                account_id(AccountKeyring::Charlie),
-                account_id(AccountKeyring::Dave),
-                account_id(AccountKeyring::Eve),
-                account_id(AccountKeyring::Ferdie)
-            ]
-        }
-
-        #[ink_e2e::test]
-        fn simple_deploy_works(
-            mut client: ink_e2e::Client<C, E>,
-        ) -> Result<(), Box<dyn Error>> {
-            println!("guardians: {:?}", guardian_ids());
-
-            let membrane_constructor = MembraneRef::new(guardian_ids(), 3);
-
-            let _membrane_address = client
-                .instantiate("membrane", &ink_e2e::alice(), membrane_constructor, 0, None)
-                .await
-                .expect("instantiate failed")
-                .account_id;
-            Ok(())
-        }
-
-        /*#[ink_e2e::test]
-        fn adding_pair_works(
-            mut client: ink_e2e::Client<C, E>,
-        ) -> Result<(), Box<dyn Error>> {
-            let membrane_constructor = MembraneRef::new(guardian_ids(), 3);
-
-            let membrane_address = client
-                .instantiate("membrane", &ink_e2e::alice(), membrane_constructor, 0, None)
-                .await
-                .expect("instantiate failed")
-                .account_id;
-
-            let token_constructor = PSP22Ref::new(10000, None, None, 8);
-
-            //let token_address = client
-            //    .instantiate("psp22")
-            Ok(())
-        }*/
     }
 }

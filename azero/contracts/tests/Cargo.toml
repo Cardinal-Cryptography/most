@@ -1,15 +1,11 @@
 [package]
-name = "membrane"
+name = "tests"
 version = "1.0.0"
 authors = ["Cardinal Cryptography"]
 edition = "2021"
 
 [dependencies]
 ink = { version = "=4.3.0", default-features = false }
-psp22 = { git = "https://github.com/Cardinal-Cryptography/PSP22.git", default-features = false }
-psp22-traits = { path = "../psp22-traits" , default-features = false }
-shared = { path = "../shared" }
-
 scale = { package = "parity-scale-codec", version = "3", default-features = false, features = [
     "derive",
 ] }
@@ -17,10 +13,16 @@ scale-info = { version = "2.5", default-features = false, features = [
     "derive",
 ], optional = true }
 
+[dev-dependencies]
+wrapped_token = { path = "../psp22", package = "token", features = ["ink-as-dependency"] }
+membrane = { path = "../membrane", package = "membrane", features = ["ink-as-dependency"] }
+ink_e2e = { version = "=4.3.0"}
+
 [lib]
 path = "lib.rs"
 
 [features]
-default = ["std"]
-std = ["ink/std", "scale/std", "scale-info/std", "psp22/std", "psp22-traits/std"]
+default = ["std", "e2e-tests"]
+std = ["ink/std", "scale/std", "scale-info/std", "membrane/std", "wrapped_token/std"]
 ink-as-dependency = []
+e2e-tests = []
