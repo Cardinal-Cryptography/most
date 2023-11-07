@@ -76,7 +76,7 @@ mod membrane {
         /// key is (guardian, destination_token)
         #[allow(clippy::type_complexity)]
         rewards: Mapping<(AccountId, [u8; 32]), Balance>,
-        /// from - to pairs that can be transferred across the bridge
+        /// source - destination token pairs that can be transferred across the bridge
         supported_pairs: Mapping<[u8; 32], [u8; 32]>,
     }
 
@@ -89,6 +89,7 @@ mod membrane {
         PSP22(PSP22Error),
         RequestAlreadyProcessed,
         UnsupportedPair,
+        AmountBelowMinimum,
         InkEnvError(String),
         NotOwner(AccountId),
         RequestAlreadySigned,
@@ -225,6 +226,10 @@ mod membrane {
             amount: Balance,
             dest_receiver_address: [u8; 32],
         ) -> Result<(), MembraneError> {
+            if amount.lt(&self.minimum_transfer_amount) {
+                return Err(MembraneError::AmountBelowMinimum);
+            }
+
             let sender = self.env().caller();
             self.transfer_from_tx(
                 src_token_address.into(),
