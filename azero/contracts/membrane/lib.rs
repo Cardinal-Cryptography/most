@@ -62,7 +62,15 @@ mod membrane {
         processed_requests: Mapping<HashedRequest, ()>,
         /// set of guardian accounts that can sign requests
         guardians: Mapping<AccountId, ()>,
-        /// rewards paid out to
+        /// minimal amount of tokens that can be transferred across the bridge
+        minimum_transfer_amount: Balance,
+        /// base fee paid in the source chains native token, set to track the gas costs of executing the transaction on the destination chain
+        base_fee: Balance,
+        /// per mille of the succesfully transferred amount that is distributed among the guardians that have signed the crosschain transfer request
+        commission_per_mille: u16,
+        /// a fixed bootstraping fee transferred along with the bridged token to the destination account on aleph zero
+        subsidy: Balance,
+        /// balance of the rewards collected by the guardians, paid out at their request and denominated in the bridged token
         rewards: Mapping<AccountId, Balance>,
         /// from - to pairs that can be transferred across the bridge
         supported_pairs: Mapping<[u8; 32], [u8; 32]>,
@@ -71,6 +79,7 @@ mod membrane {
     #[derive(Debug, PartialEq, Eq, Encode, Decode)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub enum MembraneError {
+        Constructor,
         NotGuardian,
         HashDoesNotMatchData,
         PSP22(PSP22Error),
@@ -96,22 +105,36 @@ mod membrane {
 
     impl Membrane {
         #[ink(constructor)]
-        pub fn new(guardians: Vec<AccountId>, signature_threshold: u128) -> Self {
-            let mut guardians_set = Mapping::new();
-            guardians.into_iter().for_each(|account| {
-                guardians_set.insert(account, &());
-            });
-
-            Self {
-                owner: Self::env().caller(),
-                request_nonce: 0,
-                signature_threshold,
-                pending_requests: Mapping::new(),
-                signatures: Mapping::new(),
-                processed_requests: Mapping::new(),
-                guardians: guardians_set,
-                supported_pairs: Mapping::new(),
+        pub fn new(
+            guardians: Vec<AccountId>,
+            signature_threshold: u128,
+            commission_per_mille: u16,
+        ) -> Result<Self, MembraneError> {
+            if commission_per_mille.gt(&1000) {
+                return Err(MembraneError::Constructor);
             }
+
+            if guardians.len().lt(&(signature_threshold as usize)) {
+                return Err(MembraneError::Constructor);
+            }
+
+            // let mut guardians_set = Mapping::new();
+            // guardians.into_iter().for_each(|account| {
+            //     guardians_set.insert(account, &());
+            // });
+
+            // Self {
+            //     owner: Self::env().caller(),
+            //     request_nonce: 0,
+            //     signature_threshold,
+            //     pending_requests: Mapping::new(),
+            //     signatures: Mapping::new(),
+            //     processed_requests: Mapping::new(),
+            //     guardians: guardians_set,
+            //     supported_pairs: Mapping::new(),
+            // }
+
+            todo!()
         }
 
         /// Sets a new owner account
@@ -260,6 +283,8 @@ mod membrane {
                 return Err(MembraneError::RequestAlreadySigned);
             }
 
+            // TODO : record reward
+
             match self.pending_requests.get(request_hash) {
                 None => {
                     self.pending_requests
@@ -299,6 +324,16 @@ mod membrane {
                     self.env().emit_event(RequestProcessed { request_hash });
                 }
             }
+
+            // TODO : insert reward record
+            let reward = amount
+                .checked_mul(
+                    (self
+                        .commission_per_mille
+                        .checked_div(1000)
+                        .ok_or(MembraneError::Arithmetic)?) as u128,
+                )
+                .ok_or(MembraneError::Arithmetic)?;
 
             Ok(())
         }
