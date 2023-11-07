@@ -48,13 +48,23 @@ mod membrane {
 
     #[ink(storage)]
     pub struct Membrane {
+        /// an account that can perform a subset of actions
         owner: AccountId,
+        /// nonce for outgoing cross-chain transfer requests
         request_nonce: u128,
+        /// number of signatures required to reach a quorum and execute a transfer
         signature_threshold: u128,
+        /// requests that are still collecting signatures
         pending_requests: Mapping<HashedRequest, Request>,
+        /// signatures per cross chain transfer request
         signatures: Mapping<(HashedRequest, AccountId), ()>,
+        /// signed & exec=uted requests, a replay protection
         processed_requests: Mapping<HashedRequest, ()>,
+        /// set of guardian accounts that can sign requests
         guardians: Mapping<AccountId, ()>,
+        /// rewards paid out to
+        rewards: Mapping<AccountId, Balance>,
+        /// from - to pairs that can be transferred across the bridge
         supported_pairs: Mapping<[u8; 32], [u8; 32]>,
     }
 
