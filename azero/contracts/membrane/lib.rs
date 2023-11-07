@@ -15,6 +15,8 @@ mod membrane {
     use scale::{Decode, Encode};
     use shared::{concat_u8_arrays, keccak256, Keccak256HashOutput as HashedRequest, Selector};
 
+    const MILLE: u128 = 1000;
+
     #[ink(event)]
     #[derive(Debug)]
     pub struct CrosschainTransferRequest {
@@ -67,11 +69,13 @@ mod membrane {
         /// base fee paid in the source chains native token, set to track the gas costs of executing the transaction on the destination chain
         base_fee: Balance,
         /// per mille of the succesfully transferred amount that is distributed among the guardians that have signed the crosschain transfer request
-        commission_per_mille: u16,
+        commission_per_mille: u128,
         /// a fixed bootstraping fee transferred along with the bridged token to the destination account on aleph zero
         subsidy: Balance,
-        /// balance of the rewards collected by the guardians, paid out at their request and denominated in the bridged token
-        rewards: Mapping<AccountId, Balance>,
+        /// balance of the rewards collected by the guardians, paid out at their request and denominated in the bridged token representation on the destination chain
+        /// key is (guardian, destination_token)
+        #[allow(clippy::type_complexity)]
+        rewards: Mapping<(AccountId, [u8; 32]), Balance>,
         /// from - to pairs that can be transferred across the bridge
         supported_pairs: Mapping<[u8; 32], [u8; 32]>,
     }
@@ -283,8 +287,6 @@ mod membrane {
                 return Err(MembraneError::RequestAlreadySigned);
             }
 
-            // TODO : record reward
-
             match self.pending_requests.get(request_hash) {
                 None => {
                     self.pending_requests
@@ -325,15 +327,19 @@ mod membrane {
                 }
             }
 
-            // TODO : insert reward record
+            // insert reward record for signing this transfer
             let reward = amount
-                .checked_mul(
-                    (self
-                        .commission_per_mille
-                        .checked_div(1000)
-                        .ok_or(MembraneError::Arithmetic)?) as u128,
-                )
+                .checked_mul(self.commission_per_mille)
+                .ok_or(MembraneError::Arithmetic)?
+                .checked_div(self.signature_threshold * MILLE)
                 .ok_or(MembraneError::Arithmetic)?;
+
+            let rewards = self.rewards.get((caller, dest_token_address)).unwrap_or(0);
+            let updated_rewards = rewards
+                .checked_add(reward)
+                .ok_or(MembraneError::Arithmetic)?;
+            self.rewards
+                .insert((caller, dest_token_address), &updated_rewards);
 
             Ok(())
         }
