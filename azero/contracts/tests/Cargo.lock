@@ -4666,8 +4666,6 @@ dependencies = [
  "ink",
  "ink_e2e",
  "membrane",
- "parity-scale-codec",
- "scale-info",
  "token",
 ]
 
