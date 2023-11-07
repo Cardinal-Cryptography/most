@@ -4666,6 +4666,7 @@ dependencies = [
  "ink",
  "ink_e2e",
  "membrane",
+ "psp22",
  "token",
 ]
 
