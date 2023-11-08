@@ -18,6 +18,7 @@ mod e2e {
     use membrane::{MembraneError, MembraneRef};
     use psp22::{PSP22Error, PSP22};
     use wrapped_token::TokenRef;
+    use shared::Keccak256HashOutput;
 
     #[ink_e2e::test]
     fn simple_deploy_works(mut client: ink_e2e::Client<C, E>) -> Result<(), Box<dyn Error>> {
@@ -49,8 +50,12 @@ mod e2e {
         )
         .await;
 
-        assert!(bob_res.is_err());
+        assert_eq!(
+            bob_res.err().expect("Bob should not be able to add a pair"),
+            MembraneError::NotOwner(account_id(AccountKeyring::Bob))
+        );
         assert!(alice_res.is_ok());
+
         Ok(())
     }
 
@@ -70,8 +75,6 @@ mod e2e {
         )
         .await;
 
-        assert!(add_pair_res.is_ok());
-
         let send_request_res = call_send_request(
             &mut client,
             &alice(),
@@ -82,7 +85,14 @@ mod e2e {
         )
         .await;
 
-        assert!(send_request_res.is_err());
+        assert!(add_pair_res.is_ok());
+        assert_eq!(
+            send_request_res
+                .err()
+                .expect("Request should fail without allowance"),
+            MembraneError::PSP22(PSP22Error::InsufficientAllowance)
+        );
+
         Ok(())
     }
 
@@ -107,7 +117,13 @@ mod e2e {
         .await;
 
         assert!(approve_res.is_ok());
-        assert!(send_request_res.is_err());
+        assert_eq!(
+            send_request_res
+                .err()
+                .expect("Request should fail for a non-whitelisted token"),
+            MembraneError::UnsupportedPair
+        );
+
         Ok(())
     }
 
@@ -141,6 +157,7 @@ mod e2e {
         assert!(approve_res.is_ok());
         assert!(add_pair_res.is_ok());
         assert!(send_request_res.is_ok());
+
         Ok(())
     }
 
@@ -158,10 +175,8 @@ mod e2e {
         vec![bob(), charlie(), dave(), eve(), ferdie()]
     }
 
-    type CallResult<E> = Result<
-        ink_e2e::CallResult<PolkadotConfig, DefaultEnvironment, Result<(), E>>,
-        ink_e2e::Error<PolkadotConfig, DefaultEnvironment>,
-    >;
+    type CallResult<E> =
+        Result<ink_e2e::CallResult<PolkadotConfig, DefaultEnvironment, Result<(), E>>, E>;
     type E2EClient = ink_e2e::Client<PolkadotConfig, DefaultEnvironment>;
 
     async fn instantiate_membrane(
@@ -201,7 +216,14 @@ mod e2e {
     ) -> CallResult<MembraneError> {
         let add_pair_message = build_message::<MembraneRef>(membrane)
             .call(|membrane| membrane.add_pair(*token.as_ref(), remote_token));
-        client.call(caller, add_pair_message, 0, None).await
+        client
+            .call_dry_run(caller, &add_pair_message, 0, None)
+            .await
+            .return_value()?;
+        Ok(client
+            .call(caller, add_pair_message, 0, None)
+            .await
+            .expect("Unexpected error."))
     }
 
     async fn call_send_request(
@@ -214,7 +236,14 @@ mod e2e {
     ) -> CallResult<MembraneError> {
         let send_request_message = build_message::<MembraneRef>(membrane)
             .call(|membrane| membrane.send_request(*token.as_ref(), amount, remote_address));
-        client.call(caller, send_request_message, 0, None).await
+        client
+            .call_dry_run(caller, &send_request_message, 0, None)
+            .await
+            .return_value()?;
+        Ok(client
+            .call(caller, send_request_message, 0, None)
+            .await
+            .expect("Unexpected error."))
     }
 
     async fn call_approve(
@@ -226,7 +255,14 @@ mod e2e {
     ) -> CallResult<PSP22Error> {
         let approve_message =
             build_message::<TokenRef>(token).call(|token| token.approve(spender, amount));
-        client.call(caller, approve_message, 0, None).await
+        client
+            .call_dry_run(caller, &approve_message, 0, None)
+            .await
+            .return_value()?;
+        Ok(client
+            .call(caller, approve_message, 0, None)
+            .await
+            .expect("Unexpected error."))
     }
 
     async fn call_transfer(
@@ -238,6 +274,35 @@ mod e2e {
     ) -> CallResult<PSP22Error> {
         let transfer_message = build_message::<TokenRef>(token)
             .call(|token| token.transfer(recipient, amount, vec![]));
-        client.call(caller, transfer_message, 0, None).await
+        client
+            .call_dry_run(caller, &transfer_message, 0, None)
+            .await
+            .return_value()?;
+        Ok(client
+            .call(caller, transfer_message, 0, None)
+            .await
+            .expect("Unexpected error."))
+    }
+
+    async fn call_receive_request(
+        client: &mut E2EClient,
+        caller: &Keypair,
+        membrane: AccountId,
+        request_hash: Keccak256HashOutput,
+        token: [u8; 32],
+        amount: u128,
+        receiver_address: [u8; 32],
+        request_nonce: u128,
+    ) -> CallResult<MembraneError> {
+        let receive_request_message = build_message::<MembraneRef>(membrane)
+            .call(|membrane| membrane.receive_request(request_hash, token, amount, receiver_address, request_nonce));
+        client
+            .call_dry_run(caller, &receive_request_message, 0, None)
+            .await
+            .return_value()?;
+        Ok(client
+            .call(caller, receive_request_message, 0, None)
+            .await
+            .expect("Unexpected error."))
     }
 }

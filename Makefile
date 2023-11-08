@@ -138,4 +138,4 @@ install-contracts-node:
 test-ink: # Run ink tests
 test-ink: install-contracts-node
 	cd azero/contracts/tests && \
-	cargo test --features e2e-tests 2>.ink-test.log
+	cargo test

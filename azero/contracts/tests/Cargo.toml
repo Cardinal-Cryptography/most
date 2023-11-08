@@ -9,6 +9,7 @@ ink = { version = "=4.3.0", default-features = false }
 wrapped_token = { path = "../psp22", package = "token", features = ["ink-as-dependency"] }
 membrane = { path = "../membrane", package = "membrane", features = ["ink-as-dependency"] }
 psp22 = { git = "https://github.com/Cardinal-Cryptography/PSP22.git" }
+shared = { path = "../shared" }
 ink_e2e = { version = "=4.3.0"}
 
 [lib]
