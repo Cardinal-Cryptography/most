@@ -7,7 +7,7 @@ mod membrane {
             call::{build_call, ExecutionInput},
             set_code_hash, DefaultEnvironment, Error as InkEnvError,
         },
-        prelude::{format, string::String, vec, vec::Vec},
+        prelude::{collections::HashMap, format, string::String, vec, vec::Vec},
         storage::Mapping,
     };
     use psp22::{PSP22Error, PSP22};
@@ -30,6 +30,7 @@ mod membrane {
     #[derive(Debug)]
     pub struct RequestProcessed {
         request_hash: HashedRequest,
+        dest_token_address: [u8; 32],
     }
 
     #[ink(event)]
@@ -60,7 +61,7 @@ mod membrane {
         pending_requests: Mapping<HashedRequest, Request>,
         /// signatures per cross chain transfer request
         signatures: Mapping<(HashedRequest, AccountId), ()>,
-        /// signed & exec=uted requests, a replay protection
+        /// signed & executed requests, a replay protection
         processed_requests: Mapping<HashedRequest, ()>,
         /// set of guardian accounts that can sign requests
         guardians: Mapping<AccountId, ()>,
@@ -73,9 +74,8 @@ mod membrane {
         /// a fixed bootstraping fee transferred along with the bridged token to the destination account on aleph zero
         subsidy: Balance,
         /// balance of the rewards collected by the guardians, paid out at their request and denominated in the bridged token representation on the destination chain
-        /// key is (guardian, destination_token)
         #[allow(clippy::type_complexity)]
-        rewards: Mapping<(AccountId, [u8; 32]), Balance>,
+        rewards: Mapping<(HashedRequest, AccountId), ([u8; 32], Balance)>,
         /// source - destination token pairs that can be transferred across the bridge
         supported_pairs: Mapping<[u8; 32], [u8; 32]>,
     }
@@ -87,6 +87,7 @@ mod membrane {
         NotGuardian,
         HashDoesNotMatchData,
         PSP22(PSP22Error),
+        RequestNotProcessed,
         RequestAlreadyProcessed,
         UnsupportedPair,
         AmountBelowMinimum,
@@ -165,7 +166,7 @@ mod membrane {
 
         /// Removes a guardian account from the whitelist
         ///
-        /// Can only be called by the contracts owner        
+        /// Can only be called by the contracts owner
         #[ink(message)]
         pub fn remove_guardian(&mut self, account: AccountId) -> Result<(), MembraneError> {
             self.ensure_owner()?;
@@ -175,7 +176,7 @@ mod membrane {
 
         /// Adds a supported pair for bridging
         ///
-        /// Can only be called by the contracts owner                
+        /// Can only be called by the contracts owner
         #[ink(message)]
         pub fn add_pair(&mut self, from: [u8; 32], to: [u8; 32]) -> Result<(), MembraneError> {
             self.ensure_owner()?;
@@ -185,7 +186,7 @@ mod membrane {
 
         /// Removes a supported pair from bridging
         ///
-        /// Can only be called by the contracts owner                        
+        /// Can only be called by the contracts owner
         #[ink(message)]
         pub fn remove_pair(&mut self, from: [u8; 32]) -> Result<(), MembraneError> {
             self.ensure_owner()?;
@@ -330,7 +331,10 @@ mod membrane {
 
                     self.pending_requests.insert(request_hash, &request);
 
-                    self.env().emit_event(RequestProcessed { request_hash });
+                    self.env().emit_event(RequestProcessed {
+                        request_hash,
+                        dest_token_address,
+                    });
                 }
             }
 
@@ -341,24 +345,66 @@ mod membrane {
                 .checked_div(self.signature_threshold * MILLE)
                 .ok_or(MembraneError::Arithmetic)?;
 
-            let rewards = self.rewards.get((caller, dest_token_address)).unwrap_or(0);
-            let updated_rewards = rewards
-                .checked_add(reward)
-                .ok_or(MembraneError::Arithmetic)?;
             self.rewards
-                .insert((caller, dest_token_address), &updated_rewards);
+                .insert((request_hash, caller), &(dest_token_address, reward));
 
             Ok(())
         }
 
-        /// Request payout of rewards for signing and relaying cross chain transer requests
+        /// Request payout of rewards for multiple cross-chain transer requests identified by their hashes.
+        /// Requests need to be fully processed to continue.
         ///
-        /// Can be caled by anyone on behalf of the relayer
+        /// Can be called by anyone on behalf of the relayer.
         #[ink(message)]
-        pub fn payout_rewards(&self, to: AccountId, token: [u8; 32]) -> Result<(), MembraneError> {
-            let amount = self
+        pub fn payout_rewards(
+            &self,
+            requests: Vec<HashedRequest>,
+            to: AccountId,
+        ) -> Result<(), MembraneError> {
+            let rewards =
+                requests
+                    .iter()
+                    .try_fold(HashMap::new(), |mut accumulator, &request_hash| {
+                        if self.pending_requests.contains(request_hash) {
+                            return Err(MembraneError::RequestNotProcessed);
+                        }
+
+                        let (token, amount) = self
+                            .rewards
+                            .get((request_hash, to))
+                            .ok_or(MembraneError::NoRewards)?;
+
+                        let total_reward = accumulator.get(&token).unwrap_or(&0u128);
+
+                        accumulator.insert(token, total_reward + amount);
+
+                        Ok(accumulator)
+                    })?;
+
+            for (token, amount) in rewards {
+                self.mint_to(token.into(), to, amount)?;
+            }
+
+            Ok(())
+        }
+
+        /// Request payout of the reward for signing and relaying a single cross-chain transer request identified by it's hash.
+        /// Request needs to be fully processed in order to continue.
+        ///
+        /// Can be called by anyone on behalf of the relayer.
+        #[ink(message)]
+        pub fn payout_reward(
+            &self,
+            request_hash: HashedRequest,
+            to: AccountId,
+        ) -> Result<(), MembraneError> {
+            if self.pending_requests.contains(request_hash) {
+                return Err(MembraneError::RequestNotProcessed);
+            }
+
+            let (token, amount) = self
                 .rewards
-                .get((to, token))
+                .get((request_hash, to))
                 .ok_or(MembraneError::NoRewards)?;
 
             self.mint_to(token.into(), to, amount)?;
