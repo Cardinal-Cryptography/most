@@ -25,6 +25,11 @@ jobs:
         # yamllint disable-line rule:line-length
         uses: Cardinal-Cryptography/github-actions/get-ref-properties@v3
 
+      - name: Install Rust toolchain
+        uses: Cardinal-Cryptography/github-actions/install-rust-toolchain@v3
+        with:
+          targets: wasm32-unknown-unknown
+
       - name: Install necessary tools
         shell: bash
         run: |
@@ -44,11 +49,6 @@ jobs:
         run: |
           mkdir -p eth/build/contracts/
           cp eth/artifacts/contracts/Membrane.sol/Membrane.json eth/build/contracts/Membrane.json
-
-      - name: Install Rust toolchain
-        uses: Cardinal-Cryptography/github-actions/install-rust-toolchain@v3
-        with:
-          targets: wasm32-unknown-unknown
 
       - name: Build relayer
         run: |
