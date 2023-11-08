@@ -13,7 +13,7 @@ on:
 jobs:
   test:
     name: Test ink! contracts
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux, X64, large]
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
