@@ -2,14 +2,16 @@
 
 #[ink::contract]
 mod membrane {
+
     use ink::{
         env::{
             call::{build_call, ExecutionInput},
             set_code_hash, DefaultEnvironment, Error as InkEnvError,
         },
-        prelude::{collections::HashMap, format, string::String, vec, vec::Vec},
+        prelude::{collections::BTreeMap, format, string::String, vec, vec::Vec},
         storage::Mapping,
     };
+    // use ink_prelude::collections::HashMap;
     use psp22::{PSP22Error, PSP22};
     use psp22_traits::Mintable;
     use scale::{Decode, Encode};
@@ -71,8 +73,8 @@ mod membrane {
         base_fee: Balance,
         /// per mille of the succesfully transferred amount that is distributed among the guardians that have signed the crosschain transfer request
         commission_per_mille: u128,
-        /// a fixed bootstraping fee transferred along with the bridged token to the destination account on aleph zero
-        subsidy: Balance,
+        /// a fixed subsidy transferred along with the bridged tokens to the destination account on aleph zero to bootstrap
+        pocket_money: Balance,
         /// balance of the rewards collected by the guardians, paid out at their request and denominated in the bridged token representation on the destination chain
         #[allow(clippy::type_complexity)]
         rewards: Mapping<(HashedRequest, AccountId), ([u8; 32], Balance)>,
@@ -115,7 +117,10 @@ mod membrane {
         pub fn new(
             guardians: Vec<AccountId>,
             signature_threshold: u128,
-            commission_per_mille: u16,
+            commission_per_mille: u128,
+            base_fee: Balance,
+            pocket_money: Balance,
+            minimum_transfer_amount: Balance,
         ) -> Result<Self, MembraneError> {
             if commission_per_mille.gt(&1000) {
                 return Err(MembraneError::Constructor);
@@ -125,23 +130,26 @@ mod membrane {
                 return Err(MembraneError::Constructor);
             }
 
-            // let mut guardians_set = Mapping::new();
-            // guardians.into_iter().for_each(|account| {
-            //     guardians_set.insert(account, &());
-            // });
+            let mut guardians_set = Mapping::new();
+            guardians.into_iter().for_each(|account| {
+                guardians_set.insert(account, &());
+            });
 
-            // Self {
-            //     owner: Self::env().caller(),
-            //     request_nonce: 0,
-            //     signature_threshold,
-            //     pending_requests: Mapping::new(),
-            //     signatures: Mapping::new(),
-            //     processed_requests: Mapping::new(),
-            //     guardians: guardians_set,
-            //     supported_pairs: Mapping::new(),
-            // }
-
-            todo!()
+            Ok(Self {
+                owner: Self::env().caller(),
+                request_nonce: 0,
+                signature_threshold,
+                pending_requests: Mapping::new(),
+                signatures: Mapping::new(),
+                processed_requests: Mapping::new(),
+                guardians: guardians_set,
+                supported_pairs: Mapping::new(),
+                rewards: Mapping::new(),
+                minimum_transfer_amount,
+                pocket_money,
+                base_fee,
+                commission_per_mille,
+            })
         }
 
         /// Sets a new owner account
@@ -327,6 +335,9 @@ mod membrane {
                             dest_receiver_address.into(),
                             amount,
                         )?;
+
+                        self.env()
+                            .transfer(dest_receiver_address.into(), self.pocket_money)?;
                     }
 
                     self.pending_requests.insert(request_hash, &request);
@@ -364,7 +375,7 @@ mod membrane {
             let rewards =
                 requests
                     .iter()
-                    .try_fold(HashMap::new(), |mut accumulator, &request_hash| {
+                    .try_fold(BTreeMap::new(), |mut accumulator, &request_hash| {
                         if self.pending_requests.contains(request_hash) {
                             return Err(MembraneError::RequestNotProcessed);
                         }
