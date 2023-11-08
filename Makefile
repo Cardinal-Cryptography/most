@@ -139,6 +139,7 @@ test-ink-e2e: # Run ink e2e tests
 test-ink-e2e:
 	export CONTRACTS_NODE="../../scripts/azero_contracts_node.sh" && \
 	cd azero/contracts/tests && \
+	../../scripts/azero_contracts_node.sh && \
 	cargo test -- --test-threads=1
 
 .PHONY: test-ink
