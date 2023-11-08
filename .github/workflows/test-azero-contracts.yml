@@ -21,6 +21,14 @@ jobs:
       - name: "Install Rust toolchain"
         uses: Cardinal-Cryptography/aleph-node/.github/actions/install-rust-toolchain@5eda3cd85e7e3aec3f2db7a26631c65d52c4b9ea
 
+      - name: "Install Docker Compose"
+      - uses: KengoTODA/actions-setup-docker-compose@v1
+        with:
+          version: '1.29.2'
+
+      - name: "Check Docker Compose version"
+        run: docker-compose --version
+
       - name: Run tests
         shell: bash
         run: make test-ink
