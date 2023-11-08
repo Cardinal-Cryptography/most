@@ -56,10 +56,20 @@ describe("Wrapped Ether", function () {
         expect(balance_init).to.equal(SEED_AMOUNT * DECIMALS);
 
         const mintGasEstimate = await wrapped.mint.estimateGas();
-        await wrapped.mint({ value: hre.ethers.parseEther(WRAP_AMOUNT.toString()) });
+        await wrapped.mint({
+            from: owner,
+            value: hre.ethers.parseEther(WRAP_AMOUNT.toString()),
+            gas: mintGasEstimate,
+        });
 
         const burnGasEstimate = await wrapped.burn.estimateGas(WRAP_AMOUNT * DECIMALS);
-        await wrapped.burn(WRAP_AMOUNT * DECIMALS);
+        await wrapped.burn(
+            WRAP_AMOUNT * DECIMALS,
+            {
+                from: owner,
+                gas: burnGasEstimate,
+            }
+        );
 
         const balance = await provider.getBalance(owner.address);
         expect(await wrapped.balanceOf(owner.address)).to.equal(0n);
