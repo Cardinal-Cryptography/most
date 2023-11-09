@@ -14,13 +14,13 @@ async function main() {
   // Wrapped Ether
   const wrappedEtherFactory = await hre.ethers.getContractFactory("WrappedEther");
   const wrappedEther = await wrappedEtherFactory.deploy();
-  const wrappedEtherAdress = await wrappedEther.getAddress();
+  const wrappedEtherAddress = await wrappedEther.getAddress();
 
-  console.log("Wrapped Ether deployed to:",  wrappedEtherAdress);
+  console.log("Wrapped Ether deployed to:",  wrappedEtherAddress);
 
   const addresses = {
     membrane: membraneAddress,
-    wrappedEther: wrappedEtherAdress,
+    wrappedEther: wrappedEtherAddress,
   };
 
   fs.writeFileSync("addresses.json", JSON.stringify(addresses));
