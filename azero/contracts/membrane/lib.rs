@@ -3,7 +3,7 @@
 pub use self::membrane::{MembraneRef, MembraneError};
 
 #[ink::contract]
-mod membrane {
+pub mod membrane {
     use ink::{
         env::{
             call::{build_call, ExecutionInput},
@@ -63,7 +63,7 @@ mod membrane {
     #[derive(Debug, PartialEq, Eq, Encode, Decode)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub enum MembraneError {
-        NotGuardian,
+        NotGuardian(AccountId),
         HashDoesNotMatchData,
         PSP22(PSP22Error),
         RequestAlreadyProcessed,
@@ -343,7 +343,7 @@ mod membrane {
             if self.guardians.contains(account) {
                 Ok(())
             } else {
-                Err(MembraneError::NotGuardian)
+                Err(MembraneError::NotGuardian(account))
             }
         }
     }
@@ -386,12 +386,13 @@ mod membrane {
         #[ink::test]
         fn new_sets_correct_guardians() {
             let membrane = Membrane::new(guardian_accounts(), THRESHOLD);
+            let accounts = default_accounts::<DefEnv>();
             for account in guardian_accounts() {
                 assert_eq!(membrane.is_guardian(account), Ok(()));
             }
             assert_eq!(
-                membrane.is_guardian(default_accounts::<DefEnv>().alice),
-                Err(MembraneError::NotGuardian)
+                membrane.is_guardian(accounts.alice),
+                Err(MembraneError::NotGuardian(accounts.alice))
             );
         }
 
@@ -417,7 +418,7 @@ mod membrane {
             let accounts = default_accounts::<DefEnv>();
             assert_eq!(
                 membrane.is_guardian(accounts.alice),
-                Err(MembraneError::NotGuardian)
+                Err(MembraneError::NotGuardian(accounts.alice))
             );
             assert_eq!(membrane.add_guardian(accounts.alice), Ok(()));
             assert_eq!(membrane.is_guardian(accounts.alice), Ok(()));
@@ -431,7 +432,7 @@ mod membrane {
             assert_eq!(membrane.remove_guardian(accounts.bob), Ok(()));
             assert_eq!(
                 membrane.is_guardian(accounts.bob),
-                Err(MembraneError::NotGuardian)
+                Err(MembraneError::NotGuardian(accounts.bob))
             );
         }
     }
