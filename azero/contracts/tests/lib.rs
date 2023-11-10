@@ -29,8 +29,11 @@ mod e2e {
 
     #[ink_e2e::test]
     fn adding_pair_works(mut client: ink_e2e::Client<C, E>) -> Result<(), Box<dyn Error>> {
-        let token_address = instantiate_token(&mut client, &alice(), 10000, 8).await;
-        let membrane_address = instantiate_membrane(&mut client, &alice(), guardian_ids(), 3).await;
+        let guardians_threshold = 3;
+        let initial_supply = 10000;
+        let token_address = instantiate_token(&mut client, &alice(), initial_supply, 8).await;
+        let membrane_address =
+            instantiate_membrane(&mut client, &alice(), guardian_ids(), guardians_threshold).await;
 
         let bob_add_pair_res = membrane_add_pair(
             &mut client,
@@ -51,7 +54,9 @@ mod e2e {
         .await;
 
         assert_eq!(
-            bob_add_pair_res.err().expect("Bob should not be able to add a pair"),
+            bob_add_pair_res
+                .err()
+                .expect("Bob should not be able to add a pair"),
             MembraneError::NotOwner(account_id(AccountKeyring::Bob))
         );
         assert!(alice_add_pair_res.is_ok());
@@ -63,25 +68,31 @@ mod e2e {
     fn send_request_fails_without_allowance(
         mut client: ink_e2e::Client<C, E>,
     ) -> Result<(), Box<dyn Error>> {
-        let token_address = instantiate_token(&mut client, &alice(), 10000, 8).await;
-        let membrane_address = instantiate_membrane(&mut client, &alice(), guardian_ids(), 3).await;
+        let guardians_threshold = 3;
+        let initial_supply = 10000;
+        let token_address = instantiate_token(&mut client, &alice(), initial_supply, 8).await;
+        let membrane_address =
+            instantiate_membrane(&mut client, &alice(), guardian_ids(), guardians_threshold).await;
 
+        let remote_token_address = [0x0; 32];
         let add_pair_res = membrane_add_pair(
             &mut client,
             &alice(),
             membrane_address,
             token_address,
-            [0x0; 32],
+            remote_token_address,
         )
         .await;
 
+        let amount_to_send = 1000;
+        let remote_receiver = [0x1; 32];
         let send_request_res = membrane_send_request(
             &mut client,
             &alice(),
             membrane_address,
             token_address,
-            1000,
-            [0x1; 32],
+            amount_to_send,
+            remote_receiver,
         )
         .await;
 
@@ -100,19 +111,30 @@ mod e2e {
     fn send_request_fails_on_non_whitelisted_token(
         mut client: ink_e2e::Client<C, E>,
     ) -> Result<(), Box<dyn Error>> {
-        let token_address = instantiate_token(&mut client, &alice(), 10000, 8).await;
-        let membrane_address = instantiate_membrane(&mut client, &alice(), guardian_ids(), 3).await;
+        let guardians_threshold = 3;
+        let initial_supply = 10000;
+        let token_address = instantiate_token(&mut client, &alice(), initial_supply, 8).await;
+        let membrane_address =
+            instantiate_membrane(&mut client, &alice(), guardian_ids(), guardians_threshold).await;
 
-        let approve_res =
-            psp22_approve(&mut client, &alice(), token_address, 1000, membrane_address).await;
+        let amount_to_send = 1000;
+        let approve_res = psp22_approve(
+            &mut client,
+            &alice(),
+            token_address,
+            amount_to_send,
+            membrane_address,
+        )
+        .await;
 
+        let remote_receiver = [0x1; 32];
         let send_request_res = membrane_send_request(
             &mut client,
             &alice(),
             membrane_address,
             token_address,
-            1000,
-            [0x1; 32],
+            amount_to_send,
+            remote_receiver,
         )
         .await;
 
@@ -129,28 +151,40 @@ mod e2e {
 
     #[ink_e2e::test]
     fn correct_request(mut client: ink_e2e::Client<C, E>) -> Result<(), Box<dyn Error>> {
-        let token_address = instantiate_token(&mut client, &alice(), 10000, 8).await;
-        let membrane_address = instantiate_membrane(&mut client, &alice(), guardian_ids(), 3).await;
+        let guardians_threshold = 3;
+        let initial_supply = 10000;
+        let token_address = instantiate_token(&mut client, &alice(), initial_supply, 8).await;
+        let membrane_address =
+            instantiate_membrane(&mut client, &alice(), guardian_ids(), guardians_threshold).await;
 
-        let approve_res =
-            psp22_approve(&mut client, &alice(), token_address, 1000, membrane_address).await;
+        let amount_to_send = 1000;
+        let approve_res = psp22_approve(
+            &mut client,
+            &alice(),
+            token_address,
+            amount_to_send,
+            membrane_address,
+        )
+        .await;
 
+        let remote_token_address = [0x0; 32];
         let add_pair_res = membrane_add_pair(
             &mut client,
             &alice(),
             membrane_address,
             token_address,
-            [0x0; 32],
+            remote_token_address,
         )
         .await;
 
+        let remote_receiver = [0x1; 32];
         let send_request_res = membrane_send_request(
             &mut client,
             &alice(),
             membrane_address,
             token_address,
-            1000,
-            [0x1; 32],
+            amount_to_send,
+            remote_receiver,
         )
         .await;
 
@@ -165,8 +199,11 @@ mod e2e {
     fn receive_request_can_only_be_called_by_guardians(
         mut client: ink_e2e::Client<C, E>,
     ) -> Result<(), Box<dyn Error>> {
-        let token_address = instantiate_token(&mut client, &alice(), 10000, 8).await;
-        let membrane_address = instantiate_membrane(&mut client, &alice(), guardian_ids(), 3).await;
+        let guardians_threshold = 3;
+        let initial_supply = 10000;
+        let token_address = instantiate_token(&mut client, &alice(), initial_supply, 8).await;
+        let membrane_address =
+            instantiate_membrane(&mut client, &alice(), guardian_ids(), guardians_threshold).await;
 
         let amount = 20;
         let receiver_address = account_id(AccountKeyring::One);
@@ -201,18 +238,21 @@ mod e2e {
     fn receive_request_non_matching_hash(
         mut client: ink_e2e::Client<C, E>,
     ) -> Result<(), Box<dyn Error>> {
+        let guardians_threshold = 3;
         let token_address = instantiate_token(&mut client, &alice(), 10000, 8).await;
-        let membrane_address = instantiate_membrane(&mut client, &alice(), guardian_ids(), 3).await;
+        let membrane_address =
+            instantiate_membrane(&mut client, &alice(), guardian_ids(), guardians_threshold).await;
 
         let amount = 20;
         let receiver_address = account_id(AccountKeyring::One);
         let request_nonce = 1;
 
+        let incorrect_hash = [0x3; 32];
         let receive_request_res = membrane_receive_request(
             &mut client,
             &bob(),
             membrane_address,
-            [0x1; 32],
+            incorrect_hash,
             *token_address.as_ref(),
             amount,
             *receiver_address.as_ref(),
@@ -234,8 +274,11 @@ mod e2e {
     fn receive_request_executes_request_after_enough_transactions(
         mut client: ink_e2e::Client<C, E>,
     ) -> Result<(), Box<dyn Error>> {
-        let token_address = instantiate_token(&mut client, &alice(), 10000, 8).await;
-        let membrane_address = instantiate_membrane(&mut client, &alice(), guardian_ids(), 3).await;
+        let guardians_threshold = 3;
+        let initial_supply = 10000;
+        let token_address = instantiate_token(&mut client, &alice(), initial_supply, 8).await;
+        let membrane_address =
+            instantiate_membrane(&mut client, &alice(), guardian_ids(), guardians_threshold).await;
         psp22_transfer(&mut client, &alice(), token_address, 100, membrane_address)
             .await
             .expect("Transfer should succeed");
@@ -247,7 +290,7 @@ mod e2e {
         let request_hash =
             hash_request_data(token_address, amount, receiver_address, request_nonce);
 
-        for signer in &guardian_keys()[0..3] {
+        for signer in &guardian_keys()[0..(guardians_threshold as usize)] {
             let receive_request_res = membrane_receive_request(
                 &mut client,
                 &signer,
@@ -279,8 +322,11 @@ mod e2e {
     fn receive_request_not_enough_signatures(
         mut client: ink_e2e::Client<C, E>,
     ) -> Result<(), Box<dyn Error>> {
-        let token_address = instantiate_token(&mut client, &alice(), 10000, 8).await;
-        let membrane_address = instantiate_membrane(&mut client, &alice(), guardian_ids(), 5).await;
+        let guardians_threshold = 5;
+        let initial_supply = 10000;
+        let token_address = instantiate_token(&mut client, &alice(), initial_supply, 8).await;
+        let membrane_address =
+            instantiate_membrane(&mut client, &alice(), guardian_ids(), guardians_threshold).await;
         psp22_transfer(&mut client, &alice(), token_address, 100, membrane_address)
             .await
             .expect("Transfer should succeed");
@@ -292,7 +338,7 @@ mod e2e {
         let request_hash =
             hash_request_data(token_address, amount, receiver_address, request_nonce);
 
-        for signer in &guardian_keys()[0..4] {
+        for signer in &guardian_keys()[0..(guardians_threshold as usize) - 1] {
             let receive_request_res = membrane_receive_request(
                 &mut client,
                 &signer,
