@@ -360,16 +360,13 @@ mod membrane {
                     });
 
                     if request.signature_count >= self.signature_threshold {
-                        self.processed_requests.insert(request_hash, &());
-                        self.signatures.remove((request_hash, caller));
-                        self.pending_requests.remove(request_hash);
-
                         self.mint_to(
                             dest_token_address.into(),
                             dest_receiver_address.into(),
                             amount,
                         )?;
 
+                        // bootstrap account with pocket money
                         self.env()
                             .transfer(dest_receiver_address.into(), self.pocket_money)?;
 
@@ -382,14 +379,21 @@ mod membrane {
 
                         self.commissions
                             .insert(request_hash, &(dest_token_address, reward));
+
+                        // mark it as processed
+                        self.processed_requests.insert(request_hash, &());
+
+                        // clean up
+                        self.signatures.remove((request_hash, caller));
+                        self.pending_requests.remove(request_hash);
+
+                        self.env().emit_event(RequestProcessed {
+                            request_hash,
+                            dest_token_address,
+                        });
+                    } else {
+                        self.pending_requests.insert(request_hash, &request);
                     }
-
-                    self.pending_requests.insert(request_hash, &request);
-
-                    self.env().emit_event(RequestProcessed {
-                        request_hash,
-                        dest_token_address,
-                    });
                 }
             }
 
