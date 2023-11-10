@@ -8,7 +8,7 @@ mod membrane {
             call::{build_call, ExecutionInput},
             set_code_hash, DefaultEnvironment, Error as InkEnvError,
         },
-        prelude::{format, string::String, vec, vec::Vec},
+        prelude::{collections::BTreeMap, format, string::String, vec, vec::Vec},
         storage::Mapping,
     };
     use psp22::{PSP22Error, PSP22};
@@ -93,7 +93,7 @@ mod membrane {
         Constructor,
         NotGuardian,
         HashDoesNotMatchData,
-        RewardsAlreadyCollected,
+        RewardAlreadyCollected,
         PSP22(PSP22Error),
         RequestNotProcessed,
         RequestAlreadyProcessed,
@@ -406,9 +406,50 @@ mod membrane {
             requests: Vec<HashedRequest>,
             to: AccountId,
         ) -> Result<(), MembraneError> {
-            for request in requests {
-                self.payout_reward(request, to)?;
+            let mut base_fee_total = 0;
+            let mut commission_total = BTreeMap::new();
+
+            for request_hash in requests {
+                if self.pending_requests.contains(request_hash) {
+                    return Err(MembraneError::RequestNotProcessed);
+                }
+
+                if self.collected_rewards.contains((request_hash, to)) {
+                    return Err(MembraneError::RewardAlreadyCollected);
+                }
+
+                // commission
+                let (token, amount) = self
+                    .commissions
+                    .get(request_hash)
+                    .ok_or(MembraneError::NoRewards)?;
+
+                let commission = amount
+                    .checked_div(self.guardians_count)
+                    .ok_or(MembraneError::Arithmetic)?;
+
+                let total_reward = commission_total.get(&token).unwrap_or(&0u128);
+
+                let base_fee = self
+                    .base_fees
+                    .get(request_hash)
+                    .ok_or(MembraneError::NoRewards)?
+                    .checked_div(self.guardians_count)
+                    .ok_or(MembraneError::Arithmetic)?;
+
+                commission_total.insert(token, total_reward + commission);
+                base_fee_total += base_fee;
+
+                // mark rewards as collected
+                self.collected_rewards.insert((request_hash, to), &());
             }
+
+            for (token, amount) in commission_total {
+                self.mint_to(token.into(), to, amount)?;
+            }
+
+            self.env().transfer(to, base_fee_total)?;
+
             Ok(())
         }
 
@@ -427,7 +468,7 @@ mod membrane {
             }
 
             if self.collected_rewards.contains((request_hash, to)) {
-                return Err(MembraneError::RewardsAlreadyCollected);
+                return Err(MembraneError::RewardAlreadyCollected);
             }
 
             // base fee
@@ -437,8 +478,6 @@ mod membrane {
                 .ok_or(MembraneError::NoRewards)?
                 .checked_div(self.guardians_count)
                 .ok_or(MembraneError::Arithmetic)?;
-
-            self.env().transfer(to, base_fee)?;
 
             // commission
             let (token, amount) = self
@@ -451,6 +490,7 @@ mod membrane {
                 .ok_or(MembraneError::Arithmetic)?;
 
             self.mint_to(token.into(), to, commission)?;
+            self.env().transfer(to, base_fee)?;
 
             // mark rewards as collected
             self.collected_rewards.insert((request_hash, to), &());
