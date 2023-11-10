@@ -129,11 +129,6 @@ test-solidity: # Run solidity tests
 test-solidity: eth-deps
 	cd eth && npx hardhat test ./test/Membrane.js
 
-.PHONY: install-contracts-node
-install-contracts-node: # Install substrate-contracts-node
-install-contracts-node:
-	cargo install contracts-node
-
 .PHONY: test-ink-e2e
 test-ink-e2e: # Run ink e2e tests
 test-ink-e2e: bootstrap-azero

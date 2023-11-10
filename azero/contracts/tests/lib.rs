@@ -32,7 +32,7 @@ mod e2e {
         let token_address = instantiate_token(&mut client, &alice(), 10000, 8).await;
         let membrane_address = instantiate_membrane(&mut client, &alice(), guardian_ids(), 3).await;
 
-        let bob_res = call_add_pair(
+        let bob_add_pair_res = membrane_add_pair(
             &mut client,
             &bob(),
             membrane_address,
@@ -41,7 +41,7 @@ mod e2e {
         )
         .await;
 
-        let alice_res = call_add_pair(
+        let alice_add_pair_res = membrane_add_pair(
             &mut client,
             &alice(),
             membrane_address,
@@ -51,10 +51,10 @@ mod e2e {
         .await;
 
         assert_eq!(
-            bob_res.err().expect("Bob should not be able to add a pair"),
+            bob_add_pair_res.err().expect("Bob should not be able to add a pair"),
             MembraneError::NotOwner(account_id(AccountKeyring::Bob))
         );
-        assert!(alice_res.is_ok());
+        assert!(alice_add_pair_res.is_ok());
 
         Ok(())
     }
@@ -66,7 +66,7 @@ mod e2e {
         let token_address = instantiate_token(&mut client, &alice(), 10000, 8).await;
         let membrane_address = instantiate_membrane(&mut client, &alice(), guardian_ids(), 3).await;
 
-        let add_pair_res = call_add_pair(
+        let add_pair_res = membrane_add_pair(
             &mut client,
             &alice(),
             membrane_address,
@@ -75,7 +75,7 @@ mod e2e {
         )
         .await;
 
-        let send_request_res = call_send_request(
+        let send_request_res = membrane_send_request(
             &mut client,
             &alice(),
             membrane_address,
@@ -104,9 +104,9 @@ mod e2e {
         let membrane_address = instantiate_membrane(&mut client, &alice(), guardian_ids(), 3).await;
 
         let approve_res =
-            call_approve(&mut client, &alice(), token_address, 1000, membrane_address).await;
+            psp22_approve(&mut client, &alice(), token_address, 1000, membrane_address).await;
 
-        let send_request_res = call_send_request(
+        let send_request_res = membrane_send_request(
             &mut client,
             &alice(),
             membrane_address,
@@ -133,9 +133,9 @@ mod e2e {
         let membrane_address = instantiate_membrane(&mut client, &alice(), guardian_ids(), 3).await;
 
         let approve_res =
-            call_approve(&mut client, &alice(), token_address, 1000, membrane_address).await;
+            psp22_approve(&mut client, &alice(), token_address, 1000, membrane_address).await;
 
-        let add_pair_res = call_add_pair(
+        let add_pair_res = membrane_add_pair(
             &mut client,
             &alice(),
             membrane_address,
@@ -144,7 +144,7 @@ mod e2e {
         )
         .await;
 
-        let send_request_res = call_send_request(
+        let send_request_res = membrane_send_request(
             &mut client,
             &alice(),
             membrane_address,
@@ -175,7 +175,7 @@ mod e2e {
         let request_hash =
             hash_request_data(token_address, amount, receiver_address, request_nonce);
 
-        let alice_receive_request_res = call_receive_request(
+        let alice_receive_request_res = membrane_receive_request(
             &mut client,
             &alice(),
             membrane_address,
@@ -208,7 +208,7 @@ mod e2e {
         let receiver_address = account_id(AccountKeyring::One);
         let request_nonce = 1;
 
-        let receive_request_res = call_receive_request(
+        let receive_request_res = membrane_receive_request(
             &mut client,
             &bob(),
             membrane_address,
@@ -236,7 +236,7 @@ mod e2e {
     ) -> Result<(), Box<dyn Error>> {
         let token_address = instantiate_token(&mut client, &alice(), 10000, 8).await;
         let membrane_address = instantiate_membrane(&mut client, &alice(), guardian_ids(), 3).await;
-        call_transfer(&mut client, &alice(), token_address, 100, membrane_address)
+        psp22_transfer(&mut client, &alice(), token_address, 100, membrane_address)
             .await
             .expect("Transfer should succeed");
 
@@ -248,7 +248,7 @@ mod e2e {
             hash_request_data(token_address, amount, receiver_address, request_nonce);
 
         for signer in &guardian_keys()[0..3] {
-            let receive_request_res = call_receive_request(
+            let receive_request_res = membrane_receive_request(
                 &mut client,
                 &signer,
                 membrane_address,
@@ -281,7 +281,7 @@ mod e2e {
     ) -> Result<(), Box<dyn Error>> {
         let token_address = instantiate_token(&mut client, &alice(), 10000, 8).await;
         let membrane_address = instantiate_membrane(&mut client, &alice(), guardian_ids(), 5).await;
-        call_transfer(&mut client, &alice(), token_address, 100, membrane_address)
+        psp22_transfer(&mut client, &alice(), token_address, 100, membrane_address)
             .await
             .expect("Transfer should succeed");
 
@@ -293,7 +293,7 @@ mod e2e {
             hash_request_data(token_address, amount, receiver_address, request_nonce);
 
         for signer in &guardian_keys()[0..4] {
-            let receive_request_res = call_receive_request(
+            let receive_request_res = membrane_receive_request(
                 &mut client,
                 &signer,
                 membrane_address,
@@ -382,7 +382,7 @@ mod e2e {
             .account_id
     }
 
-    async fn call_add_pair(
+    async fn membrane_add_pair(
         client: &mut E2EClient,
         caller: &Keypair,
         membrane: AccountId,
@@ -401,7 +401,7 @@ mod e2e {
             .expect("Unexpected error."))
     }
 
-    async fn call_send_request(
+    async fn membrane_send_request(
         client: &mut E2EClient,
         caller: &Keypair,
         membrane: AccountId,
@@ -421,45 +421,7 @@ mod e2e {
             .expect("Unexpected error."))
     }
 
-    async fn call_approve(
-        client: &mut E2EClient,
-        caller: &Keypair,
-        token: AccountId,
-        amount: u128,
-        spender: AccountId,
-    ) -> CallResult<PSP22Error> {
-        let approve_message =
-            build_message::<TokenRef>(token).call(|token| token.approve(spender, amount));
-        client
-            .call_dry_run(caller, &approve_message, 0, None)
-            .await
-            .return_value()?;
-        Ok(client
-            .call(caller, approve_message, 0, None)
-            .await
-            .expect("Unexpected error."))
-    }
-
-    async fn call_transfer(
-        client: &mut E2EClient,
-        caller: &Keypair,
-        token: AccountId,
-        amount: u128,
-        recipient: AccountId,
-    ) -> CallResult<PSP22Error> {
-        let transfer_message = build_message::<TokenRef>(token)
-            .call(|token| token.transfer(recipient, amount, vec![]));
-        client
-            .call_dry_run(caller, &transfer_message, 0, None)
-            .await
-            .return_value()?;
-        Ok(client
-            .call(caller, transfer_message, 0, None)
-            .await
-            .expect("Unexpected error."))
-    }
-
-    async fn call_receive_request(
+    async fn membrane_receive_request(
         client: &mut E2EClient,
         caller: &Keypair,
         membrane: AccountId,
@@ -478,6 +440,44 @@ mod e2e {
             .return_value()?;
         Ok(client
             .call(caller, receive_request_message, 0, None)
+            .await
+            .expect("Unexpected error."))
+    }
+
+    async fn psp22_approve(
+        client: &mut E2EClient,
+        caller: &Keypair,
+        token: AccountId,
+        amount: u128,
+        spender: AccountId,
+    ) -> CallResult<PSP22Error> {
+        let approve_message =
+            build_message::<TokenRef>(token).call(|token| token.approve(spender, amount));
+        client
+            .call_dry_run(caller, &approve_message, 0, None)
+            .await
+            .return_value()?;
+        Ok(client
+            .call(caller, approve_message, 0, None)
+            .await
+            .expect("Unexpected error."))
+    }
+
+    async fn psp22_transfer(
+        client: &mut E2EClient,
+        caller: &Keypair,
+        token: AccountId,
+        amount: u128,
+        recipient: AccountId,
+    ) -> CallResult<PSP22Error> {
+        let transfer_message = build_message::<TokenRef>(token)
+            .call(|token| token.transfer(recipient, amount, vec![]));
+        client
+            .call_dry_run(caller, &transfer_message, 0, None)
+            .await
+            .return_value()?;
+        Ok(client
+            .call(caller, transfer_message, 0, None)
             .await
             .expect("Unexpected error."))
     }
