@@ -67,17 +67,23 @@ mod membrane {
         processed_requests: Mapping<HashedRequest, ()>,
         /// set of guardian accounts that can sign requests
         guardians: Mapping<AccountId, ()>,
+        /// accounting helper data structure
+        guardians_count: u128,
         /// minimal amount of tokens that can be transferred across the bridge
         minimum_transfer_amount: Balance,
-        /// base fee paid in the source chains native token, set to track the gas costs of executing the transaction on the destination chain
+        /// base fee paid in the source chains native token that is distributed among the guardians, set to track the gas costs of signing the relay transactions on the destination chain
         base_fee: Balance,
         /// per mille of the succesfully transferred amount that is distributed among the guardians that have signed the crosschain transfer request
         commission_per_mille: u128,
         /// a fixed subsidy transferred along with the bridged tokens to the destination account on aleph zero to bootstrap
         pocket_money: Balance,
-        /// balance of the rewards collected by the guardians, paid out at their request and denominated in the bridged token representation on the destination chain
-        #[allow(clippy::type_complexity)]
-        rewards: Mapping<(HashedRequest, AccountId), ([u8; 32], Balance)>,
+        /// rewards collected by the commitee members for relaying cross-chain transfer requests, denominated in the bridged token representation on the destination chain
+        // #[allow(clippy::type_complexity)]
+        commissions: Mapping<HashedRequest, ([u8; 32], Balance)>,
+        /// remuneration collected by the commitee members to cover the gas fees for signing the requests on the destination chain. Denominated in the source chain native currency
+        base_fees: Mapping<HashedRequest, Balance>,
+        /// accounting data structure
+        collected_rewards: Mapping<(HashedRequest, AccountId), ()>,
         /// source - destination token pairs that can be transferred across the bridge
         supported_pairs: Mapping<[u8; 32], [u8; 32]>,
     }
@@ -88,6 +94,7 @@ mod membrane {
         Constructor,
         NotGuardian,
         HashDoesNotMatchData,
+        RewardsAlreadyCollected,
         PSP22(PSP22Error),
         RequestNotProcessed,
         RequestAlreadyProcessed,
@@ -96,6 +103,7 @@ mod membrane {
         InkEnvError(String),
         NotOwner(AccountId),
         RequestAlreadySigned,
+        BaseFeeTooLow,
         Arithmetic,
         NoRewards,
     }
@@ -144,7 +152,8 @@ mod membrane {
                 processed_requests: Mapping::new(),
                 guardians: guardians_set,
                 supported_pairs: Mapping::new(),
-                rewards: Mapping::new(),
+                commissions: Mapping::new(),
+                base_fees: Mapping::new(),
                 minimum_transfer_amount,
                 pocket_money,
                 base_fee,
@@ -230,7 +239,7 @@ mod membrane {
         }
 
         /// Invoke this tx to initiate funds transfer to the destination chain.
-        #[ink(message)]
+        #[ink(message, payable)]
         pub fn send_request(
             &mut self,
             src_token_address: [u8; 32],
@@ -253,6 +262,22 @@ mod membrane {
                 .supported_pairs
                 .get(src_token_address)
                 .ok_or(MembraneError::UnsupportedPair)?;
+
+            let base_fee = self.env().transferred_value();
+            if base_fee.lt(&self.base_fee) {
+                return Err(MembraneError::BaseFeeTooLow);
+            }
+
+            let bytes = concat_u8_arrays(vec![
+                &dest_token_address,
+                &amount.to_le_bytes(),
+                &dest_receiver_address,
+                &self.request_nonce.to_le_bytes(),
+            ]);
+
+            let hash = keccak256(&bytes);
+
+            self.base_fees.insert(hash, &base_fee);
 
             self.env().emit_event(CrosschainTransferRequest {
                 dest_token_address,
@@ -338,6 +363,16 @@ mod membrane {
 
                         self.env()
                             .transfer(dest_receiver_address.into(), self.pocket_money)?;
+
+                        // insert reward record for signing this transfer
+                        let reward = amount
+                            .checked_mul(self.commission_per_mille)
+                            .ok_or(MembraneError::Arithmetic)?
+                            .checked_div(MILLE)
+                            .ok_or(MembraneError::Arithmetic)?;
+
+                        self.commissions
+                            .insert(request_hash, &(dest_token_address, reward));
                     }
 
                     self.pending_requests.insert(request_hash, &request);
@@ -350,54 +385,54 @@ mod membrane {
             }
 
             // insert reward record for signing this transfer
-            let reward = amount
-                .checked_mul(self.commission_per_mille)
-                .ok_or(MembraneError::Arithmetic)?
-                .checked_div(self.signature_threshold * MILLE)
-                .ok_or(MembraneError::Arithmetic)?;
+            // let reward = amount
+            //     .checked_mul(self.commission_per_mille)
+            //     .ok_or(MembraneError::Arithmetic)?
+            //     .checked_div(self.signature_threshold * MILLE)
+            //     .ok_or(MembraneError::Arithmetic)?;
 
-            self.rewards
-                .insert((request_hash, caller), &(dest_token_address, reward));
-
-            Ok(())
-        }
-
-        /// Request payout of rewards for multiple cross-chain transer requests identified by their hashes.
-        /// Requests need to be fully processed to continue.
-        ///
-        /// Can be called by anyone on behalf of the relayer.
-        #[ink(message)]
-        pub fn payout_rewards(
-            &self,
-            requests: Vec<HashedRequest>,
-            to: AccountId,
-        ) -> Result<(), MembraneError> {
-            let rewards =
-                requests
-                    .iter()
-                    .try_fold(BTreeMap::new(), |mut accumulator, &request_hash| {
-                        if self.pending_requests.contains(request_hash) {
-                            return Err(MembraneError::RequestNotProcessed);
-                        }
-
-                        let (token, amount) = self
-                            .rewards
-                            .get((request_hash, to))
-                            .ok_or(MembraneError::NoRewards)?;
-
-                        let total_reward = accumulator.get(&token).unwrap_or(&0u128);
-
-                        accumulator.insert(token, total_reward + amount);
-
-                        Ok(accumulator)
-                    })?;
-
-            for (token, amount) in rewards {
-                self.mint_to(token.into(), to, amount)?;
-            }
+            // self.commissions
+            //     .insert((request_hash, caller), &(dest_token_address, reward));
 
             Ok(())
         }
+
+        // /// Request payout of rewards for multiple cross-chain transer requests identified by their hashes.
+        // /// Requests need to be fully processed to continue.
+        // ///
+        // /// Can be called by anyone on behalf of the relayer.
+        // #[ink(message)]
+        // pub fn payout_rewards(
+        //     &self,
+        //     requests: Vec<HashedRequest>,
+        //     to: AccountId,
+        // ) -> Result<(), MembraneError> {
+        //     let rewards =
+        //         requests
+        //             .iter()
+        //             .try_fold(BTreeMap::new(), |mut accumulator, &request_hash| {
+        //                 if self.pending_requests.contains(request_hash) {
+        //                     return Err(MembraneError::RequestNotProcessed);
+        //                 }
+
+        //                 let (token, amount) = self
+        //                     .commissions
+        //                     .get((request_hash, to))
+        //                     .ok_or(MembraneError::NoRewards)?;
+
+        //                 let total_reward = accumulator.get(&token).unwrap_or(&0u128);
+
+        //                 accumulator.insert(token, total_reward + amount);
+
+        //                 Ok(accumulator)
+        //             })?;
+
+        //     for (token, amount) in rewards {
+        //         self.mint_to(token.into(), to, amount)?;
+        //     }
+
+        //     Ok(())
+        // }
 
         /// Request payout of the reward for signing and relaying a single cross-chain transer request identified by it's hash.
         /// Request needs to be fully processed in order to continue.
@@ -413,12 +448,34 @@ mod membrane {
                 return Err(MembraneError::RequestNotProcessed);
             }
 
+            if self.collected_rewards.contains(&(request_hash, to)) {
+                return Err(MembraneError::RewardsAlreadyCollected);
+            }
+
+            // base fee
+            let base_fee = self
+                .base_fees
+                .get(request_hash)
+                .ok_or(MembraneError::NoRewards)?
+                .checked_div(self.guardians_count)
+                .ok_or(MembraneError::Arithmetic)?;
+
+            self.env().transfer(to, base_fee)?;
+
+            // commission
             let (token, amount) = self
-                .rewards
-                .get((request_hash, to))
+                .commissions
+                .get(request_hash)
                 .ok_or(MembraneError::NoRewards)?;
 
-            self.mint_to(token.into(), to, amount)?;
+            let commission = amount
+                .checked_div(self.guardians_count)
+                .ok_or(MembraneError::Arithmetic)?;
+
+            self.mint_to(token.into(), to, commission)?;
+
+            // mark rewards as collected
+            self.collected_rewards.insert((request_hash, to), &());
 
             Ok(())
         }
