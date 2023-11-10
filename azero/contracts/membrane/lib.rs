@@ -180,7 +180,12 @@ mod membrane {
         #[ink(message)]
         pub fn add_guardian(&mut self, account: AccountId) -> Result<(), MembraneError> {
             self.ensure_owner()?;
-            self.guardians.insert(account, &());
+
+            if !self.guardians.contains(account) {
+                self.guardians.insert(account, &());
+                self.guardians_count += 1
+            }
+
             Ok(())
         }
 
@@ -191,6 +196,7 @@ mod membrane {
         pub fn remove_guardian(&mut self, account: AccountId) -> Result<(), MembraneError> {
             self.ensure_owner()?;
             self.guardians.remove(account);
+            self.guardians_count -= 1;
             Ok(())
         }
 
