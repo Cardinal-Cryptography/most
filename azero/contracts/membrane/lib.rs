@@ -1,6 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
 
-pub use self::membrane::{MembraneRef, MembraneError};
+pub use self::membrane::{MembraneError, MembraneRef};
 
 #[ink::contract]
 pub mod membrane {
@@ -118,6 +118,7 @@ pub mod membrane {
         /// Sets a new owner account
         ///
         /// Can only be called by contracts owner
+        #[ink(message)]
         pub fn set_owner(&mut self, new_owner: AccountId) -> Result<(), MembraneError> {
             self.ensure_owner()?;
             self.owner = new_owner;
@@ -374,7 +375,9 @@ pub mod membrane {
 
         #[ink::test]
         fn new_sets_caller_as_owner() {
+            set_caller::<DefEnv>(default_accounts::<DefEnv>().alice);
             let mut membrane = Membrane::new(guardian_accounts(), THRESHOLD);
+
             assert_eq!(membrane.ensure_owner(), Ok(()));
             set_caller::<DefEnv>(guardian_accounts()[0]);
             assert_eq!(
@@ -385,8 +388,10 @@ pub mod membrane {
 
         #[ink::test]
         fn new_sets_correct_guardians() {
-            let membrane = Membrane::new(guardian_accounts(), THRESHOLD);
             let accounts = default_accounts::<DefEnv>();
+            set_caller::<DefEnv>(accounts.alice);
+            let membrane = Membrane::new(guardian_accounts(), THRESHOLD);
+
             for account in guardian_accounts() {
                 assert_eq!(membrane.is_guardian(account), Ok(()));
             }
@@ -398,8 +403,9 @@ pub mod membrane {
 
         #[ink::test]
         fn set_owner_works() {
-            let mut membrane = Membrane::new(guardian_accounts(), THRESHOLD);
             let accounts = default_accounts::<DefEnv>();
+            set_caller::<DefEnv>(accounts.alice);
+            let mut membrane = Membrane::new(guardian_accounts(), THRESHOLD);
             set_caller::<DefEnv>(accounts.bob);
             assert_eq!(
                 membrane.ensure_owner(),
@@ -414,8 +420,10 @@ pub mod membrane {
 
         #[ink::test]
         fn add_guardian_works() {
-            let mut membrane = Membrane::new(guardian_accounts(), THRESHOLD);
             let accounts = default_accounts::<DefEnv>();
+            set_caller::<DefEnv>(accounts.alice);
+            let mut membrane = Membrane::new(guardian_accounts(), THRESHOLD);
+
             assert_eq!(
                 membrane.is_guardian(accounts.alice),
                 Err(MembraneError::NotGuardian(accounts.alice))
@@ -426,8 +434,10 @@ pub mod membrane {
 
         #[ink::test]
         fn remove_guardian_works() {
-            let mut membrane = Membrane::new(guardian_accounts(), THRESHOLD);
             let accounts = default_accounts::<DefEnv>();
+            set_caller::<DefEnv>(accounts.alice);
+            let mut membrane = Membrane::new(guardian_accounts(), THRESHOLD);
+
             assert_eq!(membrane.is_guardian(accounts.bob), Ok(()));
             assert_eq!(membrane.remove_guardian(accounts.bob), Ok(()));
             assert_eq!(
