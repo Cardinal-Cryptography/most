@@ -8,8 +8,6 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 
 #[cfg(all(test, feature = "e2e-tests"))]
 mod e2e {
-    use std::error::Error;
-
     use ink::{
         codegen::TraitCallBuilder,
         env::{
@@ -38,20 +36,19 @@ mod e2e {
     const REMOTE_RECEIVER: [u8; 32] = [0x2; 32];
 
     #[ink_e2e::test]
-    fn simple_deploy_works(mut client: ink_e2e::Client<C, E>) -> Result<(), Box<dyn Error>> {
+    fn simple_deploy_works(mut client: ink_e2e::Client<C, E>) {
         let _membrane_address =
             instantiate_membrane(&mut client, &alice(), guardian_ids(), DEFAULT_THRESHOLD).await;
-        Ok(())
     }
 
     #[ink_e2e::test]
-    fn owner_can_add_a_new_pair(mut client: ink_e2e::Client<C, E>) -> Result<(), Box<dyn Error>> {
+    fn owner_can_add_a_new_pair(mut client: ink_e2e::Client<C, E>) {
         let token_address =
             instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
         let membrane_address =
             instantiate_membrane(&mut client, &alice(), guardian_ids(), DEFAULT_THRESHOLD).await;
 
-        let alice_add_pair_res = membrane_add_pair(
+        let add_pair_res = membrane_add_pair(
             &mut client,
             &alice(),
             membrane_address,
@@ -60,21 +57,17 @@ mod e2e {
         )
         .await;
 
-        assert!(alice_add_pair_res.is_ok());
-
-        Ok(())
+        assert!(add_pair_res.is_ok());
     }
 
     #[ink_e2e::test]
-    fn non_owner_cannot_add_a_new_pair(
-        mut client: ink_e2e::Client<C, E>,
-    ) -> Result<(), Box<dyn Error>> {
+    fn non_owner_cannot_add_a_new_pair(mut client: ink_e2e::Client<C, E>) {
         let token_address =
             instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
         let membrane_address =
             instantiate_membrane(&mut client, &alice(), guardian_ids(), DEFAULT_THRESHOLD).await;
 
-        let bob_add_pair_res = membrane_add_pair(
+        let add_pair_res = membrane_add_pair(
             &mut client,
             &bob(),
             membrane_address,
@@ -84,32 +77,29 @@ mod e2e {
         .await;
 
         assert_eq!(
-            bob_add_pair_res
+            add_pair_res
                 .err()
                 .expect("Bob should not be able to add a pair as he is not the owner"),
             MembraneError::NotOwner(account_id(AccountKeyring::Bob))
         );
-
-        Ok(())
     }
 
     #[ink_e2e::test]
-    fn send_request_fails_without_allowance(
-        mut client: ink_e2e::Client<C, E>,
-    ) -> Result<(), Box<dyn Error>> {
+    fn send_request_fails_without_allowance(mut client: ink_e2e::Client<C, E>) {
         let token_address =
             instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
         let membrane_address =
             instantiate_membrane(&mut client, &alice(), guardian_ids(), DEFAULT_THRESHOLD).await;
 
-        let add_pair_res = membrane_add_pair(
+        membrane_add_pair(
             &mut client,
             &alice(),
             membrane_address,
             token_address,
             REMOTE_TOKEN,
         )
-        .await;
+        .await
+        .expect("Adding a pair should succeed");
 
         let amount_to_send = 1000;
         let send_request_res = membrane_send_request(
@@ -122,35 +112,31 @@ mod e2e {
         )
         .await;
 
-        assert!(add_pair_res.is_ok());
         assert_eq!(
             send_request_res
                 .err()
                 .expect("Request should fail without allowance"),
             MembraneError::PSP22(PSP22Error::InsufficientAllowance)
         );
-
-        Ok(())
     }
 
     #[ink_e2e::test]
-    fn send_request_fails_on_non_whitelisted_token(
-        mut client: ink_e2e::Client<C, E>,
-    ) -> Result<(), Box<dyn Error>> {
+    fn send_request_fails_on_non_whitelisted_token(mut client: ink_e2e::Client<C, E>) {
         let token_address =
             instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
         let membrane_address =
             instantiate_membrane(&mut client, &alice(), guardian_ids(), DEFAULT_THRESHOLD).await;
 
         let amount_to_send = 1000;
-        let approve_res = psp22_approve(
+        psp22_approve(
             &mut client,
             &alice(),
             token_address,
             amount_to_send,
             membrane_address,
         )
-        .await;
+        .await
+        .expect("Approve should succeed");
 
         let send_request_res = membrane_send_request(
             &mut client,
@@ -162,42 +148,41 @@ mod e2e {
         )
         .await;
 
-        assert!(approve_res.is_ok());
         assert_eq!(
             send_request_res
                 .err()
                 .expect("Request should fail for a non-whitelisted token"),
             MembraneError::UnsupportedPair
         );
-
-        Ok(())
     }
 
     #[ink_e2e::test]
-    fn correct_request(mut client: ink_e2e::Client<C, E>) -> Result<(), Box<dyn Error>> {
+    fn correct_request(mut client: ink_e2e::Client<C, E>) {
         let token_address =
             instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
         let membrane_address =
             instantiate_membrane(&mut client, &alice(), guardian_ids(), DEFAULT_THRESHOLD).await;
 
         let amount_to_send = 1000;
-        let approve_res = psp22_approve(
+        psp22_approve(
             &mut client,
             &alice(),
             token_address,
             amount_to_send,
             membrane_address,
         )
-        .await;
+        .await
+        .expect("Approve should succeed");
 
-        let add_pair_res = membrane_add_pair(
+        membrane_add_pair(
             &mut client,
             &alice(),
             membrane_address,
             token_address,
             REMOTE_TOKEN,
         )
-        .await;
+        .await
+        .expect("Adding a pair should succeed");
 
         let send_request_res = membrane_send_request(
             &mut client,
@@ -209,17 +194,11 @@ mod e2e {
         )
         .await;
 
-        assert!(approve_res.is_ok());
-        assert!(add_pair_res.is_ok());
         assert!(send_request_res.is_ok());
-
-        Ok(())
     }
 
     #[ink_e2e::test]
-    fn receive_request_can_only_be_called_by_guardians(
-        mut client: ink_e2e::Client<C, E>,
-    ) -> Result<(), Box<dyn Error>> {
+    fn receive_request_can_only_be_called_by_guardians(mut client: ink_e2e::Client<C, E>) {
         let token_address =
             instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
         let membrane_address =
@@ -250,14 +229,10 @@ mod e2e {
                 .expect("Receive request should fail for non-guardians"),
             MembraneError::NotGuardian(account_id(AccountKeyring::Alice))
         );
-
-        Ok(())
     }
 
     #[ink_e2e::test]
-    fn receive_request_non_matching_hash(
-        mut client: ink_e2e::Client<C, E>,
-    ) -> Result<(), Box<dyn Error>> {
+    fn receive_request_non_matching_hash(mut client: ink_e2e::Client<C, E>) {
         let token_address =
             instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
         let membrane_address =
@@ -286,14 +261,12 @@ mod e2e {
                 .expect("Receive request should fail for non-matching hash"),
             MembraneError::HashDoesNotMatchData
         );
-
-        Ok(())
     }
 
     #[ink_e2e::test]
     fn receive_request_executes_request_after_enough_transactions(
         mut client: ink_e2e::Client<C, E>,
-    ) -> Result<(), Box<dyn Error>> {
+    ) {
         let token_address =
             instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
         let membrane_address =
@@ -310,7 +283,7 @@ mod e2e {
             hash_request_data(token_address, amount, receiver_address, request_nonce);
 
         for signer in &guardian_keys()[0..(DEFAULT_THRESHOLD as usize)] {
-            let receive_request_res = membrane_receive_request(
+            membrane_receive_request(
                 &mut client,
                 &signer,
                 membrane_address,
@@ -320,9 +293,8 @@ mod e2e {
                 *receiver_address.as_ref(),
                 request_nonce,
             )
-            .await;
-
-            assert!(receive_request_res.is_ok());
+            .await
+            .expect("Receive request should succeed");
         }
 
         let balance_of_call = build_message::<TokenRef>(token_address)
@@ -333,14 +305,10 @@ mod e2e {
             .return_value();
 
         assert_eq!(balance, amount);
-
-        Ok(())
     }
 
     #[ink_e2e::test]
-    fn receive_request_not_enough_signatures(
-        mut client: ink_e2e::Client<C, E>,
-    ) -> Result<(), Box<dyn Error>> {
+    fn receive_request_not_enough_signatures(mut client: ink_e2e::Client<C, E>) {
         let guardians_threshold = 5;
         let token_address =
             instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
@@ -358,7 +326,7 @@ mod e2e {
             hash_request_data(token_address, amount, receiver_address, request_nonce);
 
         for signer in &guardian_keys()[0..(guardians_threshold as usize) - 1] {
-            let receive_request_res = membrane_receive_request(
+            membrane_receive_request(
                 &mut client,
                 &signer,
                 membrane_address,
@@ -368,9 +336,8 @@ mod e2e {
                 *receiver_address.as_ref(),
                 request_nonce,
             )
-            .await;
-
-            assert!(receive_request_res.is_ok());
+            .await
+            .expect("Receive request should succeed");
         }
 
         let balance_of_call = build_message::<TokenRef>(token_address)
@@ -381,8 +348,6 @@ mod e2e {
             .return_value();
 
         assert_eq!(balance, 0);
-
-        Ok(())
     }
 
     fn guardian_ids() -> Vec<AccountId> {
