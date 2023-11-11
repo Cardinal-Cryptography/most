@@ -4667,6 +4667,7 @@ dependencies = [
  "ink",
  "ink_e2e",
  "membrane",
+ "parity-scale-codec",
  "psp22",
  "shared",
  "token",

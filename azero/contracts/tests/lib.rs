@@ -10,13 +10,24 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 mod e2e {
     use std::error::Error;
 
-    use ink::{env::DefaultEnvironment, primitives::AccountId};
+    use ink::{
+        codegen::TraitCallBuilder,
+        env::{
+            call::{
+                utils::{ReturnType, Set},
+                Call, CallBuilder, ExecutionInput, FromAccountId,
+            },
+            DefaultEnvironment,
+        },
+        primitives::AccountId,
+    };
     use ink_e2e::{
         account_id, alice, bob, build_message, charlie, dave, eve, ferdie, AccountKeyring, Keypair,
         PolkadotConfig,
     };
     use membrane::{MembraneError, MembraneRef};
     use psp22::{PSP22Error, PSP22};
+    use scale::{Decode, Encode};
     use shared::{keccak256, Keccak256HashOutput};
     use wrapped_token::TokenRef;
 
@@ -434,16 +445,10 @@ mod e2e {
         token: AccountId,
         remote_token: [u8; 32],
     ) -> CallResult<MembraneError> {
-        let add_pair_message = build_message::<MembraneRef>(membrane)
-            .call(|membrane| membrane.add_pair(*token.as_ref(), remote_token));
-        client
-            .call_dry_run(caller, &add_pair_message, 0, None)
-            .await
-            .return_value()?;
-        Ok(client
-            .call(caller, add_pair_message, 0, None)
-            .await
-            .expect("Unexpected error."))
+        call_message::<MembraneRef, _, _, _>(client, caller, membrane, |membrane| {
+            membrane.add_pair(*token.as_ref(), remote_token)
+        })
+        .await
     }
 
     async fn membrane_send_request(
@@ -454,16 +459,10 @@ mod e2e {
         amount: u128,
         remote_address: [u8; 32],
     ) -> CallResult<MembraneError> {
-        let send_request_message = build_message::<MembraneRef>(membrane)
-            .call(|membrane| membrane.send_request(*token.as_ref(), amount, remote_address));
-        client
-            .call_dry_run(caller, &send_request_message, 0, None)
-            .await
-            .return_value()?;
-        Ok(client
-            .call(caller, send_request_message, 0, None)
-            .await
-            .expect("Unexpected error."))
+        call_message::<MembraneRef, _, _, _>(client, caller, membrane, |membrane| {
+            membrane.send_request(*token.as_ref(), amount, remote_address)
+        })
+        .await
     }
 
     async fn membrane_receive_request(
@@ -476,17 +475,10 @@ mod e2e {
         receiver_address: [u8; 32],
         request_nonce: u128,
     ) -> CallResult<MembraneError> {
-        let receive_request_message = build_message::<MembraneRef>(membrane).call(|membrane| {
+        call_message::<MembraneRef, _, _, _>(client, caller, membrane, |membrane| {
             membrane.receive_request(request_hash, token, amount, receiver_address, request_nonce)
-        });
-        client
-            .call_dry_run(caller, &receive_request_message, 0, None)
-            .await
-            .return_value()?;
-        Ok(client
-            .call(caller, receive_request_message, 0, None)
-            .await
-            .expect("Unexpected error."))
+        })
+        .await
     }
 
     async fn psp22_approve(
@@ -496,16 +488,10 @@ mod e2e {
         amount: u128,
         spender: AccountId,
     ) -> CallResult<PSP22Error> {
-        let approve_message =
-            build_message::<TokenRef>(token).call(|token| token.approve(spender, amount));
-        client
-            .call_dry_run(caller, &approve_message, 0, None)
-            .await
-            .return_value()?;
-        Ok(client
-            .call(caller, approve_message, 0, None)
-            .await
-            .expect("Unexpected error."))
+        call_message::<TokenRef, _, _, _>(client, caller, token, |token| {
+            token.approve(spender, amount)
+        })
+        .await
     }
 
     async fn psp22_transfer(
@@ -515,15 +501,51 @@ mod e2e {
         amount: u128,
         recipient: AccountId,
     ) -> CallResult<PSP22Error> {
-        let transfer_message = build_message::<TokenRef>(token)
-            .call(|token| token.transfer(recipient, amount, vec![]));
+        call_message::<TokenRef, _, _, _>(client, caller, token, |token| {
+            token.transfer(recipient, amount, vec![])
+        })
+        .await
+    }
+
+    async fn call_message<Ref, ErrType, Args, F>(
+        client: &mut E2EClient,
+        caller: &Keypair,
+        contract_id: AccountId,
+        call_builder_fn: F,
+    ) -> CallResult<ErrType>
+    where
+        Ref: TraitCallBuilder + FromAccountId<DefaultEnvironment>,
+        F: FnMut(
+            &mut <Ref as TraitCallBuilder>::Builder,
+        ) -> CallBuilder<
+            DefaultEnvironment,
+            Set<Call<DefaultEnvironment>>,
+            Set<ExecutionInput<Args>>,
+            Set<ReturnType<Result<(), ErrType>>>,
+        >,
+        Args: Encode,
+        ErrType: Decode,
+    {
+        let message = build_message::<Ref>(contract_id).call(call_builder_fn);
+
+        // Dry run to get the return value: when a contract is called and reverted, then we
+        // get a large error message that is not very useful. We want to get the actual contract
+        // error and this can be done by dry running the call.
         client
-            .call_dry_run(caller, &transfer_message, 0, None)
+            .call_dry_run(caller, &message, 0, None)
             .await
             .return_value()?;
+
+        // Now we shouldn't get any errors originating from the contract.
+        // However, we can still get errors from the substrate runtime or the client.
         Ok(client
-            .call(caller, transfer_message, 0, None)
+            .call(caller, message, 0, None)
             .await
-            .expect("Unexpected error."))
+            .unwrap_or_else(|err| {
+                panic!(
+                    "Call did not revert, but failed anyway. ink_e2e error: {:?}",
+                    err
+                )
+            }))
     }
 }
