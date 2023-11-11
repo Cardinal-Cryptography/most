@@ -34,6 +34,8 @@ mod e2e {
     const TOKEN_INITIAL_SUPPLY: u128 = 10000;
     const DEFAULT_THRESHOLD: u128 = 3;
     const DECIMALS: u8 = 8;
+    const REMOTE_TOKEN: [u8; 32] = [0x1; 32];
+    const REMOTE_RECEIVER: [u8; 32] = [0x2; 32];
 
     #[ink_e2e::test]
     fn simple_deploy_works(mut client: ink_e2e::Client<C, E>) -> Result<(), Box<dyn Error>> {
@@ -43,38 +45,50 @@ mod e2e {
     }
 
     #[ink_e2e::test]
-    fn adding_pair_works(mut client: ink_e2e::Client<C, E>) -> Result<(), Box<dyn Error>> {
-        let guardians_threshold = 3;
+    fn owner_can_add_a_new_pair(mut client: ink_e2e::Client<C, E>) -> Result<(), Box<dyn Error>> {
         let token_address =
             instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
         let membrane_address =
-            instantiate_membrane(&mut client, &alice(), guardian_ids(), guardians_threshold).await;
-
-        let bob_add_pair_res = membrane_add_pair(
-            &mut client,
-            &bob(),
-            membrane_address,
-            token_address,
-            [0x0; 32],
-        )
-        .await;
+            instantiate_membrane(&mut client, &alice(), guardian_ids(), DEFAULT_THRESHOLD).await;
 
         let alice_add_pair_res = membrane_add_pair(
             &mut client,
             &alice(),
             membrane_address,
             token_address,
-            [0x0; 32],
+            REMOTE_TOKEN,
+        )
+        .await;
+
+        assert!(alice_add_pair_res.is_ok());
+
+        Ok(())
+    }
+
+    #[ink_e2e::test]
+    fn non_owner_cannot_add_a_new_pair(
+        mut client: ink_e2e::Client<C, E>,
+    ) -> Result<(), Box<dyn Error>> {
+        let token_address =
+            instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
+        let membrane_address =
+            instantiate_membrane(&mut client, &alice(), guardian_ids(), DEFAULT_THRESHOLD).await;
+
+        let bob_add_pair_res = membrane_add_pair(
+            &mut client,
+            &bob(),
+            membrane_address,
+            token_address,
+            REMOTE_TOKEN,
         )
         .await;
 
         assert_eq!(
             bob_add_pair_res
                 .err()
-                .expect("Bob should not be able to add a pair"),
+                .expect("Bob should not be able to add a pair as he is not the owner"),
             MembraneError::NotOwner(account_id(AccountKeyring::Bob))
         );
-        assert!(alice_add_pair_res.is_ok());
 
         Ok(())
     }
@@ -88,25 +102,23 @@ mod e2e {
         let membrane_address =
             instantiate_membrane(&mut client, &alice(), guardian_ids(), DEFAULT_THRESHOLD).await;
 
-        let remote_token_address = [0x0; 32];
         let add_pair_res = membrane_add_pair(
             &mut client,
             &alice(),
             membrane_address,
             token_address,
-            remote_token_address,
+            REMOTE_TOKEN,
         )
         .await;
 
         let amount_to_send = 1000;
-        let remote_receiver = [0x1; 32];
         let send_request_res = membrane_send_request(
             &mut client,
             &alice(),
             membrane_address,
             token_address,
             amount_to_send,
-            remote_receiver,
+            REMOTE_RECEIVER,
         )
         .await;
 
@@ -140,14 +152,13 @@ mod e2e {
         )
         .await;
 
-        let remote_receiver = [0x1; 32];
         let send_request_res = membrane_send_request(
             &mut client,
             &alice(),
             membrane_address,
             token_address,
             amount_to_send,
-            remote_receiver,
+            REMOTE_RECEIVER,
         )
         .await;
 
@@ -179,24 +190,22 @@ mod e2e {
         )
         .await;
 
-        let remote_token_address = [0x0; 32];
         let add_pair_res = membrane_add_pair(
             &mut client,
             &alice(),
             membrane_address,
             token_address,
-            remote_token_address,
+            REMOTE_TOKEN,
         )
         .await;
 
-        let remote_receiver = [0x1; 32];
         let send_request_res = membrane_send_request(
             &mut client,
             &alice(),
             membrane_address,
             token_address,
             amount_to_send,
-            remote_receiver,
+            REMOTE_RECEIVER,
         )
         .await;
 
