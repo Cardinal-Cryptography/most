@@ -17,7 +17,7 @@ use ethers::{
     types::U256,
     utils::keccak256,
 };
-use futures::StreamExt;
+
 use log::{debug, info, trace, warn};
 use redis::{aio::Connection as RedisConnection, AsyncCommands, RedisError};
 use subxt::{events::Events, utils::H256};
@@ -31,7 +31,6 @@ use crate::{
         eth::{EthConnectionError, EthWsConnection, SignedEthWsConnection},
     },
     contracts::{AzeroContractError, Membrane, MembraneInstance},
-    helpers::chunks,
 };
 
 const ALEPH_LAST_BLOCK_KEY: &str = "alephzero_last_known_block_number";
@@ -83,9 +82,11 @@ pub enum AzeroListenerError {
     Unexpected,
 }
 
-pub struct AlephZeroPastEventsListener;
+const BLOCK_PROD_TIME_SEC: u32 = 1;
 
-impl AlephZeroPastEventsListener {
+pub struct AlephZeroListener;
+
+impl AlephZeroListener {
     pub async fn run(
         config: Arc<Config>,
         azero_connection: Arc<SignedAzeroWsConnection>,
@@ -96,42 +97,50 @@ impl AlephZeroPastEventsListener {
             azero_contract_metadata,
             azero_contract_address,
             name,
+            default_sync_from_block_azero,
             sync_step,
-            default_sync_from_block,
             ..
         } = &*config;
 
-        let mut connection = redis_connection.lock().await;
-
-        let last_known_block_number: u32 = match connection
-            .get(format!("{name}:{ALEPH_LAST_BLOCK_KEY}"))
-            .await
-        {
-            Ok(value) => value,
-            Err(why) => {
-                warn!("Redis connection error {why:?}");
-                *default_sync_from_block
-            }
-        };
-
-        // replay past events from last known to the latest
-        let last_block_number = azero_connection
-            .get_block_number_opt(None)
-            .await?
-            .ok_or(AzeroListenerError::BlockNotFound)?;
-
         let instance = MembraneInstance::new(azero_contract_address, azero_contract_metadata)?;
         let contracts = vec![&instance.contract];
+        let mut first_unprocessed_block_number = read_first_unprocessed_block_number(
+            name.clone(),
+            redis_connection.clone(),
+            *default_sync_from_block_azero,
+        )
+        .await;
 
-        for (from, to) in chunks(last_known_block_number, last_block_number, *sync_step) {
-            for block_number in from..to {
+        // Main AlephZero event loop
+        loop {
+            // Query for the next unknowns finalized block number, if not present we wait for it.
+            let next_finalized_block_number = get_next_finalized_block_number(
+                azero_connection.clone(),
+                first_unprocessed_block_number,
+            )
+            .await;
+
+            // Check at most `sync_step` blocks before caching.
+            let to_block = std::cmp::min(
+                next_finalized_block_number,
+                first_unprocessed_block_number + sync_step - 1,
+            );
+
+            log::info!(
+                "Processing events from blocks {} - {}",
+                first_unprocessed_block_number,
+                to_block
+            );
+
+            // Process events from the next unknowns finalized block number.
+            for block_number in first_unprocessed_block_number..=to_block {
                 let block_hash = azero_connection
                     .get_block_hash(block_number)
                     .await?
                     .ok_or(AzeroListenerError::BlockNotFound)?;
 
-                let connection = azero_connection.as_connection();
-                let events = connection
+                let events = azero_connection
+                    .as_connection()
                     .as_client()
                     .blocks()
                     .at(block_hash)
@@ -150,67 +159,13 @@ impl AlephZeroPastEventsListener {
                 )
                 .await?;
             }
+
+            // Update the last block number.
+            first_unprocessed_block_number = to_block + 1;
+
+            // Cache the last processed block number.
+            write_last_processed_block(name.clone(), redis_connection.clone(), to_block).await?;
         }
-
-        info!("finished processing past events");
-
-        Ok(())
-    }
-}
-
-pub struct AlephZeroListener;
-
-impl AlephZeroListener {
-    pub async fn run(
-        config: Arc<Config>,
-        azero_connection: Arc<SignedAzeroWsConnection>,
-        eth_connection: Arc<SignedEthWsConnection>,
-        redis_connection: Arc<Mutex<RedisConnection>>,
-    ) -> Result<(), AzeroListenerError> {
-        let Config {
-            azero_contract_metadata,
-            azero_contract_address,
-            name,
-            ..
-        } = &*config;
-
-        let instance = MembraneInstance::new(azero_contract_address, azero_contract_metadata)?;
-
-        let contracts = vec![&instance.contract];
-
-        // subscribe to new events
-        let connection = azero_connection.as_connection();
-        let mut subscription = connection
-            .as_client()
-            .blocks()
-            .subscribe_finalized()
-            .await?;
-
-        info!("subscribing to new events");
-
-        while let Some(Ok(block)) = subscription.next().await {
-            let block_number = block.number();
-
-            let events = block.events().await?;
-            handle_events(
-                Arc::clone(&eth_connection),
-                &config,
-                events,
-                &contracts,
-                block_number,
-                block.hash(),
-            )
-            .await?;
-
-            let mut connection = redis_connection.lock().await;
-            connection
-                .set(format!("{name}:{ALEPH_LAST_BLOCK_KEY}"), block_number)
-                .await?;
-
-            info!("persisted last_block_number: {block_number}");
-        }
-
-        Ok(())
     }
 }
 
@@ -309,5 +264,68 @@ async fn handle_event(
             info!("eth tx confirmed: {tx:?}");
         }
     }
+    Ok(())
+}
+
+async fn get_next_finalized_block_number(
+    azero_connection: Arc<SignedAzeroWsConnection>,
+    not_older_than: u32,
+) -> u32 {
+    let mut best_finalized_block_number_opt: Option<u32>;
+    loop {
+        best_finalized_block_number_opt = match azero_connection.get_finalized_block_hash().await {
+            Ok(hash) => match azero_connection.get_block_number(hash).await {
+                Ok(number_opt) => number_opt,
+                Err(err) => {
+                    warn!("Aleph Client error when getting best finalized block number: {err}");
+                    None
+                }
+            },
+            Err(err) => {
+                warn!("Aleph Client error when getting best finalized block hash: {err}");
+                None
+            }
+        };
+
+        if let Some(best_finalized_block_number) = best_finalized_block_number_opt {
+            if best_finalized_block_number >= not_older_than {
+                break;
+            }
+        }
+
+        tokio::time::sleep(tokio::time::Duration::from_secs(BLOCK_PROD_TIME_SEC.into())).await;
+    }
+    best_finalized_block_number_opt
+        .expect("We return only if we managed to fetch the block.")
+}
+
+async fn read_first_unprocessed_block_number(
+    name: String,
+    redis_connection: Arc<Mutex<RedisConnection>>,
+    default_block: u32,
+) -> u32 {
+    let mut connection = redis_connection.lock().await;
+
+    match connection
+        .get::<_, u32>(format!("{name}:{ALEPH_LAST_BLOCK_KEY}"))
+        .await
+    {
+        Ok(value) => value + 1,
+        Err(why) => {
+            warn!("Redis connection error {why:?}");
+            default_block
+        }
+    }
+}
+
+async fn write_last_processed_block(
+    name: String,
+    redis_connection: Arc<Mutex<RedisConnection>>,
+    last_block_number: u32,
+) -> Result<(), AzeroListenerError> {
+    let mut connection = redis_connection.lock().await;
+    connection
+        .set(format!("{name}:{ALEPH_LAST_BLOCK_KEY}"), last_block_number)
+        .await?;
     Ok(())
 }

@@ -31,7 +31,10 @@ pub struct Config {
     pub eth_node_wss_url: String,
 
     #[arg(long, default_value = "0")]
-    pub default_sync_from_block: u32,
+    pub default_sync_from_block_eth: u32,
+
+    #[arg(long, default_value = "0")]
+    pub default_sync_from_block_azero: u32,
 
     #[arg(long, default_value = "1000")]
     pub sync_step: u32,
