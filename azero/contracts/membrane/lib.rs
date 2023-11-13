@@ -8,7 +8,7 @@ mod membrane {
             call::{build_call, ExecutionInput},
             set_code_hash, DefaultEnvironment, Error as InkEnvError,
         },
-        prelude::{collections::BTreeMap, format, string::String, vec, vec::Vec},
+        prelude::{format, string::String, vec, vec::Vec},
         storage::Mapping,
     };
     use psp22::{PSP22Error, PSP22};
@@ -17,6 +17,12 @@ mod membrane {
     use shared::{concat_u8_arrays, keccak256, Keccak256HashOutput as HashedRequest, Selector};
 
     const MILLE: u128 = 1000;
+    const NATIVE_TOKEN_ID: [u8; 32] = [
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0,
+    ];
+
+    type CommitteeId = u128;
 
     #[ink(event)]
     #[derive(Debug)]
@@ -65,9 +71,11 @@ mod membrane {
         /// signed & executed requests, a replay protection
         processed_requests: Mapping<HashedRequest, ()>,
         /// set of guardian accounts that can sign requests
-        guardians: Mapping<AccountId, ()>,
-        /// accounting helper data structure
-        guardians_count: u128,
+        committee: Mapping<(CommitteeId, AccountId), ()>,
+        /// accounting helper
+        committee_id: CommitteeId,
+        /// accounting helper
+        committee_size: Mapping<CommitteeId, u128>,
         /// minimal amount of tokens that can be transferred across the bridge
         minimum_transfer_amount: Balance,
         /// base fee paid in the source chains native token that is distributed among the guardians, set to track the gas costs of signing the relay transactions on the destination chain
@@ -76,24 +84,22 @@ mod membrane {
         commission_per_mille: u128,
         /// a fixed subsidy transferred along with the bridged tokens to the destination account on aleph zero to bootstrap
         pocket_money: Balance,
-        /// rewards collected by the commitee members for relaying cross-chain transfer requests, denominated in the bridged token representation on the destination chain
-        #[allow(clippy::type_complexity)]
-        commissions: Mapping<HashedRequest, ([u8; 32], Balance)>,
-        /// remuneration collected by the commitee members to cover the gas fees for signing the requests on the destination chain. Denominated in the source chain native currency
-        base_fees: Mapping<HashedRequest, Balance>,
-        /// accounting data structure
-        collected_rewards: Mapping<(HashedRequest, AccountId), ()>,
         /// source - destination token pairs that can be transferred across the bridge
         supported_pairs: Mapping<[u8; 32], [u8; 32]>,
+        /// rewards collected by the commitee for relaying cross-chain transfer requests                
+        #[allow(clippy::type_complexity)]
+        collected_committee_rewards: Mapping<(CommitteeId, [u8; 32]), Balance>,
+        /// rewards collected by the individual commitee members for relaying cross-chain transfer requests        
+        #[allow(clippy::type_complexity)]
+        collected_member_rewards: Mapping<(AccountId, CommitteeId, [u8; 32]), Balance>,
     }
 
     #[derive(Debug, PartialEq, Eq, Encode, Decode)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub enum MembraneError {
         Constructor,
-        NotGuardian,
+        NotInCommittee,
         HashDoesNotMatchData,
-        RewardAlreadyCollected,
         PSP22(PSP22Error),
         RequestNotProcessed,
         RequestAlreadyProcessed,
@@ -105,6 +111,7 @@ mod membrane {
         BaseFeeTooLow,
         Arithmetic,
         NoRewards,
+        NoMoreRewards,
     }
 
     impl From<InkEnvError> for MembraneError {
@@ -122,7 +129,7 @@ mod membrane {
     impl Membrane {
         #[ink(constructor)]
         pub fn new(
-            guardians: Vec<AccountId>,
+            committee: Vec<AccountId>,
             signature_threshold: u128,
             commission_per_mille: u128,
             base_fee: Balance,
@@ -133,16 +140,19 @@ mod membrane {
                 return Err(MembraneError::Constructor);
             }
 
-            if guardians.len().lt(&(signature_threshold as usize)) {
+            if committee.len().lt(&(signature_threshold as usize)) {
                 return Err(MembraneError::Constructor);
             }
 
-            let guardians_count = guardians.len() as u128;
+            let committee_id = 0;
 
-            let mut guardians_set = Mapping::new();
-            guardians.into_iter().for_each(|account| {
-                guardians_set.insert(account, &());
+            let mut committee_set = Mapping::new();
+            committee.clone().into_iter().for_each(|account| {
+                committee_set.insert((committee_id, account), &());
             });
+
+            let mut committee_size = Mapping::new();
+            committee_size.insert(committee_id, &(committee.len() as u128));
 
             Ok(Self {
                 owner: Self::env().caller(),
@@ -151,12 +161,12 @@ mod membrane {
                 pending_requests: Mapping::new(),
                 signatures: Mapping::new(),
                 processed_requests: Mapping::new(),
-                guardians: guardians_set,
-                guardians_count,
+                committee: committee_set,
+                committee_id,
+                committee_size,
                 supported_pairs: Mapping::new(),
-                commissions: Mapping::new(),
-                base_fees: Mapping::new(),
-                collected_rewards: Mapping::new(),
+                collected_committee_rewards: Mapping::new(),
+                collected_member_rewards: Mapping::new(),
                 minimum_transfer_amount,
                 pocket_money,
                 base_fee,
@@ -174,29 +184,19 @@ mod membrane {
             Ok(())
         }
 
-        /// Adds a guardian account to the whitelist
-        ///
-        /// Can only be called by the contracts owner
-        #[ink(message)]
-        pub fn add_guardian(&mut self, account: AccountId) -> Result<(), MembraneError> {
+        pub fn set_committee(&mut self, committee: Vec<AccountId>) -> Result<(), MembraneError> {
             self.ensure_owner()?;
 
-            if !self.guardians.contains(account) {
-                self.guardians.insert(account, &());
-                self.guardians_count += 1
-            }
+            let committee_id = self.committee_id + 1;
 
-            Ok(())
-        }
+            let mut committee_set = Mapping::new();
+            committee.into_iter().for_each(|account| {
+                committee_set.insert((committee_id, account), &());
+            });
 
-        /// Removes a guardian account from the whitelist
-        ///
-        /// Can only be called by the contracts owner
-        #[ink(message)]
-        pub fn remove_guardian(&mut self, account: AccountId) -> Result<(), MembraneError> {
-            self.ensure_owner()?;
-            self.guardians.remove(account);
-            self.guardians_count -= 1;
+            self.committee = committee_set;
+            self.committee_id = committee_id;
+
             Ok(())
         }
 
@@ -247,6 +247,7 @@ mod membrane {
             Ok(())
         }
 
+        // TODO : get base_fee (to be later changed to an Oracle call)
         /// Invoke this tx to initiate funds transfer to the destination chain.
         #[ink(message, payable)]
         pub fn send_request(
@@ -259,14 +260,6 @@ mod membrane {
                 return Err(MembraneError::AmountBelowMinimum);
             }
 
-            let sender = self.env().caller();
-            self.transfer_from_tx(
-                src_token_address.into(),
-                sender,
-                self.env().account_id(),
-                amount,
-            )?;
-
             let dest_token_address = self
                 .supported_pairs
                 .get(src_token_address)
@@ -277,16 +270,29 @@ mod membrane {
                 return Err(MembraneError::BaseFeeTooLow);
             }
 
-            let bytes = concat_u8_arrays(vec![
-                &dest_token_address,
-                &amount.to_le_bytes(),
-                &dest_receiver_address,
-                &self.request_nonce.to_le_bytes(),
-            ]);
+            let sender = self.env().caller();
 
-            let hash = keccak256(&bytes);
+            self.transfer_from_tx(
+                src_token_address.into(),
+                sender,
+                self.env().account_id(),
+                amount,
+            )?;
 
-            self.base_fees.insert(hash, &base_fee);
+            // record base fee as collected
+            // PROBLEM: this allows the committee members to take a payout for requests that are not neccessarily finished
+            // by that time (no signature threshold reached yet).
+            // We could be recording the base fee when the request collects quorum, but it could change in the meantime
+            // which is potentially even worse
+            let base_fee_total = self
+                .collected_committee_rewards
+                .get((self.committee_id, NATIVE_TOKEN_ID))
+                .unwrap_or(0)
+                .checked_add(base_fee)
+                .ok_or(MembraneError::Arithmetic)?;
+
+            self.collected_committee_rewards
+                .insert((self.committee_id, NATIVE_TOKEN_ID), &base_fee_total);
 
             self.env().emit_event(CrosschainTransferRequest {
                 dest_token_address,
@@ -370,15 +376,31 @@ mod membrane {
                         self.env()
                             .transfer(dest_receiver_address.into(), self.pocket_money)?;
 
-                        // insert reward record for signing this transfer
-                        let reward = amount
+                        let commission = amount
                             .checked_mul(self.commission_per_mille)
                             .ok_or(MembraneError::Arithmetic)?
                             .checked_div(MILLE)
                             .ok_or(MembraneError::Arithmetic)?;
 
-                        self.commissions
-                            .insert(request_hash, &(dest_token_address, reward));
+                        let commission_total = self
+                            .collected_committee_rewards
+                            .get((self.committee_id, dest_token_address))
+                            .unwrap_or(0)
+                            .checked_add(commission)
+                            .ok_or(MembraneError::Arithmetic)?;
+
+                        self.collected_committee_rewards
+                            .insert((self.committee_id, dest_token_address), &commission_total);
+
+                        // insert reward record for signing this transfer
+                        // let reward = amount
+                        //     .checked_mul(self.commission_per_mille)
+                        //     .ok_or(MembraneError::Arithmetic)?
+                        //     .checked_div(MILLE)
+                        //     .ok_or(MembraneError::Arithmetic)?;
+
+                        // self.commissions
+                        //     .insert(request_hash, &(dest_token_address, reward));
 
                         // mark it as processed
                         self.processed_requests.insert(request_hash, &());
@@ -400,104 +422,48 @@ mod membrane {
             Ok(())
         }
 
-        /// Request payout of rewards for multiple cross-chain transer requests identified by their hashes.
-        /// Requests need to be fully processed to continue.
+        /// Request payout of rewards for signing & relaying cross-chain transfers.
         ///
-        /// Can be called by anyone on behalf of the relayer.
+        /// Can be called by anyone on behalf of a committee member.
         #[ink(message)]
         pub fn payout_rewards(
             &mut self,
-            requests: Vec<HashedRequest>,
-            to: AccountId,
+            committee_id: CommitteeId,
+            member_id: AccountId,
+            token_id: [u8; 32],
         ) -> Result<(), MembraneError> {
-            let mut base_fee_total = 0;
-            let mut commission_total = BTreeMap::new();
-
-            for request_hash in requests {
-                if self.pending_requests.contains(request_hash) {
-                    return Err(MembraneError::RequestNotProcessed);
-                }
-
-                if self.collected_rewards.contains((request_hash, to)) {
-                    return Err(MembraneError::RewardAlreadyCollected);
-                }
-
-                // commission
-                let (token, amount) = self
-                    .commissions
-                    .get(request_hash)
-                    .ok_or(MembraneError::NoRewards)?;
-
-                let commission = amount
-                    .checked_div(self.guardians_count)
-                    .ok_or(MembraneError::Arithmetic)?;
-
-                let total_reward = commission_total.get(&token).unwrap_or(&0u128);
-
-                let base_fee = self
-                    .base_fees
-                    .get(request_hash)
-                    .ok_or(MembraneError::NoRewards)?
-                    .checked_div(self.guardians_count)
-                    .ok_or(MembraneError::Arithmetic)?;
-
-                commission_total.insert(token, total_reward + commission);
-                base_fee_total += base_fee;
-
-                // mark rewards as collected
-                self.collected_rewards.insert((request_hash, to), &());
-            }
-
-            for (token, amount) in commission_total {
-                self.mint_to(token.into(), to, amount)?;
-            }
-
-            self.env().transfer(to, base_fee_total)?;
-
-            Ok(())
-        }
-
-        /// Request payout of the reward for signing and relaying a single cross-chain transer request identified by it's hash.
-        /// Request needs to be fully processed in order to continue.
-        ///
-        /// Can be called by anyone on behalf of the relayer.
-        #[ink(message)]
-        pub fn payout_reward(
-            &mut self,
-            request_hash: HashedRequest,
-            to: AccountId,
-        ) -> Result<(), MembraneError> {
-            if self.pending_requests.contains(request_hash) {
-                return Err(MembraneError::RequestNotProcessed);
-            }
-
-            if self.collected_rewards.contains((request_hash, to)) {
-                return Err(MembraneError::RewardAlreadyCollected);
-            }
-
-            // base fee
-            let base_fee = self
-                .base_fees
-                .get(request_hash)
+            let total_amount = self
+                .collected_committee_rewards
+                .get((committee_id, token_id))
                 .ok_or(MembraneError::NoRewards)?
-                .checked_div(self.guardians_count)
+                .checked_div(
+                    self.committee_size
+                        .get(committee_id)
+                        .ok_or(MembraneError::NotInCommittee)?,
+                )
                 .ok_or(MembraneError::Arithmetic)?;
 
-            // commission
-            let (token, amount) = self
-                .commissions
-                .get(request_hash)
+            let collected_amount = self
+                .collected_member_rewards
+                .get((member_id, committee_id, token_id))
                 .ok_or(MembraneError::NoRewards)?;
 
-            let commission = amount
-                .checked_div(self.guardians_count)
+            if collected_amount >= total_amount {
+                return Err(MembraneError::NoMoreRewards);
+            }
+
+            let amount = total_amount
+                .checked_sub(collected_amount)
                 .ok_or(MembraneError::Arithmetic)?;
 
-            self.mint_to(token.into(), to, commission)?;
-            self.env().transfer(to, base_fee)?;
-
-            // mark rewards as collected
-            self.collected_rewards.insert((request_hash, to), &());
+            match token_id {
+                NATIVE_TOKEN_ID => {
+                    self.env().transfer(member_id, amount)?;
+                }
+                _ => {
+                    self.mint_to(token_id.into(), member_id, amount)?;
+                }
+            }
 
             Ok(())
         }
@@ -538,10 +504,10 @@ mod membrane {
         }
 
         fn is_guardian(&self, account: AccountId) -> Result<(), MembraneError> {
-            if self.guardians.contains(account) {
+            if self.committee.contains((self.committee_id, account)) {
                 Ok(())
             } else {
-                Err(MembraneError::NotGuardian)
+                Err(MembraneError::NotInCommittee)
             }
         }
     }
