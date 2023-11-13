@@ -65,6 +65,7 @@ pub mod membrane {
     pub enum MembraneError {
         NotGuardian(AccountId),
         HashDoesNotMatchData,
+        InvalidThreshold,
         PSP22(PSP22Error),
         RequestAlreadyProcessed,
         UnsupportedPair,
@@ -88,22 +89,20 @@ pub mod membrane {
 
     impl Membrane {
         #[ink(constructor)]
-        pub fn new(guardians: Vec<AccountId>, signature_threshold: u128) -> Self {
-            assert!(
-                signature_threshold > 0,
-                "Signature threshold must be greater than 0"
-            );
-            assert!(
-                guardians.len() as u128 >= signature_threshold,
-                "Signature threshold must be less than or equal to the number of guardians"
-            );
+        pub fn new(
+            guardians: Vec<AccountId>,
+            signature_threshold: u128,
+        ) -> Result<Self, MembraneError> {
+            if signature_threshold == 0 || (guardians.len() as u128) < signature_threshold {
+                return Err(MembraneError::InvalidThreshold);
+            }
 
             let mut guardians_set = Mapping::new();
             guardians.into_iter().for_each(|account| {
                 guardians_set.insert(account, &());
             });
 
-            Self {
+            Ok(Self {
                 owner: Self::env().caller(),
                 request_nonce: 0,
                 signature_threshold,
@@ -112,7 +111,7 @@ pub mod membrane {
                 processed_requests: Mapping::new(),
                 guardians: guardians_set,
                 supported_pairs: Mapping::new(),
-            }
+            })
         }
 
         /// Sets a new owner account
@@ -374,9 +373,30 @@ pub mod membrane {
         }
 
         #[ink::test]
+        fn new_fails_on_zero_threshold() {
+            set_caller::<DefEnv>(default_accounts::<DefEnv>().alice);
+            assert_eq!(
+                Membrane::new(guardian_accounts(), 0)
+                    .expect_err("Threshold is zero, instantiation should fail."),
+                MembraneError::InvalidThreshold
+            );
+        }
+
+        #[ink::test]
+        fn new_fails_on_threshold_large_than_guardians() {
+            set_caller::<DefEnv>(default_accounts::<DefEnv>().alice);
+            assert_eq!(
+                Membrane::new(guardian_accounts(), (guardian_accounts().len() + 1) as u128)
+                    .expect_err("Threshold is larger than guardians, instantiation should fail."),
+                MembraneError::InvalidThreshold
+            );
+        }
+
+        #[ink::test]
         fn new_sets_caller_as_owner() {
             set_caller::<DefEnv>(default_accounts::<DefEnv>().alice);
-            let mut membrane = Membrane::new(guardian_accounts(), THRESHOLD);
+            let mut membrane =
+                Membrane::new(guardian_accounts(), THRESHOLD).expect("Threshold is valid.");
 
             assert_eq!(membrane.ensure_owner(), Ok(()));
             set_caller::<DefEnv>(guardian_accounts()[0]);
@@ -390,7 +410,8 @@ pub mod membrane {
         fn new_sets_correct_guardians() {
             let accounts = default_accounts::<DefEnv>();
             set_caller::<DefEnv>(accounts.alice);
-            let membrane = Membrane::new(guardian_accounts(), THRESHOLD);
+            let membrane =
+                Membrane::new(guardian_accounts(), THRESHOLD).expect("Threshold is valid.");
 
             for account in guardian_accounts() {
                 assert_eq!(membrane.is_guardian(account), Ok(()));
@@ -405,7 +426,8 @@ pub mod membrane {
         fn set_owner_works() {
             let accounts = default_accounts::<DefEnv>();
             set_caller::<DefEnv>(accounts.alice);
-            let mut membrane = Membrane::new(guardian_accounts(), THRESHOLD);
+            let mut membrane =
+                Membrane::new(guardian_accounts(), THRESHOLD).expect("Threshold is valid.");
             set_caller::<DefEnv>(accounts.bob);
             assert_eq!(
                 membrane.ensure_owner(),
@@ -422,7 +444,8 @@ pub mod membrane {
         fn add_guardian_works() {
             let accounts = default_accounts::<DefEnv>();
             set_caller::<DefEnv>(accounts.alice);
-            let mut membrane = Membrane::new(guardian_accounts(), THRESHOLD);
+            let mut membrane =
+                Membrane::new(guardian_accounts(), THRESHOLD).expect("Threshold is valid.");
 
             assert_eq!(
                 membrane.is_guardian(accounts.alice),
@@ -436,7 +459,8 @@ pub mod membrane {
         fn remove_guardian_works() {
             let accounts = default_accounts::<DefEnv>();
             set_caller::<DefEnv>(accounts.alice);
-            let mut membrane = Membrane::new(guardian_accounts(), THRESHOLD);
+            let mut membrane =
+                Membrane::new(guardian_accounts(), THRESHOLD).expect("Threshold is valid.");
 
             assert_eq!(membrane.is_guardian(accounts.bob), Ok(()));
             assert_eq!(membrane.remove_guardian(accounts.bob), Ok(()));
