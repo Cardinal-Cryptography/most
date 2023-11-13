@@ -200,17 +200,18 @@ pub mod membrane {
             dest_receiver_address: [u8; 32],
         ) -> Result<(), MembraneError> {
             let sender = self.env().caller();
+            
+            let dest_token_address = self
+                .supported_pairs
+                .get(src_token_address)
+                .ok_or(MembraneError::UnsupportedPair)?;
+            
             self.transfer_from_tx(
                 src_token_address.into(),
                 sender,
                 self.env().account_id(),
                 amount,
             )?;
-
-            let dest_token_address = self
-                .supported_pairs
-                .get(src_token_address)
-                .ok_or(MembraneError::UnsupportedPair)?;
 
             self.env().emit_event(CrosschainTransferRequest {
                 dest_token_address,
