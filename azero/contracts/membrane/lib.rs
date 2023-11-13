@@ -247,7 +247,7 @@ mod membrane {
             Ok(())
         }
 
-        // TODO : get base_fee (to be later changed to an Oracle call)
+        // TODO : get_base_fee (to be later changed to an Oracle call)
         /// Invoke this tx to initiate funds transfer to the destination chain.
         #[ink(message, payable)]
         pub fn send_request(
