@@ -305,6 +305,16 @@ pub mod membrane {
             Ok(())
         }
 
+        /// Checks if the caller is a guardian
+        #[ink(message)]
+        pub fn is_guardian(&self, account: AccountId) -> Result<(), MembraneError> {
+            if self.guardians.contains(account) {
+                Ok(())
+            } else {
+                Err(MembraneError::NotGuardian(account))
+            }
+        }
+
         fn ensure_owner(&mut self) -> Result<(), MembraneError> {
             let caller = self.env().caller();
             match caller.eq(&self.owner) {
@@ -338,14 +348,6 @@ pub mod membrane {
         ) -> Result<(), PSP22Error> {
             let mut psp22: ink::contract_ref!(Mintable) = token.into();
             psp22.mint(to, amount)
-        }
-
-        fn is_guardian(&self, account: AccountId) -> Result<(), MembraneError> {
-            if self.guardians.contains(account) {
-                Ok(())
-            } else {
-                Err(MembraneError::NotGuardian(account))
-            }
         }
     }
 
