@@ -9,7 +9,7 @@ describe("Wrapped Ether", function () {
 
     async function setupWrappedEtherFixture() {
         const [owner] = await hre.ethers.getSigners();
-        const factory = await hre.ethers.getContractFactory("WrappedEther");
+        const factory = await hre.ethers.getContractFactory("WETH9");
         const wrapped = await factory.deploy();
         await setBalance(owner.address, hre.ethers.parseEther(SEED_AMOUNT.toString()));
 
@@ -26,44 +26,42 @@ describe("Wrapped Ether", function () {
         });
     });
 
-    describe("Mint", function () {
+    describe("Deposit", function () {
         it("Wrapped amount should be equal to the transferred amount.", async function () {
             const { wrapped, owner } = await loadFixture(setupWrappedEtherFixture);
 
-            await expect(wrapped.mint({ value: hre.ethers.parseEther(WRAP_AMOUNT.toString())})).to.changeTokenBalance(
+            await expect(wrapped.deposit({ value: hre.ethers.parseEther(WRAP_AMOUNT.toString())})).to.changeTokenBalance(
                 wrapped,
                 owner,
                 hre.ethers.parseEther(WRAP_AMOUNT.toString()),
             );
         });
 
-        it("Emits mint event.", async function () {
+        it("Emits deposit event.", async function () {
             const { wrapped, owner } = await loadFixture(setupWrappedEtherFixture);
 
-            await expect(wrapped.mint({
+            await expect(wrapped.deposit({
                 value: hre.ethers.parseEther(WRAP_AMOUNT.toString())
-            })).to.emit(wrapped, "Mint").withArgs(
+            })).to.emit(wrapped, "Deposit").withArgs(
                 owner.address,
                 hre.ethers.parseEther(WRAP_AMOUNT.toString()),
             );
         });
     });
 
-    describe("Burn", function () {
-        it("Reverts when trying to burn more tokens then are available.", async function () {
+    describe("Withdraw", function () {
+        it("Reverts when trying to withdraw more tokens then are available.", async function () {
             const { wrapped, _owner } = await loadFixture(setupWrappedEtherFixture);
-            await wrapped.mint({ value: hre.ethers.parseEther(WRAP_AMOUNT.toString()) });
+            await wrapped.deposit({ value: hre.ethers.parseEther(WRAP_AMOUNT.toString()) });
 
-            await expect(wrapped.burn(hre.ethers.parseEther(WRAP_AMOUNT.toString()) + 1n)).to.be.revertedWith(
-                "ERC20: burn amount exceeds balance"
-            );
+            await expect(wrapped.withdraw(hre.ethers.parseEther(WRAP_AMOUNT.toString()) + 1n)).to.be.reverted;
         });
 
-        it("Emits burn event.", async function () {
+        it("Emits withdraw event.", async function () {
             const { wrapped, owner } = await loadFixture(setupWrappedEtherFixture);
-            await wrapped.mint({ value: hre.ethers.parseEther(WRAP_AMOUNT.toString()) });
+            await wrapped.deposit({ value: hre.ethers.parseEther(WRAP_AMOUNT.toString()) });
 
-            await expect(wrapped.burn(WRAP_AMOUNT * DECIMALS)).to.emit(wrapped, "Burn").withArgs(
+            await expect(wrapped.withdraw(WRAP_AMOUNT * DECIMALS)).to.emit(wrapped, "Withdrawal").withArgs(
                 owner.address,
                 WRAP_AMOUNT * DECIMALS,
             );
@@ -73,9 +71,9 @@ describe("Wrapped Ether", function () {
     describe("Round trip", function () {
         it("No wrapped tokens left after unwrapping the whole balance", async function () {
             const { wrapped, owner } = await loadFixture(setupWrappedEtherFixture);
-            await wrapped.mint({ value: hre.ethers.parseEther(WRAP_AMOUNT.toString()) });
+            await wrapped.deposit({ value: hre.ethers.parseEther(WRAP_AMOUNT.toString()) });
 
-            await expect(wrapped.burn(hre.ethers.parseEther(WRAP_AMOUNT.toString()))).to.changeTokenBalance(
+            await expect(wrapped.withdraw(hre.ethers.parseEther(WRAP_AMOUNT.toString()))).to.changeTokenBalance(
                 wrapped,
                 owner,
                 hre.ethers.parseEther((-WRAP_AMOUNT).toString()),
@@ -91,22 +89,22 @@ describe("Wrapped Ether", function () {
             const provider = hre.ethers.provider;
             const balance_init = await provider.getBalance(owner);
 
-            const mintGasEstimate = await wrapped.mint.estimateGas({ value: hre.ethers.parseEther(WRAP_AMOUNT.toString()) });
-            await wrapped.mint({ value: hre.ethers.parseEther(WRAP_AMOUNT.toString()) });
-            const balance_after_mint = await provider.getBalance(owner);
+            const depositGasEstimate = await wrapped.deposit.estimateGas({ value: hre.ethers.parseEther(WRAP_AMOUNT.toString()) });
+            await wrapped.deposit({ value: hre.ethers.parseEther(WRAP_AMOUNT.toString()) });
+            const balance_after_deposit = await provider.getBalance(owner);
             expect(
-                balance_init - balance_after_mint - hre.ethers.parseEther(WRAP_AMOUNT.toString()) - mintGasEstimate
+                balance_init - balance_after_deposit - hre.ethers.parseEther(WRAP_AMOUNT.toString()) - depositGasEstimate
             ).to.be.lessThan(TOLERANCE.toString());
 
-            const burnGasEstimate = await wrapped.burn.estimateGas(hre.ethers.parseEther(WRAP_AMOUNT.toString()));
-            await wrapped.burn(hre.ethers.parseEther(WRAP_AMOUNT.toString()));
-            const balance_after_burn = await provider.getBalance(owner);
+            const withdrawGasEstimate = await wrapped.withdraw.estimateGas(hre.ethers.parseEther(WRAP_AMOUNT.toString()));
+            await wrapped.withdraw(hre.ethers.parseEther(WRAP_AMOUNT.toString()));
+            const balance_after_withdraw = await provider.getBalance(owner);
             expect(
-                balance_after_burn - balance_after_mint - hre.ethers.parseEther(WRAP_AMOUNT.toString()) - burnGasEstimate
+                balance_after_withdraw - balance_after_deposit - hre.ethers.parseEther(WRAP_AMOUNT.toString()) - withdrawGasEstimate
             ).to.be.lessThan(TOLERANCE.toString());
 
             expect(
-                balance_after_burn - balance_init - mintGasEstimate - burnGasEstimate
+                balance_after_withdraw - balance_init - depositGasEstimate - withdrawGasEstimate
             ).to.be.lessThan(TOLERANCE.toString());
         });
     });
