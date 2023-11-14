@@ -13,16 +13,18 @@ use ethers::{
     abi::{self, EncodePackedError, Token},
     core::types::Address,
     prelude::{ContractCall, ContractError},
-    providers::ProviderError,
-    types::U256,
+    providers::{Middleware, ProviderError},
+    types::{TransactionReceipt, U256},
     utils::keccak256,
 };
-
 use log::{debug, info, trace, warn};
 use redis::{aio::Connection as RedisConnection, AsyncCommands, RedisError};
 use subxt::{events::Events, utils::H256};
 use thiserror::Error;
-use tokio::sync::Mutex;
+use tokio::{
+    sync::Mutex,
+    time::{sleep, Duration},
+};
 
 use crate::{
     config::Config,
@@ -31,6 +33,7 @@ use crate::{
         eth::{EthConnectionError, EthWsConnection, SignedEthWsConnection},
     },
     contracts::{AzeroContractError, Membrane, MembraneInstance},
+    listeners::eth::get_next_finalized_block_number_eth,
 };
 
 const ALEPH_LAST_BLOCK_KEY: &str = "alephzero_last_known_block_number";
@@ -69,6 +72,9 @@ pub enum AzeroListenerError {
     #[error("no tx receipt")]
     NoTxReceipt,
 
+    #[error("eth tx not found")]
+    EthTxNotFound,
+
     #[error("missing data from event")]
     MissingEventData(String),
 
@@ -82,7 +88,8 @@ pub enum AzeroListenerError {
     Unexpected,
 }
 
-const BLOCK_PROD_TIME_SEC: u32 = 1;
+const BLOCK_PROD_TIME_SEC: u64 = 1;
+const ETH_FINALITY_WAIT_SEC: u64 = 300;
 
 pub struct AlephZeroListener;
 
@@ -114,7 +121,7 @@ impl AlephZeroListener {
         // Main AlephZero event loop
         loop {
             // Query for the next unknowns finalized block number, if not present we wait for it.
-            let next_finalized_block_number = get_next_finalized_block_number(
+            let next_finalized_block_number = get_next_finalized_block_number_azero(
                 azero_connection.clone(),
                 first_unprocessed_block_number,
             )
@@ -244,7 +251,7 @@ async fn handle_event(
             debug!("hashed event encoding: {request_hash:?}");
 
             let address = eth_contract_address.parse::<Address>()?;
-            let contract = Membrane::new(address, eth_connection);
+            let contract = Membrane::new(address, eth_connection.clone());
 
             //  forward transfer & vote
             let call: ContractCall<SignedEthWsConnection, ()> = contract.receive_request(
@@ -255,19 +262,50 @@ async fn handle_event(
                 request_nonce,
             );
 
-            let tx = call
+            let tx_hash = call
                 .send()
                 .await?
                 .await?
-                .ok_or(AzeroListenerError::NoTxReceipt)?;
+                .ok_or(AzeroListenerError::NoTxReceipt)?
+                .transaction_hash;
 
-            info!("eth tx confirmed: {tx:?}");
+            wait_for_eth_tx_finality(eth_connection, tx_hash).await?;
         }
     }
     Ok(())
 }
 
-async fn get_next_finalized_block_number(
+pub async fn wait_for_eth_tx_finality(
+    eth_connection: Arc<SignedEthWsConnection>,
+    tx_hash: H256,
+) -> Result<(), AzeroListenerError> {
+    loop {
+        log::info!("Waiting for tx finality: {tx_hash:?}");
+        sleep(Duration::from_secs(ETH_FINALITY_WAIT_SEC)).await;
+
+        let finalized_head_number =
+            get_next_finalized_block_number_eth(eth_connection.clone(), 0).await;
+        let tx_opt = eth_connection
+            .get_transaction(tx_hash)
+            .await
+            .map_err(|_err| AzeroListenerError::EthTxNotFound)?;
+        if let Some(tx) = tx_opt {
+            // If the tx is not in a block yet, keep waiting.
+            if tx.block_number.is_none() {
+                continue;
+            }
+
+            if tx.block_number.expect("Tx is included in some block.")
+                <= finalized_head_number.into()
+            {
+                log::info!("Eth tx finalized: {tx_hash:?}");
+                return Ok(());
+            }
+        }
+    }
+}
+
+pub async fn get_next_finalized_block_number_azero(
     azero_connection: Arc<SignedAzeroWsConnection>,
     not_older_than: u32,
 ) -> u32 {
@@ -293,10 +331,9 @@ async fn get_next_finalized_block_number(
             }
         }
 
-        tokio::time::sleep(tokio::time::Duration::from_secs(BLOCK_PROD_TIME_SEC.into())).await;
+        sleep(Duration::from_secs(BLOCK_PROD_TIME_SEC)).await;
     }
-    best_finalized_block_number_opt
-        .expect("We return only if we managed to fetch the block.")
+    best_finalized_block_number_opt.expect("We return only if we managed to fetch the block.")
 }
 
 async fn read_first_unprocessed_block_number(

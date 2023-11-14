@@ -81,7 +81,7 @@ impl EthListener {
         // Main Ethereum event loop.
         loop {
             // Query for the next unknowns finalized block number, if not present we wait for it.
-            let next_finalized_block_number = get_next_finalized_block_number(
+            let next_finalized_block_number = get_next_finalized_block_number_eth(
                 eth_connection.clone(),
                 first_unprocessed_block_number,
             )
@@ -174,7 +174,7 @@ async fn handle_event(
     Ok(())
 }
 
-async fn get_next_finalized_block_number(
+pub async fn get_next_finalized_block_number_eth(
     eth_connection: Arc<SignedEthWsConnection>,
     not_older_than: u32,
 ) -> u32 {
