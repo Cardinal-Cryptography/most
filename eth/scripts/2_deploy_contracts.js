@@ -12,7 +12,7 @@ async function main() {
   console.log("Membrane deployed to:",  membraneAddress);
 
   // Wrapped Ether
-  const wrappedEtherFactory = await hre.ethers.getContractFactory("WrappedEther");
+  const wrappedEtherFactory = await hre.ethers.getContractFactory("WETH9");
   const wrappedEther = await wrappedEtherFactory.deploy();
   const wrappedEtherAddress = await wrappedEther.getAddress();
 
