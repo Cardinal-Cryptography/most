@@ -200,12 +200,12 @@ pub mod membrane {
             dest_receiver_address: [u8; 32],
         ) -> Result<(), MembraneError> {
             let sender = self.env().caller();
-            
+
             let dest_token_address = self
                 .supported_pairs
                 .get(src_token_address)
                 .ok_or(MembraneError::UnsupportedPair)?;
-            
+
             self.transfer_from_tx(
                 src_token_address.into(),
                 sender,
@@ -239,7 +239,10 @@ pub mod membrane {
             request_nonce: u128,
         ) -> Result<(), MembraneError> {
             let caller = self.env().caller();
-            self.is_guardian(caller)?;
+
+            if !self.is_guardian(caller) {
+                return Err(MembraneError::NotGuardian(caller));
+            }
 
             if self.processed_requests.contains(request_hash) {
                 return Err(MembraneError::RequestAlreadyProcessed);
@@ -305,14 +308,10 @@ pub mod membrane {
             Ok(())
         }
 
-        /// Checks if the caller is a guardian
+        /// Checks if a given account is a guardian
         #[ink(message)]
-        pub fn is_guardian(&self, account: AccountId) -> Result<(), MembraneError> {
-            if self.guardians.contains(account) {
-                Ok(())
-            } else {
-                Err(MembraneError::NotGuardian(account))
-            }
+        pub fn is_guardian(&self, account: AccountId) -> bool {
+            self.guardians.contains(account)
         }
 
         fn ensure_owner(&mut self) -> Result<(), MembraneError> {
@@ -417,12 +416,9 @@ pub mod membrane {
                 Membrane::new(guardian_accounts(), THRESHOLD).expect("Threshold is valid.");
 
             for account in guardian_accounts() {
-                assert_eq!(membrane.is_guardian(account), Ok(()));
+                assert!(membrane.is_guardian(account));
             }
-            assert_eq!(
-                membrane.is_guardian(accounts.alice),
-                Err(MembraneError::NotGuardian(accounts.alice))
-            );
+            assert!(!membrane.is_guardian(accounts.alice));
         }
 
         #[ink::test]
@@ -450,12 +446,9 @@ pub mod membrane {
             let mut membrane =
                 Membrane::new(guardian_accounts(), THRESHOLD).expect("Threshold is valid.");
 
-            assert_eq!(
-                membrane.is_guardian(accounts.alice),
-                Err(MembraneError::NotGuardian(accounts.alice))
-            );
+            assert!(!membrane.is_guardian(accounts.alice));
             assert_eq!(membrane.add_guardian(accounts.alice), Ok(()));
-            assert_eq!(membrane.is_guardian(accounts.alice), Ok(()));
+            assert!(membrane.is_guardian(accounts.alice));
         }
 
         #[ink::test]
@@ -465,12 +458,9 @@ pub mod membrane {
             let mut membrane =
                 Membrane::new(guardian_accounts(), THRESHOLD).expect("Threshold is valid.");
 
-            assert_eq!(membrane.is_guardian(accounts.bob), Ok(()));
+            assert!(membrane.is_guardian(accounts.bob));
             assert_eq!(membrane.remove_guardian(accounts.bob), Ok(()));
-            assert_eq!(
-                membrane.is_guardian(accounts.bob),
-                Err(MembraneError::NotGuardian(accounts.bob))
-            );
+            assert!(!membrane.is_guardian(accounts.bob));
         }
     }
 }
