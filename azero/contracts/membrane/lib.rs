@@ -308,7 +308,7 @@ pub mod membrane {
             Ok(())
         }
 
-        /// Checks if a given account is a guardian
+        /// Returns a boolean value indicating whether given account is a guardian
         #[ink(message)]
         pub fn is_guardian(&self, account: AccountId) -> bool {
             self.guardians.contains(account)
