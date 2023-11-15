@@ -128,3 +128,20 @@ bridge: local-bridgenet deploy run-relayer
 test-solidity: # Run solidity tests
 test-solidity: eth-deps
 	cd eth && npx hardhat test ./test/Membrane.js
+
+.PHONY: test-ink-e2e
+test-ink-e2e: # Run ink e2e tests
+test-ink-e2e: bootstrap-azero
+	export CONTRACTS_NODE="../../scripts/azero_contracts_node.sh" && \
+	cd azero/contracts/tests && \
+	cargo test -- --test-threads=1
+
+.PHONY: test-ink
+test-ink: # Run ink tests
+test-ink: test-ink-e2e
+	cd azero/contracts/membrane && \
+	cargo test && \
+	cd ../governance && \
+	cargo test && \
+	cd ../psp22 && \
+	cargo test
