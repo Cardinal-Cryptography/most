@@ -70,12 +70,14 @@ contract Membrane {
     address sender = msg.sender;
 
     IERC20 token = IERC20(bytes32ToAddress(srcTokenAddress));
+
+    // check if the token is supported
+    bytes32 destTokenAddress = supportedPairs[srcTokenAddress];
+    require(destTokenAddress != 0x0, "Unsupported pair");
+
     // lock tokens in this contract
     // message sender needs to give approval else this tx will revert
     token.transferFrom(sender, address(this), amount);
-
-    bytes32 destTokenAddress = supportedPairs[srcTokenAddress];
-    require(destTokenAddress != 0x0, "Unsupported pair");
 
     emit CrosschainTransferRequest(
                                    destTokenAddress,
