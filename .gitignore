@@ -21,6 +21,9 @@ target/
 # env files
 .env
 
+# logs
+*.log
+
 # contracts
 addresses.json
 azero/artifacts/
