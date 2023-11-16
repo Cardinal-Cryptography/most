@@ -22,6 +22,11 @@ mod membrane {
         0, 0,
     ];
 
+    const ETH_TOKEN_ID: [u8; 32] = [
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 1,
+    ];
+
     type CommitteeId = u128;
 
     #[ink(event)]
@@ -62,7 +67,7 @@ mod membrane {
         owner: AccountId,
         /// nonce for outgoing cross-chain transfer requests
         request_nonce: u128,
-        /// number of signatures required to reach a quorum and execute a transfer
+        /// number of signatures required to reach a quorum and costsxecute a transfer
         signature_threshold: u128,
         /// requests that are still collecting signatures
         pending_requests: Mapping<HashedRequest, Request>,
@@ -76,22 +81,25 @@ mod membrane {
         committee_id: CommitteeId,
         /// accounting helper
         committee_size: Mapping<CommitteeId, u128>,
-        /// minimal amount of tokens that can be transferred across the bridge
-        minimum_transfer_amount: u128,
-        /// base fee paid in the source chains native token that is distributed among the guardians, set to track the gas costs of signing the relay transactions on the destination chain
-        base_fee: Balance,
+        /// minimal value of tokens that can be transferred across the bridge
+        minimum_transfer_amount_usd: u128,
+        // /// base fee paid in the source chains native token that is distributed among the guardians, set to track the gas costs of signing the relay transactions on the destination chain
+        // base_fee: Balance,
         /// per mille of the succesfully transferred amount that is distributed among the guardians that have signed the crosschain transfer request
         commission_per_mille: u128,
         /// a fixed subsidy transferred along with the bridged tokens to the destination account on aleph zero to bootstrap
         pocket_money: u128,
         /// source - destination token pairs that can be transferred across the bridge
         supported_pairs: Mapping<[u8; 32], [u8; 32]>,
-        /// rewards collected by the commitee for relaying cross-chain transfer requests                
+        /// rewards collected by the commitee for relaying cross-chain transfer requests
         #[allow(clippy::type_complexity)]
         collected_committee_rewards: Mapping<(CommitteeId, [u8; 32]), u128>,
-        /// rewards collected by the individual commitee members for relaying cross-chain transfer requests        
+        /// rewards collected by the individual commitee members for relaying cross-chain transfer requests
         #[allow(clippy::type_complexity)]
         collected_member_rewards: Mapping<(AccountId, CommitteeId, [u8; 32]), u128>,
+        /// How much gas does a single confirmation of a cross-chain transfer request use on the destination chain on average.
+        /// This value is calculated by summing the total gas usage of *all* the transactions it takes to relay a single request and dividing it by the current committee size and multiplying by 1.2
+        relay_gas_usage: u128,
     }
 
     #[derive(Debug, PartialEq, Eq, Encode, Decode)]
@@ -132,9 +140,9 @@ mod membrane {
             committee: Vec<AccountId>,
             signature_threshold: u128,
             commission_per_mille: u128,
-            base_fee: Balance,
             pocket_money: Balance,
-            minimum_transfer_amount: u128,
+            minimum_transfer_amount_usd: u128,
+            relay_gas_usage: u128,
         ) -> Result<Self, MembraneError> {
             if commission_per_mille.gt(&DIX_MILLE) {
                 return Err(MembraneError::Constructor);
@@ -167,10 +175,10 @@ mod membrane {
                 supported_pairs: Mapping::new(),
                 collected_committee_rewards: Mapping::new(),
                 collected_member_rewards: Mapping::new(),
-                minimum_transfer_amount,
+                minimum_transfer_amount_usd,
                 pocket_money,
-                base_fee,
                 commission_per_mille,
+                relay_gas_usage,
             })
         }
 
@@ -247,7 +255,37 @@ mod membrane {
             Ok(())
         }
 
-        // TODO : get_base_fee (to be later changed to an Oracle call)
+        /// Queries a price oracle and returns the `in` price of an `amount` number of the `of` tokens.
+        ///
+        /// If no `in` is passed assumes USDT
+        fn query_price(
+            &self,
+            amount: u128,
+            _of_token_address: [u8; 32],
+            _in_token_address: Option<[u8; 32]>,
+        ) -> Result<u128, MembraneError> {
+            // TODO: implement
+            // NOTE: different precisions!
+            let do_query_price = || 2;
+            Ok(amount * do_query_price())
+        }
+
+        /// Queries a gas price oracle and returns the current base_fee charged per cross chain transfer
+        /// denominated in AZERO
+        #[ink(message)]
+        pub fn base_fee(&self) -> Result<Balance, MembraneError> {
+            // TODO: implement
+            // return a current gas price in WEI
+            let do_query_gas_fee = || 39106342561;
+
+            let wei = self
+                .relay_gas_usage
+                .checked_mul(do_query_gas_fee())
+                .ok_or(MembraneError::Arithmetic)?;
+
+            self.query_price(wei, ETH_TOKEN_ID, Some(NATIVE_TOKEN_ID))
+        }
+
         /// Invoke this tx to initiate funds transfer to the destination chain.
         #[ink(message, payable)]
         pub fn send_request(
@@ -256,7 +294,10 @@ mod membrane {
             amount: u128,
             dest_receiver_address: [u8; 32],
         ) -> Result<(), MembraneError> {
-            if amount.lt(&self.minimum_transfer_amount) {
+            if self
+                .query_price(amount, src_token_address, None)?
+                .lt(&self.minimum_transfer_amount_usd)
+            {
                 return Err(MembraneError::AmountBelowMinimum);
             }
 
@@ -265,8 +306,10 @@ mod membrane {
                 .get(src_token_address)
                 .ok_or(MembraneError::UnsupportedPair)?;
 
+            let current_base_fee = self.base_fee()?;
             let base_fee = self.env().transferred_value();
-            if base_fee.lt(&self.base_fee) {
+
+            if base_fee.lt(&current_base_fee) {
                 return Err(MembraneError::BaseFeeTooLow);
             }
 
@@ -305,6 +348,11 @@ mod membrane {
                 .request_nonce
                 .checked_add(1)
                 .ok_or(MembraneError::Arithmetic)?;
+
+            // return surplus if any
+            if let Some(surplus) = base_fee.checked_sub(current_base_fee) {
+                self.env().transfer(sender, surplus)?;
+            };
 
             Ok(())
         }
