@@ -14,8 +14,13 @@ function getRandomAlephAccount(number) {
     return hre.ethers.solidityPackedKeccak256(["uint"], [number]);
 }
 
+function ethToWei(ethAmount) {
+    return hre.ethers.parseEther(ethAmount.toString());
+}
+
 module.exports = {
     addressToBytes32,
     bytes32ToAddress,
+    ethToWei,
     getRandomAlephAccount
 };

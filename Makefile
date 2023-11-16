@@ -127,7 +127,7 @@ bridge: local-bridgenet deploy run-relayer
 .PHONY: test-solidity
 test-solidity: # Run solidity tests
 test-solidity: eth-deps
-	cd eth && npx hardhat test ./test/Membrane.js
+	cd eth && npx hardhat test ./test/Membrane.js ./test/WrappedEther.js
 
 .PHONY: test-ink-e2e
 test-ink-e2e: # Run ink e2e tests
