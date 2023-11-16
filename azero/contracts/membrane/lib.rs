@@ -61,6 +61,12 @@ mod membrane {
         signature_count: u128,
     }
 
+    impl Default for Request {
+        fn default() -> Self {
+            Self { signature_count: 0 }
+        }
+    }
+
     #[ink(storage)]
     pub struct Membrane {
         /// an account that can perform a subset of actions
@@ -391,80 +397,55 @@ mod membrane {
                 return Err(MembraneError::RequestAlreadySigned);
             }
 
-            match self.pending_requests.get(request_hash) {
-                None => {
-                    self.pending_requests
-                        .insert(request_hash, &Request { signature_count: 1 });
+            let mut request = self.pending_requests.get(request_hash).unwrap_or_default(); //  {
 
-                    self.signatures.insert((request_hash, caller), &());
+            // record vote
+            request.signature_count += 1;
+            self.signatures.insert((request_hash, caller), &());
 
-                    self.env().emit_event(RequestSigned {
-                        signer: caller,
-                        request_hash,
-                    });
-                }
-                Some(mut request) => {
-                    self.signatures.insert((request_hash, caller), &());
+            self.env().emit_event(RequestSigned {
+                signer: caller,
+                request_hash,
+            });
 
-                    request.signature_count += 1;
+            if request.signature_count >= self.signature_threshold {
+                self.mint_to(
+                    dest_token_address.into(),
+                    dest_receiver_address.into(),
+                    amount,
+                )?;
 
-                    self.env().emit_event(RequestSigned {
-                        signer: caller,
-                        request_hash,
-                    });
+                // bootstrap account with pocket money
+                _ = self
+                    .env()
+                    .transfer(dest_receiver_address.into(), self.pocket_money);
 
-                    if request.signature_count >= self.signature_threshold {
-                        self.mint_to(
-                            dest_token_address.into(),
-                            dest_receiver_address.into(),
-                            amount,
-                        )?;
+                let commission = amount
+                    .checked_mul(self.commission_per_mille)
+                    .ok_or(MembraneError::Arithmetic)?
+                    .checked_div(DIX_MILLE)
+                    .ok_or(MembraneError::Arithmetic)?;
 
-                        // bootstrap account with pocket money
-                        self.env()
-                            .transfer(dest_receiver_address.into(), self.pocket_money)?;
+                let commission_total = self
+                    .collected_committee_rewards
+                    .get((self.committee_id, dest_token_address))
+                    .unwrap_or(0)
+                    .checked_add(commission)
+                    .ok_or(MembraneError::Arithmetic)?;
 
-                        let commission = amount
-                            .checked_mul(self.commission_per_mille)
-                            .ok_or(MembraneError::Arithmetic)?
-                            .checked_div(DIX_MILLE)
-                            .ok_or(MembraneError::Arithmetic)?;
+                self.collected_committee_rewards
+                    .insert((self.committee_id, dest_token_address), &commission_total);
 
-                        let commission_total = self
-                            .collected_committee_rewards
-                            .get((self.committee_id, dest_token_address))
-                            .unwrap_or(0)
-                            .checked_add(commission)
-                            .ok_or(MembraneError::Arithmetic)?;
+                // mark it as processed
+                self.processed_requests.insert(request_hash, &());
+                self.pending_requests.remove(request_hash);
 
-                        self.collected_committee_rewards
-                            .insert((self.committee_id, dest_token_address), &commission_total);
-
-                        // insert reward record for signing this transfer
-                        // let reward = amount
-                        //     .checked_mul(self.commission_per_mille)
-                        //     .ok_or(MembraneError::Arithmetic)?
-                        //     .checked_div(MILLE)
-                        //     .ok_or(MembraneError::Arithmetic)?;
-
-                        // self.commissions
-                        //     .insert(request_hash, &(dest_token_address, reward));
-
-                        // mark it as processed
-                        self.processed_requests.insert(request_hash, &());
-
-                        // clean up
-                        self.signatures.remove((request_hash, caller));
-                        self.pending_requests.remove(request_hash);
-
-                        self.env().emit_event(RequestProcessed {
-                            request_hash,
-                            dest_token_address,
-                        });
-                    } else {
-                        self.pending_requests.insert(request_hash, &request);
-                    }
-                }
+                self.env().emit_event(RequestProcessed {
+                    request_hash,
+                    dest_token_address,
+                });
+            } else {
+                self.pending_requests.insert(request_hash, &request);
             }
 
             Ok(())
