@@ -16,7 +16,7 @@ mod membrane {
     use scale::{Decode, Encode};
     use shared::{concat_u8_arrays, keccak256, Keccak256HashOutput as HashedRequest, Selector};
 
-    const MILLE: u128 = 10000;
+    const DIX_MILLE: u128 = 10000;
     const NATIVE_TOKEN_ID: [u8; 32] = [
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0,
@@ -136,7 +136,7 @@ mod membrane {
             pocket_money: Balance,
             minimum_transfer_amount: u128,
         ) -> Result<Self, MembraneError> {
-            if commission_per_mille.gt(&MILLE) {
+            if commission_per_mille.gt(&DIX_MILLE) {
                 return Err(MembraneError::Constructor);
             }
 
@@ -379,7 +379,7 @@ mod membrane {
                         let commission = amount
                             .checked_mul(self.commission_per_mille)
                             .ok_or(MembraneError::Arithmetic)?
-                            .checked_div(MILLE)
+                            .checked_div(DIX_MILLE)
                             .ok_or(MembraneError::Arithmetic)?;
 
                         let commission_total = self
