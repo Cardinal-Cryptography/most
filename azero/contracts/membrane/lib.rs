@@ -461,7 +461,7 @@ mod membrane {
             member_id: AccountId,
             token_id: [u8; 32],
         ) -> Result<(), MembraneError> {
-            let total_per_member_amount = self
+            let total_amount = self
                 .collected_committee_rewards
                 .get((committee_id, token_id))
                 .ok_or(MembraneError::NoRewards)?
@@ -472,26 +472,28 @@ mod membrane {
                 )
                 .ok_or(MembraneError::Arithmetic)?;
 
-            let collected_amount = self
-                .collected_member_rewards
-                .get((member_id, committee_id, token_id))
-                .unwrap_or_default();
+            let id = (member_id, committee_id, token_id);
 
-            if collected_amount >= total_per_member_amount {
-                return Err(MembraneError::NoMoreRewards);
-            }
+            let collected_amount = self.collected_member_rewards.get(id).unwrap_or_default();
 
-            let amount = total_per_member_amount
-                .checked_sub(collected_amount)
-                .ok_or(MembraneError::Arithmetic)?;
+            let outstanding_amount = total_amount.saturating_sub(collected_amount);
 
-            match token_id {
-                NATIVE_TOKEN_ID => {
-                    self.env().transfer(member_id, amount)?;
+            if outstanding_amount.gt(&0) {
+                match token_id {
+                    NATIVE_TOKEN_ID => {
+                        self.env().transfer(member_id, outstanding_amount)?;
+                    }
+                    _ => {
+                        self.mint_to(token_id.into(), member_id, outstanding_amount)?;
+                    }
                 }
-                _ => {
-                    self.mint_to(token_id.into(), member_id, amount)?;
-                }
+
+                self.collected_member_rewards.insert(
+                    id,
+                    &collected_amount
+                        .checked_add(outstanding_amount)
+                        .ok_or(MembraneError::Arithmetic)?,
+                );
             }
 
             Ok(())
