@@ -50,8 +50,8 @@ describe("Wrapped Ether", function () {
     });
 
     describe("Withdraw", function () {
-        it("Reverts when trying to withdraw more tokens then are available.", async function () {
-            const { wrapped, _owner } = await loadFixture(setupWrappedEtherFixture);
+        it("Reverts when trying to withdraw more tokens than are available.", async function () {
+            const { wrapped } = await loadFixture(setupWrappedEtherFixture);
             await wrapped.deposit({ value: hre.ethers.parseEther(WRAP_AMOUNT.toString()) });
 
             await expect(wrapped.withdraw(hre.ethers.parseEther(WRAP_AMOUNT.toString()) + 1n)).to.be.reverted;
