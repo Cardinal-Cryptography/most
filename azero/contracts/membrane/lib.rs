@@ -77,21 +77,21 @@ mod membrane {
         /// accounting helper
         committee_size: Mapping<CommitteeId, u128>,
         /// minimal amount of tokens that can be transferred across the bridge
-        minimum_transfer_amount: Balance,
+        minimum_transfer_amount: u128,
         /// base fee paid in the source chains native token that is distributed among the guardians, set to track the gas costs of signing the relay transactions on the destination chain
         base_fee: Balance,
         /// per mille of the succesfully transferred amount that is distributed among the guardians that have signed the crosschain transfer request
         commission_per_mille: u128,
         /// a fixed subsidy transferred along with the bridged tokens to the destination account on aleph zero to bootstrap
-        pocket_money: Balance,
+        pocket_money: u128,
         /// source - destination token pairs that can be transferred across the bridge
         supported_pairs: Mapping<[u8; 32], [u8; 32]>,
         /// rewards collected by the commitee for relaying cross-chain transfer requests                
         #[allow(clippy::type_complexity)]
-        collected_committee_rewards: Mapping<(CommitteeId, [u8; 32]), Balance>,
+        collected_committee_rewards: Mapping<(CommitteeId, [u8; 32]), u128>,
         /// rewards collected by the individual commitee members for relaying cross-chain transfer requests        
         #[allow(clippy::type_complexity)]
-        collected_member_rewards: Mapping<(AccountId, CommitteeId, [u8; 32]), Balance>,
+        collected_member_rewards: Mapping<(AccountId, CommitteeId, [u8; 32]), u128>,
     }
 
     #[derive(Debug, PartialEq, Eq, Encode, Decode)]
@@ -134,7 +134,7 @@ mod membrane {
             commission_per_mille: u128,
             base_fee: Balance,
             pocket_money: Balance,
-            minimum_transfer_amount: Balance,
+            minimum_transfer_amount: u128,
         ) -> Result<Self, MembraneError> {
             if commission_per_mille.gt(&1000) {
                 return Err(MembraneError::Constructor);
@@ -253,7 +253,7 @@ mod membrane {
         pub fn send_request(
             &mut self,
             src_token_address: [u8; 32],
-            amount: Balance,
+            amount: u128,
             dest_receiver_address: [u8; 32],
         ) -> Result<(), MembraneError> {
             if amount.lt(&self.minimum_transfer_amount) {
@@ -484,7 +484,7 @@ mod membrane {
             token: AccountId,
             from: AccountId,
             to: AccountId,
-            amount: Balance,
+            amount: u128,
         ) -> Result<(), PSP22Error> {
             let mut psp22: ink::contract_ref!(PSP22) = token.into();
             psp22.transfer_from(from, to, amount, vec![])
@@ -493,12 +493,7 @@ mod membrane {
         /// Mints the specified amount of token to the designated account
         ///
         /// Membrane contract needs to have a Minter role on the token contract
-        fn mint_to(
-            &self,
-            token: AccountId,
-            to: AccountId,
-            amount: Balance,
-        ) -> Result<(), PSP22Error> {
+        fn mint_to(&self, token: AccountId, to: AccountId, amount: u128) -> Result<(), PSP22Error> {
             let mut psp22: ink::contract_ref!(Mintable) = token.into();
             psp22.mint(to, amount)
         }
