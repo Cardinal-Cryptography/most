@@ -461,7 +461,7 @@ mod membrane {
             member_id: AccountId,
             token_id: [u8; 32],
         ) -> Result<(), MembraneError> {
-            let total_amount = self
+            let total_per_member_amount = self
                 .collected_committee_rewards
                 .get((committee_id, token_id))
                 .ok_or(MembraneError::NoRewards)?
@@ -475,13 +475,13 @@ mod membrane {
             let collected_amount = self
                 .collected_member_rewards
                 .get((member_id, committee_id, token_id))
-                .ok_or(MembraneError::NoRewards)?;
+                .unwrap_or_default();
 
-            if collected_amount >= total_amount {
+            if collected_amount >= total_per_member_amount {
                 return Err(MembraneError::NoMoreRewards);
             }
 
-            let amount = total_amount
+            let amount = total_per_member_amount
                 .checked_sub(collected_amount)
                 .ok_or(MembraneError::Arithmetic)?;
 
