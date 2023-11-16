@@ -99,7 +99,7 @@ watch-azero:
 
 .PHONY: compile-azero
 compile-azero: # compile azero contracts and generate artifacts
-compile-azero:
+compile-azero: azero-deps
 	cd azero && npm run compile
 
 .PHONY: deploy-azero
