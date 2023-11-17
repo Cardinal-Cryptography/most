@@ -1,5 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
 
+pub use self::membrane::{MembraneError, MembraneRef};
+
 #[ink::contract]
 mod membrane {
 
@@ -104,6 +106,7 @@ mod membrane {
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub enum MembraneError {
         Constructor,
+        InvalidThreshold,
         NotInCommittee,
         HashDoesNotMatchData,
         PSP22(PSP22Error),
@@ -146,8 +149,8 @@ mod membrane {
                 return Err(MembraneError::Constructor);
             }
 
-            if committee.len().lt(&(signature_threshold as usize)) {
-                return Err(MembraneError::Constructor);
+            if signature_threshold == 0 || committee.len().lt(&(signature_threshold as usize)) {
+                return Err(MembraneError::InvalidThreshold);
             }
 
             let committee_id = 0;
@@ -193,21 +196,22 @@ mod membrane {
         /// Returns an error (reverts) if account is not in the currently active committee  
         #[ink(message)]
         pub fn is_in_current_committee(&self, account: AccountId) -> Result<(), MembraneError> {
-            self.is_in_committee(self.committee_id, account)
+            match self.is_in_committee(self.committee_id, account) {
+                true => Ok(()),
+                false => Err(MembraneError::NotInCommittee),
+            }
         }
 
         /// Returns an error (reverts) if account is not in the committee with `committee_id`
         #[ink(message)]
-        pub fn is_in_committee(
-            &self,
-            committee_id: CommitteeId,
-            account: AccountId,
-        ) -> Result<(), MembraneError> {
-            if self.committee.contains((committee_id, account)) {
-                Ok(())
-            } else {
-                Err(MembraneError::NotInCommittee)
-            }
+        pub fn is_in_committee(&self, committee_id: CommitteeId, account: AccountId) -> bool {
+            self.committee.contains((committee_id, account))
+        }
+
+        /// Returns current committee id
+        #[ink(message)]
+        pub fn current_committee_id(&self) -> u128 {
+            self.committee_id
         }
 
         /// Change the committee and increase committe id
@@ -543,6 +547,174 @@ mod membrane {
         fn mint_to(&self, token: AccountId, to: AccountId, amount: u128) -> Result<(), PSP22Error> {
             let mut psp22: ink::contract_ref!(Mintable) = token.into();
             psp22.mint(to, amount)
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use ink::env::{
+            test::{default_accounts, set_caller},
+            DefaultEnvironment, Environment,
+        };
+
+        use super::*;
+
+        const THRESHOLD: u128 = 3;
+        const COMMISSION_PER_MILLE: u128 = 30;
+        const POCKET_MONEY: Balance = 1000000000000;
+        const MINIMUM_TRANSFER_AMOUNT_USD: u128 = 50;
+        const RELAY_GAS_USAGE: u128 = 50000;
+
+        type DefEnv = DefaultEnvironment;
+        type AccountId = <DefEnv as Environment>::AccountId;
+
+        fn guardian_accounts() -> Vec<AccountId> {
+            let accounts = default_accounts::<DefEnv>();
+            vec![
+                accounts.bob,
+                accounts.charlie,
+                accounts.django,
+                accounts.eve,
+                accounts.frank,
+            ]
+        }
+
+        #[ink::test]
+        fn new_fails_on_zero_threshold() {
+            set_caller::<DefEnv>(default_accounts::<DefEnv>().alice);
+            assert_eq!(
+                Membrane::new(
+                    guardian_accounts(),
+                    0,
+                    COMMISSION_PER_MILLE,
+                    POCKET_MONEY,
+                    MINIMUM_TRANSFER_AMOUNT_USD,
+                    RELAY_GAS_USAGE
+                )
+                .expect_err("Threshold is zero, instantiation should fail."),
+                MembraneError::InvalidThreshold
+            );
+        }
+
+        #[ink::test]
+        fn new_fails_on_threshold_large_than_guardians() {
+            set_caller::<DefEnv>(default_accounts::<DefEnv>().alice);
+            assert_eq!(
+                Membrane::new(
+                    guardian_accounts(),
+                    (guardian_accounts().len() + 1) as u128,
+                    COMMISSION_PER_MILLE,
+                    POCKET_MONEY,
+                    MINIMUM_TRANSFER_AMOUNT_USD,
+                    RELAY_GAS_USAGE
+                )
+                .expect_err("Threshold is larger than guardians, instantiation should fail."),
+                MembraneError::InvalidThreshold
+            );
+        }
+
+        #[ink::test]
+        fn new_sets_caller_as_owner() {
+            set_caller::<DefEnv>(default_accounts::<DefEnv>().alice);
+            let mut membrane = Membrane::new(
+                guardian_accounts(),
+                THRESHOLD,
+                COMMISSION_PER_MILLE,
+                POCKET_MONEY,
+                MINIMUM_TRANSFER_AMOUNT_USD,
+                RELAY_GAS_USAGE,
+            )
+            .expect("Threshold is valid.");
+
+            assert_eq!(membrane.ensure_owner(), Ok(()));
+            set_caller::<DefEnv>(guardian_accounts()[0]);
+            assert_eq!(
+                membrane.ensure_owner(),
+                Err(MembraneError::NotOwner(guardian_accounts()[0]))
+            );
+        }
+
+        #[ink::test]
+        fn new_sets_correct_guardians() {
+            let accounts = default_accounts::<DefEnv>();
+            set_caller::<DefEnv>(accounts.alice);
+            let membrane = Membrane::new(
+                guardian_accounts(),
+                THRESHOLD,
+                COMMISSION_PER_MILLE,
+                POCKET_MONEY,
+                MINIMUM_TRANSFER_AMOUNT_USD,
+                RELAY_GAS_USAGE,
+            )
+            .expect("Threshold is valid.");
+
+            for account in guardian_accounts() {
+                assert!(membrane.is_in_committee(membrane.current_committee_id(), account));
+            }
+            assert!(!membrane.is_in_committee(membrane.current_committee_id(), accounts.alice));
+        }
+
+        #[ink::test]
+        fn set_owner_works() {
+            let accounts = default_accounts::<DefEnv>();
+            set_caller::<DefEnv>(accounts.alice);
+            let mut membrane = Membrane::new(
+                guardian_accounts(),
+                THRESHOLD,
+                COMMISSION_PER_MILLE,
+                POCKET_MONEY,
+                MINIMUM_TRANSFER_AMOUNT_USD,
+                RELAY_GAS_USAGE,
+            )
+            .expect("Threshold is valid.");
+            set_caller::<DefEnv>(accounts.bob);
+            assert_eq!(
+                membrane.ensure_owner(),
+                Err(MembraneError::NotOwner(accounts.bob))
+            );
+            set_caller::<DefEnv>(accounts.alice);
+            assert_eq!(membrane.ensure_owner(), Ok(()));
+            assert_eq!(membrane.set_owner(accounts.bob), Ok(()));
+            set_caller::<DefEnv>(accounts.bob);
+            assert_eq!(membrane.ensure_owner(), Ok(()));
+        }
+
+        #[ink::test]
+        fn add_guardian_works() {
+            let accounts = default_accounts::<DefEnv>();
+            set_caller::<DefEnv>(accounts.alice);
+            let mut membrane = Membrane::new(
+                guardian_accounts(),
+                THRESHOLD,
+                COMMISSION_PER_MILLE,
+                POCKET_MONEY,
+                MINIMUM_TRANSFER_AMOUNT_USD,
+                RELAY_GAS_USAGE,
+            )
+            .expect("Threshold is valid.");
+
+            assert!(!membrane.is_in_committee(membrane.current_committee_id(), accounts.alice));
+            assert_eq!(membrane.set_committee(vec![accounts.alice]), Ok(()));
+            assert!(membrane.is_in_committee(membrane.current_committee_id(), accounts.alice));
+        }
+
+        #[ink::test]
+        fn remove_guardian_works() {
+            let accounts = default_accounts::<DefEnv>();
+            set_caller::<DefEnv>(accounts.alice);
+            let mut membrane = Membrane::new(
+                guardian_accounts(),
+                THRESHOLD,
+                COMMISSION_PER_MILLE,
+                POCKET_MONEY,
+                MINIMUM_TRANSFER_AMOUNT_USD,
+                RELAY_GAS_USAGE,
+            )
+            .expect("Threshold is valid.");
+
+            assert!(membrane.is_in_committee(membrane.current_committee_id(), accounts.bob));
+            assert_eq!(membrane.set_committee(vec![accounts.alice]), Ok(()));
+            assert!(!membrane.is_in_committee(membrane.current_committee_id(), accounts.bob));
         }
     }
 }
