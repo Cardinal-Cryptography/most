@@ -102,7 +102,7 @@ mod membrane {
         collected_committee_rewards: Mapping<(CommitteeId, [u8; 32]), u128>,
         /// rewards collected by the individual commitee members for relaying cross-chain transfer requests
         #[allow(clippy::type_complexity)]
-        collected_member_rewards: Mapping<(AccountId, CommitteeId, [u8; 32]), u128>,
+        paid_out_member_rewards: Mapping<(AccountId, CommitteeId, [u8; 32]), u128>,
         /// How much gas does a single confirmation of a cross-chain transfer request use on the destination chain on average.
         /// This value is calculated by summing the total gas usage of *all* the transactions it takes to relay a single request and dividing it by the current committee size and multiplying by 1.2
         relay_gas_usage: u128,
@@ -180,7 +180,7 @@ mod membrane {
                 committee_size,
                 supported_pairs: Mapping::new(),
                 collected_committee_rewards: Mapping::new(),
-                collected_member_rewards: Mapping::new(),
+                paid_out_member_rewards: Mapping::new(),
                 minimum_transfer_amount_usd,
                 pocket_money,
                 commission_per_mille,
@@ -198,6 +198,11 @@ mod membrane {
             Ok(())
         }
 
+        /// Change the committee and increase committe id
+        /// Can only be called by contracts owner
+        ///
+        /// This is the ONLY way of upgrading the committee, by changing the entire set
+        #[ink(message)]
         pub fn set_committee(&mut self, committee: Vec<AccountId>) -> Result<(), MembraneError> {
             self.ensure_owner()?;
 
@@ -473,7 +478,7 @@ mod membrane {
 
             let id = (member_id, committee_id, token_id);
 
-            let collected_amount = self.collected_member_rewards.get(id).unwrap_or_default();
+            let collected_amount = self.paid_out_member_rewards.get(id).unwrap_or_default();
 
             let outstanding_amount = total_amount.saturating_sub(collected_amount);
 
@@ -487,7 +492,7 @@ mod membrane {
                     }
                 }
 
-                self.collected_member_rewards.insert(
+                self.paid_out_member_rewards.insert(
                     id,
                     &collected_amount
                         .checked_add(outstanding_amount)
