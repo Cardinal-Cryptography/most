@@ -328,8 +328,7 @@ mod membrane {
                 amount,
             )?;
 
-            // record base fee as collected
-            // PROBLEM: this allows the committee members to take a payout for requests that are not neccessarily finished
+            // NOTE: this allows the committee members to take a payout for requests that are not neccessarily finished
             // by that time (no signature threshold reached yet).
             // We could be recording the base fee when the request collects quorum, but it could change in the meantime
             // which is potentially even worse
