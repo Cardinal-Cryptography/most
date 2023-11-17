@@ -1,10 +1,10 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{BTreeSet, HashMap},
+    sync::Arc,
+};
 
 use aleph_client::{
-    contract::{
-        event::{translate_events, BlockDetails, ContractEvent},
-        ContractInstance,
-    },
+    contract::event::{translate_events, BlockDetails, ContractEvent},
     contract_transcode::Value,
     utility::BlocksApi,
     AlephConfig, AsConnection,
@@ -14,7 +14,7 @@ use ethers::{
     core::types::Address,
     prelude::{ContractCall, ContractError},
     providers::{Middleware, ProviderError},
-    types::{TransactionReceipt, U256},
+    types::U256,
     utils::keccak256,
 };
 use log::{debug, info, trace, warn};
@@ -109,14 +109,21 @@ impl AlephZeroListener {
             ..
         } = &*config;
 
-        let instance = MembraneInstance::new(azero_contract_address, azero_contract_metadata)?;
-        let contracts = vec![&instance.contract];
+        let pending_blocks: Arc<Mutex<BTreeSet<u32>>> = Arc::new(Mutex::new(BTreeSet::new()));
+
+        let instance = Arc::new(MembraneInstance::new(
+            azero_contract_address,
+            azero_contract_metadata,
+        )?);
         let mut first_unprocessed_block_number = read_first_unprocessed_block_number(
             name.clone(),
             redis_connection.clone(),
             *default_sync_from_block_azero,
         )
         .await;
+
+        // Add the first block number to the set of pending blocks.
+        add_to_pending(first_unprocessed_block_number, pending_blocks.clone()).await;
 
         // Main AlephZero event loop
         loop {
@@ -141,6 +148,9 @@ impl AlephZeroListener {
 
             // Process events from the next unknowns finalized block number.
             for block_number in first_unprocessed_block_number..=to_block {
+                // Add the next block number now, so that there is always some block number in the set.
+                add_to_pending(block_number + 1, pending_blocks.clone()).await;
+
                 let block_hash = azero_connection
                     .get_block_hash(block_number)
                     .await?
@@ -155,36 +165,59 @@ impl AlephZeroListener {
                     .events()
                     .await?;
 
+                let config = config.clone();
+                let eth_connection = eth_connection.clone();
+                let redis_connection = redis_connection.clone();
+                let pending_blocks = pending_blocks.clone();
+                let membrane_instance = instance.clone();
+
                 // filter contract events
-                handle_events(
-                    Arc::clone(&eth_connection),
-                    &config,
-                    events,
-                    &contracts,
-                    block_number,
-                    block_hash,
-                )
-                .await?;
+                tokio::spawn(async move {
+                    handle_events(
+                        eth_connection,
+                        &config,
+                        events,
+                        membrane_instance,
+                        block_number,
+                        block_hash,
+                        pending_blocks.clone(),
+                        redis_connection.clone(),
+                    )
+                    .await
+                    .expect("Block events handler failed");
+                });
             }
 
             // Update the last block number.
             first_unprocessed_block_number = to_block + 1;
-
-            // Cache the last processed block number.
-            write_last_processed_block(name.clone(), redis_connection.clone(), to_block).await?;
         }
     }
 }
 
+async fn add_to_pending(block_number: u32, pending_blocks: Arc<Mutex<BTreeSet<u32>>>) {
+    let mut pending_blocks = pending_blocks.lock().await;
+    pending_blocks.insert(block_number);
+}
+
+// handle all events present in one block
 async fn handle_events(
     eth_connection: Arc<SignedEthWsConnection>,
     config: &Config,
     events: Events<AlephConfig>,
-    contracts: &[&ContractInstance],
+    membrane_instance: Arc<MembraneInstance>,
     block_number: u32,
     block_hash: H256,
+    pending_blocks: Arc<Mutex<BTreeSet<u32>>>,
+    redis_connection: Arc<Mutex<RedisConnection>>,
 ) -> Result<(), AzeroListenerError> {
-    for event in translate_events(
+    let Config {
+        name,
+        eth_contract_address,
+        ..
+    } = config;
+    let contracts = &[&membrane_instance.contract];
+    let mut event_tasks = Vec::new();
+    for event_res in translate_events(
         events.iter(),
         contracts,
         Some(BlockDetails {
@@ -192,8 +225,35 @@ async fn handle_events(
             block_hash,
         }),
     ) {
-        handle_event(Arc::clone(&eth_connection), config, event?).await?;
+        let event = event_res?;
+        let eth_contract_address = eth_contract_address.clone();
+        let eth_connection = eth_connection.clone();
+        // Spawn a new task for handling each event.
+        event_tasks.push(tokio::spawn(async move {
+            handle_event(eth_connection, eth_contract_address, event)
+                .await
+                .expect("Event handler failed");
+        }));
     }
+
+    // Wait for all event processing tasks to finish.
+    for task in event_tasks {
+        task.await.expect("Event processing task has failed");
+    }
+
+    // Lock the pending blocks set and remove the current block number (as we managed to process all events from it).
+    let mut pending_blocks = pending_blocks.lock().await;
+    pending_blocks.remove(&block_number);
+
+    // Now we know that all blocks before the pending block with the lowest number have been processed.
+    // We can update the last processed block number in Redis.
+    let earliest_still_pending = pending_blocks
+        .first()
+        .expect("There should always be a pending block in the set)");
+
+    // Note: `earliest_still_pending` will never be 0
+    write_last_processed_block(name.clone(), redis_connection, earliest_still_pending - 1).await?;
+
     Ok(())
 }
 
@@ -213,14 +273,9 @@ fn get_event_data(
 
 async fn handle_event(
     eth_connection: Arc<SignedEthWsConnection>,
-    config: &Config,
+    eth_contract_address: String,
     event: ContractEvent,
 ) -> Result<(), AzeroListenerError> {
-    let Config {
-        eth_contract_address,
-        ..
-    } = config;
-
     if let Some(name) = &event.name {
         if name.eq("CrosschainTransferRequest") {
             info!("handling A0 contract event: {event:?}");
