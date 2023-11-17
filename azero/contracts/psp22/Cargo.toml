@@ -6,10 +6,7 @@ edition = "2021"
 
 [dependencies]
 ink = { version = "=4.3.0", default-features = false }
-psp22 = { git = "https://github.com/Cardinal-Cryptography/PSP22.git", default-features = false, features = [
-      "mintable",
-      "burnable",
-]}
+psp22 = { version = "0.2.0", default-features = false }
 psp22-traits = { path = "../psp22-traits", default-features = false }
 
 scale = { package = "parity-scale-codec", version = "3", default-features = false, features = [

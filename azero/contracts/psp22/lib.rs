@@ -1,5 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
 
+pub use self::token::TokenRef;
+
 #[ink::contract]
 pub mod token {
     use ink::prelude::{string::String, vec::Vec};

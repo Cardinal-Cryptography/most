@@ -2,7 +2,6 @@
 geth/
 jwt.hex
 history
-genesis.json
 
 # aleph node blockchain data
 backup-stash/
@@ -21,6 +20,9 @@ target/
 # env files
 .env
 
+# logs
+*.log
+
 # contracts
 addresses.json
 azero/artifacts/
@@ -31,3 +33,6 @@ node_modules
 
 # emacs
 relayer/src/ markdown-code-fontification:rustic-mode
+
+# idea
+/.idea/

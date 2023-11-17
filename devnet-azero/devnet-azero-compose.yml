@@ -3,7 +3,7 @@ version: '3.9'
 services:
   # key derived from "//0"
   AlephBridgenode:
-    image: public.ecr.aws/p6e8q1z1/aleph-node:r-11.4
+    image: public.ecr.aws/p6e8q1z1/aleph-node:r-12.0
     container_name: aleph_bridgenode
     user: "${UID}:${GID}"
     volumes:

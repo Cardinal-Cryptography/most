@@ -3,7 +3,7 @@
 pub use self::membrane::{MembraneError, MembraneRef};
 
 #[ink::contract]
-mod membrane {
+pub mod membrane {
 
     use ink::{
         env::{
