@@ -52,19 +52,13 @@ mod membrane {
         request_hash: HashedRequest,
     }
 
-    #[derive(Debug, Encode, Decode, Clone, Copy, PartialEq, Eq)]
+    #[derive(Default, Debug, Encode, Decode, Clone, Copy, PartialEq, Eq)]
     #[cfg_attr(
         feature = "std",
         derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout)
     )]
     pub struct Request {
         signature_count: u128,
-    }
-
-    impl Default for Request {
-        fn default() -> Self {
-            Self { signature_count: 0 }
-        }
     }
 
     #[ink(storage)]
@@ -89,8 +83,6 @@ mod membrane {
         committee_size: Mapping<CommitteeId, u128>,
         /// minimal value of tokens that can be transferred across the bridge
         minimum_transfer_amount_usd: u128,
-        // /// base fee paid in the source chains native token that is distributed among the guardians, set to track the gas costs of signing the relay transactions on the destination chain
-        // base_fee: Balance,
         /// per mille of the succesfully transferred amount that is distributed among the guardians that have signed the crosschain transfer request
         commission_per_mille: u128,
         /// a fixed subsidy transferred along with the bridged tokens to the destination account on aleph zero to bootstrap
@@ -198,10 +190,30 @@ mod membrane {
             Ok(())
         }
 
+        /// Returns an error (reverts) if account is not in the currently active committee  
+        #[ink(message)]
+        pub fn is_in_current_committee(&self, account: AccountId) -> Result<(), MembraneError> {
+            self.is_in_committee(self.committee_id, account)
+        }
+
+        /// Returns an error (reverts) if account is not in the committee with `committee_id`
+        #[ink(message)]
+        pub fn is_in_committee(
+            &self,
+            committee_id: CommitteeId,
+            account: AccountId,
+        ) -> Result<(), MembraneError> {
+            if self.committee.contains((committee_id, account)) {
+                Ok(())
+            } else {
+                Err(MembraneError::NotInCommittee)
+            }
+        }
+
         /// Change the committee and increase committe id
-        /// Can only be called by contracts owner
+        /// Can only be called by the contracts owner
         ///
-        /// This is the ONLY way of upgrading the committee, by changing the entire set
+        /// Changing the entire set is the ONLY way of upgrading the committee
         #[ink(message)]
         pub fn set_committee(&mut self, committee: Vec<AccountId>) -> Result<(), MembraneError> {
             self.ensure_owner()?;
@@ -378,7 +390,7 @@ mod membrane {
             request_nonce: u128,
         ) -> Result<(), MembraneError> {
             let caller = self.env().caller();
-            self.is_guardian(caller)?;
+            self.is_in_current_committee(caller)?;
 
             if self.processed_requests.contains(request_hash) {
                 return Err(MembraneError::RequestAlreadyProcessed);
@@ -531,14 +543,6 @@ mod membrane {
         fn mint_to(&self, token: AccountId, to: AccountId, amount: u128) -> Result<(), PSP22Error> {
             let mut psp22: ink::contract_ref!(Mintable) = token.into();
             psp22.mint(to, amount)
-        }
-
-        fn is_guardian(&self, account: AccountId) -> Result<(), MembraneError> {
-            if self.committee.contains((self.committee_id, account)) {
-                Ok(())
-            } else {
-                Err(MembraneError::NotInCommittee)
-            }
         }
     }
 }
