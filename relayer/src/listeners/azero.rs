@@ -33,10 +33,8 @@ use crate::{
         eth::{EthConnectionError, EthWsConnection, SignedEthWsConnection},
     },
     contracts::{AzeroContractError, Membrane, MembraneInstance},
-    listeners::eth::get_next_finalized_block_number_eth,
+    listeners::eth::{get_next_finalized_block_number_eth, ETH_BLOCK_PROD_TIME_SEC},
 };
-
-const ALEPH_LAST_BLOCK_KEY: &str = "alephzero_last_known_block_number";
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -69,11 +67,8 @@ pub enum AzeroListenerError {
     #[error("no block found")]
     BlockNotFound,
 
-    #[error("no tx receipt")]
-    NoTxReceipt,
-
-    #[error("eth tx not found")]
-    EthTxNotFound,
+    #[error("tx was not present in any block or mempool after the maximum number of retries")]
+    TxNotPresentInBlockOrMempool,
 
     #[error("missing data from event")]
     MissingEventData(String),
@@ -88,8 +83,8 @@ pub enum AzeroListenerError {
     Unexpected,
 }
 
-const BLOCK_PROD_TIME_SEC: u64 = 1;
-const ETH_FINALITY_WAIT_SEC: u64 = 300;
+const ALEPH_LAST_BLOCK_KEY: &str = "alephzero_last_known_block_number";
+const ALEPH_BLOCK_PROD_TIME_SEC: u64 = 1;
 
 pub struct AlephZeroListener;
 
@@ -105,7 +100,6 @@ impl AlephZeroListener {
             azero_contract_address,
             name,
             default_sync_from_block_azero,
-            sync_step,
             ..
         } = &*config;
 
@@ -128,17 +122,11 @@ impl AlephZeroListener {
         // Main AlephZero event loop
         loop {
             // Query for the next unknowns finalized block number, if not present we wait for it.
-            let next_finalized_block_number = get_next_finalized_block_number_azero(
+            let to_block = get_next_finalized_block_number_azero(
                 azero_connection.clone(),
                 first_unprocessed_block_number,
             )
             .await;
-
-            // Check at most `sync_step` blocks before caching.
-            let to_block = std::cmp::min(
-                next_finalized_block_number,
-                first_unprocessed_block_number + sync_step - 1,
-            );
 
             log::info!(
                 "Processing events from blocks {} - {}",
@@ -146,7 +134,7 @@ impl AlephZeroListener {
                 to_block
             );
 
-            // Process events from the next unknowns finalized block number.
+            // Process events from the next unknown finalized block.
             for block_number in first_unprocessed_block_number..=to_block {
                 // Add the next block number now, so that there is always some block number in the set.
                 add_to_pending(block_number + 1, pending_blocks.clone()).await;
@@ -171,11 +159,11 @@ impl AlephZeroListener {
                 let pending_blocks = pending_blocks.clone();
                 let membrane_instance = instance.clone();
 
-                // filter contract events
+                // Spawn a task to handle the events.
                 tokio::spawn(async move {
                     handle_events(
                         eth_connection,
-                        &config,
+                        config,
                         events,
                         membrane_instance,
                         block_number,
@@ -202,7 +190,7 @@ async fn add_to_pending(block_number: u32, pending_blocks: Arc<Mutex<BTreeSet<u3
 // handle all events present in one block
 async fn handle_events(
     eth_connection: Arc<SignedEthWsConnection>,
-    config: &Config,
+    config: Arc<Config>,
     events: Events<AlephConfig>,
     membrane_instance: Arc<MembraneInstance>,
     block_number: u32,
@@ -212,9 +200,8 @@ async fn handle_events(
 ) -> Result<(), AzeroListenerError> {
     let Config {
         name,
-        eth_contract_address,
         ..
-    } = config;
+    } = &*config;
     let contracts = &[&membrane_instance.contract];
     let mut event_tasks = Vec::new();
     for event_res in translate_events(
@@ -226,11 +213,11 @@ async fn handle_events(
         }),
     ) {
         let event = event_res?;
-        let eth_contract_address = eth_contract_address.clone();
+        let config = config.clone();
         let eth_connection = eth_connection.clone();
         // Spawn a new task for handling each event.
         event_tasks.push(tokio::spawn(async move {
-            handle_event(eth_connection, eth_contract_address, event)
+            handle_event(config, eth_connection, event)
                 .await
                 .expect("Event handler failed");
         }));
@@ -272,10 +259,16 @@ fn get_event_data(
 }
 
 async fn handle_event(
+    config: Arc<Config>,
     eth_connection: Arc<SignedEthWsConnection>,
-    eth_contract_address: String,
     event: ContractEvent,
 ) -> Result<(), AzeroListenerError> {
+    let Config {
+        eth_contract_address,
+        eth_tx_min_confirmations,
+        eth_tx_submission_retries,
+        ..
+    } = &*config;
     if let Some(name) = &event.name {
         if name.eq("CrosschainTransferRequest") {
             info!("handling A0 contract event: {event:?}");
@@ -308,7 +301,7 @@ async fn handle_event(
             let address = eth_contract_address.parse::<Address>()?;
             let contract = Membrane::new(address, eth_connection.clone());
 
-            //  forward transfer & vote
+            // forward transfer & vote
             let call: ContractCall<SignedEthWsConnection, ()> = contract.receive_request(
                 request_hash,
                 dest_token_address,
@@ -317,11 +310,14 @@ async fn handle_event(
                 request_nonce,
             );
 
+            // This shouldn't fail unless there is something wrong with our config.
             let tx_hash = call
                 .send()
                 .await?
+                .confirmations(*eth_tx_min_confirmations)
+                .retries(*eth_tx_submission_retries)
                 .await?
-                .ok_or(AzeroListenerError::NoTxReceipt)?
+                .ok_or(AzeroListenerError::TxNotPresentInBlockOrMempool)?
                 .transaction_hash;
 
             wait_for_eth_tx_finality(eth_connection, tx_hash).await?;
@@ -336,27 +332,25 @@ pub async fn wait_for_eth_tx_finality(
 ) -> Result<(), AzeroListenerError> {
     loop {
         log::info!("Waiting for tx finality: {tx_hash:?}");
-        sleep(Duration::from_secs(ETH_FINALITY_WAIT_SEC)).await;
+        sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
 
         let finalized_head_number =
             get_next_finalized_block_number_eth(eth_connection.clone(), 0).await;
-        let tx_opt = eth_connection
-            .get_transaction(tx_hash)
-            .await
-            .map_err(|_err| AzeroListenerError::EthTxNotFound)?;
-        if let Some(tx) = tx_opt {
-            // If the tx is not in a block yet, keep waiting.
-            if tx.block_number.is_none() {
-                continue;
-            }
 
-            if tx.block_number.expect("Tx is included in some block.")
-                <= finalized_head_number.into()
-            {
-                log::info!("Eth tx finalized: {tx_hash:?}");
-                return Ok(());
+        match eth_connection.get_transaction(tx_hash).await {
+            Ok(Some(tx)) => {
+                if let Some(block_number) = tx.block_number {
+                    if block_number <= finalized_head_number.into() {
+                        log::info!("Eth tx finalized: {tx_hash:?}");
+                        return Ok(());
+                    }
+                }
             }
-        }
+            Err(err) => {
+                log::error!("Failed to get tx that should be present: {err}");
+            }
+            _ => (),
+        };
     }
 }
 
@@ -386,7 +380,7 @@ pub async fn get_next_finalized_block_number_azero(
             }
         }
 
-        sleep(Duration::from_secs(BLOCK_PROD_TIME_SEC)).await;
+        sleep(Duration::from_secs(ALEPH_BLOCK_PROD_TIME_SEC)).await;
     }
     best_finalized_block_number_opt.expect("We return only if we managed to fetch the block.")
 }

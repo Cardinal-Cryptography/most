@@ -13,6 +13,7 @@ use log::{debug, info, trace, warn};
 use redis::{aio::Connection as RedisConnection, AsyncCommands, RedisError};
 use thiserror::Error;
 use tokio::sync::Mutex;
+use tokio::time::{sleep, Duration};
 
 use crate::{
     config::Config,
@@ -23,8 +24,6 @@ use crate::{
     },
     helpers::{concat_u8_arrays},
 };
-
-const ETH_LAST_BLOCK_KEY: &str = "ethereum_last_known_block_number";
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -49,7 +48,8 @@ pub enum EthListenerError {
     Redis(#[from] RedisError),
 }
 
-const BLOCK_PROD_TIME_SEC: u32 = 15;
+pub const ETH_BLOCK_PROD_TIME_SEC: u64 = 15;
+const ETH_LAST_BLOCK_KEY: &str = "ethereum_last_known_block_number";
 
 pub struct EthListener;
 
@@ -201,7 +201,7 @@ pub async fn get_next_finalized_block_number_eth(
             }    
         }
 
-        tokio::time::sleep(tokio::time::Duration::from_secs(BLOCK_PROD_TIME_SEC.into())).await;
+        sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC.into())).await;
     }
     best_finalized_block_number_opt.expect("We return only if we managed to fetch the block.")
 }

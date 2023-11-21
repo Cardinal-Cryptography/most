@@ -30,6 +30,12 @@ pub struct Config {
     #[arg(long, default_value = "ws://127.0.0.1:8546")]
     pub eth_node_wss_url: String,
 
+    #[arg(long, default_value = "10")]
+    pub eth_tx_submission_retries: usize,
+
+    #[arg(long, default_value = "32")]
+    pub eth_tx_min_confirmations: usize,
+
     #[arg(long, default_value = "0")]
     pub default_sync_from_block_eth: u32,
 

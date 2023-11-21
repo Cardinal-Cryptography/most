@@ -97,10 +97,12 @@ contract Membrane {
                           bytes32 destReceiverAddress,
                           uint256 _requestNonce
                           ) external _onlyGuardian {
-    require(
-            !processedRequests[_requestHash],
-            "This request has already been processed"
-            );
+
+    // Don't revert if the request has already been processed as it
+    // such a call can be made during regular guardian operation.
+    if(processedRequests[_requestHash]) {
+      return;
+    }
 
     bytes32 requestHash = keccak256(abi.encodePacked(destTokenAddress,
                                                      amount,

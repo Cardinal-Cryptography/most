@@ -244,8 +244,10 @@ pub mod membrane {
                 return Err(MembraneError::NotGuardian(caller));
             }
 
+            // Don't revert if the request has already been processed as it
+            // such a call can be made during regular guardian operation.
             if self.processed_requests.contains(request_hash) {
-                return Err(MembraneError::RequestAlreadyProcessed);
+                return Ok(());
             }
 
             let bytes = concat_u8_arrays(vec![
