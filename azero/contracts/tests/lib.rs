@@ -160,6 +160,8 @@ mod e2e {
         .await
         .expect("Adding a pair should succeed");
 
+        let base_fee = 50; //membrane_base_fee(&mut client, &alice(), membrane_address).await?;
+
         let amount_to_send = 1000;
         let send_request_res = membrane_send_request(
             &mut client,
@@ -168,6 +170,7 @@ mod e2e {
             token_address,
             amount_to_send,
             REMOTE_RECEIVER,
+            base_fee,
         )
         .await;
 
@@ -212,6 +215,8 @@ mod e2e {
         .await
         .expect("Approve should succeed");
 
+        let base_fee = 50; //membrane_base_fee(&mut client, &alice(), membrane_address).await?;
+
         let send_request_res = membrane_send_request(
             &mut client,
             &alice(),
@@ -219,6 +224,7 @@ mod e2e {
             token_address,
             amount_to_send,
             REMOTE_RECEIVER,
+            base_fee,
         )
         .await;
 
@@ -273,6 +279,8 @@ mod e2e {
         .await
         .expect("Adding a pair should succeed");
 
+        let base_fee = 50; //membrane_base_fee(&mut client, &alice(), membrane_address).await?;
+
         let send_request_res = membrane_send_request(
             &mut client,
             &alice(),
@@ -280,10 +288,13 @@ mod e2e {
             token_address,
             amount_to_send,
             REMOTE_RECEIVER,
+            base_fee,
         )
         .await;
 
-        assert!(send_request_res.is_ok());
+        println!("{:?}", send_request_res.unwrap().dry_run);
+
+        // assert!(send_request_res.is_ok());
     }
 
     #[ink_e2e::test]
@@ -528,6 +539,7 @@ mod e2e {
         keccak256(&request_data)
     }
 
+    type DryRunResult<E> = ink_e2e::CallDryRunResult<DefaultEnvironment, Result<(), E>>;
     type CallResult<E> =
         Result<ink_e2e::CallResult<PolkadotConfig, DefaultEnvironment, Result<(), E>>, E>;
     type E2EClient = ink_e2e::Client<PolkadotConfig, DefaultEnvironment>;
@@ -578,9 +590,13 @@ mod e2e {
         token: AccountId,
         remote_token: [u8; 32],
     ) -> CallResult<MembraneError> {
-        call_message::<MembraneRef, _, _, _>(client, caller, membrane, |membrane| {
-            membrane.add_pair(*token.as_ref(), remote_token)
-        })
+        call_message::<MembraneRef, _, _, _>(
+            client,
+            caller,
+            membrane,
+            |membrane| membrane.add_pair(*token.as_ref(), remote_token),
+            None,
+        )
         .await
     }
 
@@ -591,10 +607,15 @@ mod e2e {
         token: AccountId,
         amount: u128,
         remote_address: [u8; 32],
+        base_fee: u128,
     ) -> CallResult<MembraneError> {
-        call_message::<MembraneRef, _, _, _>(client, caller, membrane, |membrane| {
-            membrane.send_request(*token.as_ref(), amount, remote_address)
-        })
+        call_message::<MembraneRef, _, _, _>(
+            client,
+            caller,
+            membrane,
+            |membrane| membrane.send_request(*token.as_ref(), amount, remote_address),
+            Some(base_fee),
+        )
         .await
     }
 
@@ -608,9 +629,21 @@ mod e2e {
         receiver_address: [u8; 32],
         request_nonce: u128,
     ) -> CallResult<MembraneError> {
-        call_message::<MembraneRef, _, _, _>(client, caller, membrane, |membrane| {
-            membrane.receive_request(request_hash, token, amount, receiver_address, request_nonce)
-        })
+        call_message::<MembraneRef, _, _, _>(
+            client,
+            caller,
+            membrane,
+            |membrane| {
+                membrane.receive_request(
+                    request_hash,
+                    token,
+                    amount,
+                    receiver_address,
+                    request_nonce,
+                )
+            },
+            None,
+        )
         .await
     }
 
@@ -621,9 +654,13 @@ mod e2e {
         amount: u128,
         spender: AccountId,
     ) -> CallResult<PSP22Error> {
-        call_message::<TokenRef, _, _, _>(client, caller, token, |token| {
-            token.approve(spender, amount)
-        })
+        call_message::<TokenRef, _, _, _>(
+            client,
+            caller,
+            token,
+            |token| token.approve(spender, amount),
+            None,
+        )
         .await
     }
 
@@ -634,9 +671,13 @@ mod e2e {
         amount: u128,
         recipient: AccountId,
     ) -> CallResult<PSP22Error> {
-        call_message::<TokenRef, _, _, _>(client, caller, token, |token| {
-            token.transfer(recipient, amount, vec![])
-        })
+        call_message::<TokenRef, _, _, _>(
+            client,
+            caller,
+            token,
+            |token| token.transfer(recipient, amount, vec![]),
+            None,
+        )
         .await
     }
 
@@ -645,7 +686,57 @@ mod e2e {
         caller: &Keypair,
         contract_id: AccountId,
         call_builder_fn: F,
+        value: Option<u128>,
     ) -> CallResult<ErrType>
+    where
+        Ref: TraitCallBuilder + FromAccountId<DefaultEnvironment>,
+        F: Clone
+            + FnMut(
+                &mut <Ref as TraitCallBuilder>::Builder,
+            ) -> CallBuilder<
+                DefaultEnvironment,
+                Set<Call<DefaultEnvironment>>,
+                Set<ExecutionInput<Args>>,
+                Set<ReturnType<Result<(), ErrType>>>,
+            >,
+        Args: Encode,
+        ErrType: Decode,
+    {
+        // Dry run to get the return value: when a contract is called and reverted, then we
+        // get a large error message that is not very useful. We want to get the actual contract
+        // error and this can be done by dry running the call.
+        dry_run::<Ref, ErrType, Args, F>(
+            client,
+            caller,
+            contract_id,
+            call_builder_fn.clone(),
+            value,
+        )
+        .await
+        .return_value()?;
+
+        let message = build_message::<Ref>(contract_id).call(call_builder_fn);
+
+        // Now we shouldn't get any errors originating from the contract.
+        // However, we can still get errors from the substrate runtime or the client.
+        Ok(client
+            .call(caller, message, value.unwrap_or_default(), None)
+            .await
+            .unwrap_or_else(|err| {
+                panic!(
+                    "Call did not revert, but failed anyway. ink_e2e error: {:?}",
+                    err
+                )
+            }))
+    }
+
+    async fn dry_run<Ref, ErrType, Args, F>(
+        client: &mut E2EClient,
+        caller: &Keypair,
+        contract_id: AccountId,
+        call_builder_fn: F,
+        value: Option<u128>,
+    ) -> DryRunResult<ErrType>
     where
         Ref: TraitCallBuilder + FromAccountId<DefaultEnvironment>,
         F: FnMut(
@@ -661,24 +752,9 @@ mod e2e {
     {
         let message = build_message::<Ref>(contract_id).call(call_builder_fn);
 
-        // Dry run to get the return value: when a contract is called and reverted, then we
-        // get a large error message that is not very useful. We want to get the actual contract
-        // error and this can be done by dry running the call.
         client
-            .call_dry_run(caller, &message, 0, None)
+            .call_dry_run(caller, &message, value.unwrap_or_default(), None)
             .await
-            .return_value()?;
-
-        // Now we shouldn't get any errors originating from the contract.
-        // However, we can still get errors from the substrate runtime or the client.
-        Ok(client
-            .call(caller, message, 0, None)
-            .await
-            .unwrap_or_else(|err| {
-                panic!(
-                    "Call did not revert, but failed anyway. ink_e2e error: {:?}",
-                    err
-                )
-            }))
+        // .return_value()
     }
 }
