@@ -20,8 +20,8 @@ mod e2e {
         primitives::AccountId,
     };
     use ink_e2e::{
-        account_id, alice, bob, build_message, charlie, dave, eve, ferdie, AccountKeyring,
-        CallDryRunResult, Keypair, PolkadotConfig,
+        account_id, alice, bob, build_message, charlie, dave, eve, ferdie, AccountKeyring, Keypair,
+        PolkadotConfig,
     };
     use membrane::{MembraneError, MembraneRef};
     use psp22::{PSP22Error, PSP22};
@@ -160,7 +160,9 @@ mod e2e {
         .await
         .expect("Adding a pair should succeed");
 
-        let base_fee = 50; //membrane_base_fee(&mut client, &alice(), membrane_address).await?;
+        let base_fee = membrane_base_fee(&mut client, &alice(), membrane_address)
+            .await
+            .expect("should return base fee");
 
         let amount_to_send = 1000;
         let send_request_res = membrane_send_request(
@@ -294,9 +296,9 @@ mod e2e {
         )
         .await;
 
-        println!("{:?}", send_request_res.unwrap().dry_run);
+        // println!("{:?}", send_request_res.unwrap().dry_run);
 
-        // assert!(send_request_res.is_ok());
+        assert!(send_request_res.is_ok());
     }
 
     #[ink_e2e::test]
