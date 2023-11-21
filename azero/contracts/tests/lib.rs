@@ -20,8 +20,8 @@ mod e2e {
         primitives::AccountId,
     };
     use ink_e2e::{
-        account_id, alice, bob, build_message, charlie, dave, eve, ferdie, AccountKeyring, Keypair,
-        PolkadotConfig,
+        account_id, alice, bob, build_message, charlie, dave, eve, ferdie, AccountKeyring,
+        CallDryRunResult, Keypair, PolkadotConfig,
     };
     use membrane::{MembraneError, MembraneRef};
     use psp22::{PSP22Error, PSP22};
@@ -279,7 +279,9 @@ mod e2e {
         .await
         .expect("Adding a pair should succeed");
 
-        let base_fee = 50; //membrane_base_fee(&mut client, &alice(), membrane_address).await?;
+        let base_fee = membrane_base_fee(&mut client, &alice(), membrane_address)
+            .await
+            .expect("should return base fee");
 
         let send_request_res = membrane_send_request(
             &mut client,
@@ -539,9 +541,9 @@ mod e2e {
         keccak256(&request_data)
     }
 
-    type DryRunResult<E> = ink_e2e::CallDryRunResult<DefaultEnvironment, Result<(), E>>;
-    type CallResult<E> =
-        Result<ink_e2e::CallResult<PolkadotConfig, DefaultEnvironment, Result<(), E>>, E>;
+    // type DryRunResult<V, E> = ink_e2e::CallDryRunResult<DefaultEnvironment, Result<V, E>>;
+    type CallResult<V, E> =
+        Result<ink_e2e::CallResult<PolkadotConfig, DefaultEnvironment, Result<V, E>>, E>;
     type E2EClient = ink_e2e::Client<PolkadotConfig, DefaultEnvironment>;
 
     async fn instantiate_membrane(
@@ -589,8 +591,8 @@ mod e2e {
         membrane: AccountId,
         token: AccountId,
         remote_token: [u8; 32],
-    ) -> CallResult<MembraneError> {
-        call_message::<MembraneRef, _, _, _>(
+    ) -> CallResult<(), MembraneError> {
+        call_message::<MembraneRef, (), _, _, _>(
             client,
             caller,
             membrane,
@@ -608,8 +610,8 @@ mod e2e {
         amount: u128,
         remote_address: [u8; 32],
         base_fee: u128,
-    ) -> CallResult<MembraneError> {
-        call_message::<MembraneRef, _, _, _>(
+    ) -> CallResult<(), MembraneError> {
+        call_message::<MembraneRef, (), _, _, _>(
             client,
             caller,
             membrane,
@@ -628,8 +630,8 @@ mod e2e {
         amount: u128,
         receiver_address: [u8; 32],
         request_nonce: u128,
-    ) -> CallResult<MembraneError> {
-        call_message::<MembraneRef, _, _, _>(
+    ) -> CallResult<(), MembraneError> {
+        call_message::<MembraneRef, (), _, _, _>(
             client,
             caller,
             membrane,
@@ -653,8 +655,8 @@ mod e2e {
         token: AccountId,
         amount: u128,
         spender: AccountId,
-    ) -> CallResult<PSP22Error> {
-        call_message::<TokenRef, _, _, _>(
+    ) -> CallResult<(), PSP22Error> {
+        call_message::<TokenRef, (), _, _, _>(
             client,
             caller,
             token,
@@ -670,8 +672,8 @@ mod e2e {
         token: AccountId,
         amount: u128,
         recipient: AccountId,
-    ) -> CallResult<PSP22Error> {
-        call_message::<TokenRef, _, _, _>(
+    ) -> CallResult<(), PSP22Error> {
+        call_message::<TokenRef, (), _, _, _>(
             client,
             caller,
             token,
@@ -681,13 +683,31 @@ mod e2e {
         .await
     }
 
-    async fn call_message<Ref, ErrType, Args, F>(
+    async fn membrane_base_fee(
+        client: &mut E2EClient,
+        caller: &Keypair,
+        membrane: AccountId,
+    ) -> Result<u128, MembraneError> {
+        call_message::<MembraneRef, u128, _, _, _>(
+            client,
+            caller,
+            membrane,
+            |membrane| membrane.base_fee(),
+            None,
+        )
+        .await
+        .expect("oooops")
+        .dry_run
+        .return_value()
+    }
+
+    async fn call_message<Ref, RetType, ErrType, Args, F>(
         client: &mut E2EClient,
         caller: &Keypair,
         contract_id: AccountId,
         call_builder_fn: F,
         value: Option<u128>,
-    ) -> CallResult<ErrType>
+    ) -> CallResult<RetType, ErrType>
     where
         Ref: TraitCallBuilder + FromAccountId<DefaultEnvironment>,
         F: Clone
@@ -697,25 +717,21 @@ mod e2e {
                 DefaultEnvironment,
                 Set<Call<DefaultEnvironment>>,
                 Set<ExecutionInput<Args>>,
-                Set<ReturnType<Result<(), ErrType>>>,
+                Set<ReturnType<Result<RetType, ErrType>>>,
             >,
         Args: Encode,
         ErrType: Decode,
+        RetType: Decode,
     {
+        let message = build_message::<Ref>(contract_id).call(call_builder_fn);
+
         // Dry run to get the return value: when a contract is called and reverted, then we
         // get a large error message that is not very useful. We want to get the actual contract
         // error and this can be done by dry running the call.
-        dry_run::<Ref, ErrType, Args, F>(
-            client,
-            caller,
-            contract_id,
-            call_builder_fn.clone(),
-            value,
-        )
-        .await
-        .return_value()?;
-
-        let message = build_message::<Ref>(contract_id).call(call_builder_fn);
+        client
+            .call_dry_run(caller, &message, value.unwrap_or_default(), None)
+            .await
+            .return_value()?;
 
         // Now we shouldn't get any errors originating from the contract.
         // However, we can still get errors from the substrate runtime or the client.
@@ -728,33 +744,5 @@ mod e2e {
                     err
                 )
             }))
-    }
-
-    async fn dry_run<Ref, ErrType, Args, F>(
-        client: &mut E2EClient,
-        caller: &Keypair,
-        contract_id: AccountId,
-        call_builder_fn: F,
-        value: Option<u128>,
-    ) -> DryRunResult<ErrType>
-    where
-        Ref: TraitCallBuilder + FromAccountId<DefaultEnvironment>,
-        F: FnMut(
-            &mut <Ref as TraitCallBuilder>::Builder,
-        ) -> CallBuilder<
-            DefaultEnvironment,
-            Set<Call<DefaultEnvironment>>,
-            Set<ExecutionInput<Args>>,
-            Set<ReturnType<Result<(), ErrType>>>,
-        >,
-        Args: Encode,
-        ErrType: Decode,
-    {
-        let message = build_message::<Ref>(contract_id).call(call_builder_fn);
-
-        client
-            .call_dry_run(caller, &message, value.unwrap_or_default(), None)
-            .await
-        // .return_value()
     }
 }
