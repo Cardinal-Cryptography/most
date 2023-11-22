@@ -26,7 +26,10 @@ mod e2e {
         account_id, alice, bob, build_message, charlie, dave, eve, ferdie, AccountKeyring, Keypair,
         PolkadotConfig,
     };
-    use membrane::{membrane::CrosschainTransferRequest, MembraneError, MembraneRef};
+    use membrane::{
+        membrane::{CrosschainTransferRequest, RequestProcessed, RequestSigned},
+        MembraneError, MembraneRef,
+    };
     use psp22::{PSP22Error, PSP22};
     use scale::{Decode, Encode};
     use shared::{keccak256, Keccak256HashOutput};
@@ -206,17 +209,19 @@ mod e2e {
                 // 2 events for transfer_from and 1 `CrosschainTransferRequest`
                 assert_eq!(events.len(), 3);
 
-                let request_events =
-                    filter_decode_events_as::<CrosschainTransferRequest>(events);
+                let request_events = filter_decode_events_as::<CrosschainTransferRequest>(events);
 
                 // `CrosschainTransferRequest` event
                 assert_eq!(request_events.len(), 1);
-                assert_eq!(request_events[0], CrosschainTransferRequest {
-                    dest_token_address: REMOTE_TOKEN,
-                    amount: amount_to_send,
-                    dest_receiver_address: REMOTE_RECEIVER,
-                    request_nonce: 0,
-                });
+                assert_eq!(
+                    request_events[0],
+                    CrosschainTransferRequest {
+                        dest_token_address: REMOTE_TOKEN,
+                        amount: amount_to_send,
+                        dest_receiver_address: REMOTE_RECEIVER,
+                        request_nonce: 0,
+                    }
+                );
             }
             Err(e) => panic!("Request should succeed: {:?}", e),
         }
@@ -307,8 +312,9 @@ mod e2e {
         let request_hash =
             hash_request_data(token_address, amount, receiver_address, request_nonce);
 
-        for signer in &guardian_keys()[0..(DEFAULT_THRESHOLD as usize)] {
-            membrane_receive_request(
+        for i in 0..(DEFAULT_THRESHOLD as usize) {
+            let signer = &guardian_keys()[i];
+            let receive_res = membrane_receive_request(
                 &mut client,
                 &signer,
                 membrane_address,
@@ -318,8 +324,23 @@ mod e2e {
                 *receiver_address.as_ref(),
                 request_nonce,
             )
-            .await
-            .expect("Receive request should succeed");
+            .await;
+
+            match receive_res {
+                Ok(events) => {
+                    if i == (DEFAULT_THRESHOLD - 1) as usize {
+                        assert_eq!(events.len(), 3);
+                        assert_eq!(
+                            filter_decode_events_as::<RequestProcessed>(vec![events[2].clone()])[0],
+                            RequestProcessed { request_hash }
+                        );
+                    } else {
+                        assert_eq!(events.len(), 1);
+                        assert_eq!(filter_decode_events_as::<RequestSigned>(events).len(), 1);
+                    }
+                }
+                Err(e) => panic!("Receive request should succeed: {:?}", e),
+            }
         }
 
         let balance_of_call = build_message::<TokenRef>(token_address)
@@ -350,8 +371,9 @@ mod e2e {
         let request_hash =
             hash_request_data(token_address, amount, receiver_address, request_nonce);
 
-        for signer in &guardian_keys()[0..(guardians_threshold as usize) - 1] {
-            membrane_receive_request(
+        for i in 0..(DEFAULT_THRESHOLD - 1) as usize {
+            let signer = &guardian_keys()[i];
+            let receive_res = membrane_receive_request(
                 &mut client,
                 &signer,
                 membrane_address,
@@ -361,8 +383,16 @@ mod e2e {
                 *receiver_address.as_ref(),
                 request_nonce,
             )
-            .await
-            .expect("Receive request should succeed");
+            .await;
+
+            match receive_res {
+                Ok(events) => {
+                    assert_eq!(events.len(), 1);
+                    // Byte 0 is the index of the event in the contract.
+                    assert_eq!(events[0].event.data[0], 2);
+                }
+                Err(e) => panic!("Receive request should succeed: {:?}", e),
+            }
         }
 
         let balance_of_call = build_message::<TokenRef>(token_address)

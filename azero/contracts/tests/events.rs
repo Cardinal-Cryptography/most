@@ -29,12 +29,13 @@ use subxt::{
 };
 
 /// A decoded event with its associated topics.
-pub struct EventWithTopics<T> {
+#[derive(Debug, Clone)]
+pub struct EventWithTopics<T: Clone> {
     pub topics: Vec<H256>,
     pub event: T,
 }
 
-#[derive(Decode, Encode, scale_decode::DecodeAsType, scale_encode::EncodeAsType, Debug)]
+#[derive(Decode, Encode, scale_decode::DecodeAsType, scale_encode::EncodeAsType, Debug, Clone)]
 #[decode_as_type(trait_bounds = "", crate_path = "subxt::ext::scale_decode")]
 #[encode_as_type(crate_path = "subxt::ext::scale_encode")]
 /// A custom event emitted by the contract.
@@ -73,6 +74,7 @@ pub fn filter_decode_events_as<E: Decode>(
 ) -> Vec<E> {
     events_with_topics
         .iter()
+        // Byte 0 is the event index, so we skip it.
         .filter_map(|event| E::decode(&mut &event.event.data[1..]).ok())
         .collect()
 }

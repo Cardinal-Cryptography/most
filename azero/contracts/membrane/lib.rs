@@ -300,11 +300,11 @@ pub mod membrane {
                             dest_receiver_address.into(),
                             amount,
                         )?;
+
+                        self.env().emit_event(RequestProcessed { request_hash });
                     }
 
                     self.pending_requests.insert(request_hash, &request);
-
-                    self.env().emit_event(RequestProcessed { request_hash });
                 }
             }
 
