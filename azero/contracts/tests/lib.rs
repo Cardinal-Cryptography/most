@@ -7,6 +7,9 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 }
 
 #[cfg(all(test, feature = "e2e-tests"))]
+mod events;
+
+#[cfg(all(test, feature = "e2e-tests"))]
 mod e2e {
     use ink::{
         codegen::TraitCallBuilder,
@@ -28,6 +31,8 @@ mod e2e {
     use scale::{Decode, Encode};
     use shared::{keccak256, Keccak256HashOutput};
     use wrapped_token::TokenRef;
+
+    use crate::events::{get_contract_emitted_events, ContractEmitted, EventWithTopics};
 
     const TOKEN_INITIAL_SUPPLY: u128 = 10000;
     const DEFAULT_THRESHOLD: u128 = 3;
@@ -194,7 +199,13 @@ mod e2e {
         )
         .await;
 
-        assert!(send_request_res.is_ok());
+        match send_request_res {
+            Ok(events) => {
+                // 2 events for transfer_from and 1 `CrosschainTransferRequest`
+                assert_eq!(events.len(), 3);
+            }
+            Err(e) => panic!("Request should succeed: {:?}", e),
+        }
     }
 
     #[ink_e2e::test]
@@ -380,8 +391,7 @@ mod e2e {
         keccak256(&request_data)
     }
 
-    type CallResult<E> =
-        Result<ink_e2e::CallResult<PolkadotConfig, DefaultEnvironment, Result<(), E>>, E>;
+    type CallResult<E> = Result<Vec<EventWithTopics<ContractEmitted>>, E>;
     type E2EClient = ink_e2e::Client<PolkadotConfig, DefaultEnvironment>;
 
     async fn instantiate_membrane(
@@ -512,7 +522,7 @@ mod e2e {
 
         // Now we shouldn't get any errors originating from the contract.
         // However, we can still get errors from the substrate runtime or the client.
-        Ok(client
+        let call_result = client
             .call(caller, message, 0, None)
             .await
             .unwrap_or_else(|err| {
@@ -520,6 +530,10 @@ mod e2e {
                     "Call did not revert, but failed anyway. ink_e2e error: {:?}",
                     err
                 )
-            }))
+            });
+        Ok(
+            get_contract_emitted_events(call_result.events)
+                .expect("event decoding should not fail"),
+        )
     }
 }
