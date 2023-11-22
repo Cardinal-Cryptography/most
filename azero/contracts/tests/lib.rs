@@ -26,13 +26,15 @@ mod e2e {
         account_id, alice, bob, build_message, charlie, dave, eve, ferdie, AccountKeyring, Keypair,
         PolkadotConfig,
     };
-    use membrane::{MembraneError, MembraneRef};
+    use membrane::{membrane::CrosschainTransferRequest, MembraneError, MembraneRef};
     use psp22::{PSP22Error, PSP22};
     use scale::{Decode, Encode};
     use shared::{keccak256, Keccak256HashOutput};
     use wrapped_token::TokenRef;
 
-    use crate::events::{get_contract_emitted_events, ContractEmitted, EventWithTopics};
+    use crate::events::{
+        filter_decode_events_as, get_contract_emitted_events, ContractEmitted, EventWithTopics,
+    };
 
     const TOKEN_INITIAL_SUPPLY: u128 = 10000;
     const DEFAULT_THRESHOLD: u128 = 3;
@@ -203,6 +205,18 @@ mod e2e {
             Ok(events) => {
                 // 2 events for transfer_from and 1 `CrosschainTransferRequest`
                 assert_eq!(events.len(), 3);
+
+                let request_events =
+                    filter_decode_events_as::<CrosschainTransferRequest>(events);
+
+                // `CrosschainTransferRequest` event
+                assert_eq!(request_events.len(), 1);
+                assert_eq!(request_events[0], CrosschainTransferRequest {
+                    dest_token_address: REMOTE_TOKEN,
+                    amount: amount_to_send,
+                    dest_receiver_address: REMOTE_RECEIVER,
+                    request_nonce: 0,
+                });
             }
             Err(e) => panic!("Request should succeed: {:?}", e),
         }

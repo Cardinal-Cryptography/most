@@ -19,24 +19,27 @@ pub mod membrane {
 
     #[ink(event)]
     #[derive(Debug)]
+    #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
     pub struct CrosschainTransferRequest {
-        dest_token_address: [u8; 32],
-        amount: u128,
-        dest_receiver_address: [u8; 32],
-        request_nonce: u128,
+        pub dest_token_address: [u8; 32],
+        pub amount: u128,
+        pub dest_receiver_address: [u8; 32],
+        pub request_nonce: u128,
     }
 
     #[ink(event)]
     #[derive(Debug)]
+    #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
     pub struct RequestProcessed {
-        request_hash: HashedRequest,
+        pub request_hash: HashedRequest,
     }
 
     #[ink(event)]
     #[derive(Debug)]
+    #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
     pub struct RequestSigned {
-        signer: AccountId,
-        request_hash: HashedRequest,
+        pub signer: AccountId,
+        pub request_hash: HashedRequest,
     }
 
     #[derive(Debug, Encode, Decode, Clone, Copy, PartialEq, Eq)]

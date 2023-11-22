@@ -73,6 +73,6 @@ pub fn filter_decode_events_as<E: Decode>(
 ) -> Vec<E> {
     events_with_topics
         .iter()
-        .filter_map(|event| E::decode(&mut &event.event.data[..]).ok())
+        .filter_map(|event| E::decode(&mut &event.event.data[1..]).ok())
         .collect()
 }
