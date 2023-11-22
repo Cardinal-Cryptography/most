@@ -19,7 +19,9 @@ mod governance {
     #[derive(Debug)]
     #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
     pub struct ProposalSubmitted {
+        #[ink(topic)]
         pub by: AccountId,
+        #[ink(topic)]
         pub id: ProposalId,
         pub proposal: Proposal,
     }
@@ -28,7 +30,9 @@ mod governance {
     #[derive(Debug)]
     #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
     pub struct Vote {
+        #[ink(topic)]
         pub by: AccountId,
+        #[ink(topic)]
         pub proposal: ProposalId,
     }
 
@@ -36,7 +40,9 @@ mod governance {
     #[derive(Debug)]
     #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
     pub struct ProposalExecuted {
+        #[ink(topic)]
         pub by: AccountId,
+        #[ink(topic)]
         pub id: ProposalId,
         pub result: Vec<u8>,
     }
