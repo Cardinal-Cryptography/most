@@ -388,8 +388,13 @@ mod e2e {
             match receive_res {
                 Ok(events) => {
                     assert_eq!(events.len(), 1);
-                    // Byte 0 is the index of the event in the contract.
-                    assert_eq!(events[0].event.data[0], 2);
+                    assert_eq!(
+                        filter_decode_events_as::<RequestSigned>(events)[0],
+                        RequestSigned {
+                            signer: guardian_ids()[i],
+                            request_hash,
+                        }
+                    );
                 }
                 Err(e) => panic!("Receive request should succeed: {:?}", e),
             }
