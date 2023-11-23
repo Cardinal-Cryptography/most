@@ -86,7 +86,7 @@ pub mod membrane {
         /// minimal value of tokens that can be transferred across the bridge
         minimum_transfer_amount_usd: u128,
         /// per mille of the succesfully transferred amount that is distributed among the guardians that have signed the crosschain transfer request
-        commission_per_mille: u128,
+        commission_per_dix_mille: u128,
         /// a fixed subsidy transferred along with the bridged tokens to the destination account on aleph zero to bootstrap
         pocket_money: u128,
         /// source - destination token pairs that can be transferred across the bridge
@@ -140,12 +140,12 @@ pub mod membrane {
         pub fn new(
             committee: Vec<AccountId>,
             signature_threshold: u128,
-            commission_per_mille: u128,
+            commission_per_dix_mille: u128,
             pocket_money: Balance,
             minimum_transfer_amount_usd: u128,
             relay_gas_usage: u128,
         ) -> Result<Self, MembraneError> {
-            if commission_per_mille.gt(&DIX_MILLE) {
+            if commission_per_dix_mille.gt(&DIX_MILLE) {
                 return Err(MembraneError::Constructor);
             }
 
@@ -178,9 +178,14 @@ pub mod membrane {
                 paid_out_member_rewards: Mapping::new(),
                 minimum_transfer_amount_usd,
                 pocket_money,
-                commission_per_mille,
+                commission_per_dix_mille,
                 relay_gas_usage,
             })
+        }
+
+        #[ink(message)]
+        pub fn get_commission_per_dix_mille(&self) -> u128 {
+            self.commission_per_dix_mille
         }
 
         /// Sets a new owner account
@@ -441,7 +446,7 @@ pub mod membrane {
                     .transfer(dest_receiver_address.into(), self.pocket_money);
 
                 let commission = amount
-                    .checked_mul(self.commission_per_mille)
+                    .checked_mul(self.commission_per_dix_mille)
                     .ok_or(MembraneError::Arithmetic)?
                     .checked_div(DIX_MILLE)
                     .ok_or(MembraneError::Arithmetic)?;
@@ -560,7 +565,7 @@ pub mod membrane {
         use super::*;
 
         const THRESHOLD: u128 = 3;
-        const COMMISSION_PER_MILLE: u128 = 30;
+        const COMMISSION_PER_DIX_MILLE: u128 = 30;
         const POCKET_MONEY: Balance = 1000000000000;
         const MINIMUM_TRANSFER_AMOUNT_USD: u128 = 50;
         const RELAY_GAS_USAGE: u128 = 50000;
@@ -586,7 +591,7 @@ pub mod membrane {
                 Membrane::new(
                     guardian_accounts(),
                     0,
-                    COMMISSION_PER_MILLE,
+                    COMMISSION_PER_DIX_MILLE,
                     POCKET_MONEY,
                     MINIMUM_TRANSFER_AMOUNT_USD,
                     RELAY_GAS_USAGE
@@ -603,7 +608,7 @@ pub mod membrane {
                 Membrane::new(
                     guardian_accounts(),
                     (guardian_accounts().len() + 1) as u128,
-                    COMMISSION_PER_MILLE,
+                    COMMISSION_PER_DIX_MILLE,
                     POCKET_MONEY,
                     MINIMUM_TRANSFER_AMOUNT_USD,
                     RELAY_GAS_USAGE
@@ -619,7 +624,7 @@ pub mod membrane {
             let mut membrane = Membrane::new(
                 guardian_accounts(),
                 THRESHOLD,
-                COMMISSION_PER_MILLE,
+                COMMISSION_PER_DIX_MILLE,
                 POCKET_MONEY,
                 MINIMUM_TRANSFER_AMOUNT_USD,
                 RELAY_GAS_USAGE,
@@ -641,7 +646,7 @@ pub mod membrane {
             let membrane = Membrane::new(
                 guardian_accounts(),
                 THRESHOLD,
-                COMMISSION_PER_MILLE,
+                COMMISSION_PER_DIX_MILLE,
                 POCKET_MONEY,
                 MINIMUM_TRANSFER_AMOUNT_USD,
                 RELAY_GAS_USAGE,
@@ -661,7 +666,7 @@ pub mod membrane {
             let mut membrane = Membrane::new(
                 guardian_accounts(),
                 THRESHOLD,
-                COMMISSION_PER_MILLE,
+                COMMISSION_PER_DIX_MILLE,
                 POCKET_MONEY,
                 MINIMUM_TRANSFER_AMOUNT_USD,
                 RELAY_GAS_USAGE,
@@ -686,7 +691,7 @@ pub mod membrane {
             let mut membrane = Membrane::new(
                 guardian_accounts(),
                 THRESHOLD,
-                COMMISSION_PER_MILLE,
+                COMMISSION_PER_DIX_MILLE,
                 POCKET_MONEY,
                 MINIMUM_TRANSFER_AMOUNT_USD,
                 RELAY_GAS_USAGE,
@@ -705,7 +710,7 @@ pub mod membrane {
             let mut membrane = Membrane::new(
                 guardian_accounts(),
                 THRESHOLD,
-                COMMISSION_PER_MILLE,
+                COMMISSION_PER_DIX_MILLE,
                 POCKET_MONEY,
                 MINIMUM_TRANSFER_AMOUNT_USD,
                 RELAY_GAS_USAGE,

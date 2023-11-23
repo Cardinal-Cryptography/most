@@ -24,9 +24,11 @@ mod e2e {
         PolkadotConfig,
     };
     use membrane::{MembraneError, MembraneRef};
+    use pallet_contracts_primitives::StorageDeposit;
     use psp22::{PSP22Error, PSP22};
     use scale::{Decode, Encode};
     use shared::{keccak256, Keccak256HashOutput};
+    use sp_weights::Weight;
     use wrapped_token::TokenRef;
 
     const TOKEN_INITIAL_SUPPLY: u128 = 10000;
@@ -296,8 +298,6 @@ mod e2e {
         )
         .await;
 
-        // println!("{:?}", send_request_res.unwrap().dry_run);
-
         assert!(send_request_res.is_ok());
     }
 
@@ -491,7 +491,7 @@ mod e2e {
         for signer in &guardian_keys()[0..(guardians_threshold as usize) - 1] {
             membrane_receive_request(
                 &mut client,
-                &signer,
+                signer,
                 membrane_address,
                 request_hash,
                 *token_address.as_ref(),
@@ -512,6 +512,137 @@ mod e2e {
 
         assert_eq!(balance, 0);
     }
+
+    #[ink_e2e::test]
+    fn base_fee_too_low(mut client: ink_e2e::Client<C, E>) {
+        let guardians_threshold = 5;
+        let commission_per_mille = 30;
+        let pocket_money = 1000000000000;
+        let minimum_transfer_amount_usd = 50;
+        let relay_gas_usage = 50000;
+
+        let token_address =
+            instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
+
+        let membrane_address = instantiate_membrane(
+            &mut client,
+            &alice(),
+            guardian_ids(),
+            guardians_threshold,
+            commission_per_mille,
+            pocket_money,
+            minimum_transfer_amount_usd,
+            relay_gas_usage,
+        )
+        .await;
+
+        membrane_add_pair(
+            &mut client,
+            &alice(),
+            membrane_address,
+            token_address,
+            REMOTE_TOKEN,
+        )
+        .await
+        .expect("Adding a pair should succeed");
+
+        let base_fee = membrane_base_fee(&mut client, &alice(), membrane_address)
+            .await
+            .expect("should return base fee");
+
+        let amount_to_send = 1000;
+        let send_request_res = membrane_send_request(
+            &mut client,
+            &alice(),
+            membrane_address,
+            token_address,
+            amount_to_send,
+            REMOTE_RECEIVER,
+            base_fee - 1,
+        )
+        .await;
+
+        assert_eq!(
+            send_request_res
+                .err()
+                .expect("Request should fail without allowance"),
+            MembraneError::BaseFeeTooLow
+        );
+    }
+
+    #[ink_e2e::test]
+    fn committee_rewards(mut client: ink_e2e::Client<C, E>) {
+        let guardians_threshold = 5;
+        let commission_per_mille = 30;
+        let pocket_money = 1000000000000;
+        let minimum_transfer_amount_usd = 50;
+        let relay_gas_usage = 50000;
+
+        let token_address =
+            instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
+
+        let membrane_address = instantiate_membrane(
+            &mut client,
+            &alice(),
+            guardian_ids(),
+            guardians_threshold,
+            commission_per_mille,
+            pocket_money,
+            minimum_transfer_amount_usd,
+            relay_gas_usage,
+        )
+        .await;
+
+        psp22_transfer(&mut client, &alice(), token_address, 100, membrane_address)
+            .await
+            .expect("Transfer should succeed");
+
+        let amount = 20;
+        let receiver_address = account_id(AccountKeyring::One);
+        let request_nonce = 1;
+
+        let request_hash =
+            hash_request_data(token_address, amount, receiver_address, request_nonce);
+
+        let balance_before = psp22_balance_of(&mut client, token_address, receiver_address)
+            .await
+            .expect("balance read before");
+
+        for signer in &guardian_keys()[0..(DEFAULT_THRESHOLD as usize)] {
+            membrane_receive_request(
+                &mut client,
+                signer,
+                membrane_address,
+                request_hash,
+                *token_address.as_ref(),
+                amount,
+                *receiver_address.as_ref(),
+                request_nonce,
+            )
+            .await
+            .expect("Receive request should succeed");
+        }
+
+        let commission = membrane_commission_per_dix_mille(&mut client, membrane_address)
+            .await
+            .expect("get commission");
+
+        // check receiver balance
+        let balance_after = psp22_balance_of(&mut client, token_address, receiver_address)
+            .await
+            .expect("balance read after");
+
+        assert_eq!(
+            balance_after,
+            balance_before + ((amount * commission) / 10000)
+        );
+
+        // TODO: withdraw rewards
+    }
+
+    // fn weight_to_fee(weight: &Weight) -> u128 {
+    //     weight.ref_time().into()
+    // }
 
     fn guardian_ids() -> Vec<AccountId> {
         vec![
@@ -701,6 +832,33 @@ mod e2e {
         .expect("oooops")
         .dry_run
         .return_value()
+    }
+
+    async fn psp22_balance_of(
+        client: &mut E2EClient,
+        token: AccountId,
+        owner: AccountId,
+    ) -> Result<u128, PSP22Error> {
+        let balance_of_call =
+            build_message::<TokenRef>(token).call(|token| token.balance_of(owner));
+
+        Ok(client
+            .call_dry_run(&alice(), &balance_of_call, 0, None)
+            .await
+            .return_value())
+    }
+
+    async fn membrane_commission_per_dix_mille(
+        client: &mut E2EClient,
+        membrane_address: AccountId,
+    ) -> Result<u128, MembraneError> {
+        let call = build_message::<MembraneRef>(membrane_address)
+            .call(|membrane| membrane.get_commission_per_dix_mille());
+
+        Ok(client
+            .call_dry_run(&alice(), &call, 0, None)
+            .await
+            .return_value())
     }
 
     async fn call_message<Ref, RetType, ErrType, Args, F>(
