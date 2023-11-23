@@ -24,11 +24,9 @@ mod e2e {
         PolkadotConfig,
     };
     use membrane::{MembraneError, MembraneRef};
-    use pallet_contracts_primitives::StorageDeposit;
     use psp22::{PSP22Error, PSP22};
     use scale::{Decode, Encode};
     use shared::{keccak256, Keccak256HashOutput};
-    use sp_weights::Weight;
     use wrapped_token::TokenRef;
 
     const TOKEN_INITIAL_SUPPLY: u128 = 10000;
@@ -606,7 +604,7 @@ mod e2e {
 
         let balance_before = psp22_balance_of(&mut client, token_address, receiver_address)
             .await
-            .expect("balance read before");
+            .expect("balance before");
 
         for signer in &guardian_keys()[0..(DEFAULT_THRESHOLD as usize)] {
             membrane_receive_request(
@@ -630,19 +628,43 @@ mod e2e {
         // check receiver balance
         let balance_after = psp22_balance_of(&mut client, token_address, receiver_address)
             .await
-            .expect("balance read after");
+            .expect("balance after");
 
         assert_eq!(
             balance_after,
             balance_before + ((amount * commission) / 10000)
         );
 
-        // TODO: withdraw rewards
-    }
+        let committee_id = membrane_committe_id(&mut client, membrane_address)
+            .await
+            .expect("committe id");
 
-    // fn weight_to_fee(weight: &Weight) -> u128 {
-    //     weight.ref_time().into()
-    // }
+        println!("committe_id: {committee_id}, token address: {token_address:?}");
+
+        // TODO : check receiver pocket money
+
+        // TODO : withdraw rewards
+        // TODO : check balances
+        for i in 0..guardian_ids().len() {
+            // println!("i: {i:?}");
+
+            let signer = &guardian_keys()[i];
+            let member_id = guardian_ids()[i];
+
+            membrane_request_payout(
+                &mut client,
+                signer,
+                membrane_address,
+                committee_id,
+                member_id,
+                *token_address.as_ref(),
+            )
+            .await
+            .expect("request payout");
+        }
+
+        // TODO : check signer balances
+    }
 
     fn guardian_ids() -> Vec<AccountId> {
         vec![
@@ -666,9 +688,9 @@ mod e2e {
     ) -> Keccak256HashOutput {
         let request_data = [
             AsRef::<[u8]>::as_ref(&token_address),
-            &(amount as u128).to_le_bytes(),
+            &amount.to_le_bytes(),
             AsRef::<[u8]>::as_ref(&receiver_address),
-            &(request_nonce as u128).to_le_bytes(),
+            &request_nonce.to_le_bytes(),
         ]
         .concat();
         keccak256(&request_data)
@@ -816,6 +838,24 @@ mod e2e {
         .await
     }
 
+    async fn membrane_request_payout(
+        client: &mut E2EClient,
+        caller: &Keypair,
+        membrane: AccountId,
+        committee_id: u128,
+        member_id: AccountId,
+        token_id: [u8; 32],
+    ) -> CallResult<(), MembraneError> {
+        call_message::<MembraneRef, _, _, _, _>(
+            client,
+            caller,
+            membrane,
+            |membrane| membrane.payout_rewards(committee_id, member_id, token_id),
+            None,
+        )
+        .await
+    }
+
     async fn membrane_base_fee(
         client: &mut E2EClient,
         caller: &Keypair,
@@ -844,6 +884,19 @@ mod e2e {
 
         Ok(client
             .call_dry_run(&alice(), &balance_of_call, 0, None)
+            .await
+            .return_value())
+    }
+
+    async fn membrane_committe_id(
+        client: &mut E2EClient,
+        membrane_address: AccountId,
+    ) -> Result<u128, MembraneError> {
+        let call = build_message::<MembraneRef>(membrane_address)
+            .call(|membrane| membrane.current_committee_id());
+
+        Ok(client
+            .call_dry_run(&alice(), &call, 0, None)
             .await
             .return_value())
     }

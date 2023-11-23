@@ -4667,11 +4667,9 @@ dependencies = [
  "ink",
  "ink_e2e",
  "membrane",
- "pallet-contracts-primitives",
  "parity-scale-codec",
  "psp22",
  "shared",
- "sp-weights",
  "token",
 ]
 

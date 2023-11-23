@@ -9,8 +9,6 @@ ink = { version = "=4.3.0", default-features = false }
 scale = { package = "parity-scale-codec", version = "=3.6.5", default-features = false, features = [
     "derive",
 ] }
-pallet-contracts-primitives = { version = "24.0.0", default-features = false }
-sp-weights = { version = "20.0.0", default-features = false }
 
 wrapped_token = { path = "../psp22", package = "token", features = ["ink-as-dependency"] }
 membrane = { path = "../membrane", package = "membrane", features = ["ink-as-dependency"] }

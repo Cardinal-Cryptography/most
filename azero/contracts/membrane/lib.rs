@@ -198,7 +198,7 @@ pub mod membrane {
             Ok(())
         }
 
-        /// Returns an error (reverts) if account is not in the currently active committee  
+        /// Returns an error (reverts) if account is not in the currently active committee
         #[ink(message)]
         pub fn is_in_current_committee(&self, account: AccountId) -> Result<(), MembraneError> {
             match self.is_in_committee(self.committee_id, account) {
@@ -213,7 +213,7 @@ pub mod membrane {
             self.committee.contains((committee_id, account))
         }
 
-        /// Returns current committee id
+        /// Returns current active committee id
         #[ink(message)]
         pub fn current_committee_id(&self) -> u128 {
             self.committee_id
@@ -474,6 +474,14 @@ pub mod membrane {
             }
 
             Ok(())
+        }
+
+        /// Query total rewards for this committee
+        #[ink(message)]
+        pub fn get_committee_rewards(&self, committee_id: CommitteeId, token_id: [u8; 32]) -> u128 {
+            self.collected_committee_rewards
+                .get((committee_id, token_id))
+                .unwrap_or_default()
         }
 
         /// Request payout of rewards for signing & relaying cross-chain transfers.
