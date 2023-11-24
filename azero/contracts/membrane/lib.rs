@@ -183,140 +183,7 @@ pub mod membrane {
             })
         }
 
-        #[ink(message)]
-        pub fn get_commission_per_dix_mille(&self) -> u128 {
-            self.commission_per_dix_mille
-        }
-
-        /// Sets a new owner account
-        ///
-        /// Can only be called by contracts owner
-        #[ink(message)]
-        pub fn set_owner(&mut self, new_owner: AccountId) -> Result<(), MembraneError> {
-            self.ensure_owner()?;
-            self.owner = new_owner;
-            Ok(())
-        }
-
-        /// Returns an error (reverts) if account is not in the currently active committee
-        #[ink(message)]
-        pub fn is_in_current_committee(&self, account: AccountId) -> Result<(), MembraneError> {
-            match self.is_in_committee(self.committee_id, account) {
-                true => Ok(()),
-                false => Err(MembraneError::NotInCommittee),
-            }
-        }
-
-        /// Returns an error (reverts) if account is not in the committee with `committee_id`
-        #[ink(message)]
-        pub fn is_in_committee(&self, committee_id: CommitteeId, account: AccountId) -> bool {
-            self.committee.contains((committee_id, account))
-        }
-
-        /// Returns current active committee id
-        #[ink(message)]
-        pub fn current_committee_id(&self) -> u128 {
-            self.committee_id
-        }
-
-        /// Change the committee and increase committe id
-        /// Can only be called by the contracts owner
-        ///
-        /// Changing the entire set is the ONLY way of upgrading the committee
-        #[ink(message)]
-        pub fn set_committee(&mut self, committee: Vec<AccountId>) -> Result<(), MembraneError> {
-            self.ensure_owner()?;
-
-            let committee_id = self.committee_id + 1;
-
-            let mut committee_set = Mapping::new();
-            committee.into_iter().for_each(|account| {
-                committee_set.insert((committee_id, account), &());
-            });
-
-            self.committee = committee_set;
-            self.committee_id = committee_id;
-
-            Ok(())
-        }
-
-        /// Adds a supported pair for bridging
-        ///
-        /// Can only be called by the contracts owner
-        #[ink(message)]
-        pub fn add_pair(&mut self, from: [u8; 32], to: [u8; 32]) -> Result<(), MembraneError> {
-            self.ensure_owner()?;
-            self.supported_pairs.insert(from, &to);
-            Ok(())
-        }
-
-        /// Removes a supported pair from bridging
-        ///
-        /// Can only be called by the contracts owner
-        #[ink(message)]
-        pub fn remove_pair(&mut self, from: [u8; 32]) -> Result<(), MembraneError> {
-            self.ensure_owner()?;
-            self.supported_pairs.remove(from);
-            Ok(())
-        }
-
-        /// Upgrades contract code
-        #[ink(message)]
-        pub fn set_code(
-            &mut self,
-            code_hash: [u8; 32],
-            callback: Option<Selector>,
-        ) -> Result<(), MembraneError> {
-            self.ensure_owner()?;
-            set_code_hash(&code_hash)?;
-
-            // Optionally call a callback function in the new contract that performs the storage data migration.
-            // By convention this function should be called `migrate`, it should take no arguments
-            // and be call-able only by `this` contract's instance address.
-            // To ensure the latter the `migrate` in the updated contract can e.g. check if it has an Admin role on self.
-            //
-            // `delegatecall` ensures that the target contract is called within the caller contracts context.
-            if let Some(selector) = callback {
-                build_call::<DefaultEnvironment>()
-                    .delegate(Hash::from(code_hash))
-                    .exec_input(ExecutionInput::new(ink::env::call::Selector::new(selector)))
-                    .returns::<Result<(), MembraneError>>()
-                    .invoke()?;
-            }
-
-            Ok(())
-        }
-
-        /// Queries a price oracle and returns the `in` price of an `amount` number of the `of` tokens.
-        ///
-        /// If no `in` is passed assumes USDT
-        fn query_price(
-            &self,
-            amount: u128,
-            _of_token_address: [u8; 32],
-            _in_token_address: Option<[u8; 32]>,
-        ) -> Result<u128, MembraneError> {
-            // TODO: implement
-            // NOTE: different precisions!
-            let do_query_price = || 2;
-            Ok(amount * do_query_price())
-        }
-
-        /// Queries a gas price oracle and returns the current base_fee charged per cross chain transfer
-        /// denominated in AZERO
-        #[ink(message)]
-        pub fn base_fee(&self) -> Result<Balance, MembraneError> {
-            // TODO: implement
-            // return a current gas price in WEI
-            let do_query_gas_fee = || 39106342561;
-
-            let wei = self
-                .relay_gas_usage
-                .checked_mul(do_query_gas_fee())
-                .ok_or(MembraneError::Arithmetic)?;
-
-            self.query_price(wei, ETH_TOKEN_ID, Some(NATIVE_TOKEN_ID))
-        }
+        // --- business logic
 
         /// Invoke this tx to initiate funds transfer to the destination chain.
         #[ink(message, payable)]
@@ -478,6 +345,72 @@ pub mod membrane {
             Ok(())
         }
 
+        /// Request payout of rewards for signing & relaying cross-chain transfers.
+        ///
+        /// Can be called by anyone on behalf of the committee member.
+        #[ink(message)]
+        pub fn payout_rewards(
+            &mut self,
+            committee_id: CommitteeId,
+            member_id: AccountId,
+            token_id: [u8; 32],
+        ) -> Result<(), MembraneError> {
+            let collected_amount =
+                self.get_paid_out_member_rewards(committee_id, member_id, token_id);
+
+            let outstanding_amount =
+                self.get_outstanding_member_rewards(committee_id, member_id, token_id)?;
+
+            if outstanding_amount.gt(&0) {
+                match token_id {
+                    NATIVE_TOKEN_ID => {
+                        self.env().transfer(member_id, outstanding_amount)?;
+                    }
+                    _ => {
+                        self.mint_to(token_id.into(), member_id, outstanding_amount)?;
+                    }
+                }
+
+                self.paid_out_member_rewards.insert(
+                    (member_id, committee_id, token_id),
+                    &collected_amount
+                        .checked_add(outstanding_amount)
+                        .ok_or(MembraneError::Arithmetic)?,
+                );
+            }
+
+            Ok(())
+        }
+
+        /// Upgrades contract code
+        #[ink(message)]
+        pub fn set_code(
+            &mut self,
+            code_hash: [u8; 32],
+            callback: Option<Selector>,
+        ) -> Result<(), MembraneError> {
+            self.ensure_owner()?;
+            set_code_hash(&code_hash)?;
+
+            // Optionally call a callback function in the new contract that performs the storage data migration.
+            // By convention this function should be called `migrate`, it should take no arguments
+            // and be call-able only by `this` contract's instance address.
+            // To ensure the latter the `migrate` in the updated contract can e.g. check if it has an Admin role on self.
+            //
+            // `delegatecall` ensures that the target contract is called within the caller contracts context.
+            if let Some(selector) = callback {
+                build_call::<DefaultEnvironment>()
+                    .delegate(Hash::from(code_hash))
+                    .exec_input(ExecutionInput::new(ink::env::call::Selector::new(selector)))
+                    .returns::<Result<(), MembraneError>>()
+                    .invoke()?;
+            }
+
+            Ok(())
+        }
+
+        // ---  getter txs
+
         /// Query total rewards for this committee
         #[ink(message)]
         pub fn get_committee_rewards(&self, committee_id: CommitteeId, token_id: [u8; 32]) -> u128 {
@@ -530,41 +463,116 @@ pub mod membrane {
             Ok(total_amount.saturating_sub(collected_amount))
         }
 
-        /// Request payout of rewards for signing & relaying cross-chain transfers.
-        ///
-        /// Can be called by anyone on behalf of the committee member.
+        /// Queries a gas price oracle and returns the current base_fee charged per cross chain transfer
+        /// denominated in AZERO
         #[ink(message)]
-        pub fn payout_rewards(
-            &mut self,
-            committee_id: CommitteeId,
-            member_id: AccountId,
-            token_id: [u8; 32],
-        ) -> Result<(), MembraneError> {
-            let collected_amount =
-                self.get_paid_out_member_rewards(committee_id, member_id, token_id);
+        pub fn base_fee(&self) -> Result<Balance, MembraneError> {
+            // TODO: implement
+            // return a current gas price in WEI
+            let do_query_gas_fee = || 39106342561;
 
-            let outstanding_amount =
-                self.get_outstanding_member_rewards(committee_id, member_id, token_id)?;
+            let wei = self
+                .relay_gas_usage
+                .checked_mul(do_query_gas_fee())
+                .ok_or(MembraneError::Arithmetic)?;
 
-            if outstanding_amount.gt(&0) {
-                match token_id {
-                    NATIVE_TOKEN_ID => {
-                        self.env().transfer(member_id, outstanding_amount)?;
-                    }
-                    _ => {
-                        self.mint_to(token_id.into(), member_id, outstanding_amount)?;
-                    }
-                }
+            self.query_price(wei, ETH_TOKEN_ID, Some(NATIVE_TOKEN_ID))
+        }
 
-                self.paid_out_member_rewards.insert(
-                    (member_id, committee_id, token_id),
-                    &collected_amount
-                        .checked_add(outstanding_amount)
-                        .ok_or(MembraneError::Arithmetic)?,
-                );
+        /// Returns current active committee id
+        #[ink(message)]
+        pub fn current_committee_id(&self) -> u128 {
+            self.committee_id
+        }
+
+        /// Returns an error (reverts) if account is not in the committee with `committee_id`
+        #[ink(message)]
+        pub fn is_in_committee(&self, committee_id: CommitteeId, account: AccountId) -> bool {
+            self.committee.contains((committee_id, account))
+        }
+
+        /// Returns an error (reverts) if account is not in the currently active committee
+        #[ink(message)]
+        pub fn is_in_current_committee(&self, account: AccountId) -> Result<(), MembraneError> {
+            match self.is_in_committee(self.committee_id, account) {
+                true => Ok(()),
+                false => Err(MembraneError::NotInCommittee),
             }
+        }
+
+        #[ink(message)]
+        pub fn get_commission_per_dix_mille(&self) -> u128 {
+            self.commission_per_dix_mille
+        }
+
+        // ---  setter txs
+
+        /// Removes a supported pair from bridging
+        ///
+        /// Can only be called by the contracts owner
+        #[ink(message)]
+        pub fn remove_pair(&mut self, from: [u8; 32]) -> Result<(), MembraneError> {
+            self.ensure_owner()?;
+            self.supported_pairs.remove(from);
+            Ok(())
+        }
+
+        /// Adds a supported pair for bridging
+        ///
+        /// Can only be called by the contracts owner
+        #[ink(message)]
+        pub fn add_pair(&mut self, from: [u8; 32], to: [u8; 32]) -> Result<(), MembraneError> {
+            self.ensure_owner()?;
+            self.supported_pairs.insert(from, &to);
+            Ok(())
+        }
+
+        /// Change the committee and increase committe id
+        /// Can only be called by the contracts owner
+        ///
+        /// Changing the entire set is the ONLY way of upgrading the committee
+        #[ink(message)]
+        pub fn set_committee(&mut self, committee: Vec<AccountId>) -> Result<(), MembraneError> {
+            self.ensure_owner()?;
+
+            let committee_id = self.committee_id + 1;
+
+            let mut committee_set = Mapping::new();
+            committee.into_iter().for_each(|account| {
+                committee_set.insert((committee_id, account), &());
+            });
+
+            self.committee = committee_set;
+            self.committee_id = committee_id;
 
             Ok(())
+        }
+
+        /// Sets a new owner account
+        ///
+        /// Can only be called by contracts owner
+        #[ink(message)]
+        pub fn set_owner(&mut self, new_owner: AccountId) -> Result<(), MembraneError> {
+            self.ensure_owner()?;
+            self.owner = new_owner;
+            Ok(())
+        }
+
+        // ---  helper functions
+
+        /// Queries a price oracle and returns the `in` price of an `amount` number of the `of` tokens.
+        ///
+        /// If no `in` is passed assumes USDT
+        fn query_price(
+            &self,
+            amount: u128,
+            _of_token_address: [u8; 32],
+            _in_token_address: Option<[u8; 32]>,
+        ) -> Result<u128, MembraneError> {
+            // TODO: implement
+            // NOTE: different precisions!
+            let do_query_price = || 2;
+            Ok(amount * do_query_price())
         }
 
         fn ensure_owner(&mut self) -> Result<(), MembraneError> {
