@@ -422,7 +422,8 @@ mod e2e {
         )
         .await;
 
-        let amount = 20; // 841189100000000
+        let amount = 841189100000000;
+
         let receiver_address = account_id(AccountKeyring::One);
         let request_nonce = 1;
 
@@ -448,9 +449,6 @@ mod e2e {
             .await
             .expect("balance before");
 
-        println!("balance: {balance}");
-
-        // TODO : why you fail?
         assert_eq!(
             balance,
             ((amount * (10000 - commission_per_dix_mille)) / 10000)
@@ -576,7 +574,7 @@ mod e2e {
         assert_eq!(
             send_request_res
                 .err()
-                .expect("Request should fail without allowance"),
+                .expect("Request should because the amount is below the minimum"),
             MembraneError::AmountBelowMinimum
         );
     }
