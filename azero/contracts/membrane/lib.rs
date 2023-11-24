@@ -411,7 +411,18 @@ pub mod membrane {
 
         // ---  getter txs
 
+        /// Query pocket money
+        ///
+        /// An amount of the native token that is tranferred with every request
+        #[ink(message)]
+        pub fn get_pocket_money(&self) -> Balance {
+            self.pocket_money
+        }
+
         /// Query total rewards for this committee
+        ///
+        /// Denominated in token with the `token_id` address
+        /// Uses [0u8;32] to identify the native token
         #[ink(message)]
         pub fn get_committee_rewards(&self, committee_id: CommitteeId, token_id: [u8; 32]) -> u128 {
             self.collected_committee_rewards
@@ -419,15 +430,10 @@ pub mod membrane {
                 .unwrap_or_default()
         }
 
-        /// Query pocket money
-        ///
-        /// Native amount that is tranferred with every request
-        #[ink(message)]
-        pub fn get_pocket_money(&self) -> Balance {
-            self.pocket_money
-        }
-
         /// Query already paid out committee member rewards
+        ///
+        /// Denominated in token with the `token_id` address
+        /// Uses [0u8;32] to identify the native token
         #[ink(message)]
         pub fn get_paid_out_member_rewards(
             &self,
@@ -441,6 +447,11 @@ pub mod membrane {
         }
 
         /// Query outstanding committee member rewards
+        ///
+        /// The amount that can still be requested.
+        /// Denominated in token with the `token_id` address
+        /// Uses [0u8;32] to identify the native token
+        /// Returns an error (reverts) if the `member_id` account is not in the committee with `committee_id`
         #[ink(message)]
         pub fn get_outstanding_member_rewards(
             &self,
@@ -463,8 +474,7 @@ pub mod membrane {
             Ok(total_amount.saturating_sub(collected_amount))
         }
 
-        /// Queries a gas price oracle and returns the current base_fee charged per cross chain transfer
-        /// denominated in AZERO
+        /// Queries a gas price oracle and returns the current base_fee charged per cross chain transfer denominated in AZERO
         #[ink(message)]
         pub fn base_fee(&self) -> Result<Balance, MembraneError> {
             // TODO: implement
