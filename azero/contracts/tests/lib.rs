@@ -20,8 +20,8 @@ mod e2e {
         primitives::AccountId,
     };
     use ink_e2e::{
-        account_id, alice, bob, build_message, charlie, dave, eve, ferdie, AccountKeyring, Keypair,
-        PolkadotConfig,
+        account_id, alice, bob, build_message, charlie, dave, eve, ferdie, subxt::dynamic::Value,
+        AccountKeyring, Keypair, PolkadotConfig,
     };
     use membrane::{MembraneError, MembraneRef};
     use psp22::{PSP22Error, PSP22};
@@ -569,7 +569,7 @@ mod e2e {
     }
 
     #[ink_e2e::test]
-    fn committee_rewards(mut client: ink_e2e::Client<C, E>) {
+    fn pocket_money(mut client: ink_e2e::Client<C, E>) {
         let commission_per_dix_mille = 300;
         let pocket_money = 1000000000000;
         let minimum_transfer_amount_usd = 50;
@@ -578,7 +578,73 @@ mod e2e {
         let token_address =
             instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
 
-        // TODO : give minter role to membrane contract
+        let membrane_address = instantiate_membrane(
+            &mut client,
+            &alice(),
+            guardian_ids(),
+            DEFAULT_THRESHOLD,
+            commission_per_dix_mille,
+            pocket_money,
+            minimum_transfer_amount_usd,
+            relay_gas_usage,
+        )
+        .await;
+
+        // seed contract with some funds for pocket money transfers
+        let call_data = vec![
+            Value::unnamed_variant("Id", [Value::from_bytes(membrane_address)]),
+            Value::u128(10 * pocket_money),
+        ];
+
+        client
+            .runtime_call(&alice(), "Balances", "transfer", call_data)
+            .await
+            .expect("runtime call failed");
+
+        let amount = 841189100000000;
+        let receiver_address = account_id(AccountKeyring::One);
+        let request_nonce = 1;
+
+        let request_hash =
+            hash_request_data(token_address, amount, receiver_address, request_nonce);
+
+        let azero_balance_before = client
+            .balance(receiver_address)
+            .await
+            .expect("native balacne before");
+
+        for signer in &guardian_keys()[0..(DEFAULT_THRESHOLD as usize)] {
+            membrane_receive_request(
+                &mut client,
+                signer,
+                membrane_address,
+                request_hash,
+                *token_address.as_ref(),
+                amount,
+                *receiver_address.as_ref(),
+                request_nonce,
+            )
+            .await
+            .expect("Receive request should succeed");
+        }
+
+        let azero_balance_after = client
+            .balance(receiver_address)
+            .await
+            .expect("native balance after");
+
+        assert_eq!(azero_balance_after, azero_balance_before + pocket_money);
+    }
+
+    #[ink_e2e::test]
+    fn committee_rewards(mut client: ink_e2e::Client<C, E>) {
+        let commission_per_dix_mille = 300;
+        let pocket_money = 1000000000000;
+        let minimum_transfer_amount_usd = 50;
+        let relay_gas_usage = 50000;
+
+        let token_address =
+            instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
 
         let membrane_address = instantiate_membrane(
             &mut client,
@@ -605,7 +671,7 @@ mod e2e {
         let request_hash =
             hash_request_data(token_address, amount, receiver_address, request_nonce);
 
-        let balance_before = psp22_balance_of(&mut client, token_address, receiver_address)
+        let token_balance_before = psp22_balance_of(&mut client, token_address, receiver_address)
             .await
             .expect("balance before");
 
@@ -624,26 +690,20 @@ mod e2e {
             .expect("Receive request should succeed");
         }
 
-        let balance_after = psp22_balance_of(&mut client, token_address, receiver_address)
+        let token_balance_after = psp22_balance_of(&mut client, token_address, receiver_address)
             .await
             .expect("balance after");
 
-        println!("balance before: {balance_before} balance after: {balance_after}");
-
         assert_eq!(
-            balance_after,
-            balance_before + ((amount * (10000 - commission)) / 10000)
+            token_balance_after,
+            token_balance_before + ((amount * (10000 - commission)) / 10000)
         );
 
-        let committee_id = membrane_committe_id(&mut client, membrane_address)
+        let committee_id = membrane_committee_id(&mut client, membrane_address)
             .await
             .expect("committe id");
 
-        // TODO : check receiver has pocket money
-
-        // TODO : check balances
-
-        let total_rewards = membrane_committe_rewards(
+        let total_rewards = membrane_committee_rewards(
             &mut client,
             membrane_address,
             committee_id,
@@ -684,7 +744,29 @@ mod e2e {
             );
         }
 
-        // TODO : cannot request payment twice
+        // no double spend is possible
+        let bob_balance_before =
+            psp22_balance_of(&mut client, token_address, account_id(AccountKeyring::Bob))
+                .await
+                .expect("signer balance before");
+
+        membrane_request_payout(
+            &mut client,
+            &alice(),
+            membrane_address,
+            committee_id,
+            account_id(AccountKeyring::Bob),
+            *token_address.as_ref(),
+        )
+        .await
+        .expect("request payout twice");
+
+        let bob_balance_after =
+            psp22_balance_of(&mut client, token_address, account_id(AccountKeyring::Bob))
+                .await
+                .expect("signer balance before");
+
+        assert_eq!(bob_balance_after, bob_balance_before);
     }
 
     fn guardian_ids() -> Vec<AccountId> {
@@ -910,7 +992,7 @@ mod e2e {
             .return_value())
     }
 
-    async fn membrane_committe_rewards(
+    async fn membrane_committee_rewards(
         client: &mut E2EClient,
         membrane_address: AccountId,
         committee_id: u128,
@@ -925,7 +1007,7 @@ mod e2e {
             .return_value())
     }
 
-    async fn membrane_committe_id(
+    async fn membrane_committee_id(
         client: &mut E2EClient,
         membrane_address: AccountId,
     ) -> Result<u128, MembraneError> {

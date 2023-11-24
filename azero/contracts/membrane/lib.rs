@@ -486,20 +486,37 @@ pub mod membrane {
                 .unwrap_or_default()
         }
 
-        /// Request payout of rewards for signing & relaying cross-chain transfers.
+        /// Query pocket money
         ///
-        /// Can be called by anyone on behalf of a committee member.
+        /// Native amount that is tranferred with every request
         #[ink(message)]
-        pub fn payout_rewards(
-            &mut self,
+        pub fn get_pocket_money(&self) -> Balance {
+            self.pocket_money
+        }
+
+        /// Query already paid out committee member rewards
+        #[ink(message)]
+        pub fn get_paid_out_member_rewards(
+            &self,
             committee_id: CommitteeId,
             member_id: AccountId,
             token_id: [u8; 32],
-        ) -> Result<(), MembraneError> {
+        ) -> u128 {
+            self.paid_out_member_rewards
+                .get((member_id, committee_id, token_id))
+                .unwrap_or_default()
+        }
+
+        /// Query outstanding committee member rewards
+        #[ink(message)]
+        pub fn get_outstanding_member_rewards(
+            &self,
+            committee_id: CommitteeId,
+            member_id: AccountId,
+            token_id: [u8; 32],
+        ) -> Result<u128, MembraneError> {
             let total_amount = self
-                .collected_committee_rewards
-                .get((committee_id, token_id))
-                .ok_or(MembraneError::NoRewards)?
+                .get_committee_rewards(committee_id, token_id)
                 .checked_div(
                     self.committee_size
                         .get(committee_id)
@@ -507,11 +524,27 @@ pub mod membrane {
                 )
                 .ok_or(MembraneError::Arithmetic)?;
 
-            let id = (member_id, committee_id, token_id);
+            let collected_amount =
+                self.get_paid_out_member_rewards(committee_id, member_id, token_id);
 
-            let collected_amount = self.paid_out_member_rewards.get(id).unwrap_or_default();
+            Ok(total_amount.saturating_sub(collected_amount))
+        }
 
-            let outstanding_amount = total_amount.saturating_sub(collected_amount);
+        /// Request payout of rewards for signing & relaying cross-chain transfers.
+        ///
+        /// Can be called by anyone on behalf of the committee member.
+        #[ink(message)]
+        pub fn payout_rewards(
+            &mut self,
+            committee_id: CommitteeId,
+            member_id: AccountId,
+            token_id: [u8; 32],
+        ) -> Result<(), MembraneError> {
+            let collected_amount =
+                self.get_paid_out_member_rewards(committee_id, member_id, token_id);
+
+            let outstanding_amount =
+                self.get_outstanding_member_rewards(committee_id, member_id, token_id)?;
 
             if outstanding_amount.gt(&0) {
                 match token_id {
@@ -524,7 +557,7 @@ pub mod membrane {
                 }
 
                 self.paid_out_member_rewards.insert(
-                    id,
+                    (member_id, committee_id, token_id),
                     &collected_amount
                         .checked_add(outstanding_amount)
                         .ok_or(MembraneError::Arithmetic)?,
