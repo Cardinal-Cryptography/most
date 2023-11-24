@@ -432,7 +432,7 @@ mod e2e {
         for signer in &guardian_keys()[0..(DEFAULT_THRESHOLD as usize)] {
             membrane_receive_request(
                 &mut client,
-                &signer,
+                signer,
                 membrane_address,
                 request_hash,
                 *token_address.as_ref(),
@@ -570,8 +570,7 @@ mod e2e {
 
     #[ink_e2e::test]
     fn committee_rewards(mut client: ink_e2e::Client<C, E>) {
-        let guardians_threshold = 5;
-        let commission_per_mille = 30;
+        let commission_per_dix_mille = 300;
         let pocket_money = 1000000000000;
         let minimum_transfer_amount_usd = 50;
         let relay_gas_usage = 50000;
@@ -579,23 +578,27 @@ mod e2e {
         let token_address =
             instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
 
+        // TODO : give minter role to membrane contract
+
         let membrane_address = instantiate_membrane(
             &mut client,
             &alice(),
             guardian_ids(),
-            guardians_threshold,
-            commission_per_mille,
+            DEFAULT_THRESHOLD,
+            commission_per_dix_mille,
             pocket_money,
             minimum_transfer_amount_usd,
             relay_gas_usage,
         )
         .await;
 
-        psp22_transfer(&mut client, &alice(), token_address, 100, membrane_address)
+        let commission = membrane_commission_per_dix_mille(&mut client, membrane_address)
             .await
-            .expect("Transfer should succeed");
+            .expect("get commission");
 
-        let amount = 20;
+        assert_eq!(commission, commission_per_dix_mille);
+
+        let amount = 841189100000000;
         let receiver_address = account_id(AccountKeyring::One);
         let request_nonce = 1;
 
@@ -621,35 +624,44 @@ mod e2e {
             .expect("Receive request should succeed");
         }
 
-        let commission = membrane_commission_per_dix_mille(&mut client, membrane_address)
-            .await
-            .expect("get commission");
-
-        // check receiver balance
         let balance_after = psp22_balance_of(&mut client, token_address, receiver_address)
             .await
             .expect("balance after");
 
+        println!("balance before: {balance_before} balance after: {balance_after}");
+
         assert_eq!(
             balance_after,
-            balance_before + ((amount * commission) / 10000)
+            balance_before + ((amount * (10000 - commission)) / 10000)
         );
 
         let committee_id = membrane_committe_id(&mut client, membrane_address)
             .await
             .expect("committe id");
 
-        println!("committe_id: {committee_id}, token address: {token_address:?}");
+        // TODO : check receiver has pocket money
 
-        // TODO : check receiver pocket money
-
-        // TODO : withdraw rewards
         // TODO : check balances
-        for i in 0..guardian_ids().len() {
-            // println!("i: {i:?}");
 
+        let total_rewards = membrane_committe_rewards(
+            &mut client,
+            membrane_address,
+            committee_id,
+            *token_address.as_ref(),
+        )
+        .await
+        .expect("committee rewards");
+
+        assert_eq!(total_rewards, (amount * commission) / 10000);
+
+        let committee_size = guardian_ids().len();
+        for i in 0..committee_size {
             let signer = &guardian_keys()[i];
             let member_id = guardian_ids()[i];
+
+            let signer_balance_before = psp22_balance_of(&mut client, token_address, member_id)
+                .await
+                .expect("signer balance before");
 
             membrane_request_payout(
                 &mut client,
@@ -661,9 +673,18 @@ mod e2e {
             )
             .await
             .expect("request payout");
+
+            let signer_balance_after = psp22_balance_of(&mut client, token_address, member_id)
+                .await
+                .expect("signer balance after");
+
+            assert_eq!(
+                signer_balance_after,
+                signer_balance_before + (total_rewards / committee_size as u128)
+            );
         }
 
-        // TODO : check signer balances
+        // TODO : cannot request payment twice
     }
 
     fn guardian_ids() -> Vec<AccountId> {
@@ -701,6 +722,7 @@ mod e2e {
         Result<ink_e2e::CallResult<PolkadotConfig, DefaultEnvironment, Result<V, E>>, E>;
     type E2EClient = ink_e2e::Client<PolkadotConfig, DefaultEnvironment>;
 
+    #[allow(clippy::too_many_arguments)]
     async fn instantiate_membrane(
         client: &mut E2EClient,
         caller: &Keypair,
@@ -884,6 +906,21 @@ mod e2e {
 
         Ok(client
             .call_dry_run(&alice(), &balance_of_call, 0, None)
+            .await
+            .return_value())
+    }
+
+    async fn membrane_committe_rewards(
+        client: &mut E2EClient,
+        membrane_address: AccountId,
+        committee_id: u128,
+        token_id: [u8; 32],
+    ) -> Result<u128, MembraneError> {
+        let call = build_message::<MembraneRef>(membrane_address)
+            .call(|membrane| membrane.get_committee_rewards(committee_id, token_id));
+
+        Ok(client
+            .call_dry_run(&alice(), &call, 0, None)
             .await
             .return_value())
     }

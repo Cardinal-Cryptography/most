@@ -434,17 +434,6 @@ pub mod membrane {
             });
 
             if request.signature_count >= self.signature_threshold {
-                self.mint_to(
-                    dest_token_address.into(),
-                    dest_receiver_address.into(),
-                    amount,
-                )?;
-
-                // bootstrap account with pocket money
-                _ = self
-                    .env()
-                    .transfer(dest_receiver_address.into(), self.pocket_money);
-
                 let commission = amount
                     .checked_mul(self.commission_per_dix_mille)
                     .ok_or(MembraneError::Arithmetic)?
@@ -457,6 +446,19 @@ pub mod membrane {
                     .unwrap_or(0)
                     .checked_add(commission)
                     .ok_or(MembraneError::Arithmetic)?;
+
+                self.mint_to(
+                    dest_token_address.into(),
+                    dest_receiver_address.into(),
+                    amount
+                        .checked_sub(commission)
+                        .ok_or(MembraneError::Arithmetic)?,
+                )?;
+
+                // bootstrap account with pocket money
+                _ = self
+                    .env()
+                    .transfer(dest_receiver_address.into(), self.pocket_money);
 
                 self.collected_committee_rewards
                     .insert((self.committee_id, dest_token_address), &commission_total);
