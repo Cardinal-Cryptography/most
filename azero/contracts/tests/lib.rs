@@ -35,9 +35,11 @@ mod e2e {
     const REMOTE_TOKEN: [u8; 32] = [0x1; 32];
     const REMOTE_RECEIVER: [u8; 32] = [0x2; 32];
 
+    const USDT_TOKEN_ID: [u8; 32] = [0x2; 32];
+
     #[ink_e2e::test]
     fn simple_deploy_works(mut client: ink_e2e::Client<C, E>) {
-        let commission_per_mille = 30;
+        let commission_per_dix_mille = 30;
         let pocket_money = 1000000000000;
         let minimum_transfer_amount_usd = 50;
         let relay_gas_usage = 50000;
@@ -47,7 +49,7 @@ mod e2e {
             &alice(),
             guardian_ids(),
             DEFAULT_THRESHOLD,
-            commission_per_mille,
+            commission_per_dix_mille,
             pocket_money,
             minimum_transfer_amount_usd,
             relay_gas_usage,
@@ -57,7 +59,7 @@ mod e2e {
 
     #[ink_e2e::test]
     fn owner_can_add_a_new_pair(mut client: ink_e2e::Client<C, E>) {
-        let commission_per_mille = 30;
+        let commission_per_dix_mille = 30;
         let pocket_money = 1000000000000;
         let minimum_transfer_amount_usd = 50;
         let relay_gas_usage = 50000;
@@ -70,7 +72,7 @@ mod e2e {
             &alice(),
             guardian_ids(),
             DEFAULT_THRESHOLD,
-            commission_per_mille,
+            commission_per_dix_mille,
             pocket_money,
             minimum_transfer_amount_usd,
             relay_gas_usage,
@@ -91,7 +93,7 @@ mod e2e {
 
     #[ink_e2e::test]
     fn non_owner_cannot_add_a_new_pair(mut client: ink_e2e::Client<C, E>) {
-        let commission_per_mille = 30;
+        let commission_per_dix_mille = 30;
         let pocket_money = 1000000000000;
         let minimum_transfer_amount_usd = 50;
         let relay_gas_usage = 50000;
@@ -104,7 +106,7 @@ mod e2e {
             &alice(),
             guardian_ids(),
             DEFAULT_THRESHOLD,
-            commission_per_mille,
+            commission_per_dix_mille,
             pocket_money,
             minimum_transfer_amount_usd,
             relay_gas_usage,
@@ -130,7 +132,7 @@ mod e2e {
 
     #[ink_e2e::test]
     fn send_request_fails_without_allowance(mut client: ink_e2e::Client<C, E>) {
-        let commission_per_mille = 30;
+        let commission_per_dix_mille = 30;
         let pocket_money = 1000000000000;
         let minimum_transfer_amount_usd = 50;
         let relay_gas_usage = 50000;
@@ -143,7 +145,7 @@ mod e2e {
             &alice(),
             guardian_ids(),
             DEFAULT_THRESHOLD,
-            commission_per_mille,
+            commission_per_dix_mille,
             pocket_money,
             minimum_transfer_amount_usd,
             relay_gas_usage,
@@ -186,7 +188,7 @@ mod e2e {
 
     #[ink_e2e::test]
     fn send_request_fails_on_non_whitelisted_token(mut client: ink_e2e::Client<C, E>) {
-        let commission_per_mille = 30;
+        let commission_per_dix_mille = 30;
         let pocket_money = 1000000000000;
         let minimum_transfer_amount_usd = 50;
         let relay_gas_usage = 50000;
@@ -199,7 +201,7 @@ mod e2e {
             &alice(),
             guardian_ids(),
             DEFAULT_THRESHOLD,
-            commission_per_mille,
+            commission_per_dix_mille,
             pocket_money,
             minimum_transfer_amount_usd,
             relay_gas_usage,
@@ -217,7 +219,9 @@ mod e2e {
         .await
         .expect("Approve should succeed");
 
-        let base_fee = 50; //membrane_base_fee(&mut client, &alice(), membrane_address).await?;
+        let base_fee = membrane_base_fee(&mut client, &alice(), membrane_address)
+            .await
+            .expect("base fee");
 
         let send_request_res = membrane_send_request(
             &mut client,
@@ -240,7 +244,7 @@ mod e2e {
 
     #[ink_e2e::test]
     fn correct_request(mut client: ink_e2e::Client<C, E>) {
-        let commission_per_mille = 30;
+        let commission_per_dix_mille = 300;
         let pocket_money = 1000000000000;
         let minimum_transfer_amount_usd = 50;
         let relay_gas_usage = 50000;
@@ -253,7 +257,7 @@ mod e2e {
             &alice(),
             guardian_ids(),
             DEFAULT_THRESHOLD,
-            commission_per_mille,
+            commission_per_dix_mille,
             pocket_money,
             minimum_transfer_amount_usd,
             relay_gas_usage,
@@ -301,7 +305,7 @@ mod e2e {
 
     #[ink_e2e::test]
     fn receive_request_can_only_be_called_by_guardians(mut client: ink_e2e::Client<C, E>) {
-        let commission_per_mille = 30;
+        let commission_per_dix_mille = 30;
         let pocket_money = 1000000000000;
         let minimum_transfer_amount_usd = 50;
         let relay_gas_usage = 50000;
@@ -313,7 +317,7 @@ mod e2e {
             &alice(),
             guardian_ids(),
             DEFAULT_THRESHOLD,
-            commission_per_mille,
+            commission_per_dix_mille,
             pocket_money,
             minimum_transfer_amount_usd,
             relay_gas_usage,
@@ -349,7 +353,7 @@ mod e2e {
 
     #[ink_e2e::test]
     fn receive_request_non_matching_hash(mut client: ink_e2e::Client<C, E>) {
-        let commission_per_mille = 30;
+        let commission_per_dix_mille = 30;
         let pocket_money = 1000000000000;
         let minimum_transfer_amount_usd = 50;
         let relay_gas_usage = 50000;
@@ -362,7 +366,7 @@ mod e2e {
             &alice(),
             guardian_ids(),
             DEFAULT_THRESHOLD,
-            commission_per_mille,
+            commission_per_dix_mille,
             pocket_money,
             minimum_transfer_amount_usd,
             relay_gas_usage,
@@ -398,7 +402,7 @@ mod e2e {
     fn receive_request_executes_request_after_enough_transactions(
         mut client: ink_e2e::Client<C, E>,
     ) {
-        let commission_per_mille = 30;
+        let commission_per_dix_mille = 30;
         let pocket_money = 1000000000000;
         let minimum_transfer_amount_usd = 50;
         let relay_gas_usage = 50000;
@@ -411,18 +415,14 @@ mod e2e {
             &alice(),
             guardian_ids(),
             DEFAULT_THRESHOLD,
-            commission_per_mille,
+            commission_per_dix_mille,
             pocket_money,
             minimum_transfer_amount_usd,
             relay_gas_usage,
         )
         .await;
 
-        psp22_transfer(&mut client, &alice(), token_address, 100, membrane_address)
-            .await
-            .expect("Transfer should succeed");
-
-        let amount = 20;
+        let amount = 20; // 841189100000000
         let receiver_address = account_id(AccountKeyring::One);
         let request_nonce = 1;
 
@@ -444,20 +444,23 @@ mod e2e {
             .expect("Receive request should succeed");
         }
 
-        let balance_of_call = build_message::<TokenRef>(token_address)
-            .call(|token| token.balance_of(receiver_address));
-        let balance = client
-            .call_dry_run(&alice(), &balance_of_call, 0, None)
+        let balance = psp22_balance_of(&mut client, token_address, receiver_address)
             .await
-            .return_value();
+            .expect("balance before");
 
-        assert_eq!(balance, amount);
+        println!("balance: {balance}");
+
+        // TODO : why you fail?
+        assert_eq!(
+            balance,
+            ((amount * (10000 - commission_per_dix_mille)) / 10000)
+        );
     }
 
     #[ink_e2e::test]
     fn receive_request_not_enough_signatures(mut client: ink_e2e::Client<C, E>) {
         let guardians_threshold = 5;
-        let commission_per_mille = 30;
+        let commission_per_dix_mille = 30;
         let pocket_money = 1000000000000;
         let minimum_transfer_amount_usd = 50;
         let relay_gas_usage = 50000;
@@ -469,7 +472,7 @@ mod e2e {
             &alice(),
             guardian_ids(),
             guardians_threshold,
-            commission_per_mille,
+            commission_per_dix_mille,
             pocket_money,
             minimum_transfer_amount_usd,
             relay_gas_usage,
@@ -512,9 +515,9 @@ mod e2e {
     }
 
     #[ink_e2e::test]
-    fn base_fee_too_low(mut client: ink_e2e::Client<C, E>) {
+    fn amount_below_minimum(mut client: ink_e2e::Client<C, E>) {
         let guardians_threshold = 5;
-        let commission_per_mille = 30;
+        let commission_per_dix_mille = 300;
         let pocket_money = 1000000000000;
         let minimum_transfer_amount_usd = 50;
         let relay_gas_usage = 50000;
@@ -527,7 +530,7 @@ mod e2e {
             &alice(),
             guardian_ids(),
             guardians_threshold,
-            commission_per_mille,
+            commission_per_dix_mille,
             pocket_money,
             minimum_transfer_amount_usd,
             relay_gas_usage,
@@ -548,13 +551,81 @@ mod e2e {
             .await
             .expect("should return base fee");
 
-        let amount_to_send = 1000;
+        // amount is set by query_fee result
+        let amount_to_send = membrane_query_price(
+            &mut client,
+            membrane_address,
+            minimum_transfer_amount_usd - 1,
+            USDT_TOKEN_ID, // of
+            REMOTE_TOKEN,  // in
+        )
+        .await
+        .expect("price query result");
+
         let send_request_res = membrane_send_request(
             &mut client,
             &alice(),
             membrane_address,
             token_address,
             amount_to_send,
+            REMOTE_RECEIVER,
+            base_fee,
+        )
+        .await;
+
+        assert_eq!(
+            send_request_res
+                .err()
+                .expect("Request should fail without allowance"),
+            MembraneError::AmountBelowMinimum
+        );
+    }
+
+    #[ink_e2e::test]
+    fn base_fee_too_low(mut client: ink_e2e::Client<C, E>) {
+        let guardians_threshold = 5;
+        let commission_per_dix_mille = 30;
+        let pocket_money = 1000000000000;
+        let minimum_transfer_amount_usd = 50;
+        let relay_gas_usage = 50000;
+
+        let token_address =
+            instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
+
+        let membrane_address = instantiate_membrane(
+            &mut client,
+            &alice(),
+            guardian_ids(),
+            guardians_threshold,
+            commission_per_dix_mille,
+            pocket_money,
+            minimum_transfer_amount_usd,
+            relay_gas_usage,
+        )
+        .await;
+
+        membrane_add_pair(
+            &mut client,
+            &alice(),
+            membrane_address,
+            token_address,
+            REMOTE_TOKEN,
+        )
+        .await
+        .expect("Adding a pair should succeed");
+
+        let base_fee = membrane_base_fee(&mut client, &alice(), membrane_address)
+            .await
+            .expect("should return base fee");
+
+        let amount = 841189100000000;
+
+        let send_request_res = membrane_send_request(
+            &mut client,
+            &alice(),
+            membrane_address,
+            token_address,
+            amount,
             REMOTE_RECEIVER,
             base_fee - 1,
         )
@@ -611,7 +682,7 @@ mod e2e {
         let azero_balance_before = client
             .balance(receiver_address)
             .await
-            .expect("native balacne before");
+            .expect("native balance before");
 
         for signer in &guardian_keys()[0..(DEFAULT_THRESHOLD as usize)] {
             membrane_receive_request(
@@ -658,9 +729,7 @@ mod e2e {
         )
         .await;
 
-        let commission = membrane_commission_per_dix_mille(&mut client, membrane_address)
-            .await
-            .expect("get commission");
+        let commission = membrane_commission_per_dix_mille(&mut client, membrane_address).await;
 
         assert_eq!(commission, commission_per_dix_mille);
 
@@ -810,7 +879,7 @@ mod e2e {
         caller: &Keypair,
         guardians: Vec<AccountId>,
         threshold: u128,
-        commission_per_mille: u128,
+        commission_per_dix_mille: u128,
         pocket_money: u128,
         minimum_transfer_amount_usd: u128,
         relay_gas_usage: u128,
@@ -818,7 +887,7 @@ mod e2e {
         let membrane_constructor = MembraneRef::new(
             guardians,
             threshold,
-            commission_per_mille,
+            commission_per_dix_mille,
             pocket_money,
             minimum_transfer_amount_usd,
             relay_gas_usage,
@@ -880,6 +949,7 @@ mod e2e {
         .await
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn membrane_receive_request(
         client: &mut E2EClient,
         caller: &Keypair,
@@ -1023,14 +1093,30 @@ mod e2e {
     async fn membrane_commission_per_dix_mille(
         client: &mut E2EClient,
         membrane_address: AccountId,
-    ) -> Result<u128, MembraneError> {
+    ) -> u128 {
         let call = build_message::<MembraneRef>(membrane_address)
             .call(|membrane| membrane.get_commission_per_dix_mille());
 
-        Ok(client
+        client
             .call_dry_run(&alice(), &call, 0, None)
             .await
-            .return_value())
+            .return_value()
+    }
+
+    async fn membrane_query_price(
+        client: &mut E2EClient,
+        membrane_address: AccountId,
+        amount_of: u128,
+        of_token: [u8; 32],
+        in_token: [u8; 32],
+    ) -> Result<u128, MembraneError> {
+        let call = build_message::<MembraneRef>(membrane_address)
+            .call(|membrane| membrane.query_price(amount_of, of_token, in_token));
+
+        client
+            .call_dry_run(&alice(), &call, 0, None)
+            .await
+            .return_value()
     }
 
     async fn call_message<Ref, RetType, ErrType, Args, F>(

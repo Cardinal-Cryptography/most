@@ -19,15 +19,9 @@ pub mod membrane {
     use shared::{concat_u8_arrays, keccak256, Keccak256HashOutput as HashedRequest, Selector};
 
     const DIX_MILLE: u128 = 10000;
-    const NATIVE_TOKEN_ID: [u8; 32] = [
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0,
-    ];
-
-    const ETH_TOKEN_ID: [u8; 32] = [
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 1,
-    ];
+    const NATIVE_TOKEN_ID: [u8; 32] = [0x0; 32];
+    const WETH_TOKEN_ID: [u8; 32] = [0x1; 32];
+    const USDT_TOKEN_ID: [u8; 32] = [0x2; 32];
 
     type CommitteeId = u128;
 
@@ -194,7 +188,7 @@ pub mod membrane {
             dest_receiver_address: [u8; 32],
         ) -> Result<(), MembraneError> {
             if self
-                .query_price(amount, src_token_address, None)?
+                .query_price(amount, src_token_address, USDT_TOKEN_ID)?
                 .lt(&self.minimum_transfer_amount_usd)
             {
                 return Err(MembraneError::AmountBelowMinimum);
@@ -307,7 +301,7 @@ pub mod membrane {
                     .checked_div(DIX_MILLE)
                     .ok_or(MembraneError::Arithmetic)?;
 
-                let commission_total = self
+                let updated_commission_total = self
                     .collected_committee_rewards
                     .get((self.committee_id, dest_token_address))
                     .unwrap_or(0)
@@ -323,12 +317,15 @@ pub mod membrane {
                 )?;
 
                 // bootstrap account with pocket money
+                // NOTE: we don't revert on a failure!
                 _ = self
                     .env()
                     .transfer(dest_receiver_address.into(), self.pocket_money);
 
-                self.collected_committee_rewards
-                    .insert((self.committee_id, dest_token_address), &commission_total);
+                self.collected_committee_rewards.insert(
+                    (self.committee_id, dest_token_address),
+                    &updated_commission_total,
+                );
 
                 // mark it as processed
                 self.processed_requests.insert(request_hash, &());
@@ -481,12 +478,12 @@ pub mod membrane {
             // return a current gas price in WEI
             let do_query_gas_fee = || 39106342561;
 
-            let wei = self
+            let amount = self
                 .relay_gas_usage
                 .checked_mul(do_query_gas_fee())
                 .ok_or(MembraneError::Arithmetic)?;
 
-            self.query_price(wei, ETH_TOKEN_ID, Some(NATIVE_TOKEN_ID))
+            self.query_price(amount, WETH_TOKEN_ID, NATIVE_TOKEN_ID)
         }
 
         /// Returns current active committee id
@@ -570,19 +567,24 @@ pub mod membrane {
 
         // ---  helper functions
 
-        /// Queries a price oracle and returns the `in` price of an `amount` number of the `of` tokens.
-        ///
-        /// If no `in` is passed assumes USDT
-        fn query_price(
+        /// Queries a price oracle and returns the price of an `amount` number of the `of` tokens.
+        #[ink(message)]
+        pub fn query_price(
             &self,
-            amount: u128,
-            _of_token_address: [u8; 32],
-            _in_token_address: Option<[u8; 32]>,
+            amount_of: u128,
+            of_token_address: [u8; 32],
+            in_token_address: [u8; 32],
         ) -> Result<u128, MembraneError> {
             // TODO: implement
-            // NOTE: different precisions!
-            let do_query_price = || 2;
-            Ok(amount * do_query_price())
+            if (of_token_address == WETH_TOKEN_ID) && (in_token_address == USDT_TOKEN_ID) {
+                return Ok(amount_of * 2);
+            }
+
+            if (of_token_address == USDT_TOKEN_ID) && (in_token_address == WETH_TOKEN_ID) {
+                return Ok(amount_of / 2);
+            }
+
+            Ok(amount_of)
         }
 
         fn ensure_owner(&mut self) -> Result<(), MembraneError> {
