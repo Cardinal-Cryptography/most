@@ -158,7 +158,7 @@ solidity-lint: eth-deps
 
 .PHONY: relayer-lint
 relayer-lint: # Lint relayer
-relayer-lint: compile-azero
+relayer-lint: compile-azero-docker
 	cd relayer && cargo clippy -- --no-deps -D warnings
 
 .PHONY: ink-lint
