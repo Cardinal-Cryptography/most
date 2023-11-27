@@ -158,17 +158,17 @@ solidity-lint: eth-deps
 
 .PHONY: relayer-lint
 relayer-lint: # Lint relayer
-relayer-lint:
-	cd relayer && cargo clippy
+relayer-lint: compile-azero
+	cd relayer && cargo clippy -- --no-deps -D warnings
 
 .PHONY: ink-lint
 ink-lint: # Lint ink contracts
 ink-lint:
-	cd azero/contracts/membrane && cargo clippy && \
-	cd ../governance && cargo clippy && \
-	cd ../psp22 && cargo clippy && \
-	cd ../psp22-traits && cargo clippy && \
-	cd ../tests && cargo clippy
+	cd azero/contracts/membrane && cargo clippy -- --no-deps -D warnings && \
+	cd ../governance && cargo clippy -- --no-deps -D warnings && \
+	cd ../psp22 && cargo clippy -- --no-deps -D warnings && \
+	cd ../psp22-traits && cargo clippy -- --no-deps -D warnings && \
+	cd ../tests && cargo clippy -- --no-deps -D warnings
 
 .PHONY: lint
 lint: # Lint everything
