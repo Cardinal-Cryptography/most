@@ -145,3 +145,32 @@ test-ink: test-ink-e2e
 	cargo test && \
 	cd ../psp22 && \
 	cargo test
+
+.PHONY: check-js-format
+check-js-format: # Check js formatting
+check-js-format:
+	cd eth && npx prettier --check test
+
+.PHONY: solidity-lint
+solidity-lint: # Lint solidity contracts
+solidity-lint: eth-deps
+	cd eth && npx solium -d contracts
+
+.PHONY: relayer-lint
+relayer-lint: # Lint relayer
+relayer-lint:
+	cd relayer && cargo clippy
+
+.PHONY: ink-lint
+ink-lint: # Lint ink contracts
+ink-lint:
+	cd azero/contracts/membrane && cargo clippy && \
+	cd ../governance && cargo clippy && \
+	cd ../psp22 && cargo clippy && \
+	cd ../psp22-traits && cargo clippy && \
+	cd ../tests && cargo clippy && \
+	cd ../utils && cargo clippy
+
+.PHONY: lint
+lint: # Lint everything
+lint: check-js-format solidity-lint relayer-lint ink-lint
