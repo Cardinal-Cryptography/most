@@ -168,8 +168,7 @@ ink-lint:
 	cd ../governance && cargo clippy && \
 	cd ../psp22 && cargo clippy && \
 	cd ../psp22-traits && cargo clippy && \
-	cd ../tests && cargo clippy && \
-	cd ../utils && cargo clippy
+	cd ../tests && cargo clippy
 
 .PHONY: lint
 lint: # Lint everything
