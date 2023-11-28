@@ -2,5 +2,9 @@
   "ws_node": "ws://127.0.0.1:9944",
   "authority": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
   "authority_seed": "//Alice",
-  "signature_threshold": 1
+  "signature_threshold": 1,
+  "commission_per_dix_mille": 300,
+  "pocket_money": 1000000000000,
+  "minimum_transfer_amount_usd" : 50,
+  "relay_gas_usage": 50000
 }
