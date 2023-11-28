@@ -6,16 +6,13 @@ edition = "2021"
 
 [dev-dependencies]
 ink = { version = "=4.3.0", default-features = false }
-scale = { package = "parity-scale-codec", version = "3", default-features = false, features = [
-    "derive",
-] }
-
-wrapped_token = { path = "../psp22", package = "token", features = ["ink-as-dependency"] }
-membrane = { path = "../membrane", package = "membrane", features = ["ink-as-dependency"] }
-shared = { path = "../shared" }
-psp22 = "0.2.0"
 ink_e2e = "=4.3.0"
+membrane = { path = "../membrane", package = "membrane", features = ["ink-as-dependency"] }
+psp22 = "0.2.0"
+scale = { package = "parity-scale-codec", version = "3", default-features = false, features = ["derive"] }
 subxt = "0.31.0"
+shared = { path = "../shared" }
+wrapped_token = { path = "../psp22", package = "token", features = ["ink-as-dependency"] }
 
 [lib]
 path = "lib.rs"
