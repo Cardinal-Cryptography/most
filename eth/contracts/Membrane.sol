@@ -48,7 +48,7 @@ contract Membrane {
               ) {
     require(_signatureThreshold > 0, "Signature threshold must be greater than 0");
     require(_guardians.length >= _signatureThreshold, "Not enough guardians specified");
-        
+
     owner = msg.sender;
     signatureThreshold = _signatureThreshold;
     for (uint256 i = 0; i < _guardians.length; i++) {
@@ -58,7 +58,7 @@ contract Membrane {
 
   // Invoke this tx to transfer funds to the destination chain.
   // Account needs to approve the Membrane contract to spend the srcTokenAmount
-  // on their behalf before executing the tx.
+  // of srcTokenAddress tokens on their behalf before executing the tx.
   //
   // Tx emits a CrosschainTransferRequest event that the relayers listen to
   // & forward to the destination chain.
@@ -89,7 +89,7 @@ contract Membrane {
     requestNonce++;
   }
 
-  // aggregates relayer signatures and burns/mints the token
+  // aggregates relayer signatures and returns the locked tokens
   function receiveRequest(
                           bytes32 _requestHash,
                           bytes32 destTokenAddress,
