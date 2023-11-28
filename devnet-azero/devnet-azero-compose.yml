@@ -3,15 +3,14 @@ version: '3.9'
 services:
   # key derived from "//0"
   AlephBridgenode:
-    image: public.ecr.aws/p6e8q1z1/aleph-node:r-12.0
+    image: public.ecr.aws/p6e8q1z1/aleph-node:r-12.1
     container_name: aleph_bridgenode
     user: "${UID}:${GID}"
     volumes:
       - ./5D34dL5prEUaGNQtPPZ3yN5Y6BnkfXunKXXz6fo7ZJbLwRRH:/data
     network_mode: host
     environment:
-      - RPC_PORT=9934
-      - WS_PORT=9944
+      - RPC_PORT=9944
       - PORT=30334
       - VALIDATOR_PORT=30344
       - PUBLIC_VALIDATOR_ADDRESS=127.0.0.1:30344

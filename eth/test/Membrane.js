@@ -156,7 +156,7 @@ describe("Membrane", function () {
             ).to.be.revertedWith("This guardian has already signed this request");
         });
 
-        it("Reverts if request has already been executed", async () => {
+        it("Ignores already executed requests", async () => {
             const { membrane, token, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
             const accounts = await hre.ethers.getSigners();
             const ethAddress = addressToBytes32(accounts[10].address);
@@ -186,7 +186,7 @@ describe("Membrane", function () {
                     ethAddress,
                     0,
                 )
-            ).to.be.revertedWith("This request has already been processed");
+            ).to.emit(membrane, "ProcessedRequestSigned").withArgs(requestHash, accounts[6].address);
         });
 
         it("Unlocks tokens for the user", async () => {
