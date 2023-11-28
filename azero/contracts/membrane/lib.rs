@@ -13,8 +13,8 @@ pub mod membrane {
         prelude::{format, string::String, vec, vec::Vec},
         storage::Mapping,
     };
-    use psp22::{PSP22Error, PSP22};
-    use psp22_traits::Mintable;
+    use psp22::PSP22Error;
+    use psp22_traits::{Burnable, Mintable};
     use scale::{Decode, Encode};
     use shared::{concat_u8_arrays, keccak256, Keccak256HashOutput as HashedRequest, Selector};
 
@@ -180,6 +180,9 @@ pub mod membrane {
         // --- business logic
 
         /// Invoke this tx to initiate funds transfer to the destination chain.
+        ///
+        /// Upon checking basic conditions the contract will burn the `amount` number of `src_token_address` tokens from the caller
+        /// and emit an event which is to be picked up & acted on up by the bridge guardians.
         #[ink(message, payable)]
         pub fn send_request(
             &mut self,
@@ -208,12 +211,8 @@ pub mod membrane {
 
             let sender = self.env().caller();
 
-            self.transfer_from_tx(
-                src_token_address.into(),
-                sender,
-                self.env().account_id(),
-                amount,
-            )?;
+            // burn the psp22 tokens
+            self.burn_from(src_token_address.into(), sender, amount)?;
 
             // NOTE: this allows the committee members to take a payout for requests that are not neccessarily finished
             // by that time (no signature threshold reached yet).
@@ -595,26 +594,25 @@ pub mod membrane {
             }
         }
 
-        /// Transfers a given amount of a PSP22 token on behalf of a specified account to another account
-        ///
-        /// Will revert if not enough allowance was given to the caller prior to executing this tx
-        fn transfer_from_tx(
-            &self,
-            token: AccountId,
-            from: AccountId,
-            to: AccountId,
-            amount: u128,
-        ) -> Result<(), PSP22Error> {
-            let mut psp22: ink::contract_ref!(PSP22) = token.into();
-            psp22.transfer_from(from, to, amount, vec![])
-        }
-
         /// Mints the specified amount of token to the designated account
         ///
         /// Membrane contract needs to have a Minter role on the token contract
         fn mint_to(&self, token: AccountId, to: AccountId, amount: u128) -> Result<(), PSP22Error> {
             let mut psp22: ink::contract_ref!(Mintable) = token.into();
             psp22.mint(to, amount)
+        }
+
+        /// Mints the specified amount of token to the designated account
+        ///
+        /// Membrane contract needs to have a Minter role on the token contract
+        fn burn_from(
+            &self,
+            token: AccountId,
+            from: AccountId,
+            amount: u128,
+        ) -> Result<(), PSP22Error> {
+            let mut psp22: ink::contract_ref!(Burnable) = token.into();
+            psp22.burn(from, amount)
         }
     }
 
