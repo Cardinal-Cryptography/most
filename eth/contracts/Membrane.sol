@@ -5,17 +5,21 @@ pragma solidity ^0.8;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract Membrane {
+  uint256 public constant DIX_MILLE = 10000;
+
   address public owner;
   uint256 public requestNonce;
   uint256 public signatureThreshold;
+  uint256 public commission_per_dix_mille;
+  uint256 public minimum_transfer_amount_usd;
 
   struct Request {
     uint256 signatureCount;
     mapping(address => bool) signatures;
   }
 
-    // from -> to mapping
-    mapping(bytes32 => bytes32) public supportedPairs;
+  // from -> to mapping
+  mapping(bytes32 => bytes32) public supportedPairs;
   mapping(bytes32 => Request) public pendingRequests;
   mapping(bytes32 => bool) public processedRequests;
 
@@ -44,21 +48,27 @@ contract Membrane {
 
   constructor(
               address[] memory _guardians,
-              uint256 _signatureThreshold
+              uint256 _signatureThreshold,
+              uint256 _commission_per_dix_mille,
+              uint256 _minimum_transfer_amount_usd
               ) {
     require(_signatureThreshold > 0, "Signature threshold must be greater than 0");
     require(_guardians.length >= _signatureThreshold, "Not enough guardians specified");
 
     owner = msg.sender;
     signatureThreshold = _signatureThreshold;
+    commission_per_dix_mille = _commission_per_dix_mille;
+    minimum_transfer_amount_usd = _minimum_transfer_amount_usd;
+
     for (uint256 i = 0; i < _guardians.length; i++) {
       guardians[_guardians[i]] = true;
     }
+
   }
 
   // Invoke this tx to transfer funds to the destination chain.
-  // Account needs to approve the Membrane contract to spend the srcTokenAmount
-  // of srcTokenAddress tokens on their behalf before executing the tx.
+  // Account needs to approve the Membrane contract to spend the `srcTokenAmount`
+  // of `srcTokenAddress` tokens on their behalf before executing the tx.
   //
   // Tx emits a CrosschainTransferRequest event that the relayers listen to
   // & forward to the destination chain.
