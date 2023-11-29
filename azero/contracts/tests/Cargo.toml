@@ -6,7 +6,7 @@ edition = "2021"
 
 [dev-dependencies]
 ink = { version = "=4.3.0", default-features = false }
-scale = { package = "parity-scale-codec", version = "3", default-features = false, features = [
+scale = { package = "parity-scale-codec", version = "=3.6.5", default-features = false, features = [
     "derive",
 ] }
 
