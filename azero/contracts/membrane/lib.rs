@@ -259,7 +259,7 @@ pub mod membrane {
             request_nonce: u128,
         ) -> Result<(), MembraneError> {
             let caller = self.env().caller();
-            self.is_in_current_committee(caller)?;
+            self.only_current_committee_member(caller)?;
 
             if self.processed_requests.contains(request_hash) {
                 return Err(MembraneError::RequestAlreadyProcessed);
@@ -301,9 +301,7 @@ pub mod membrane {
                     .ok_or(MembraneError::Arithmetic)?;
 
                 let updated_commission_total = self
-                    .collected_committee_rewards
-                    .get((self.committee_id, dest_token_address))
-                    .unwrap_or(0)
+                    .get_collected_committee_rewards(self.committee_id, dest_token_address)
                     .checked_add(commission)
                     .ok_or(MembraneError::Arithmetic)?;
 
@@ -351,26 +349,26 @@ pub mod membrane {
             member_id: AccountId,
             token_id: [u8; 32],
         ) -> Result<(), MembraneError> {
-            let collected_amount =
+            let paid_out_rewards =
                 self.get_paid_out_member_rewards(committee_id, member_id, token_id);
 
-            let outstanding_amount =
+            let outstanding_rewards =
                 self.get_outstanding_member_rewards(committee_id, member_id, token_id)?;
 
-            if outstanding_amount.gt(&0) {
+            if outstanding_rewards.gt(&0) {
                 match token_id {
                     NATIVE_TOKEN_ID => {
-                        self.env().transfer(member_id, outstanding_amount)?;
+                        self.env().transfer(member_id, outstanding_rewards)?;
                     }
                     _ => {
-                        self.mint_to(token_id.into(), member_id, outstanding_amount)?;
+                        self.mint_to(token_id.into(), member_id, outstanding_rewards)?;
                     }
                 }
 
                 self.paid_out_member_rewards.insert(
                     (member_id, committee_id, token_id),
-                    &collected_amount
-                        .checked_add(outstanding_amount)
+                    &paid_out_rewards
+                        .checked_add(outstanding_rewards)
                         .ok_or(MembraneError::Arithmetic)?,
                 );
             }
@@ -420,7 +418,11 @@ pub mod membrane {
         /// Denominated in token with the `token_id` address
         /// Uses [0u8;32] to identify the native token
         #[ink(message)]
-        pub fn get_committee_rewards(&self, committee_id: CommitteeId, token_id: [u8; 32]) -> u128 {
+        pub fn get_collected_committee_rewards(
+            &self,
+            committee_id: CommitteeId,
+            token_id: [u8; 32],
+        ) -> u128 {
             self.collected_committee_rewards
                 .get((committee_id, token_id))
                 .unwrap_or_default()
@@ -456,7 +458,7 @@ pub mod membrane {
             token_id: [u8; 32],
         ) -> Result<u128, MembraneError> {
             let total_amount = self
-                .get_committee_rewards(committee_id, token_id)
+                .get_collected_committee_rewards(committee_id, token_id)
                 .checked_div(
                     self.committee_size
                         .get(committee_id)
@@ -499,7 +501,10 @@ pub mod membrane {
 
         /// Returns an error (reverts) if account is not in the currently active committee
         #[ink(message)]
-        pub fn is_in_current_committee(&self, account: AccountId) -> Result<(), MembraneError> {
+        pub fn only_current_committee_member(
+            &self,
+            account: AccountId,
+        ) -> Result<(), MembraneError> {
             match self.is_in_committee(self.committee_id, account) {
                 true => Ok(()),
                 false => Err(MembraneError::NotInCommittee),
