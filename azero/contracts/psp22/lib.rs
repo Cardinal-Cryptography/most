@@ -9,21 +9,25 @@ pub mod token {
     use psp22_traits::{Burnable, Mintable};
 
     #[ink(event)]
+    #[derive(Debug)]
+    #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
     pub struct Approval {
         #[ink(topic)]
-        owner: AccountId,
+        pub owner: AccountId,
         #[ink(topic)]
-        spender: AccountId,
-        amount: u128,
+        pub spender: AccountId,
+        pub amount: u128,
     }
 
     #[ink(event)]
+    #[derive(Debug)]
+    #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
     pub struct Transfer {
         #[ink(topic)]
-        from: Option<AccountId>,
+        pub from: Option<AccountId>,
         #[ink(topic)]
-        to: Option<AccountId>,
-        value: u128,
+        pub to: Option<AccountId>,
+        pub value: u128,
     }
 
     #[ink(storage)]

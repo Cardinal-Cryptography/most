@@ -2,7 +2,7 @@ import { ApiPromise, WsProvider, Keyring } from '@polkadot/api';
 import MembraneConstructors from '../types/constructors/membrane';
 import TokenConstructors from '../types/constructors/token';
 import GovernanceConstructors from '../types/constructors/governance';
-import { uploadCode, Addresses, storeAddresses } from './utils';
+import { uploadCode, Addresses, storeAddresses, estimateContractInit } from './utils';
 import 'dotenv/config';
 import '@polkadot/api-augment';
 
@@ -16,7 +16,11 @@ async function main(): Promise<void> {
     ws_node,
     authority,
     authority_seed,
-    signature_threshold
+    signature_threshold,
+    commission_per_dix_mille,
+    pocket_money,
+    minimum_transfer_amount_usd,
+    relay_gas_usage
   } = await import_env();
 
   let wsProvider = new WsProvider(ws_node);
@@ -38,9 +42,23 @@ async function main(): Promise<void> {
   const membraneConstructors = new MembraneConstructors(api, deployer);
   const tokenConstructors = new TokenConstructors(api, deployer);
 
+  let estimatedGas = await estimateContractInit(api, deployer, 'membrane.contract', [
+    [authority],
+    signature_threshold!,
+    commission_per_dix_mille!,
+    pocket_money!,
+    minimum_transfer_amount_usd!,
+    relay_gas_usage!,
+  ]);
+
   const { address: membraneAddress } = await membraneConstructors.new(
     [authority],
-    signature_threshold!
+    signature_threshold!,
+    commission_per_dix_mille!,
+    pocket_money!,
+    minimum_transfer_amount_usd!,
+    relay_gas_usage!,
+   { gasLimit: estimatedGas },
   );
   console.log('membrane address:', membraneAddress);
 

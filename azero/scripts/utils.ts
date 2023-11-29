@@ -58,3 +58,30 @@ export function storeAddresses(addresses: Addresses): void {
         JSON.stringify(addresses, null, 2),
     );
 }
+
+/**
+ * Estimates gas required to create a new instance of the contract.
+ *
+ * NOTE: This shouldn't be necessary but `Contract::new()` doesn't estimate gas and uses a hardcoded value.
+ */
+export async function estimateContractInit(
+  api: ApiPromise,
+  deployer: KeyringPair,
+  contractName: string,
+  sampleArgs: unknown[],
+): Promise<WeightV2> {
+  const contractRaw = JSON.parse(
+    fs.readFileSync(__dirname + `/../artifacts/` + contractName, 'utf8'),
+  );
+  const contractAbi = new Abi(contractRaw);
+  const { gasRequired } = (await api.call.contractsApi.instantiate(
+    deployer.address,
+    0,
+    null,
+    null,
+    { Upload: contractAbi.info.source.wasm },
+    contractAbi.constructors[0].toU8a(sampleArgs),
+    '',
+  )) as unknown as ContractInstantiateResult;
+  return gasRequired;
+}
