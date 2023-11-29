@@ -7,6 +7,9 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 }
 
 #[cfg(all(test, feature = "e2e-tests"))]
+mod events;
+
+#[cfg(all(test, feature = "e2e-tests"))]
 mod e2e {
     use ink::{
         codegen::TraitCallBuilder,
@@ -23,11 +26,19 @@ mod e2e {
         account_id, alice, bob, build_message, charlie, dave, eve, ferdie, subxt::dynamic::Value,
         AccountKeyring, Keypair, PolkadotConfig,
     };
-    use membrane::{MembraneError, MembraneRef};
+    use membrane::{
+        membrane::{CrosschainTransferRequest, RequestProcessed, RequestSigned},
+        MembraneError, MembraneRef,
+    };
     use psp22::{PSP22Error, PSP22};
     use scale::{Decode, Encode};
     use shared::{keccak256, Keccak256HashOutput};
     use wrapped_token::TokenRef;
+    use core::fmt::Debug;
+
+    use crate::events::{
+        filter_decode_events_as, get_contract_emitted_events, ContractEmitted, EventWithTopics,
+    };
 
     const TOKEN_INITIAL_SUPPLY: u128 = 10000;
     const DEFAULT_THRESHOLD: u128 = 3;
@@ -300,7 +311,28 @@ mod e2e {
         )
         .await;
 
-        assert!(send_request_res.is_ok());
+        match send_request_res {
+            Ok(call_res) => {
+                // 2 events for transfer_from and 1 `CrosschainTransferRequest`
+                assert_eq!(call_res.events.len(), 3);
+
+                let request_events =
+                    filter_decode_events_as::<CrosschainTransferRequest>(call_res.events);
+
+                // `CrosschainTransferRequest` event
+                assert_eq!(request_events.len(), 1);
+                assert_eq!(
+                    request_events[0],
+                    CrosschainTransferRequest {
+                        dest_token_address: REMOTE_TOKEN,
+                        amount: amount_to_send,
+                        dest_receiver_address: REMOTE_RECEIVER,
+                        request_nonce: 0,
+                    }
+                );
+            }
+            Err(e) => panic!("Request should succeed: {:?}", e),
+        }
     }
 
     #[ink_e2e::test]
@@ -430,8 +462,9 @@ mod e2e {
         let request_hash =
             hash_request_data(token_address, amount, receiver_address, request_nonce);
 
-        for signer in &guardian_keys()[0..(DEFAULT_THRESHOLD as usize)] {
-            membrane_receive_request(
+        for i in 0..(DEFAULT_THRESHOLD as usize) {
+            let signer = &guardian_keys()[i];
+            let receive_res = membrane_receive_request(
                 &mut client,
                 signer,
                 membrane_address,
@@ -441,8 +474,27 @@ mod e2e {
                 *receiver_address.as_ref(),
                 request_nonce,
             )
-            .await
-            .expect("Receive request should succeed");
+            .await;
+
+            match receive_res {
+                Ok(call_res) => {
+                    let events = call_res.events;
+                    if i == (DEFAULT_THRESHOLD - 1) as usize {
+                        assert_eq!(events.len(), 3);
+                        assert_eq!(
+                            filter_decode_events_as::<RequestProcessed>(vec![events[2].clone()])[0],
+                            RequestProcessed {
+                                request_hash,
+                                dest_token_address: *token_address.as_ref(),
+                            }
+                        );
+                    } else {
+                        assert_eq!(events.len(), 1);
+                        assert_eq!(filter_decode_events_as::<RequestSigned>(events).len(), 1);
+                    }
+                }
+                Err(e) => panic!("Receive request should succeed: {:?}", e),
+            }
         }
 
         let balance = psp22_balance_of(&mut client, token_address, receiver_address)
@@ -487,8 +539,9 @@ mod e2e {
         let request_hash =
             hash_request_data(token_address, amount, receiver_address, request_nonce);
 
-        for signer in &guardian_keys()[0..(guardians_threshold as usize) - 1] {
-            membrane_receive_request(
+        for i in 0..(DEFAULT_THRESHOLD - 1) as usize {
+            let signer = &guardian_keys()[i];
+            let receive_res = membrane_receive_request(
                 &mut client,
                 signer,
                 membrane_address,
@@ -498,8 +551,21 @@ mod e2e {
                 *receiver_address.as_ref(),
                 request_nonce,
             )
-            .await
-            .expect("Receive request should succeed");
+            .await;
+
+            match receive_res {
+                Ok(call_res) => {
+                    assert_eq!(call_res.events.len(), 1);
+                    assert_eq!(
+                        filter_decode_events_as::<RequestSigned>(call_res.events)[0],
+                        RequestSigned {
+                            signer: guardian_ids()[i],
+                            request_hash,
+                        }
+                    );
+                }
+                Err(e) => panic!("Receive request should succeed: {:?}", e),
+            }
         }
 
         let balance_of_call = build_message::<TokenRef>(token_address)
@@ -866,9 +932,12 @@ mod e2e {
         keccak256(&request_data)
     }
 
-    // type DryRunResult<V, E> = ink_e2e::CallDryRunResult<DefaultEnvironment, Result<V, E>>;
-    type CallResult<V, E> =
-        Result<ink_e2e::CallResult<PolkadotConfig, DefaultEnvironment, Result<V, E>>, E>;
+    struct CallResultValue<V> {
+        value: V,
+        events: Vec<EventWithTopics<ContractEmitted>>,
+    }
+
+    type CallResult<V, E> = Result<CallResultValue<V>, E>;
     type E2EClient = ink_e2e::Client<PolkadotConfig, DefaultEnvironment>;
 
     #[allow(clippy::too_many_arguments)]
@@ -1041,9 +1110,7 @@ mod e2e {
             None,
         )
         .await
-        .expect("oooops")
-        .dry_run
-        .return_value()
+        .map(|call_res| call_res.value)
     }
 
     async fn psp22_balance_of(
@@ -1136,7 +1203,7 @@ mod e2e {
                 Set<ReturnType<Result<RetType, ErrType>>>,
             >,
         Args: Encode,
-        ErrType: Decode,
+        ErrType: Decode + Debug,
         RetType: Decode,
     {
         let message = build_message::<Ref>(contract_id).call(call_builder_fn);
@@ -1151,7 +1218,7 @@ mod e2e {
 
         // Now we shouldn't get any errors originating from the contract.
         // However, we can still get errors from the substrate runtime or the client.
-        Ok(client
+        let call_result = client
             .call(caller, message, value.unwrap_or_default(), None)
             .await
             .unwrap_or_else(|err| {
@@ -1159,6 +1226,12 @@ mod e2e {
                     "Call did not revert, but failed anyway. ink_e2e error: {:?}",
                     err
                 )
-            }))
+            });
+        Ok(CallResultValue {
+            value: call_result.dry_run.return_value()
+                .expect("return value should be present"),
+            events: get_contract_emitted_events(call_result.events)
+                .expect("event decoding should not fail"),
+        })
     }
 }
