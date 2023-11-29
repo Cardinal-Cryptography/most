@@ -170,6 +170,6 @@ ink-lint:
 	cd ../psp22-traits && cargo clippy -- --no-deps -D warnings && \
 	cd ../tests && cargo clippy -- --no-deps -D warnings
 
-.PHONY: lint
-lint: # Lint everything
-lint: check-js-format solidity-lint relayer-lint ink-lint
+.PHONY: contracts-lint
+contracts-lint: # Lint contracts
+contracts-lint: solidity-lint ink-lint
