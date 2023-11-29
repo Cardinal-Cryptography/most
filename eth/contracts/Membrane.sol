@@ -67,7 +67,7 @@ contract Membrane {
     signatureThreshold = _signatureThreshold;
     commissionPerDixMille = _commissionPerDixMille;
     minimumTransferAmountUsd = _minimumTransferAmountUsd;
-    committeeId = 1;
+    committeeId = 0;
 
     for (uint256 i = 0; i < _committee.length; i++) {
       committee[keccak256(abi.encodePacked(committeeId, _committee[i]))] = true;
@@ -153,7 +153,6 @@ contract Membrane {
     }
   }
 
-  // TODO
   // Request payout of rewards for signing & relaying cross-chain transfers
   //
   // Can be called by anyone on behalf of the committee member,
@@ -161,23 +160,18 @@ contract Membrane {
   function payoutRewards (
                           uint256 _committeeId,
                           address member,
-                          bytes32 token
+                          bytes32 _token
                           ) external {
+    uint256 outstandingRewards = getOutstandingMemberRewards (_committeeId, member, _token);
 
-    uint256 paidOutRewards = getPaidOutMemberRewards (_committeeId, member, token);
-    uint256 outStandingRewards = getOutstandingMemberRewards (_committeeId, member, token);    
-
-    if (outStandingRewards > 0) {
-
-
-            /* token.transfer(bytes32ToAddress(destReceiverAddress), ); */
-
-      paidOutMemberRewards [keccak256(abi.encodePacked(_committeeId, member, token))] += outStandingRewards;
-            
-                                  }
+    if (outstandingRewards > 0) {
+      IERC20 token = IERC20(bytes32ToAddress(_token));
+      token.transfer(member, outstandingRewards);
+      paidOutMemberRewards [keccak256(abi.encodePacked(_committeeId, member, _token))] = getPaidOutMemberRewards (_committeeId, member, _token) + outstandingRewards;
+    }
 
   }
-  
+
   function getCollectedCommitteeRewards (
                                          uint256 _committeeId,
                                          bytes32 token
@@ -202,7 +196,7 @@ contract Membrane {
   }
 
   // Queries a price oracle and returns the price of an `amount` number of the `ofToken` tokens.
-  // TODO: this is a mocked method pending implementation
+  // TODO: this is a mocked method pending an implementation
   function queryPrice(
                       uint256 amountOf,
                       bytes32 ofToken,
@@ -242,13 +236,16 @@ contract Membrane {
     return bytes32(uint256(uint160(addr)));
   }
 
-  /* function addGuardian(address guardian) external _onlyOwner { */
-  /*   guardians[guardian] = true; */
-  /* } */
+  function setCommittee(address[] memory _committee) external _onlyOwner {
+    committeeId += 1;
+    
+    for (uint256 i = 0; i < _committee.length; i++) {
+      committee[keccak256(abi.encodePacked(committeeId, _committee[i]))] = true;
+    }
 
-  /* function removeGuardian(address guardian) external _onlyOwner { */
-  /*   guardians[guardian] = false; */
-  /* } */
+    committeeSize [committeeId] = _committee.length;    
+  }
+
 
   function setOwner(address _owner) external _onlyOwner {
     owner = _owner;
