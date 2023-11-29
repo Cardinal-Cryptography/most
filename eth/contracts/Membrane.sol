@@ -14,7 +14,6 @@ contract Membrane {
   uint256 public minimumTransferAmountUsd;
   uint256 public committeeId;
   bytes32 public USDT = 0x1000000000000000000000000000000000000000000000000000000000000000;
-  bytes32 public WETH = 0x2000000000000000000000000000000000000000000000000000000000000000;
 
   struct Request {
     uint256 signatureCount;
@@ -238,12 +237,12 @@ contract Membrane {
 
   function setCommittee(address[] memory _committee) external _onlyOwner {
     committeeId += 1;
-    
+
     for (uint256 i = 0; i < _committee.length; i++) {
       committee[keccak256(abi.encodePacked(committeeId, _committee[i]))] = true;
     }
 
-    committeeSize [committeeId] = _committee.length;    
+    committeeSize [committeeId] = _committee.length;
   }
 
 
@@ -261,10 +260,6 @@ contract Membrane {
 
   function setUSDT(bytes32 _USDT) external _onlyOwner {
     USDT = _USDT;
-  }
-
-  function setWETH(bytes32 _WETH) external _onlyOwner {
-    WETH = _WETH;
   }
 
 }

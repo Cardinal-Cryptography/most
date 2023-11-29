@@ -275,30 +275,44 @@ describe("Membrane", function () {
 
         // TODO
         it("account can request a payout", async () => {
-            // const { membrane, token, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
-            // const accounts = await hre.ethers.getSigners();
-            // const ethAddress = addressToBytes32(accounts[10].address);
-            // const requestHash = hre.ethers.solidityPackedKeccak256(
-            //     ["bytes32", "uint256", "bytes32", "uint256"],
-            //     [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0]
-            // );
+            const { membrane, token, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
+            const accounts = await hre.ethers.getSigners();
+            const ethAddress = addressToBytes32(accounts[10].address);
+            const requestHash = hre.ethers.solidityPackedKeccak256(
+                ["bytes32", "uint256", "bytes32", "uint256"],
+                [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0]
+            );
 
-            // // Provide funds for Membrane
-            // await token.transfer(await membrane.getAddress(), TOKEN_AMOUNT * 2);
+            // Provide funds for Membrane
+            await token.transfer(await membrane.getAddress(), TOKEN_AMOUNT * 2);
 
-            // for (let i = 1; i < 6; i++) {
-            //     await membrane.connect(accounts[i]).receiveRequest(
-            //         requestHash,
-            //         tokenAddressBytes32,
-            //         TOKEN_AMOUNT,
-            //         ethAddress,
-            //         0,
-            //     );
-            // }
+            for (let i = 1; i < 6 ; i++) {
+                await membrane.connect(accounts[i]).receiveRequest(
+                    requestHash,
+                    tokenAddressBytes32,
+                    TOKEN_AMOUNT,
+                    ethAddress,
+                    0,
+                );
+            }
 
-            // expect(await token.balanceOf(accounts[10].address)).to.equal(TOKEN_AMOUNT * (DIX_MILLE - COMMISSION_PER_DIX_MILLE) / DIX_MILLE);
+            currentCommitteeId = await membrane.committeeId ();
+            totalRewards = await membrane.getCollectedCommitteeRewards (currentCommitteeId, tokenAddressBytes32);
+
+            await expect(
+                currentCommitteeId
+            ).to.be.equal(0);
+
+            signerBalanceBefore = await token.balanceOf(accounts[1].address);
+
+            await membrane.payoutRewards (currentCommitteeId,
+                                         accounts[1].address,
+                                         tokenAddressBytes32);
+
+            signerBalanceAfter = await token.balanceOf(accounts[1].address);
+            await expect(signerBalanceAfter).to.be.equal(signerBalanceBefore + (totalRewards / BigInt (8)));
         });
-        
+
     });
-    
+
 });
