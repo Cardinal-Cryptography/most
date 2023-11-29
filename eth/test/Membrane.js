@@ -62,8 +62,6 @@ describe("Membrane", function () {
     }
 
     describe("sendRequest", function () {
-
-        // TODO
         it("Reverts if the USD value of the transfer amount is below the minimum", async () => {
             const { membrane, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
 
@@ -272,4 +270,35 @@ describe("Membrane", function () {
             ).to.be.revertedWith("Hash does not match the data");
         });
     });
+
+    describe("payoutRewards", function () {
+
+        // TODO
+        it("account can request a payout", async () => {
+            // const { membrane, token, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
+            // const accounts = await hre.ethers.getSigners();
+            // const ethAddress = addressToBytes32(accounts[10].address);
+            // const requestHash = hre.ethers.solidityPackedKeccak256(
+            //     ["bytes32", "uint256", "bytes32", "uint256"],
+            //     [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0]
+            // );
+
+            // // Provide funds for Membrane
+            // await token.transfer(await membrane.getAddress(), TOKEN_AMOUNT * 2);
+
+            // for (let i = 1; i < 6; i++) {
+            //     await membrane.connect(accounts[i]).receiveRequest(
+            //         requestHash,
+            //         tokenAddressBytes32,
+            //         TOKEN_AMOUNT,
+            //         ethAddress,
+            //         0,
+            //     );
+            // }
+
+            // expect(await token.balanceOf(accounts[10].address)).to.equal(TOKEN_AMOUNT * (DIX_MILLE - COMMISSION_PER_DIX_MILLE) / DIX_MILLE);
+        });
+        
+    });
+    
 });
