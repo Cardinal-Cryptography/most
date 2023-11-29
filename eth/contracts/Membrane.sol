@@ -13,8 +13,8 @@ contract Membrane {
   uint256 public commissionPerDixMille;
   uint256 public minimumTransferAmountUsd;
   uint256 public committeeId;
-  bytes32 public USDT;
-  bytes32 public WETH;
+  bytes32 public USDT = 0x1000000000000000000000000000000000000000000000000000000000000000;
+  bytes32 public WETH = 0x2000000000000000000000000000000000000000000000000000000000000000;
 
   struct Request {
     uint256 signatureCount;
@@ -201,14 +201,14 @@ contract Membrane {
                       uint256 amountOf,
                       bytes32 ofToken,
                       bytes32 inToken
-                      ) private view returns(uint256) {
+                      ) public view returns(uint256) {
 
-    if ((ofToken == WETH) && (inToken == USDT)) {
-        return amountOf * 2;
+    if (inToken == USDT) {
+      return amountOf * 2;
     }
 
-    if ((ofToken == USDT) && (inToken == WETH)) {
-        return amountOf / 2;
+    if (ofToken == USDT) {
+      return amountOf / 2;
     }
 
     return amountOf;

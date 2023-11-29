@@ -580,11 +580,11 @@ pub mod membrane {
             in_token_address: [u8; 32],
         ) -> Result<u128, MembraneError> {
             // TODO: implement
-            if (of_token_address == WETH_TOKEN_ID) && (in_token_address == USDT_TOKEN_ID) {
+            if in_token_address == USDT_TOKEN_ID {
                 return Ok(amount_of * 2);
             }
 
-            if (of_token_address == USDT_TOKEN_ID) && (in_token_address == WETH_TOKEN_ID) {
+            if of_token_address == USDT_TOKEN_ID {
                 return Ok(amount_of / 2);
             }
 

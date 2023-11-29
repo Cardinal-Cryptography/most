@@ -34,7 +34,6 @@ mod e2e {
     const DECIMALS: u8 = 8;
     const REMOTE_TOKEN: [u8; 32] = [0x1; 32];
     const REMOTE_RECEIVER: [u8; 32] = [0x2; 32];
-
     const USDT_TOKEN_ID: [u8; 32] = [0x2; 32];
 
     #[ink_e2e::test]
@@ -131,7 +130,7 @@ mod e2e {
     }
 
     #[ink_e2e::test]
-    fn send_request_fails_without_allowance(mut client: ink_e2e::Client<C, E>) {
+    fn send_request_burns_tokens(mut client: ink_e2e::Client<C, E>) {
         let commission_per_dix_mille = 30;
         let pocket_money = 1000000000000;
         let minimum_transfer_amount_usd = 50;
@@ -166,8 +165,16 @@ mod e2e {
             .await
             .expect("should return base fee");
 
+        let balance_before = psp22_balance_of(
+            &mut client,
+            token_address,
+            account_id(AccountKeyring::Alice),
+        )
+        .await
+        .expect("balance before");
+
         let amount_to_send = 1000;
-        let send_request_res = membrane_send_request(
+        _ = membrane_send_request(
             &mut client,
             &alice(),
             membrane_address,
@@ -178,11 +185,18 @@ mod e2e {
         )
         .await;
 
+        let balance_after = psp22_balance_of(
+            &mut client,
+            token_address,
+            account_id(AccountKeyring::Alice),
+        )
+        .await
+        .expect("balance before");
+
         assert_eq!(
-            send_request_res
-                .err()
-                .expect("Request should fail without allowance"),
-            MembraneError::PSP22(PSP22Error::InsufficientAllowance)
+            balance_after,
+            balance_before - amount_to_send,
+            "sender balance after should be lowered by that amount"
         );
     }
 
@@ -632,7 +646,7 @@ mod e2e {
         assert_eq!(
             send_request_res
                 .err()
-                .expect("Request should fail without allowance"),
+                .expect("Request should fail with base fee too low"),
             MembraneError::BaseFeeTooLow
         );
     }
@@ -1067,7 +1081,7 @@ mod e2e {
         token_id: [u8; 32],
     ) -> Result<u128, MembraneError> {
         let call = build_message::<MembraneRef>(membrane_address)
-            .call(|membrane| membrane.get_committee_rewards(committee_id, token_id));
+            .call(|membrane| membrane.get_collected_committee_rewards(committee_id, token_id));
 
         Ok(client
             .call_dry_run(&alice(), &call, 0, None)

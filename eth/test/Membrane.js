@@ -8,6 +8,7 @@ const { addressToBytes32, getRandomAlephAccount } = require("./TestUtils");
 const TOKEN_AMOUNT = 1000;
 const ALEPH_ACCOUNT = getRandomAlephAccount(3);
 const WRAPPED_TOKEN_ADDRESS = getRandomAlephAccount(5);
+const USDT = "0x1000000000000000000000000000000000000000000000000000000000000000";
 const COMMISSION_PER_DIX_MILLE = 30;
 const MINIMUM_TRANSFER_AMOUNT_USD = 50;
 const DIX_MILLE = 10000;
@@ -61,6 +62,27 @@ describe("Membrane", function () {
     }
 
     describe("sendRequest", function () {
+
+        // TODO
+        it("Reverts if the USD value of the transfer amount is below the minimum", async () => {
+            const { membrane, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
+
+            await membrane.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
+
+            amountToSend = await membrane.queryPrice(MINIMUM_TRANSFER_AMOUNT_USD - 1,
+                                                     USDT, // of
+                                                     tokenAddressBytes32 // in
+                                                    );
+
+            await expect(
+                membrane.sendRequest(
+                    tokenAddressBytes32,
+                    amountToSend,
+                    ALEPH_ACCOUNT
+                )
+            ).to.be.revertedWith("AmountBelowMinimum");
+        });
+
         it("Reverts if token is not whitelisted", async () => {
             const { membrane, token, tokenAddressBytes32, membraneAddress } = await loadFixture(deployEightGuardianMembraneFixture);
 
