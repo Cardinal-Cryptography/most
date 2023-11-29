@@ -19,7 +19,6 @@
         "gulp": "^4.0.2",
         "gulp-shell": "^0.8.0",
         "hardhat": "^2.19.0",
-        "npx": "^10.2.2",
         "prettier": "^3.0.3",
         "prettier-plugin-solidity": "^1.1.3"
     }

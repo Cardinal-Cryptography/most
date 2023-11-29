@@ -8,6 +8,9 @@ const { addressToBytes32, getRandomAlephAccount } = require("./TestUtils");
 const TOKEN_AMOUNT = 1000;
 const ALEPH_ACCOUNT = getRandomAlephAccount(3);
 const WRAPPED_TOKEN_ADDRESS = getRandomAlephAccount(5);
+const COMMISSION_PER_DIX_MILLE = 30;
+const MINIMUM_TRANSFER_AMOUNT_USD = 50;
+const DIX_MILLE = 10000;
 
 describe("Membrane", function () {
     describe("Constructor", function () {
@@ -15,14 +18,22 @@ describe("Membrane", function () {
             const accounts = await hre.ethers.getSigners();
             const Membrane = await hre.ethers.getContractFactory("Membrane");
             await expect(
-                Membrane.deploy([accounts[0].address], 0, { from: accounts[0] })
+                Membrane.deploy([accounts[0].address],
+                                0,
+                                COMMISSION_PER_DIX_MILLE,
+                                MINIMUM_TRANSFER_AMOUNT_USD,
+                                { from: accounts[0] })
             ).to.be.revertedWith("Signature threshold must be greater than 0");
         });
         it("Reverts if threshold is greater than number of guardians", async () => {
             const accounts = await hre.ethers.getSigners();
             const Membrane = await hre.ethers.getContractFactory("Membrane");
             await expect(
-                Membrane.deploy([accounts[0].address], 2, { from: accounts[0] })
+                Membrane.deploy([accounts[0].address],
+                                2,
+                                COMMISSION_PER_DIX_MILLE,
+                                MINIMUM_TRANSFER_AMOUNT_USD,
+                                { from: accounts[0] })
             ).to.be.revertedWith("Not enough guardians specified");
         });
     });
@@ -37,6 +48,8 @@ describe("Membrane", function () {
         const membrane = await Membrane.deploy(
             guardianAddresses,
             threshold,
+            COMMISSION_PER_DIX_MILLE,
+            MINIMUM_TRANSFER_AMOUNT_USD
         );
         const membraneAddress = await membrane.getAddress();
 
@@ -126,7 +139,7 @@ describe("Membrane", function () {
                     ethAddress,
                     0,
                 )
-            ).to.be.revertedWith("Can only be called by a guardian");
+            ).to.be.revertedWith("NotInCommittee");
         });
 
         it("Reverts if request has already been signed by a guardian", async () => {
@@ -211,7 +224,7 @@ describe("Membrane", function () {
                 );
             }
 
-            expect(await token.balanceOf(accounts[10].address)).to.equal(TOKEN_AMOUNT);
+            expect(await token.balanceOf(accounts[10].address)).to.equal(TOKEN_AMOUNT * (DIX_MILLE - COMMISSION_PER_DIX_MILLE) / DIX_MILLE);
         });
 
         it("Reverts on non-matching hash", async () => {

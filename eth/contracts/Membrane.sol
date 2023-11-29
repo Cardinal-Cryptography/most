@@ -50,7 +50,7 @@ contract Membrane {
   }
 
   modifier _onlyCurrentCommitteeMember() {
-    require(isInCommittee(committeeId, msg.sender), "Can only be called by a current committeMember");
+    require(isInCommittee(committeeId, msg.sender), "NotInCommittee");
     _;
   }
 
