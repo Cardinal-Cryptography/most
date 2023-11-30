@@ -4670,6 +4670,7 @@ dependencies = [
  "parity-scale-codec",
  "psp22",
  "shared",
+ "subxt",
  "token",
 ]
 

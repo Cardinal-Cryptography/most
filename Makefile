@@ -134,7 +134,7 @@ test-ink-e2e: # Run ink e2e tests
 test-ink-e2e: bootstrap-azero
 	export CONTRACTS_NODE="../../scripts/azero_contracts_node.sh" && \
 	cd azero/contracts/tests && \
-	cargo test -- --test-threads=1
+	cargo test e2e -- --test-threads=1 --nocapture
 
 .PHONY: test-ink
 test-ink: # Run ink tests
