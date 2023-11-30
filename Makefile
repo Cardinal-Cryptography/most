@@ -164,11 +164,11 @@ relayer-lint: compile-azero-docker compile-eth
 .PHONY: ink-lint
 ink-lint: # Lint ink contracts
 ink-lint:
-	cd azero/contracts/membrane && cargo clippy -- --no-deps -D warnings && \
-	cd ../governance && cargo clippy -- --no-deps -D warnings && \
-	cd ../psp22 && cargo clippy -- --no-deps -D warnings && \
-	cd ../psp22-traits && cargo clippy -- --no-deps -D warnings && \
-	cd ../tests && cargo clippy -- --no-deps -D warnings
+	cd azero/contracts/membrane && cargo clippy -- --no-deps -D warnings
+	cd azero/contracts/governance && cargo clippy -- --no-deps -D warnings
+	cd azero/contracts/psp22 && cargo clippy -- --no-deps -D warnings
+	cd azero/contracts/psp22-traits && cargo clippy -- --no-deps -D warnings
+	cd azero/contracts/tests && cargo clippy -- --no-deps -D warnings
 
 .PHONY: contracts-lint
 contracts-lint: # Lint contracts
