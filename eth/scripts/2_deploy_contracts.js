@@ -1,12 +1,18 @@
 const fs = require("node:fs");
 const hre = require("hardhat");
 
+const COMMISSION_PER_DIX_MILLE=30
+const MINIMUM_TRANSFER_AMOUNT_USD=50
+
 async function main() {
   const accounts = await hre.ethers.getSigners();
 
   // Membrane
   const Membrane = await hre.ethers.getContractFactory("Membrane");
-  const membrane = await Membrane.deploy(accounts.slice(1, 9), 5);
+  const membrane = await Membrane.deploy(accounts.slice(1, 9),
+                                         5,
+                                         COMMISSION_PER_DIX_MILLE,
+                                         MINIMUM_TRANSFER_AMOUNT_USD,);
   const membraneAddress = await membrane.getAddress();
 
   console.log("Membrane deployed to:",  membraneAddress);

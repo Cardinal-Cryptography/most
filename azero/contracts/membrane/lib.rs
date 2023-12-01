@@ -13,8 +13,8 @@ pub mod membrane {
         prelude::{format, string::String, vec, vec::Vec},
         storage::Mapping,
     };
-    use psp22::{PSP22Error, PSP22};
-    use psp22_traits::Mintable;
+    use psp22::PSP22Error;
+    use psp22_traits::{Burnable, Mintable};
     use scale::{Decode, Encode};
     use shared::{concat_u8_arrays, keccak256, Keccak256HashOutput as HashedRequest, Selector};
 
@@ -30,11 +30,12 @@ pub mod membrane {
     #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
     pub struct CrosschainTransferRequest {
         #[ink(topic)]
+        pub committee_id: CommitteeId,
+        #[ink(topic)]
         pub dest_token_address: [u8; 32],
         pub amount: u128,
         #[ink(topic)]
         pub dest_receiver_address: [u8; 32],
-        #[ink(topic)]
         pub request_nonce: u128,
     }
 
@@ -72,8 +73,6 @@ pub mod membrane {
         owner: AccountId,
         /// nonce for outgoing cross-chain transfer requests
         request_nonce: u128,
-        /// number of signatures required to reach a quorum and costsxecute a transfer
-        signature_threshold: u128,
         /// requests that are still collecting signatures
         pending_requests: Mapping<HashedRequest, Request>,
         /// signatures per cross chain transfer request
@@ -81,11 +80,13 @@ pub mod membrane {
         /// signed & executed requests, a replay protection
         processed_requests: Mapping<HashedRequest, ()>,
         /// set of guardian accounts that can sign requests
-        committee: Mapping<(CommitteeId, AccountId), ()>,
+        committees: Mapping<(CommitteeId, AccountId), ()>,
         /// accounting helper
         committee_id: CommitteeId,
         /// accounting helper
-        committee_size: Mapping<CommitteeId, u128>,
+        committee_sizes: Mapping<CommitteeId, u128>,
+        /// number of signatures required to reach a quorum and costsxecute a transfer
+        signature_thresholds: Mapping<CommitteeId, u128>,
         /// minimal value of tokens that can be transferred across the bridge
         minimum_transfer_amount_usd: u128,
         /// per mille of the succesfully transferred amount that is distributed among the guardians that have signed the crosschain transfer request
@@ -158,24 +159,27 @@ pub mod membrane {
 
             let committee_id = 0;
 
-            let mut committee_set = Mapping::new();
+            let mut committees = Mapping::new();
             committee.clone().into_iter().for_each(|account| {
-                committee_set.insert((committee_id, account), &());
+                committees.insert((committee_id, account), &());
             });
 
-            let mut committee_size = Mapping::new();
-            committee_size.insert(committee_id, &(committee.len() as u128));
+            let mut committee_sizes = Mapping::new();
+            committee_sizes.insert(committee_id, &(committee.len() as u128));
+
+            let mut signature_thresholds = Mapping::new();
+            signature_thresholds.insert(committee_id, &signature_threshold);
 
             Ok(Self {
                 owner: Self::env().caller(),
                 request_nonce: 0,
-                signature_threshold,
+                signature_thresholds,
                 pending_requests: Mapping::new(),
                 signatures: Mapping::new(),
                 processed_requests: Mapping::new(),
-                committee: committee_set,
+                committees,
                 committee_id,
-                committee_size,
+                committee_sizes,
                 supported_pairs: Mapping::new(),
                 collected_committee_rewards: Mapping::new(),
                 paid_out_member_rewards: Mapping::new(),
@@ -189,6 +193,9 @@ pub mod membrane {
         // --- business logic
 
         /// Invoke this tx to initiate funds transfer to the destination chain.
+        ///
+        /// Upon checking basic conditions the contract will burn the `amount` number of `src_token_address` tokens from the caller
+        /// and emit an event which is to be picked up & acted on up by the bridge guardians.
         #[ink(message, payable)]
         pub fn send_request(
             &mut self,
@@ -217,12 +224,22 @@ pub mod membrane {
 
             let sender = self.env().caller();
 
-            self.transfer_from_tx(
-                src_token_address.into(),
-                sender,
-                self.env().account_id(),
-                amount,
-            )?;
+            // burn the psp22 tokens
+            self.burn_from(src_token_address.into(), sender, amount)?;
+
+            // NOTE: this allows the committee members to take a payout for requests that are not neccessarily finished
+            // by that time (no signature threshold reached yet).
+            // We could be recording the base fee when the request collects quorum, but it could change in the meantime
+            // which is potentially even worse
+            let base_fee_total = self
+                .collected_committee_rewards
+                .get((self.committee_id, NATIVE_TOKEN_ID))
+                .unwrap_or(0)
+                .checked_add(base_fee)
+                .ok_or(MembraneError::Arithmetic)?;
+
+            self.collected_committee_rewards
+                .insert((self.committee_id, NATIVE_TOKEN_ID), &base_fee_total);
 
             // NOTE: this allows the committee members to take a payout for requests that are not neccessarily finished
             // by that time (no signature threshold reached yet).
@@ -239,6 +256,7 @@ pub mod membrane {
                 .insert((self.committee_id, NATIVE_TOKEN_ID), &base_fee_total);
 
             self.env().emit_event(CrosschainTransferRequest {
+                committee_id: self.committee_id,
                 dest_token_address,
                 amount,
                 dest_receiver_address,
@@ -269,7 +287,8 @@ pub mod membrane {
             request_nonce: u128,
         ) -> Result<(), MembraneError> {
             let caller = self.env().caller();
-            self.is_in_current_committee(caller)?;
+
+            self.only_current_committee_member(caller)?;
 
             if self.processed_requests.contains(request_hash) {
                 return Err(MembraneError::RequestAlreadyProcessed);
@@ -303,7 +322,12 @@ pub mod membrane {
                 request_hash,
             });
 
-            if request.signature_count >= self.signature_threshold {
+            let signature_threshold = self
+                .signature_thresholds
+                .get(self.committee_id)
+                .ok_or(MembraneError::InvalidThreshold)?;
+
+            if request.signature_count >= signature_threshold {
                 let commission = amount
                     .checked_mul(self.commission_per_dix_mille)
                     .ok_or(MembraneError::Arithmetic)?
@@ -311,9 +335,7 @@ pub mod membrane {
                     .ok_or(MembraneError::Arithmetic)?;
 
                 let updated_commission_total = self
-                    .collected_committee_rewards
-                    .get((self.committee_id, dest_token_address))
-                    .unwrap_or(0)
+                    .get_collected_committee_rewards(self.committee_id, dest_token_address)
                     .checked_add(commission)
                     .ok_or(MembraneError::Arithmetic)?;
 
@@ -361,26 +383,26 @@ pub mod membrane {
             member_id: AccountId,
             token_id: [u8; 32],
         ) -> Result<(), MembraneError> {
-            let collected_amount =
+            let paid_out_rewards =
                 self.get_paid_out_member_rewards(committee_id, member_id, token_id);
 
-            let outstanding_amount =
+            let outstanding_rewards =
                 self.get_outstanding_member_rewards(committee_id, member_id, token_id)?;
 
-            if outstanding_amount.gt(&0) {
+            if outstanding_rewards.gt(&0) {
                 match token_id {
                     NATIVE_TOKEN_ID => {
-                        self.env().transfer(member_id, outstanding_amount)?;
+                        self.env().transfer(member_id, outstanding_rewards)?;
                     }
                     _ => {
-                        self.mint_to(token_id.into(), member_id, outstanding_amount)?;
+                        self.mint_to(token_id.into(), member_id, outstanding_rewards)?;
                     }
                 }
 
                 self.paid_out_member_rewards.insert(
                     (member_id, committee_id, token_id),
-                    &collected_amount
-                        .checked_add(outstanding_amount)
+                    &paid_out_rewards
+                        .checked_add(outstanding_rewards)
                         .ok_or(MembraneError::Arithmetic)?,
                 );
             }
@@ -430,7 +452,11 @@ pub mod membrane {
         /// Denominated in token with the `token_id` address
         /// Uses [0u8;32] to identify the native token
         #[ink(message)]
-        pub fn get_committee_rewards(&self, committee_id: CommitteeId, token_id: [u8; 32]) -> u128 {
+        pub fn get_collected_committee_rewards(
+            &self,
+            committee_id: CommitteeId,
+            token_id: [u8; 32],
+        ) -> u128 {
             self.collected_committee_rewards
                 .get((committee_id, token_id))
                 .unwrap_or_default()
@@ -466,9 +492,9 @@ pub mod membrane {
             token_id: [u8; 32],
         ) -> Result<u128, MembraneError> {
             let total_amount = self
-                .get_committee_rewards(committee_id, token_id)
+                .get_collected_committee_rewards(committee_id, token_id)
                 .checked_div(
-                    self.committee_size
+                    self.committee_sizes
                         .get(committee_id)
                         .ok_or(MembraneError::NotInCommittee)?,
                 )
@@ -504,12 +530,15 @@ pub mod membrane {
         /// Returns an error (reverts) if account is not in the committee with `committee_id`
         #[ink(message)]
         pub fn is_in_committee(&self, committee_id: CommitteeId, account: AccountId) -> bool {
-            self.committee.contains((committee_id, account))
+            self.committees.contains((committee_id, account))
         }
 
         /// Returns an error (reverts) if account is not in the currently active committee
         #[ink(message)]
-        pub fn is_in_current_committee(&self, account: AccountId) -> Result<(), MembraneError> {
+        pub fn only_current_committee_member(
+            &self,
+            account: AccountId,
+        ) -> Result<(), MembraneError> {
             match self.is_in_committee(self.committee_id, account) {
                 true => Ok(()),
                 false => Err(MembraneError::NotInCommittee),
@@ -548,8 +577,16 @@ pub mod membrane {
         ///
         /// Changing the entire set is the ONLY way of upgrading the committee
         #[ink(message)]
-        pub fn set_committee(&mut self, committee: Vec<AccountId>) -> Result<(), MembraneError> {
+        pub fn set_committee(
+            &mut self,
+            committee: Vec<AccountId>,
+            signature_threshold: u128,
+        ) -> Result<(), MembraneError> {
             self.ensure_owner()?;
+
+            if signature_threshold == 0 || committee.len().lt(&(signature_threshold as usize)) {
+                return Err(MembraneError::InvalidThreshold);
+            }
 
             let committee_id = self.committee_id + 1;
 
@@ -558,8 +595,11 @@ pub mod membrane {
                 committee_set.insert((committee_id, account), &());
             });
 
-            self.committee = committee_set;
+            self.committees = committee_set;
             self.committee_id = committee_id;
+
+            self.signature_thresholds
+                .insert(committee_id, &signature_threshold);
 
             Ok(())
         }
@@ -576,7 +616,9 @@ pub mod membrane {
 
         // ---  helper functions
 
-        /// Queries a price oracle and returns the price of an `amount` number of the `of` tokens.
+        /// Queries a price oracle and returns the price of an `amount` number of the `of` tokens denominated in the `in_token`
+        ///
+        /// TODO: this is a mocked method pending an implementation
         #[ink(message)]
         pub fn query_price(
             &self,
@@ -584,12 +626,11 @@ pub mod membrane {
             of_token_address: [u8; 32],
             in_token_address: [u8; 32],
         ) -> Result<u128, MembraneError> {
-            // TODO: implement
-            if (of_token_address == WETH_TOKEN_ID) && (in_token_address == USDT_TOKEN_ID) {
+            if in_token_address == USDT_TOKEN_ID {
                 return Ok(amount_of * 2);
             }
 
-            if (of_token_address == USDT_TOKEN_ID) && (in_token_address == WETH_TOKEN_ID) {
+            if of_token_address == USDT_TOKEN_ID {
                 return Ok(amount_of / 2);
             }
 
@@ -604,26 +645,25 @@ pub mod membrane {
             }
         }
 
-        /// Transfers a given amount of a PSP22 token on behalf of a specified account to another account
-        ///
-        /// Will revert if not enough allowance was given to the caller prior to executing this tx
-        fn transfer_from_tx(
-            &self,
-            token: AccountId,
-            from: AccountId,
-            to: AccountId,
-            amount: u128,
-        ) -> Result<(), PSP22Error> {
-            let mut psp22: ink::contract_ref!(PSP22) = token.into();
-            psp22.transfer_from(from, to, amount, vec![])
-        }
-
         /// Mints the specified amount of token to the designated account
         ///
         /// Membrane contract needs to have a Minter role on the token contract
         fn mint_to(&self, token: AccountId, to: AccountId, amount: u128) -> Result<(), PSP22Error> {
             let mut psp22: ink::contract_ref!(Mintable) = token.into();
             psp22.mint(to, amount)
+        }
+
+        /// Burn the specified amount of token from the designated account
+        ///
+        /// Membrane contract needs to have a Burner role on the token contract
+        fn burn_from(
+            &self,
+            token: AccountId,
+            from: AccountId,
+            amount: u128,
+        ) -> Result<(), PSP22Error> {
+            let mut psp22: ink::contract_ref!(Burnable) = token.into();
+            psp22.burn(from, amount)
         }
     }
 
@@ -771,7 +811,7 @@ pub mod membrane {
             .expect("Threshold is valid.");
 
             assert!(!membrane.is_in_committee(membrane.current_committee_id(), accounts.alice));
-            assert_eq!(membrane.set_committee(vec![accounts.alice]), Ok(()));
+            assert_eq!(membrane.set_committee(vec![accounts.alice], 1), Ok(()));
             assert!(membrane.is_in_committee(membrane.current_committee_id(), accounts.alice));
         }
 
@@ -790,7 +830,7 @@ pub mod membrane {
             .expect("Threshold is valid.");
 
             assert!(membrane.is_in_committee(membrane.current_committee_id(), accounts.bob));
-            assert_eq!(membrane.set_committee(vec![accounts.alice]), Ok(()));
+            assert_eq!(membrane.set_committee(vec![accounts.alice], 1), Ok(()));
             assert!(!membrane.is_in_committee(membrane.current_committee_id(), accounts.bob));
         }
     }

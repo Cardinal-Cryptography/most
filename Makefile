@@ -45,6 +45,13 @@ redis-instance:
 local-bridgenet: # Run both devnets + a redis instance
 local-bridgenet: devnet-azero devnet-eth redis-instance
 
+.PHONY: stop-local-bridgenet
+stop-local-bridgenet:
+stop-local-bridgenet:
+	docker-compose -f ./devnet-azero/devnet-azero-compose.yml down && \
+	docker-compose -f ./devnet-eth/devnet-eth-compose.yml down && \
+	docker-compose -f ./relayer/scripts/redis-compose.yml down
+
 .PHONY: eth-deps
 eth-deps: # Install eth dependencies
 eth-deps:
