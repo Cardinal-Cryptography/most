@@ -67,7 +67,7 @@ fn main() -> Result<()> {
             &keypair,
         ));
 
-        let wallet = if &config.eth_keystore_path != "" {
+        let wallet = if !config.eth_keystore_path.is_empty() {
             LocalWallet::decrypt_keystore(&config.eth_keystore_path, &config.eth_keystore_password)
                 .expect("Cannot decrypt eth wallet")
         } else {

@@ -202,7 +202,7 @@ pub async fn get_next_finalized_block_number_eth(
             }    
         }
 
-        sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC.into())).await;
+        sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
     }
     best_finalized_block_number_opt.expect("We return only if we managed to fetch the block.")
 }

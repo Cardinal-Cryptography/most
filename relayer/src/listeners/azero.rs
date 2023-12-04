@@ -168,8 +168,10 @@ impl AlephZeroListener {
                         config,
                         events,
                         membrane_instance,
-                        block_number,
-                        block_hash,
+                        BlockDetails {
+                            block_number,
+                            block_hash,
+                        },
                         pending_blocks.clone(),
                         redis_connection.clone(),
                     )
@@ -195,22 +197,14 @@ async fn handle_events(
     config: Arc<Config>,
     events: Events<AlephConfig>,
     membrane_instance: Arc<MembraneInstance>,
-    block_number: u32,
-    block_hash: H256,
+    block_details: BlockDetails,
     pending_blocks: Arc<Mutex<BTreeSet<u32>>>,
     redis_connection: Arc<Mutex<RedisConnection>>,
 ) -> Result<(), AzeroListenerError> {
     let Config { name, .. } = &*config;
     let contracts = &[&membrane_instance.contract];
     let mut event_tasks = Vec::new();
-    for event_res in translate_events(
-        events.iter(),
-        contracts,
-        Some(BlockDetails {
-            block_number,
-            block_hash,
-        }),
-    ) {
+    for event_res in translate_events(events.iter(), contracts, Some(block_details.clone())) {
         if let Ok(event) = event_res {
             let config = config.clone();
             let eth_connection = eth_connection.clone();
@@ -220,6 +214,8 @@ async fn handle_events(
                     .await
                     .expect("Event handler failed");
             }));
+        } else {
+            log::debug!("Failed to translate event: {:?}", event_res);
         }
     }
 
@@ -230,7 +226,7 @@ async fn handle_events(
 
     // Lock the pending blocks set and remove the current block number (as we managed to process all events from it).
     let mut pending_blocks = pending_blocks.lock().await;
-    pending_blocks.remove(&block_number);
+    pending_blocks.remove(&block_details.block_number);
 
     // Now we know that all blocks before the pending block with the lowest number have been processed.
     // We can update the last processed block number in Redis.
@@ -343,12 +339,12 @@ async fn handle_event(
             info!(" Decoded event data:");
             info!(
                 "     dest_token_address: 0x{}",
-                hex::encode(dest_token_address.clone())
+                hex::encode(dest_token_address)
             );
             info!("     amount: {amount}");
             info!(
                 "     dest_receiver_address: 0x{}",
-                hex::encode(dest_receiver_address.clone())
+                hex::encode(dest_receiver_address)
             );
             info!("     request_nonce: {request_nonce}\n");
 

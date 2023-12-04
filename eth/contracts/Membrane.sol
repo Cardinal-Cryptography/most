@@ -12,8 +12,7 @@ contract Membrane {
     uint256 public commissionPerDixMille;
     uint256 public minimumTransferAmountUsd;
     uint256 public committeeId;
-    bytes32 public USDT =
-        0x1000000000000000000000000000000000000000000000000000000000000000;
+    bytes32 public USDT = 0x1000000000000000000000000000000000000000000000000000000000000000;
 
     struct Request {
         uint256 signatureCount;
