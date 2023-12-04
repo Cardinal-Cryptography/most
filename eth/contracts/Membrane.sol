@@ -268,8 +268,7 @@ contract Membrane {
         returns (bool)
     {
         return
-            committee[keccak256(abi.encodePacked(_committeeId, account))] ==
-            true;
+            committee[keccak256(abi.encodePacked(_committeeId, account))];
     }
 
     function bytes32ToAddress(bytes32 data) internal pure returns (address) {
