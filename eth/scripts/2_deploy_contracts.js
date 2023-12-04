@@ -6,7 +6,7 @@ async function main() {
 
   // Membrane
   const Membrane = await hre.ethers.getContractFactory("Membrane");
-  const membrane = await Membrane.deploy(accounts.slice(1, 9), 5);
+  const membrane = await Membrane.deploy(accounts.slice(0, 1), 1);
   const membraneAddress = await membrane.getAddress();
 
   console.log("Membrane deployed to:",  membraneAddress);

@@ -50,13 +50,17 @@ impl MembraneInstance {
                 signed_connection,
                 "receive_request",
                 &[
-                    str::from_utf8(&request_hash)?,
-                    str::from_utf8(&dest_token_address)?,
-                    &amount.to_string(),
-                    str::from_utf8(&dest_receiver_address)?,
-                    &request_nonce.to_string(),
+                    bytes32_to_str(&request_hash),
+                    bytes32_to_str(&dest_token_address),
+                    amount.to_string(),
+                    bytes32_to_str(&dest_receiver_address),
+                    request_nonce.to_string(),
                 ],
             )
             .await?)
     }
+}
+
+fn bytes32_to_str(data: &[u8; 32]) -> String {
+    "0x".to_owned() + &hex::encode(data)
 }

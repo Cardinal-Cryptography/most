@@ -14,10 +14,9 @@ use ethers::{
     core::types::Address,
     prelude::{ContractCall, ContractError},
     providers::{Middleware, ProviderError},
-    types::U256,
     utils::keccak256,
 };
-use log::{debug, info, trace, warn};
+use log::{error, info, warn};
 use redis::{aio::Connection as RedisConnection, AsyncCommands, RedisError};
 use subxt::{events::Events, utils::H256};
 use thiserror::Error;
@@ -33,7 +32,10 @@ use crate::{
         eth::{EthConnectionError, EthWsConnection, SignedEthWsConnection},
     },
     contracts::{AzeroContractError, Membrane, MembraneInstance},
-    listeners::eth::{get_next_finalized_block_number_eth, ETH_BLOCK_PROD_TIME_SEC},
+    listeners::{
+        azero::Value::Seq,
+        eth::{get_next_finalized_block_number_eth, ETH_BLOCK_PROD_TIME_SEC},
+    },
 };
 
 #[derive(Debug, Error)]
@@ -198,10 +200,7 @@ async fn handle_events(
     pending_blocks: Arc<Mutex<BTreeSet<u32>>>,
     redis_connection: Arc<Mutex<RedisConnection>>,
 ) -> Result<(), AzeroListenerError> {
-    let Config {
-        name,
-        ..
-    } = &*config;
+    let Config { name, .. } = &*config;
     let contracts = &[&membrane_instance.contract];
     let mut event_tasks = Vec::new();
     for event_res in translate_events(
@@ -212,15 +211,16 @@ async fn handle_events(
             block_hash,
         }),
     ) {
-        let event = event_res?;
-        let config = config.clone();
-        let eth_connection = eth_connection.clone();
-        // Spawn a new task for handling each event.
-        event_tasks.push(tokio::spawn(async move {
-            handle_event(config, eth_connection, event)
-                .await
-                .expect("Event handler failed");
-        }));
+        if let Ok(event) = event_res {
+            let config = config.clone();
+            let eth_connection = eth_connection.clone();
+            // Spawn a new task for handling each event.
+            event_tasks.push(tokio::spawn(async move {
+                handle_event(config, eth_connection, event)
+                    .await
+                    .expect("Event handler failed");
+            }));
+        }
     }
 
     // Wait for all event processing tasks to finish.
@@ -244,17 +244,74 @@ async fn handle_events(
     Ok(())
 }
 
+struct CrosschainTransferRequestData {
+    pub dest_token_address: [u8; 32],
+    pub amount: u128,
+    pub dest_receiver_address: [u8; 32],
+    pub request_nonce: u128,
+}
+
 fn get_event_data(
+    data: &HashMap<String, Value>,
+) -> Result<CrosschainTransferRequestData, AzeroListenerError> {
+    let dest_token_address: [u8; 32] = decode_seq_field(data, "dest_token_address")?;
+    let amount: u128 = decode_uint_field(data, "amount")?;
+    let dest_receiver_address: [u8; 32] = decode_seq_field(data, "dest_receiver_address")?;
+    let request_nonce: u128 = decode_uint_field(data, "request_nonce")?;
+
+    Ok(CrosschainTransferRequestData {
+        dest_token_address,
+        amount,
+        dest_receiver_address,
+        request_nonce,
+    })
+}
+
+fn decode_seq_field(
     data: &HashMap<String, Value>,
     field: &str,
 ) -> Result<[u8; 32], AzeroListenerError> {
-    match data.get(field) {
-        Some(Value::Hex(hex)) => {
-            let mut result = [0u8; 32];
-            result.copy_from_slice(hex.bytes());
-            Ok(result)
+    if let Some(Seq(seq_data)) = data.get(field) {
+        match seq_data
+            .elems()
+            .iter()
+            .try_fold(Vec::new(), |mut v, x| match x {
+                Value::UInt(x) => {
+                    v.push(*x as u8);
+                    Ok(v)
+                }
+                _ => Err(AzeroListenerError::MissingEventData(format!(
+                    "Seq under data field {:?} contains elements of incorrect type",
+                    field
+                ))),
+            })?
+            .try_into()
+        {
+            Ok(x) => Ok(x),
+            Err(_) => Err(AzeroListenerError::MissingEventData(format!(
+                "Seq under data field {:?} has incorrect length",
+                field
+            ))),
         }
-        _ => Err(AzeroListenerError::Unexpected),
+    } else {
+        Err(AzeroListenerError::MissingEventData(format!(
+            "Data field {:?} couldn't be found or has incorrect format",
+            field
+        )))
+    }
+}
+
+fn decode_uint_field(
+    data: &HashMap<String, Value>,
+    field: &str,
+) -> Result<u128, AzeroListenerError> {
+    if let Some(Value::UInt(x)) = data.get(field) {
+        Ok(*x)
+    } else {
+        Err(AzeroListenerError::MissingEventData(format!(
+            "Data field {:?} couldn't be found or has incorrect format",
+            field
+        )))
     }
 }
 
@@ -271,32 +328,46 @@ async fn handle_event(
     } = &*config;
     if let Some(name) = &event.name {
         if name.eq("CrosschainTransferRequest") {
-            info!("handling A0 contract event: {event:?}");
+            info!("Handling A0 contract event...");
 
             let data = event.data;
 
             // decode event data
-            let dest_token_address = get_event_data(&data, "dest_token_address")?;
-            let amount = get_event_data(&data, "amount")?;
-            let dest_receiver_address = get_event_data(&data, "dest_receiver_address")?;
-            let request_nonce = get_event_data(&data, "request_nonce")?;
+            let CrosschainTransferRequestData {
+                dest_token_address,
+                amount,
+                dest_receiver_address,
+                request_nonce,
+            } = get_event_data(&data)?;
 
-            let amount = U256::from_little_endian(&amount);
-            let request_nonce = U256::from_little_endian(&request_nonce);
+            info!(" Decoded event data:");
+            info!(
+                "     dest_token_address: 0x{}",
+                hex::encode(dest_token_address.clone())
+            );
+            info!("     amount: {amount}");
+            info!(
+                "     dest_receiver_address: 0x{}",
+                hex::encode(dest_receiver_address.clone())
+            );
+            info!("     request_nonce: {request_nonce}\n");
 
             // hash event data
-            let bytes = abi::encode_packed(&[
+            // NOTE: for some reason, ethers-rs's `encode_packed` does not properly encode the data
+            // (it does not pad uint to 32 bytes, but uses the actual number of bytes required to store the value)
+            // so we use `abi::encode` instead (it only differs for signed and dynamic size types, which we don't use here)
+            let bytes = abi::encode(&[
                 Token::FixedBytes(dest_token_address.to_vec()),
-                Token::Int(amount),
+                Token::Uint(amount.into()),
                 Token::FixedBytes(dest_receiver_address.to_vec()),
-                Token::Int(request_nonce),
-            ])?;
+                Token::Uint(request_nonce.into()),
+            ]);
 
-            trace!("ABI event encoding: {bytes:?}");
+            info!("ABI event encoding: 0x{}", hex::encode(bytes.clone()));
 
             let request_hash = keccak256(bytes);
 
-            debug!("hashed event encoding: {request_hash:?}");
+            info!("hashed event encoding: 0x{}", hex::encode(request_hash));
 
             let address = eth_contract_address.parse::<Address>()?;
             let contract = Membrane::new(address, eth_connection.clone());
@@ -305,10 +376,12 @@ async fn handle_event(
             let call: ContractCall<SignedEthWsConnection, ()> = contract.receive_request(
                 request_hash,
                 dest_token_address,
-                amount,
+                amount.into(),
                 dest_receiver_address,
-                request_nonce,
+                request_nonce.into(),
             );
+
+            info!("Sending tx with nonce {request_nonce} to the Ethereum network and waiting for enough confirmations...");
 
             // This shouldn't fail unless there is something wrong with our config.
             let tx_hash = call
@@ -319,6 +392,8 @@ async fn handle_event(
                 .await?
                 .ok_or(AzeroListenerError::TxNotPresentInBlockOrMempool)?
                 .transaction_hash;
+
+            info!("Tx with nonce {request_nonce} has been sent to the Ethereum network: {tx_hash:?} and received {eth_tx_min_confirmations} confirmations.");
 
             wait_for_eth_tx_finality(eth_connection, tx_hash).await?;
         }
@@ -331,7 +406,7 @@ pub async fn wait_for_eth_tx_finality(
     tx_hash: H256,
 ) -> Result<(), AzeroListenerError> {
     loop {
-        log::info!("Waiting for tx finality: {tx_hash:?}");
+        info!("Waiting for tx finality: {tx_hash:?}");
         sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
 
         let finalized_head_number =
@@ -341,13 +416,13 @@ pub async fn wait_for_eth_tx_finality(
             Ok(Some(tx)) => {
                 if let Some(block_number) = tx.block_number {
                     if block_number <= finalized_head_number.into() {
-                        log::info!("Eth tx finalized: {tx_hash:?}");
+                        info!("Eth tx finalized: {tx_hash:?}");
                         return Ok(());
                     }
                 }
             }
             Err(err) => {
-                log::error!("Failed to get tx that should be present: {err}");
+                error!("Failed to get tx that should be present: {err}");
             }
             _ => (),
         };
@@ -380,7 +455,8 @@ pub async fn get_next_finalized_block_number_azero(
             }
         }
 
-        sleep(Duration::from_secs(ALEPH_BLOCK_PROD_TIME_SEC)).await;
+        // If we are up to date, we can sleep for a longer time.
+        sleep(Duration::from_secs(10 * ALEPH_BLOCK_PROD_TIME_SEC)).await;
     }
     best_finalized_block_number_opt.expect("We return only if we managed to fetch the block.")
 }

@@ -23,7 +23,7 @@ pub struct Config {
 
     #[arg(
         long,
-        default_value = "../devnet-eth/execution/keystore/123463a4b065722e99115d6c222f267d9cabb524"
+        default_value = ""
     )]
     pub eth_keystore_path: String,
 
