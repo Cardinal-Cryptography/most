@@ -156,6 +156,7 @@ async fn handle_event(
             amount,
             dest_receiver_address,
             request_nonce,
+            ..
         },
     ) = event
     {
