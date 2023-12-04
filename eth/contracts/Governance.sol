@@ -1,127 +1,131 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8;
+pragma solidity ^0.8.0;
 
 contract Governance {
+    address public owner;
+    uint256 public quorum;
+    uint256 public nextId;
 
-  address public owner;
-  uint256 public quorum;
-  uint256 public nextId;
-
-  struct Proposal {
-    address destination;
-    bytes payload;
-    uint256 signatureCount;
-    mapping(address => bool) signatures;
-  }
+    struct Proposal {
+        address destination;
+        bytes payload;
+        uint256 signatureCount;
+        mapping(address => bool) signatures;
+    }
 
     mapping(uint256 => Proposal) public pendingProposals;
 
-  mapping(address => bool) private members;
+    mapping(address => bool) private members;
 
-  event ProposalSubmitted(address by, uint256 id);
+    event ProposalSubmitted(address by, uint256 id);
 
-  event Vote(address by, uint256 id);
+    event Vote(address by, uint256 id);
 
-  event ProposalExecuted(address by, uint256 id, bytes data);
+    event ProposalExecuted(address by, uint256 id, bytes data);
 
-  modifier _onlyOwner() {
-    require(msg.sender == owner);
-    _;
-  }
-
-  modifier _onlyMember() {
-    require(isMember(msg.sender), "NotMember");
-    _;
-  }
-
-  constructor(address[] memory _members,
-              uint256 _quorum) {
-    require(_members.length >= _quorum, "Not enough members specified");
-
-    owner = msg.sender;
-    quorum = _quorum;
-
-    for (uint256 i = 0; i < _members.length; i++) {
-      members[_members[i]] = true;
+    modifier _onlyOwner() {
+        require(msg.sender == owner, "Caller is not the owner");
+        _;
     }
-  }
 
-  function submitProposal(address destination,
-                          bytes calldata payload) external _onlyMember {
+    modifier _onlyMember() {
+        require(isMember(msg.sender), "NotMember");
+        _;
+    }
 
-    Proposal storage proposal = pendingProposals[nextId];
+    constructor(address[] memory _members, uint256 _quorum) {
+        require(_members.length >= _quorum, "Not enough members specified");
 
-    proposal.destination = destination;
-    proposal.payload = payload;
-    proposal.signatureCount = 1;
-    proposal.signatures[msg.sender] = true;
+        owner = msg.sender;
+        quorum = _quorum;
 
-    emit ProposalSubmitted(msg.sender, nextId);
-    nextId += 1;
-  }
+        for (uint256 i = 0; i < _members.length; i++) {
+            members[_members[i]] = true;
+        }
+    }
 
-  function vote(uint256 id) external _onlyMember {
+    function submitProposal(
+        address destination,
+        bytes calldata payload
+    ) external _onlyMember {
+        Proposal storage proposal = pendingProposals[nextId];
 
-    require(proposalExists(id), "NonExistentProposal");
+        proposal.destination = destination;
+        proposal.payload = payload;
+        proposal.signatureCount = 1;
+        proposal.signatures[msg.sender] = true;
 
-    Proposal storage proposal = pendingProposals[id];
+        emit ProposalSubmitted(msg.sender, nextId);
+        nextId += 1;
+    }
 
-    require(proposal.signatures[msg.sender] == false, "ProposalAlreadySigned");
+    function vote(uint256 id) external _onlyMember {
+        require(proposalExists(id), "NonExistentProposal");
 
-    proposal.signatureCount += 1;
-    proposal.signatures[msg.sender] = true;
+        Proposal storage proposal = pendingProposals[id];
 
-    emit Vote(msg.sender, id);
-  }
+        require(
+            proposal.signatures[msg.sender] == false,
+            "ProposalAlreadySigned"
+        );
 
-  function executeProposal(uint256 id) external {
+        proposal.signatureCount += 1;
+        proposal.signatures[msg.sender] = true;
 
-    require(proposalExists(id), "NonExistentProposal");
+        emit Vote(msg.sender, id);
+    }
 
-    Proposal storage proposal = pendingProposals[id];
+    function executeProposal(uint256 id) external {
+        require(proposalExists(id), "NonExistentProposal");
 
-    require(hasQuorum(id), "NoQuorum");
+        Proposal storage proposal = pendingProposals[id];
 
-    (bool success, bytes memory result) = proposal.destination.call(proposal.payload);
+        require(hasQuorum(id), "NoQuorum");
 
-    require(success, "ExecuteProposalFailed");
+        (bool success, bytes memory result) = proposal.destination.call(
+            proposal.payload
+        );
 
-    delete pendingProposals[id];
+        require(success, "ExecuteProposalFailed");
 
-    emit ProposalExecuted(msg.sender, id, result);
-  }
+        delete pendingProposals[id];
 
-  function hasQuorum(uint256 id) public view returns (bool) {
-    return pendingProposals[id].signatureCount >= quorum;
-  }
+        emit ProposalExecuted(msg.sender, id, result);
+    }
 
-  function isMember(address _address) public view returns (bool) {
-    return members[_address];
-  }
+    function hasQuorum(uint256 id) public view returns (bool) {
+        return pendingProposals[id].signatureCount >= quorum;
+    }
 
-  function proposalExists(uint256 id) internal view returns (bool) {
-    return pendingProposals[id].signatureCount > 0;
-  }
+    function isMember(address _address) public view returns (bool) {
+        return members[_address];
+    }
 
-  function hasSignedProposal(address member, uint256 id) external view returns (bool) {
-    return pendingProposals[id].signatures[member];
-  }
+    function proposalExists(uint256 id) internal view returns (bool) {
+        return pendingProposals[id].signatureCount > 0;
+    }
 
-  function setQuorum(uint256 _quorum) external _onlyOwner {
-    quorum = _quorum;
-  }
+    function hasSignedProposal(
+        address member,
+        uint256 id
+    ) external view returns (bool) {
+        return pendingProposals[id].signatures[member];
+    }
 
-  function setOwner(address _owner) external _onlyOwner {
-    owner = _owner;
-  }
+    function setQuorum(uint256 _quorum) external _onlyOwner {
+        quorum = _quorum;
+    }
 
-  function addMember(address member) external _onlyOwner {
-    members[member] = true;
-  }
+    function setOwner(address _owner) external _onlyOwner {
+        owner = _owner;
+    }
 
-  function removeMember(address member) external _onlyOwner {
-    members[member] = false;
-  }
+    function addMember(address member) external _onlyOwner {
+        members[member] = true;
+    }
 
+    function removeMember(address member) external _onlyOwner {
+        members[member] = false;
+    }
 }

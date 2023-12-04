@@ -5,9 +5,15 @@ pragma solidity ^0.8;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract Membrane {
+    uint256 constant DIX_MILLE = 10000;
+
     address public owner;
     uint256 public requestNonce;
-    uint256 public signatureThreshold;
+    uint256 public commissionPerDixMille;
+    uint256 public minimumTransferAmountUsd;
+    uint256 public committeeId;
+    bytes32 public USDT =
+        0x1000000000000000000000000000000000000000000000000000000000000000;
 
     struct Request {
         uint256 signatureCount;
@@ -18,13 +24,17 @@ contract Membrane {
     mapping(bytes32 => bytes32) public supportedPairs;
     mapping(bytes32 => Request) public pendingRequests;
     mapping(bytes32 => bool) public processedRequests;
-
-    mapping(address => bool) private guardians;
+    mapping(bytes32 => bool) private committee;
+    mapping(uint256 => uint256) public committeeSize;
+    mapping(uint256 => uint256) public signatureThreshold;
+    mapping(bytes32 => uint256) private collectedCommitteeRewards;
+    mapping(bytes32 => uint256) private paidOutMemberRewards;
 
     event CrosschainTransferRequest(
+        uint256 indexed committeeId,
         bytes32 indexed destTokenAddress,
         uint256 amount,
-        bytes32 destReceiverAddress,
+        bytes32 indexed destReceiverAddress,
         uint256 requestNonce
     );
 
@@ -36,35 +46,48 @@ contract Membrane {
     event ProcessedRequestSigned(bytes32 requestHash, address signer);
 
     modifier _onlyOwner() {
-        require(msg.sender == owner);
+        require(msg.sender == owner, "CallerIsNotOwner");
         _;
     }
 
-    modifier _onlyGuardian() {
-        require(isGuardian(msg.sender), "Can only be called by a guardian");
+    modifier _onlyCurrentCommitteeMember() {
+        require(isInCommittee(committeeId, msg.sender), "NotInCommittee");
         _;
     }
 
-    constructor(address[] memory _guardians, uint256 _signatureThreshold) {
+    constructor(
+        address[] memory _committee,
+        uint256 _signatureThreshold,
+        uint256 _commissionPerDixMille,
+        uint256 _minimumTransferAmountUsd
+    ) {
         require(
             _signatureThreshold > 0,
             "Signature threshold must be greater than 0"
         );
         require(
-            _guardians.length >= _signatureThreshold,
+            _committee.length >= _signatureThreshold,
             "Not enough guardians specified"
         );
 
         owner = msg.sender;
-        signatureThreshold = _signatureThreshold;
-        for (uint256 i = 0; i < _guardians.length; i++) {
-            guardians[_guardians[i]] = true;
+        commissionPerDixMille = _commissionPerDixMille;
+        minimumTransferAmountUsd = _minimumTransferAmountUsd;
+        committeeId = 0;
+
+        for (uint256 i = 0; i < _committee.length; i++) {
+            committee[
+                keccak256(abi.encodePacked(committeeId, _committee[i]))
+            ] = true;
         }
+
+        committeeSize[committeeId] = _committee.length;
+        signatureThreshold[committeeId] = _signatureThreshold;
     }
 
     // Invoke this tx to transfer funds to the destination chain.
-    // Account needs to approve the Membrane contract to spend the srcTokenAmount
-    // on their behalf before executing the tx.
+    // Account needs to approve the Membrane contract to spend the `srcTokenAmount`
+    // of `srcTokenAddress` tokens on their behalf before executing the tx.
     //
     // Tx emits a CrosschainTransferRequest event that the relayers listen to
     // & forward to the destination chain.
@@ -73,6 +96,12 @@ contract Membrane {
         uint256 amount,
         bytes32 destReceiverAddress
     ) external {
+        require(
+            queryPrice(amount, srcTokenAddress, USDT) >
+                minimumTransferAmountUsd,
+            "AmountBelowMinimum"
+        );
+
         address sender = msg.sender;
 
         IERC20 token = IERC20(bytes32ToAddress(srcTokenAddress));
@@ -86,6 +115,7 @@ contract Membrane {
         token.transferFrom(sender, address(this), amount);
 
         emit CrosschainTransferRequest(
+            committeeId,
             destTokenAddress,
             amount,
             destReceiverAddress,
@@ -95,14 +125,14 @@ contract Membrane {
         requestNonce++;
     }
 
-    // aggregates relayer signatures and burns/mints the token
+    // aggregates relayer signatures and returns the locked tokens
     function receiveRequest(
         bytes32 _requestHash,
         bytes32 destTokenAddress,
         uint256 amount,
         bytes32 destReceiverAddress,
         uint256 _requestNonce
-    ) external _onlyGuardian {
+    ) external _onlyCurrentCommitteeMember {
         // Don't revert if the request has already been processed as it
         // such a call can be made during regular guardian operation.
         if (processedRequests[_requestHash]) {
@@ -132,16 +162,100 @@ contract Membrane {
 
         emit RequestSigned(requestHash, msg.sender);
 
-        if (request.signatureCount >= signatureThreshold) {
+        if (request.signatureCount >= signatureThreshold[committeeId]) {
+            uint256 commission = (amount * commissionPerDixMille) / DIX_MILLE;
+
+            collectedCommitteeRewards[
+                keccak256(abi.encodePacked(committeeId, destTokenAddress))
+            ] += commission;
+
             processedRequests[requestHash] = true;
             delete pendingRequests[requestHash];
 
-            // returns the locked tokens
+            // return the locked tokens
             IERC20 token = IERC20(bytes32ToAddress(destTokenAddress));
 
-            token.transfer(bytes32ToAddress(destReceiverAddress), amount);
+            token.transfer(
+                bytes32ToAddress(destReceiverAddress),
+                amount - commission
+            );
             emit RequestProcessed(requestHash);
         }
+    }
+
+    // Request payout of rewards for signing & relaying cross-chain transfers
+    //
+    // Can be called by anyone on behalf of the committee member,
+    // past or present
+    function payoutRewards(
+        uint256 _committeeId,
+        address member,
+        bytes32 _token
+    ) external {
+        uint256 outstandingRewards = getOutstandingMemberRewards(
+            _committeeId,
+            member,
+            _token
+        );
+
+        if (outstandingRewards > 0) {
+            IERC20 token = IERC20(bytes32ToAddress(_token));
+            token.transfer(member, outstandingRewards);
+            paidOutMemberRewards[
+                keccak256(abi.encodePacked(_committeeId, member, _token))
+            ] += outstandingRewards;
+        }
+    }
+
+    function getCollectedCommitteeRewards(
+        uint256 _committeeId,
+        bytes32 token
+    ) public view returns (uint256) {
+        return
+            collectedCommitteeRewards[
+                keccak256(abi.encodePacked(_committeeId, token))
+            ];
+    }
+
+    function getPaidOutMemberRewards(
+        uint256 _committeeId,
+        address member,
+        bytes32 token
+    ) public view returns (uint256) {
+        return
+            paidOutMemberRewards[
+                keccak256(abi.encodePacked(_committeeId, member, token))
+            ];
+    }
+
+    function getOutstandingMemberRewards(
+        uint256 _committeeId,
+        address member,
+        bytes32 token
+    ) public view returns (uint256) {
+        return
+            (getCollectedCommitteeRewards(_committeeId, token) /
+                committeeSize[_committeeId]) -
+            getPaidOutMemberRewards(_committeeId, member, token);
+    }
+
+    // Queries a price oracle and returns the price of an `amount` number of the `of` tokens denominated in the `in_token`
+    //
+    // TODO: this is a mocked method pending an implementation
+    function queryPrice(
+        uint256 amountOf,
+        bytes32 ofToken,
+        bytes32 inToken
+    ) public view returns (uint256) {
+        if (inToken == USDT) {
+            return amountOf * 2;
+        }
+
+        if (ofToken == USDT) {
+            return amountOf / 2;
+        }
+
+        return amountOf;
     }
 
     function hasSignedRequest(
@@ -151,8 +265,11 @@ contract Membrane {
         return pendingRequests[hash].signatures[guardian];
     }
 
-    function isGuardian(address sender) public view returns (bool) {
-        return guardians[sender];
+    function isInCommittee(
+        uint256 _committeeId,
+        address account
+    ) public view returns (bool) {
+        return committee[keccak256(abi.encodePacked(_committeeId, account))];
     }
 
     function bytes32ToAddress(bytes32 data) internal pure returns (address) {
@@ -163,12 +280,29 @@ contract Membrane {
         return bytes32(uint256(uint160(addr)));
     }
 
-    function addGuardian(address guardian) external _onlyOwner {
-        guardians[guardian] = true;
-    }
+    function setCommittee(
+        address[] memory _committee,
+        uint256 _signatureThreshold
+    ) external _onlyOwner {
+        require(
+            _signatureThreshold > 0,
+            "Signature threshold must be greater than 0"
+        );
+        require(
+            _committee.length >= _signatureThreshold,
+            "Not enough guardians specified"
+        );
 
-    function removeGuardian(address guardian) external _onlyOwner {
-        guardians[guardian] = false;
+        committeeId += 1;
+
+        for (uint256 i = 0; i < _committee.length; i++) {
+            committee[
+                keccak256(abi.encodePacked(committeeId, _committee[i]))
+            ] = true;
+        }
+
+        committeeSize[committeeId] = _committee.length;
+        signatureThreshold[committeeId] = _signatureThreshold;
     }
 
     function setOwner(address _owner) external _onlyOwner {
@@ -181,5 +315,9 @@ contract Membrane {
 
     function removePair(bytes32 from) external _onlyOwner {
         delete supportedPairs[from];
+    }
+
+    function setUSDT(bytes32 _USDT) external _onlyOwner {
+        USDT = _USDT;
     }
 }
