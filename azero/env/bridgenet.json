@@ -1,5 +1,5 @@
 {
-  "ws_node": "wss://ws-fe-updnet-bridgenet.dev.azero.dev",
+  "ws_node": "wss://ws-fe-bridgenet.dev.azero.dev",
   "authority": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
   "authority_seed": "//Alice",
   "signature_threshold": 1
