@@ -4,7 +4,10 @@ use std::{
 };
 
 use aleph_client::{
-    contract::event::{translate_events, BlockDetails, ContractEvent},
+    contract::{
+        event::{translate_events, BlockDetails, ContractEvent},
+        ContractInstance,
+    },
     contract_transcode::Value,
     utility::BlocksApi,
     AlephConfig, AsConnection,
@@ -21,7 +24,7 @@ use redis::{aio::Connection as RedisConnection, AsyncCommands, RedisError};
 use subxt::{events::Events, utils::H256};
 use thiserror::Error;
 use tokio::{
-    sync::Mutex,
+    sync::{Mutex, OwnedSemaphorePermit, Semaphore},
     time::{sleep, Duration},
 };
 
@@ -37,8 +40,6 @@ use crate::{
         eth::{get_next_finalized_block_number_eth, ETH_BLOCK_PROD_TIME_SEC},
     },
 };
-
-use aleph_client::contract::ContractInstance;
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -104,12 +105,14 @@ impl AlephZeroListener {
         let Config {
             azero_contract_metadata,
             azero_contract_address,
+            azero_max_block_processing_tasks,
             name,
             default_sync_from_block_azero,
             ..
         } = &*config;
 
         let pending_blocks: Arc<Mutex<BTreeSet<u32>>> = Arc::new(Mutex::new(BTreeSet::new()));
+        let block_task_semaphore = Arc::new(Semaphore::new(*azero_max_block_processing_tasks));
 
         let membrane_instance =
             MembraneInstance::new(azero_contract_address, azero_contract_metadata)?;
@@ -170,6 +173,13 @@ impl AlephZeroListener {
                 let redis_connection = redis_connection.clone();
                 let pending_blocks = pending_blocks.clone();
 
+                // Acquire a permit to spawn a task to handle the events.
+                let _permit = block_task_semaphore
+                    .clone()
+                    .acquire_owned()
+                    .await
+                    .expect("Semaphore permit acquisition failed");
+
                 // Spawn a task to handle the events.
                 tokio::spawn(async move {
                     handle_events(
@@ -179,6 +189,7 @@ impl AlephZeroListener {
                         block_number,
                         pending_blocks.clone(),
                         redis_connection.clone(),
+                        _permit,
                     )
                     .await
                     .expect("Block events handler failed");
@@ -204,6 +215,7 @@ async fn handle_events(
     block_number: u32,
     pending_blocks: Arc<Mutex<BTreeSet<u32>>>,
     redis_connection: Arc<Mutex<RedisConnection>>,
+    _permit: OwnedSemaphorePermit,
 ) -> Result<(), AzeroListenerError> {
     let Config { name, .. } = &*config;
     let mut event_tasks = Vec::new();
