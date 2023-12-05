@@ -154,7 +154,7 @@ test-ink: test-ink-e2e
 	cargo test && \
 	cd ../governance && \
 	cargo test && \
-	cd ../psp22 && \
+	cd ../token && \
 	cargo test
 
 .PHONY: check-js-format
@@ -177,7 +177,7 @@ ink-lint: # Lint ink contracts
 ink-lint:
 	cd azero/contracts/membrane && cargo clippy -- --no-deps -D warnings
 	cd azero/contracts/governance && cargo clippy -- --no-deps -D warnings
-	cd azero/contracts/psp22 && cargo clippy -- --no-deps -D warnings
+	cd azero/contracts/token && cargo clippy -- --no-deps -D warnings
 	cd azero/contracts/psp22-traits && cargo clippy -- --no-deps -D warnings
 	cd azero/contracts/tests && cargo clippy -- --no-deps -D warnings
 
