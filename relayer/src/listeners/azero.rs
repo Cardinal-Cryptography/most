@@ -401,8 +401,8 @@ pub async fn wait_for_eth_tx_finality(
     eth_connection: Arc<SignedEthWsConnection>,
     tx_hash: H256,
 ) -> Result<(), AzeroListenerError> {
+    info!("Waiting for tx finality: {tx_hash:?}");
     loop {
-        info!("Waiting for tx finality: {tx_hash:?}");
         sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
 
         let finalized_head_number =
@@ -420,7 +420,7 @@ pub async fn wait_for_eth_tx_finality(
             Err(err) => {
                 error!("Failed to get tx that should be present: {err}");
             }
-            _ => (),
+            Ok(None) => panic!("Transaction {tx_hash:?} for which finality we were waiting is no longer included in the chain, aborting..."),
         };
     }
 }

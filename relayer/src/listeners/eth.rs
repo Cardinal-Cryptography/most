@@ -6,14 +6,16 @@ use ethers::{
     prelude::{k256::ecdsa::SigningKey, ContractError, SignerMiddleware},
     providers::{Middleware, Provider, ProviderError, Ws},
     signers::Wallet,
-    types::{BlockNumber},
+    types::BlockNumber,
     utils::keccak256,
 };
 use log::{debug, info, trace, warn};
 use redis::{aio::Connection as RedisConnection, AsyncCommands, RedisError};
 use thiserror::Error;
-use tokio::sync::Mutex;
-use tokio::time::{sleep, Duration};
+use tokio::{
+    sync::Mutex,
+    time::{sleep, Duration},
+};
 
 use crate::{
     config::Config,
@@ -22,7 +24,7 @@ use crate::{
         AzeroContractError, CrosschainTransferRequestFilter, Membrane, MembraneEvents,
         MembraneInstance,
     },
-    helpers::{concat_u8_arrays},
+    helpers::concat_u8_arrays,
 };
 
 #[derive(Debug, Error)]
@@ -179,32 +181,29 @@ pub async fn get_next_finalized_block_number_eth(
     eth_connection: Arc<SignedEthWsConnection>,
     not_older_than: u32,
 ) -> u32 {
-    let mut best_finalized_block_number_opt: Option<u32>;
     loop {
-        let finalized_block_opt = match eth_connection.get_block(BlockNumber::Finalized).await {
-            Ok(block) => Some(block.expect("msg")),
+        match eth_connection.get_block(BlockNumber::Finalized).await {
+            Ok(block) => match block {
+                Some(block) => {
+                    let best_finalized_block_number = block
+                        .number
+                        .expect("Finalized block should have a number.")
+                        .as_u32();
+                    if best_finalized_block_number >= not_older_than {
+                        return best_finalized_block_number;
+                    }
+                }
+                None => {
+                    warn!("No finalized block found.");
+                }
+            },
             Err(e) => {
                 warn!("Client error when getting last finalized block: {e}");
-                None
             }
         };
 
-        best_finalized_block_number_opt = finalized_block_opt.clone().map(|block| {
-            block
-                .number
-                .expect("Finalized block should have a number.")
-                .as_u32()
-        });
-
-        if let Some(best_finalized_block_number) = best_finalized_block_number_opt {
-            if best_finalized_block_number >= not_older_than {
-                break;
-            }    
-        }
-
         sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
     }
-    best_finalized_block_number_opt.expect("We return only if we managed to fetch the block.")
 }
 
 async fn read_first_unprocessed_block_number(
@@ -214,7 +213,10 @@ async fn read_first_unprocessed_block_number(
 ) -> u32 {
     let mut connection = redis_connection.lock().await;
 
-    match connection.get::<_, u32>(format!("{name}:{ETH_LAST_BLOCK_KEY}")).await {
+    match connection
+        .get::<_, u32>(format!("{name}:{ETH_LAST_BLOCK_KEY}"))
+        .await
+    {
         Ok(value) => value + 1,
         Err(why) => {
             warn!("Redis connection error {why:?}");
