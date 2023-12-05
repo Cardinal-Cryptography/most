@@ -16,7 +16,7 @@ use ethers::{
     providers::{Middleware, ProviderError},
     utils::keccak256,
 };
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use redis::{aio::Connection as RedisConnection, AsyncCommands, RedisError};
 use subxt::{events::Events, utils::H256};
 use thiserror::Error;
@@ -359,7 +359,7 @@ async fn handle_event(
                 Token::Uint(request_nonce.into()),
             ]);
 
-            info!("ABI event encoding: 0x{}", hex::encode(bytes.clone()));
+            debug!("ABI event encoding: 0x{}", hex::encode(bytes.clone()));
 
             let request_hash = keccak256(bytes);
 
@@ -429,32 +429,28 @@ pub async fn get_next_finalized_block_number_azero(
     azero_connection: Arc<SignedAzeroWsConnection>,
     not_older_than: u32,
 ) -> u32 {
-    let mut best_finalized_block_number_opt: Option<u32>;
     loop {
-        best_finalized_block_number_opt = match azero_connection.get_finalized_block_hash().await {
+        match azero_connection.get_finalized_block_hash().await {
             Ok(hash) => match azero_connection.get_block_number(hash).await {
-                Ok(number_opt) => number_opt,
+                Ok(number_opt) => {
+                    let best_finalized_block_number =
+                        number_opt.expect("Finalized block should have a number.");
+                    if best_finalized_block_number >= not_older_than {
+                        return best_finalized_block_number;
+                    }
+                }
                 Err(err) => {
                     warn!("Aleph Client error when getting best finalized block number: {err}");
-                    None
                 }
             },
             Err(err) => {
                 warn!("Aleph Client error when getting best finalized block hash: {err}");
-                None
             }
         };
-
-        if let Some(best_finalized_block_number) = best_finalized_block_number_opt {
-            if best_finalized_block_number >= not_older_than {
-                break;
-            }
-        }
 
         // If we are up to date, we can sleep for a longer time.
         sleep(Duration::from_secs(10 * ALEPH_BLOCK_PROD_TIME_SEC)).await;
     }
-    best_finalized_block_number_opt.expect("We return only if we managed to fetch the block.")
 }
 
 async fn read_first_unprocessed_block_number(
