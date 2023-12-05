@@ -31,14 +31,10 @@ async function main() {
   const addresses = {
     governance: governanceAddress,
     membrane: membraneAddress,
-    wrappedEther: wrappedEtherAddress,
+    weth: wrappedEtherAddress,
   };
 
   fs.writeFileSync("addresses.json", JSON.stringify(addresses));
-
-  //await governance.setOwner(governance);
-  //await membrane.setOwner(governance);
-  //await membrane.addPair(hre.ethers.zeroPadValue(wrappedEtherAddress, 32), )
 }
 
 main().catch((error) => {

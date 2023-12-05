@@ -15,6 +15,7 @@
         "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
         "@nomicfoundation/hardhat-ethers": "^3.0.4",
         "@nomicfoundation/hardhat-toolbox": "^3.0.0",
+        "@polkadot/keyring": "^12.6.1",
         "ethers": "^6.8.0",
         "gulp": "^4.0.2",
         "gulp-shell": "^0.8.0",

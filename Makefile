@@ -111,6 +111,20 @@ deploy-azero: compile-azero
 deploy: # Deploy all contracts
 deploy: deploy-azero deploy-eth
 
+#.PHONY: setup-azero
+#setup-azero: # Set up azero contracts
+#setup-azero: deploy
+
+.PHONY: setup-eth
+setup-eth: # Set up eth contracts
+setup-eth:
+	cd eth && \
+	npx hardhat run --network $(NETWORK) scripts/3_setup_contracts.js
+
+.PHONY: setup
+setup: # Set up all contracts
+setup: setup-azero setup-eth
+
 .PHONY: watch-relayer
 watch-relayer:
 	cd relayer && cargo watch -s 'cargo clippy' -c
