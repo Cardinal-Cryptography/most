@@ -1,7 +1,7 @@
-const hre = require("hardhat");
+const { ethers } = require("hardhat");
 
 async function main() {
-  const Migrations = await hre.ethers.getContractFactory("Migrations");
+  const Migrations = await ethers.getContractFactory("Migrations");
   const migrations = await Migrations.deploy();
 }
 
