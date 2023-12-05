@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-contract Membrane {
+contract Membrane is Initializable {
     uint256 constant DIX_MILLE = 10000;
 
     address public owner;
     uint256 public requestNonce;
-    /* uint256 public signatureThreshold; */
     uint256 public commissionPerDixMille;
     uint256 public minimumTransferAmountUsd;
     uint256 public committeeId;
@@ -52,12 +52,12 @@ contract Membrane {
         _;
     }
 
-    constructor(
+    function initialize(
         address[] memory _committee,
         uint256 _signatureThreshold,
         uint256 _commissionPerDixMille,
         uint256 _minimumTransferAmountUsd
-    ) {
+    ) public initializer {
         require(
             _signatureThreshold > 0,
             "Signature threshold must be greater than 0"
