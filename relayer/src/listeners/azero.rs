@@ -16,7 +16,7 @@ use ethers::{
     providers::{Middleware, ProviderError},
     utils::keccak256,
 };
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 use redis::{aio::Connection as RedisConnection, AsyncCommands, RedisError};
 use subxt::{events::Events, utils::H256};
 use thiserror::Error;
@@ -37,6 +37,8 @@ use crate::{
         eth::{get_next_finalized_block_number_eth, ETH_BLOCK_PROD_TIME_SEC},
     },
 };
+
+use aleph_client::contract::ContractInstance;
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -87,6 +89,7 @@ pub enum AzeroListenerError {
 
 const ALEPH_LAST_BLOCK_KEY: &str = "alephzero_last_known_block_number";
 const ALEPH_BLOCK_PROD_TIME_SEC: u64 = 1;
+// This is more than the maximum number of send_request calls than will fit into the block (execution time)
 const ALEPH_MAX_REQUESTS_PER_BLOCK: usize = 50;
 
 pub struct AlephZeroListener;
@@ -108,10 +111,8 @@ impl AlephZeroListener {
 
         let pending_blocks: Arc<Mutex<BTreeSet<u32>>> = Arc::new(Mutex::new(BTreeSet::new()));
 
-        let instance = Arc::new(MembraneInstance::new(
-            azero_contract_address,
-            azero_contract_metadata,
-        )?);
+        let membrane_instance =
+            MembraneInstance::new(azero_contract_address, azero_contract_metadata)?;
         let mut first_unprocessed_block_number = read_first_unprocessed_block_number(
             name.clone(),
             redis_connection.clone(),
@@ -155,24 +156,27 @@ impl AlephZeroListener {
                     .await?
                     .events()
                     .await?;
+                let filtered_events = filter_events(
+                    events,
+                    &[&membrane_instance.contract],
+                    BlockDetails {
+                        block_number,
+                        block_hash,
+                    },
+                );
 
                 let config = config.clone();
                 let eth_connection = eth_connection.clone();
                 let redis_connection = redis_connection.clone();
                 let pending_blocks = pending_blocks.clone();
-                let membrane_instance = instance.clone();
 
                 // Spawn a task to handle the events.
                 tokio::spawn(async move {
                     handle_events(
                         eth_connection,
                         config,
-                        events,
-                        membrane_instance,
-                        BlockDetails {
-                            block_number,
-                            block_hash,
-                        },
+                        filtered_events,
+                        block_number,
                         pending_blocks.clone(),
                         redis_connection.clone(),
                     )
@@ -196,30 +200,24 @@ async fn add_to_pending(block_number: u32, pending_blocks: Arc<Mutex<BTreeSet<u3
 async fn handle_events(
     eth_connection: Arc<SignedEthWsConnection>,
     config: Arc<Config>,
-    events: Events<AlephConfig>,
-    membrane_instance: Arc<MembraneInstance>,
-    block_details: BlockDetails,
+    events: Vec<ContractEvent>,
+    block_number: u32,
     pending_blocks: Arc<Mutex<BTreeSet<u32>>>,
     redis_connection: Arc<Mutex<RedisConnection>>,
 ) -> Result<(), AzeroListenerError> {
     let Config { name, .. } = &*config;
-    let contracts = &[&membrane_instance.contract];
     let mut event_tasks = Vec::new();
-    for event_res in translate_events(events.iter(), contracts, Some(block_details.clone())) {
-        if let Ok(event) = event_res {
-            let config = config.clone();
-            let eth_connection = eth_connection.clone();
-            // Spawn a new task for handling each event.
-            event_tasks.push(tokio::spawn(async move {
-                handle_event(config, eth_connection, event)
-                    .await
-                    .expect("Event handler failed");
-            }));
-            if event_tasks.len() >= ALEPH_MAX_REQUESTS_PER_BLOCK {
-                panic!("Too many send_request calls in one block: our benchmark is outdated.");
-            }
-        } else {
-            log::debug!("Failed to translate event: {:?}", event_res);
+    for event in events {
+        let config = config.clone();
+        let eth_connection = eth_connection.clone();
+        // Spawn a new task for handling each event.
+        event_tasks.push(tokio::spawn(async move {
+            handle_event(config, eth_connection, event)
+                .await
+                .expect("Event handler failed");
+        }));
+        if event_tasks.len() >= ALEPH_MAX_REQUESTS_PER_BLOCK {
+            panic!("Too many send_request calls in one block: our benchmark is outdated.");
         }
     }
 
@@ -230,7 +228,7 @@ async fn handle_events(
 
     // Lock the pending blocks set and remove the current block number (as we managed to process all events from it).
     let mut pending_blocks = pending_blocks.lock().await;
-    pending_blocks.remove(&block_details.block_number);
+    pending_blocks.remove(&block_number);
 
     // Now we know that all blocks before the pending block with the lowest number have been processed.
     // We can update the last processed block number in Redis.
@@ -249,6 +247,24 @@ struct CrosschainTransferRequestData {
     pub amount: u128,
     pub dest_receiver_address: [u8; 32],
     pub request_nonce: u128,
+}
+
+fn filter_events(
+    events: Events<AlephConfig>,
+    contracts: &[&ContractInstance],
+    block_details: BlockDetails,
+) -> Vec<ContractEvent> {
+    translate_events(events.iter(), contracts, Some(block_details))
+        .into_iter()
+        .filter_map(|event_res| {
+            if let Ok(event) = event_res {
+                Some(event)
+            } else {
+                trace!("Failed to translate event: {:?}", event_res);
+                None
+            }
+        })
+        .collect()
 }
 
 fn get_event_data(
