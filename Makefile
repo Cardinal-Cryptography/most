@@ -15,10 +15,14 @@ clean-azero:
 	5*/chainspec.json \
 	&& echo "Done azero clean"
 
+.PHONY: clean-eth
+clean-eth: # Remove eth node data
+clean-eth:
+	cd devnet-eth && ./clean.sh && echo "Done clean"
+
 .PHONY: clean
 clean: # Remove all node data
-clean: clean-azero
-	cd devnet-eth && ./clean.sh && echo "Done clean"
+clean: clean-azero clean-eth
 
 .PHONY: bootstrap-azero
 bootstrap-azero: # Bootstrap the node data
