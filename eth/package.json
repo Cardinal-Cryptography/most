@@ -12,11 +12,11 @@
         "@openzeppelin/contracts-upgradeable": "=5.0.0"
     },
     "devDependencies": {
+        "@openzeppelin/hardhat-upgrades": "^2.5.0",
         "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
         "@nomicfoundation/hardhat-ethers": "^3.0.4",
         "@nomicfoundation/hardhat-toolbox": "^3.0.0",
         "dotenv": "^16.3.1",
-        "ethers": "^6.8.0",
         "gulp": "^4.0",
         "gulp-shell": "^0.8.0",
         "hardhat": "^2.19.0",
