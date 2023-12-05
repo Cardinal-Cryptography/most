@@ -300,7 +300,7 @@ pub mod membrane {
 
             self.only_current_committee_member(caller)?;
 
-            // Don't revert if the request has already been processed as it
+            // Don't revert if the request has already been processed as
             // such a call can be made during regular guardian operation.
             if self.processed_requests.contains(request_hash) {
                 self.env().emit_event(SignedProcessedRequest {

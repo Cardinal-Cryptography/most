@@ -377,7 +377,7 @@ async fn handle_event(
                 request_nonce.into(),
             );
 
-            info!("Sending tx with nonce {request_nonce} to the Ethereum network and waiting for enough confirmations...");
+            info!("Sending tx with nonce {request_nonce} to the Ethereum network and waiting for {eth_tx_min_confirmations} confirmations");
 
             // This shouldn't fail unless there is something wrong with our config.
             let tx_hash = call
@@ -412,7 +412,7 @@ pub async fn wait_for_eth_tx_finality(
             Ok(Some(tx)) => {
                 if let Some(block_number) = tx.block_number {
                     if block_number <= finalized_head_number.into() {
-                        info!("Eth tx finalized: {tx_hash:?}");
+                        info!("Eth tx {tx_hash:?} finalized");
                         return Ok(());
                     }
                 }

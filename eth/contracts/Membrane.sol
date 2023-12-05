@@ -132,7 +132,7 @@ contract Membrane {
         bytes32 destReceiverAddress,
         uint256 _requestNonce
     ) external _onlyCurrentCommitteeMember {
-        // Don't revert if the request has already been processed as it
+        // Don't revert if the request has already been processed as
         // such a call can be made during regular guardian operation.
         if (processedRequests[_requestHash]) {
             emit ProcessedRequestSigned(_requestHash, msg.sender);
