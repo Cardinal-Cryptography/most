@@ -87,6 +87,7 @@ pub enum AzeroListenerError {
 
 const ALEPH_LAST_BLOCK_KEY: &str = "alephzero_last_known_block_number";
 const ALEPH_BLOCK_PROD_TIME_SEC: u64 = 1;
+const ALEPH_MAX_REQUESTS_PER_BLOCK: usize = 50;
 
 pub struct AlephZeroListener;
 
@@ -214,6 +215,9 @@ async fn handle_events(
                     .await
                     .expect("Event handler failed");
             }));
+            if event_tasks.len() >= ALEPH_MAX_REQUESTS_PER_BLOCK {
+                panic!("Too many send_request calls in one block: our benchmark is outdated.");
+            }
         } else {
             log::debug!("Failed to translate event: {:?}", event_res);
         }
