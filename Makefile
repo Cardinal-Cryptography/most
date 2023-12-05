@@ -45,6 +45,13 @@ redis-instance:
 local-bridgenet: # Run both devnets + a redis instance
 local-bridgenet: devnet-azero devnet-eth redis-instance
 
+.PHONY: stop-local-bridgenet
+stop-local-bridgenet:
+stop-local-bridgenet:
+	docker-compose -f ./devnet-azero/devnet-azero-compose.yml down && \
+	docker-compose -f ./devnet-eth/devnet-eth-compose.yml down && \
+	docker-compose -f ./relayer/scripts/redis-compose.yml down
+
 .PHONY: eth-deps
 eth-deps: # Install eth dependencies
 eth-deps:
@@ -159,3 +166,31 @@ test-ink: test-ink-e2e
 	cargo test && \
 	cd ../psp22 && \
 	cargo test
+
+.PHONY: check-js-format
+check-js-format: # Check js formatting
+check-js-format:
+	cd eth && npx prettier --check test
+
+.PHONY: solidity-lint
+solidity-lint: # Lint solidity contracts
+solidity-lint: eth-deps
+	cd eth && npx solium -d contracts
+
+.PHONY: relayer-lint
+relayer-lint: # Lint relayer
+relayer-lint: compile-azero-docker compile-eth
+	cd relayer && cargo clippy -- --no-deps -D warnings
+
+.PHONY: ink-lint
+ink-lint: # Lint ink contracts
+ink-lint:
+	cd azero/contracts/membrane && cargo clippy -- --no-deps -D warnings
+	cd azero/contracts/governance && cargo clippy -- --no-deps -D warnings
+	cd azero/contracts/psp22 && cargo clippy -- --no-deps -D warnings
+	cd azero/contracts/psp22-traits && cargo clippy -- --no-deps -D warnings
+	cd azero/contracts/tests && cargo clippy -- --no-deps -D warnings
+
+.PHONY: contracts-lint
+contracts-lint: # Lint contracts
+contracts-lint: solidity-lint ink-lint

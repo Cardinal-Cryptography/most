@@ -36,7 +36,8 @@ async function main() {
     console.log('wethEthereumBytes32: ', wethEthereumAddressBytes32);
     console.log('randomAlephBytes32: ', hre.ethers.solidityPackedKeccak256(["uint"], [5]));
 
-    await membrane.addPair(
+    const governanceSigner = await hre.ethers.getSigner(governance.address);
+    await membrane.connect(governanceSigner).addPair(
         wethEthereumAddressBytes32,
         wethAlephAddressBytes32
     );
