@@ -207,7 +207,9 @@ pub mod token {
         #[ink(message)]
         fn burn(&mut self, from: AccountId, value: u128) -> Result<(), PSP22Error> {
             self.ensure_admin()?;
-            let events = self.data.burn(from, value)?;
+            
+            self.transfer_from(from, self.env().caller(), value, Vec::new())?;
+            let events = self.data.burn(self.env().caller(), value)?;
             self.emit_events(events);
             Ok(())
         }
@@ -251,7 +253,49 @@ pub mod token {
         }
 
         #[ink::test]
-        fn admin_can_burn() {
+        fn admin_cannot_burn_tokens_he_does_not_own() {
+            let mut token = init_contract(INIT_SUPPLY_TEST);
+            let alice = default_accounts::<E>().alice;
+            let bob = default_accounts::<E>().bob;
+
+            set_caller::<E>(alice);
+            token
+                .transfer(bob, 1000, vec![])
+                .expect("Transfer should work.");
+
+            assert_eq!(token.burn(bob, 100), Err(PSP22Error::InsufficientAllowance));
+        }
+
+        #[ink::test]
+        fn user_cannot_burn_own_tokens() {
+            let mut token = init_contract(INIT_SUPPLY_TEST);
+            let alice = default_accounts::<E>().alice;
+            let bob = default_accounts::<E>().bob;
+
+            set_caller::<E>(alice);
+            token
+                .transfer(bob, 1000, vec![])
+                .expect("Transfer should work.");
+
+            set_caller::<E>(bob);
+            assert_eq!(token.burn(bob, 100), Err(PSP22Error::Custom(String::from(
+                "Caller has to be the admin."
+            ))));
+        }
+
+        #[ink::test]
+        fn admin_can_burn_own_tokens() {
+            let mut token = init_contract(INIT_SUPPLY_TEST);
+            let alice = default_accounts::<E>().alice;
+            let alice_balance_before = token.balance_of(alice);
+
+            set_caller::<E>(alice);
+            assert!(token.burn(alice, 100).is_ok());
+            assert_eq!(token.balance_of(alice), alice_balance_before - 100);
+        }
+
+        #[ink::test]
+        fn admin_can_burn_tokens_with_allowance() {
             let mut token = init_contract(INIT_SUPPLY_TEST);
             let alice = default_accounts::<E>().alice;
             let bob = default_accounts::<E>().bob;
@@ -262,23 +306,14 @@ pub mod token {
                 .transfer(bob, 1000, vec![])
                 .expect("Transfer should work.");
 
+            set_caller::<E>(bob);
+            token
+                .approve(alice, 800)
+                .expect("Approve should work.");
+
+            set_caller::<E>(alice);
             assert!(token.burn(bob, 100).is_ok());
             assert_eq!(token.balance_of(bob), bob_balance_before + 900);
-        }
-
-        #[ink::test]
-        fn non_admin_cannot_burn() {
-            let mut token = init_contract(INIT_SUPPLY_TEST);
-            let alice = default_accounts::<E>().alice;
-            let bob = default_accounts::<E>().bob;
-
-            set_caller::<E>(bob);
-            assert_eq!(
-                token.burn(alice, 100),
-                Err(PSP22Error::Custom(String::from(
-                    "Caller has to be the admin."
-                )))
-            );
         }
 
         fn init_contract(init_supply: u128) -> Token {

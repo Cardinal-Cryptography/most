@@ -127,7 +127,18 @@ mod e2e {
         .expect("balance before");
 
         let amount_to_send = 1000;
-        _ = membrane_send_request(
+
+        psp22_approve(
+            &mut client,
+            &alice(),
+            token_address,
+            membrane_address,
+            amount_to_send,
+        )
+        .await
+        .expect("Alice should be able to approve the membrane to spend her tokens");
+
+        membrane_send_request(
             &mut client,
             &alice(),
             membrane_address,
@@ -136,7 +147,8 @@ mod e2e {
             REMOTE_RECEIVER,
             base_fee,
         )
-        .await;
+        .await
+        .expect("send request should succeed");
 
         let balance_after = psp22_balance_of(
             &mut client,
@@ -198,6 +210,16 @@ mod e2e {
 
         let amount_to_send = 1000;
 
+        psp22_approve(
+            &mut client,
+            &alice(),
+            token_address,
+            membrane_address,
+            amount_to_send,
+        )
+        .await
+        .expect("Alice should be able to approve the membrane to spend her tokens");
+
         let base_fee = membrane_base_fee(&mut client, membrane_address)
             .await
             .expect("should return base fee");
@@ -215,8 +237,8 @@ mod e2e {
 
         match send_request_res {
             Ok(call_res) => {
-                // 1 PSP22Event::Transfer event for burn and 1 `CrosschainTransferRequest`
-                assert_eq!(call_res.events.len(), 2);
+                // 3 PSP22Events for transfer, change of allowance and burn, 1 `CrosschainTransferRequest`
+                assert_eq!(call_res.events.len(), 4);
 
                 let request_events =
                     filter_decode_events_as::<CrosschainTransferRequest>(call_res.events);
@@ -954,6 +976,23 @@ mod e2e {
         )
         .await
         .map(|call_res| call_res.value)
+    }
+
+    async fn psp22_approve(
+        client: &mut E2EClient,
+        caller: &Keypair,
+        token: AccountId,
+        spender: AccountId,
+        amount: u128,
+    ) -> CallResult<(), PSP22Error> {
+        call_message::<TokenRef, _, _, _, _>(
+            client,
+            caller,
+            token,
+            |token| token.approve(spender, amount),
+            None,
+        )
+        .await
     }
 
     async fn psp22_balance_of(
