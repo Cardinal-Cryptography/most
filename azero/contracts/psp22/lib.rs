@@ -71,9 +71,9 @@ pub mod token {
 
         fn ensure_admin(&self) -> Result<(), PSP22Error> {
             if self.env().caller() != self.admin {
-                Err(PSP22Error::Custom(
-                    String::from("Caller has to be the admin."),
-                ))
+                Err(PSP22Error::Custom(String::from(
+                    "Caller has to be the admin.",
+                )))
             } else {
                 Ok(())
             }
@@ -210,6 +210,85 @@ pub mod token {
             let events = self.data.burn(from, value)?;
             self.emit_events(events);
             Ok(())
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use ink::env::{test::*, DefaultEnvironment as E};
+
+        use super::*;
+
+        const INIT_SUPPLY_TEST: u128 = 1_000_000;
+
+        psp22::tests!(Token, crate::token::tests::init_contract);
+
+        #[ink::test]
+        fn admin_can_mint() {
+            let mut token = init_contract(INIT_SUPPLY_TEST);
+            let alice = default_accounts::<E>().alice;
+            let bob = default_accounts::<E>().bob;
+            let bob_balance_before = token.balance_of(bob);
+
+            set_caller::<E>(alice);
+            assert!(token.mint(bob, 100).is_ok());
+            assert_eq!(token.balance_of(bob), bob_balance_before + 100);
+        }
+
+        #[ink::test]
+        fn non_admin_cannot_mint() {
+            let mut token = init_contract(INIT_SUPPLY_TEST);
+            let alice = default_accounts::<E>().alice;
+            let bob = default_accounts::<E>().bob;
+
+            set_caller::<E>(bob);
+            assert_eq!(
+                token.mint(alice, 100),
+                Err(PSP22Error::Custom(String::from(
+                    "Caller has to be the admin."
+                )))
+            );
+        }
+
+        #[ink::test]
+        fn admin_can_burn() {
+            let mut token = init_contract(INIT_SUPPLY_TEST);
+            let alice = default_accounts::<E>().alice;
+            let bob = default_accounts::<E>().bob;
+            let bob_balance_before = token.balance_of(bob);
+
+            set_caller::<E>(alice);
+            token
+                .transfer(bob, 1000, vec![])
+                .expect("Transfer should work.");
+
+            assert!(token.burn(bob, 100).is_ok());
+            assert_eq!(token.balance_of(bob), bob_balance_before + 900);
+        }
+
+        #[ink::test]
+        fn non_admin_cannot_burn() {
+            let mut token = init_contract(INIT_SUPPLY_TEST);
+            let alice = default_accounts::<E>().alice;
+            let bob = default_accounts::<E>().bob;
+
+            set_caller::<E>(bob);
+            assert_eq!(
+                token.burn(alice, 100),
+                Err(PSP22Error::Custom(String::from(
+                    "Caller has to be the admin."
+                )))
+            );
+        }
+
+        fn init_contract(init_supply: u128) -> Token {
+            Token::new(
+                init_supply,
+                Some(String::from("MOST wrapped Ether")),
+                Some(String::from("mETH")),
+                18,
+                default_accounts::<E>().alice,
+            )
         }
     }
 }
