@@ -381,7 +381,16 @@ describe("Membrane", function () {
             signerBalanceAfter = await token.balanceOf(accounts[1].address);
             await expect(signerBalanceAfter).to.be.equal(signerBalanceBefore + (totalRewards / BigInt (8)));
         });
+    });
 
+    describe("Upgrade", function () {
+        it("Membrane contract can be upgraded", async () => {
+            const { membrane, membraneAddress } = await loadFixture(deployEightGuardianMembraneFixture);
+            const MembraneV2 = await ethers.getContractFactory("Membrane");
+            const membraneV2 = await upgrades.upgradeProxy(membraneAddress, MembraneV2);
+            const address = await membraneV2.getAddress();
+            await expect(address).to.be.equal(membraneAddress);
+        });
     });
 
 });
