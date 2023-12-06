@@ -103,286 +103,285 @@ describe("Membrane", function () {
             ).to.be.revertedWith("AmountBelowMinimum");
         });
 
-        // it("Reverts if token is not whitelisted", async () => {
-        //     const { membrane, token, tokenAddressBytes32, membraneAddress } = await loadFixture(deployEightGuardianMembraneFixture);
+        it("Reverts if token is not whitelisted", async () => {
+            const { membrane, token, tokenAddressBytes32, membraneAddress } = await loadFixture(deployEightGuardianMembraneFixture);
 
-        //     await token.approve(membraneAddress, TOKEN_AMOUNT);
-        //     await expect(
-        //         membrane.sendRequest(
-        //             tokenAddressBytes32,
-        //             TOKEN_AMOUNT,
-        //             ALEPH_ACCOUNT
-        //         )
-        //     ).to.be.revertedWith("Unsupported pair");
-        // });
+            await token.approve(membraneAddress, TOKEN_AMOUNT);
+            await expect(
+                membrane.sendRequest(
+                    tokenAddressBytes32,
+                    TOKEN_AMOUNT,
+                    ALEPH_ACCOUNT
+                )
+            ).to.be.revertedWith("Unsupported pair");
+        });
 
-        // it("Reverts if token is not approved", async () => {
-        //     const { membrane, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
+        it("Reverts if token transfer is not approved", async () => {
+            const { membrane, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
 
-        //     await membrane.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
-        //     await expect(
-        //         membrane.sendRequest(
-        //             tokenAddressBytes32,
-        //             TOKEN_AMOUNT,
-        //             ALEPH_ACCOUNT
-        //         )
-        //     ).to.be.revertedWith("ERC20: insufficient allowance");
-        // });
+            await membrane.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
+            await expect(
+                membrane.sendRequest(
+                    tokenAddressBytes32,
+                    TOKEN_AMOUNT,
+                    ALEPH_ACCOUNT
+                )
+            ).to.be.reverted;
+        });
 
-        // it("Transfers tokens to Membrane", async () => {
-        //     const { membrane, token, tokenAddressBytes32, membraneAddress } = await loadFixture(deployEightGuardianMembraneFixture);
+        it("Transfers tokens to Membrane", async () => {
+            const { membrane, token, tokenAddressBytes32, membraneAddress } = await loadFixture(deployEightGuardianMembraneFixture);
 
-        //     await token.approve(membraneAddress, TOKEN_AMOUNT);
-        //     await membrane.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
-        //     await membrane.sendRequest(
-        //         tokenAddressBytes32,
-        //         TOKEN_AMOUNT,
-        //         ALEPH_ACCOUNT
-        //     );
+            await token.approve(membraneAddress, TOKEN_AMOUNT);
+            await membrane.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
+            await membrane.sendRequest(
+                tokenAddressBytes32,
+                TOKEN_AMOUNT,
+                ALEPH_ACCOUNT
+            );
 
-        //     expect(await token.balanceOf(membraneAddress)).to.equal(TOKEN_AMOUNT);
-        // });
+            expect(await token.balanceOf(membraneAddress)).to.equal(TOKEN_AMOUNT);
+        });
 
-        // it("Emits correct event", async () => {
-        //     const { membrane, token, tokenAddressBytes32, membraneAddress } = await loadFixture(deployEightGuardianMembraneFixture);
+        it("Emits correct event", async () => {
+            const { membrane, token, tokenAddressBytes32, membraneAddress } = await loadFixture(deployEightGuardianMembraneFixture);
 
-        //     await token.approve(membraneAddress, TOKEN_AMOUNT);
-        //     await membrane.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
-        //     await expect(
-        //         membrane.sendRequest(
-        //             tokenAddressBytes32,
-        //             TOKEN_AMOUNT,
-        //             ALEPH_ACCOUNT
-        //         )
-        //     ).to.emit(membrane, "CrosschainTransferRequest").withArgs(
-        //         0,
-        //         WRAPPED_TOKEN_ADDRESS,
-        //         TOKEN_AMOUNT,
-        //         ALEPH_ACCOUNT,
-        //         0,
-        //     );
-        // });
+            await token.approve(membraneAddress, TOKEN_AMOUNT);
+            await membrane.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
+            await expect(
+                membrane.sendRequest(
+                    tokenAddressBytes32,
+                    TOKEN_AMOUNT,
+                    ALEPH_ACCOUNT
+                )
+            ).to.emit(membrane, "CrosschainTransferRequest").withArgs(
+                0,
+                WRAPPED_TOKEN_ADDRESS,
+                TOKEN_AMOUNT,
+                ALEPH_ACCOUNT,
+                0,
+            );
+        });
     });
 
-    // describe("receiveRequest", function () {
-    //     it("Reverts if caller is not a guardian", async () => {
-    //         const { membrane, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
-    //         const accounts = await hre.ethers.getSigners();
-    //         const ethAddress = addressToBytes32(accounts[10].address);
-    //         const requestHash = hre.ethers.solidityPackedKeccak256(
-    //             ["bytes32", "uint256", "bytes32", "uint256"],
-    //             [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0]
-    //         );
+    describe("receiveRequest", function () {
+        it("Reverts if caller is not a guardian", async () => {
+            const { membrane, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
+            const accounts = await ethers.getSigners();
+            const ethAddress = addressToBytes32(accounts[10].address);
+            const requestHash = ethers.solidityPackedKeccak256(
+                ["bytes32", "uint256", "bytes32", "uint256"],
+                [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0]
+            );
 
-    //         await expect(
-    //             membrane.connect(accounts[0]).receiveRequest(
-    //                 requestHash,
-    //                 tokenAddressBytes32,
-    //                 TOKEN_AMOUNT,
-    //                 ethAddress,
-    //                 0,
-    //             )
-    //         ).to.be.revertedWith("NotInCommittee");
-    //     });
+            await expect(
+                membrane.connect(accounts[0]).receiveRequest(
+                    requestHash,
+                    tokenAddressBytes32,
+                    TOKEN_AMOUNT,
+                    ethAddress,
+                    0,
+                )
+            ).to.be.revertedWith("NotInCommittee");
+        });
 
-    //     it("Reverts if request has already been signed by a guardian", async () => {
-    //         const { membrane, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
-    //         const accounts = await hre.ethers.getSigners();
-    //         const ethAddress = addressToBytes32(accounts[10].address);
-    //         const requestHash = hre.ethers.solidityPackedKeccak256(
-    //             ["bytes32", "uint256", "bytes32", "uint256"],
-    //             [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0]
-    //         );
+        it("Reverts if request has already been signed by a guardian", async () => {
+            const { membrane, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
+            const accounts = await ethers.getSigners();
+            const ethAddress = addressToBytes32(accounts[10].address);
+            const requestHash = ethers.solidityPackedKeccak256(
+                ["bytes32", "uint256", "bytes32", "uint256"],
+                [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0]
+            );
 
-    //         await membrane.connect(accounts[1]).receiveRequest(
-    //             requestHash,
-    //             tokenAddressBytes32,
-    //             TOKEN_AMOUNT,
-    //             ethAddress,
-    //             0,
-    //         );
-    //         await expect(
-    //             membrane.connect(accounts[1]).receiveRequest(
-    //                 requestHash,
-    //                 tokenAddressBytes32,
-    //                 TOKEN_AMOUNT,
-    //                 ethAddress,
-    //                 0,
-    //             )
-    //         ).to.be.revertedWith("This guardian has already signed this request");
-    //     });
+            await membrane.connect(accounts[1]).receiveRequest(
+                requestHash,
+                tokenAddressBytes32,
+                TOKEN_AMOUNT,
+                ethAddress,
+                0,
+            );
+            await expect(
+                membrane.connect(accounts[1]).receiveRequest(
+                    requestHash,
+                    tokenAddressBytes32,
+                    TOKEN_AMOUNT,
+                    ethAddress,
+                    0,
+                )
+            ).to.be.revertedWith("This guardian has already signed this request");
+        });
 
-    //     it("Reverts if request has already been executed", async () => {
-    //         const { membrane, token, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
-    //         const accounts = await hre.ethers.getSigners();
-    //         const ethAddress = addressToBytes32(accounts[10].address);
-    //         const requestHash = hre.ethers.solidityPackedKeccak256(
-    //             ["bytes32", "uint256", "bytes32", "uint256"],
-    //             [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0]
-    //         );
+        it("Reverts if request has already been executed", async () => {
+            const { membrane, token, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
+            const accounts = await ethers.getSigners();
+            const ethAddress = addressToBytes32(accounts[10].address);
+            const requestHash = ethers.solidityPackedKeccak256(
+                ["bytes32", "uint256", "bytes32", "uint256"],
+                [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0]
+            );
 
-    //         // Provide funds for Membrane
-    //         await token.transfer(await membrane.getAddress(), TOKEN_AMOUNT * 2);
+            // Provide funds for Membrane
+            await token.transfer(await membrane.getAddress(), TOKEN_AMOUNT * 2);
 
-    //         for (let i = 1; i < 6; i++) {
-    //             await membrane.connect(accounts[i]).receiveRequest(
-    //                 requestHash,
-    //                 tokenAddressBytes32,
-    //                 TOKEN_AMOUNT,
-    //                 ethAddress,
-    //                 0,
-    //             );
-    //         }
+            for (let i = 1; i < 6; i++) {
+                await membrane.connect(accounts[i]).receiveRequest(
+                    requestHash,
+                    tokenAddressBytes32,
+                    TOKEN_AMOUNT,
+                    ethAddress,
+                    0,
+                );
+            }
 
-    //         await expect(
-    //             membrane.connect(accounts[6]).receiveRequest(
-    //                 requestHash,
-    //                 tokenAddressBytes32,
-    //                 TOKEN_AMOUNT,
-    //                 ethAddress,
-    //                 0,
-    //             )
-    //         ).to.be.revertedWith("This request has already been processed");
-    //     });
+            await expect(
+                membrane.connect(accounts[6]).receiveRequest(
+                    requestHash,
+                    tokenAddressBytes32,
+                    TOKEN_AMOUNT,
+                    ethAddress,
+                    0,
+                )
+            ).to.be.revertedWith("This request has already been processed");
+        });
 
-    //     it("Unlocks tokens for the user", async () => {
-    //         const { membrane, token, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
-    //         const accounts = await hre.ethers.getSigners();
-    //         const ethAddress = addressToBytes32(accounts[10].address);
-    //         const requestHash = hre.ethers.solidityPackedKeccak256(
-    //             ["bytes32", "uint256", "bytes32", "uint256"],
-    //             [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0]
-    //         );
+        it("Unlocks tokens for the user", async () => {
+            const { membrane, token, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
+            const accounts = await ethers.getSigners();
+            const ethAddress = addressToBytes32(accounts[10].address);
+            const requestHash = ethers.solidityPackedKeccak256(
+                ["bytes32", "uint256", "bytes32", "uint256"],
+                [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0]
+            );
 
-    //         // Provide funds for Membrane
-    //         await token.transfer(await membrane.getAddress(), TOKEN_AMOUNT * 2);
+            // Provide funds for Membrane
+            await token.transfer(await membrane.getAddress(), TOKEN_AMOUNT * 2);
 
-    //         for (let i = 1; i < 6; i++) {
-    //             await membrane.connect(accounts[i]).receiveRequest(
-    //                 requestHash,
-    //                 tokenAddressBytes32,
-    //                 TOKEN_AMOUNT,
-    //                 ethAddress,
-    //                 0,
-    //             );
-    //         }
+            for (let i = 1; i < 6; i++) {
+                await membrane.connect(accounts[i]).receiveRequest(
+                    requestHash,
+                    tokenAddressBytes32,
+                    TOKEN_AMOUNT,
+                    ethAddress,
+                    0,
+                );
+            }
 
-    //         expect(await token.balanceOf(accounts[10].address)).to.equal(TOKEN_AMOUNT * (DIX_MILLE - COMMISSION_PER_DIX_MILLE) / DIX_MILLE);
-    //     });
+            expect(await token.balanceOf(accounts[10].address)).to.equal(TOKEN_AMOUNT * (DIX_MILLE - COMMISSION_PER_DIX_MILLE) / DIX_MILLE);
+        });
 
-    //     it("Reverts on non-matching hash", async () => {
-    //         const { membrane, token, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
-    //         const accounts = await hre.ethers.getSigners();
-    //         const ethAddress = addressToBytes32(accounts[10].address);
-    //         const requestHash = hre.ethers.solidityPackedKeccak256(
-    //             ["bytes32", "uint256", "bytes32", "uint256"],
-    //             [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 1]
-    //         );
+        it("Reverts on non-matching hash", async () => {
+            const { membrane, token, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
+            const accounts = await ethers.getSigners();
+            const ethAddress = addressToBytes32(accounts[10].address);
+            const requestHash = ethers.solidityPackedKeccak256(
+                ["bytes32", "uint256", "bytes32", "uint256"],
+                [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 1]
+            );
 
-    //         // Provide funds for Membrane
-    //         await token.transfer(await membrane.getAddress(), TOKEN_AMOUNT * 2);
+            // Provide funds for Membrane
+            await token.transfer(await membrane.getAddress(), TOKEN_AMOUNT * 2);
 
-    //         await expect(
-    //             membrane.connect(accounts[1]).receiveRequest(
-    //                 requestHash,
-    //                 tokenAddressBytes32,
-    //                 TOKEN_AMOUNT,
-    //                 ethAddress,
-    //                 0,
-    //             )
-    //         ).to.be.revertedWith("Hash does not match the data");
-    //     });
-    // });
+            await expect(
+                membrane.connect(accounts[1]).receiveRequest(
+                    requestHash,
+                    tokenAddressBytes32,
+                    TOKEN_AMOUNT,
+                    ethAddress,
+                    0,
+                )
+            ).to.be.revertedWith("Hash does not match the data");
+        });
+    });
 
-    // describe("payoutRewards", function () {
+    describe("payoutRewards", function () {
+        it("account can request a payout", async () => {
+            const { membrane, token, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
+            const accounts = await ethers.getSigners();
+            const ethAddress = addressToBytes32(accounts[10].address);
+            const requestHash = ethers.solidityPackedKeccak256(
+                ["bytes32", "uint256", "bytes32", "uint256"],
+                [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0]
+            );
 
-    //     it("account can request a payout", async () => {
-    //         const { membrane, token, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
-    //         const accounts = await hre.ethers.getSigners();
-    //         const ethAddress = addressToBytes32(accounts[10].address);
-    //         const requestHash = hre.ethers.solidityPackedKeccak256(
-    //             ["bytes32", "uint256", "bytes32", "uint256"],
-    //             [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0]
-    //         );
+            // Provide funds for Membrane
+            await token.transfer(await membrane.getAddress(), TOKEN_AMOUNT * 2);
 
-    //         // Provide funds for Membrane
-    //         await token.transfer(await membrane.getAddress(), TOKEN_AMOUNT * 2);
+            for (let i = 1; i < 6 ; i++) {
+                await membrane.connect(accounts[i]).receiveRequest(
+                    requestHash,
+                    tokenAddressBytes32,
+                    TOKEN_AMOUNT,
+                    ethAddress,
+                    0,
+                );
+            }
 
-    //         for (let i = 1; i < 6 ; i++) {
-    //             await membrane.connect(accounts[i]).receiveRequest(
-    //                 requestHash,
-    //                 tokenAddressBytes32,
-    //                 TOKEN_AMOUNT,
-    //                 ethAddress,
-    //                 0,
-    //             );
-    //         }
+            currentCommitteeId = await membrane.committeeId ();
+            totalRewards = await membrane.getCollectedCommitteeRewards (currentCommitteeId, tokenAddressBytes32);
 
-    //         currentCommitteeId = await membrane.committeeId ();
-    //         totalRewards = await membrane.getCollectedCommitteeRewards (currentCommitteeId, tokenAddressBytes32);
+            await expect(
+                currentCommitteeId
+            ).to.be.equal(0);
 
-    //         await expect(
-    //             currentCommitteeId
-    //         ).to.be.equal(0);
+            signerBalanceBefore = await token.balanceOf(accounts[1].address);
 
-    //         signerBalanceBefore = await token.balanceOf(accounts[1].address);
+            await membrane.payoutRewards (currentCommitteeId,
+                                         accounts[1].address,
+                                         tokenAddressBytes32);
 
-    //         await membrane.payoutRewards (currentCommitteeId,
-    //                                      accounts[1].address,
-    //                                      tokenAddressBytes32);
+            signerBalanceAfter = await token.balanceOf(accounts[1].address);
+            await expect(signerBalanceAfter).to.be.equal(signerBalanceBefore + (totalRewards / BigInt (8)));
+        });
 
-    //         signerBalanceAfter = await token.balanceOf(accounts[1].address);
-    //         await expect(signerBalanceAfter).to.be.equal(signerBalanceBefore + (totalRewards / BigInt (8)));
-    //     });
+        it("past committee member can still request a payout", async () => {
+            const { membrane, token, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
+            const accounts = await ethers.getSigners();
+            const ethAddress = addressToBytes32(accounts[10].address);
+            const requestHash = ethers.solidityPackedKeccak256(
+                ["bytes32", "uint256", "bytes32", "uint256"],
+                [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0]
+            );
 
-    //     it("past committee member can still request a payout", async () => {
-    //         const { membrane, token, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
-    //         const accounts = await hre.ethers.getSigners();
-    //         const ethAddress = addressToBytes32(accounts[10].address);
-    //         const requestHash = hre.ethers.solidityPackedKeccak256(
-    //             ["bytes32", "uint256", "bytes32", "uint256"],
-    //             [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0]
-    //         );
+            // Provide funds for Membrane
+            await token.transfer(await membrane.getAddress(), TOKEN_AMOUNT * 2);
 
-    //         // Provide funds for Membrane
-    //         await token.transfer(await membrane.getAddress(), TOKEN_AMOUNT * 2);
+            for (let i = 1; i < 6 ; i++) {
+                await membrane.connect(accounts[i]).receiveRequest(
+                    requestHash,
+                    tokenAddressBytes32,
+                    TOKEN_AMOUNT,
+                    ethAddress,
+                    0,
+                );
+            }
 
-    //         for (let i = 1; i < 6 ; i++) {
-    //             await membrane.connect(accounts[i]).receiveRequest(
-    //                 requestHash,
-    //                 tokenAddressBytes32,
-    //                 TOKEN_AMOUNT,
-    //                 ethAddress,
-    //                 0,
-    //             );
-    //         }
+            previousCommitteeId = await membrane.committeeId ();
 
-    //         previousCommitteeId = await membrane.committeeId ();
+            await expect(
+                previousCommitteeId
+            ).to.be.equal(0);
 
-    //         await expect(
-    //             previousCommitteeId
-    //         ).to.be.equal(0);
+            let committee = accounts.slice(2, 9).map((x) => x.address);
+            let threshold = 4;
 
-    //         let committee = accounts.slice(2, 9).map((x) => x.address);
-    //         let threshold = 4;
+            await membrane.setCommittee (committee, threshold);
 
-    //         await membrane.setCommittee (committee, threshold);
+            await expect(
+                await membrane.committeeId ()
+            ).to.be.equal(1);
 
-    //         await expect(
-    //             await membrane.committeeId ()
-    //         ).to.be.equal(1);
+            totalRewards = await membrane.getCollectedCommitteeRewards (previousCommitteeId, tokenAddressBytes32);
+            signerBalanceBefore = await token.balanceOf(accounts[1].address);
 
-    //         totalRewards = await membrane.getCollectedCommitteeRewards (previousCommitteeId, tokenAddressBytes32);
-    //         signerBalanceBefore = await token.balanceOf(accounts[1].address);
+            await membrane.payoutRewards (previousCommitteeId,
+                                         accounts[1].address,
+                                         tokenAddressBytes32);
 
-    //         await membrane.payoutRewards (previousCommitteeId,
-    //                                      accounts[1].address,
-    //                                      tokenAddressBytes32);
+            signerBalanceAfter = await token.balanceOf(accounts[1].address);
+            await expect(signerBalanceAfter).to.be.equal(signerBalanceBefore + (totalRewards / BigInt (8)));
+        });
 
-    //         signerBalanceAfter = await token.balanceOf(accounts[1].address);
-    //         await expect(signerBalanceAfter).to.be.equal(signerBalanceBefore + (totalRewards / BigInt (8)));
-    //     });
-
-    // });
+    });
 
 });
