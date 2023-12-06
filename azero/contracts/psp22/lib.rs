@@ -36,6 +36,7 @@ pub mod token {
         name: Option<String>,
         symbol: Option<String>,
         decimals: u8,
+        admin: AccountId,
     }
 
     impl Token {
@@ -45,12 +46,36 @@ pub mod token {
             name: Option<String>,
             symbol: Option<String>,
             decimals: u8,
+            admin: AccountId,
         ) -> Self {
             Self {
                 data: PSP22Data::new(total_supply, Self::env().caller()),
                 name,
                 symbol,
                 decimals,
+                admin,
+            }
+        }
+
+        #[ink(message)]
+        pub fn admin(&self) -> AccountId {
+            self.admin
+        }
+
+        #[ink(message)]
+        pub fn set_admin(&mut self, new_admin: AccountId) -> Result<(), PSP22Error> {
+            self.ensure_admin()?;
+            self.admin = new_admin;
+            Ok(())
+        }
+
+        fn ensure_admin(&self) -> Result<(), PSP22Error> {
+            if self.env().caller() != self.admin {
+                Err(PSP22Error::Custom(
+                    String::from("Caller has to be the admin."),
+                ))
+            } else {
+                Ok(())
             }
         }
 
@@ -168,20 +193,20 @@ pub mod token {
         }
     }
 
-    // TODO : access control (roles)
     impl Mintable for Token {
         #[ink(message)]
         fn mint(&mut self, to: AccountId, value: u128) -> Result<(), PSP22Error> {
+            self.ensure_admin()?;
             let events = self.data.mint(to, value)?;
             self.emit_events(events);
             Ok(())
         }
     }
 
-    // TODO : access control (roles)
     impl Burnable for Token {
         #[ink(message)]
         fn burn(&mut self, from: AccountId, value: u128) -> Result<(), PSP22Error> {
+            self.ensure_admin()?;
             let events = self.data.burn(from, value)?;
             self.emit_events(events);
             Ok(())
