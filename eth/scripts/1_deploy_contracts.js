@@ -1,5 +1,5 @@
 const fs = require("node:fs");
-const { ethers, upgrades } = require("hardhat");
+const { ethers, upgrades, artifacts } = require("hardhat");
 
 const COMMISSION_PER_DIX_MILLE=30
 const MINIMUM_TRANSFER_AMOUNT_USD=50
@@ -50,26 +50,17 @@ async function main() {
     await membrane.waitForDeployment();
     console.log("Membrane deployed to:",  membrane.target);
 
-    // --- setup
+    const Migrations = await ethers.getContractFactory("Migrations");
+    const migrations = await Migrations.deploy();
+    console.log("migrations deployed to:",  migrations.target);
 
-    let initialOwner = await governance.owner();
-    console.log("Transferring Governance ownership from ", initialOwner, "to self...");
-    await governance.transferOwnership(governance.target);
-    console.log("Governance ownership transferred successfully");
-
-    const payload = ethers.zeroPadValue(ethers.getBytes(
-        usdt.target
-    ), 32);
-
-    console.log("Setting USDT address in Membrane to:", payload);
-    await membrane.setUSDT(payload);
-
-    await membrane.transferOwnership(governance.target);
-    console.log("Membrane ownership transferred successfully");
+    console.log("Updating migrations...");
+    await migrations.setCompleted (1);
 
     // --- spit addresses
 
     const addresses = {
+        migrations: migrations.target,
         governance: governance.target,
         membrane: membrane.target,
         weth9: weth9.target,

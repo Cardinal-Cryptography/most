@@ -75,8 +75,13 @@ compile-eth: eth-deps
 deploy-eth: # Deploy eth contracts
 deploy-eth: compile-eth
 	cd eth && \
-	npx hardhat run --network $(NETWORK) scripts/1_initial_migration.js && \
-	npx hardhat run --network $(NETWORK) scripts/2_deploy_contracts.js
+	npx hardhat run --network $(NETWORK) scripts/1_deploy_contracts.js
+
+.PHONY: setup-eth
+setup-eth: # Setup eth contracts
+setup-eth: compile-eth
+	cd eth && \
+	npx hardhat run --network $(NETWORK) scripts/2_setup_contracts.js
 
 .PHONY: membrane-builder
 membrane-builder: # Build an image in which contracts can be built
