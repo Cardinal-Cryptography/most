@@ -6,7 +6,7 @@ const MINIMUM_TRANSFER_AMOUNT_USD=50
 
 async function main() {
     const signers = await ethers.getSigners();
-    accounts = signers.map(s => s.address)
+    const accounts = signers.map(s => s.address)
 
     console.log("Using ", accounts [0], "as signer");
 
