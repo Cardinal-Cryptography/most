@@ -1,16 +1,9 @@
-use std::{
-    collections::{BTreeSet, HashMap},
-    sync::Arc,
-};
+use std::{collections::BTreeSet, sync::Arc};
 
 use aleph_client::{
-    contract::{
-        event::{translate_events, BlockDetails, ContractEvent},
-        ContractInstance,
-    },
-    contract_transcode::Value,
+    contract::event::{BlockDetails, ContractEvent},
     utility::BlocksApi,
-    AlephConfig, AsConnection,
+    AsConnection,
 };
 use ethers::{
     abi::{self, EncodePackedError, Token},
@@ -19,9 +12,9 @@ use ethers::{
     providers::{Middleware, ProviderError},
     utils::keccak256,
 };
-use log::{debug, error, info, trace, warn};
+use log::{debug, error, info, warn};
 use redis::{aio::Connection as RedisConnection, AsyncCommands, RedisError};
-use subxt::{events::Events, utils::H256};
+use subxt::utils::H256;
 use thiserror::Error;
 use tokio::{
     sync::{Mutex, OwnedSemaphorePermit, Semaphore},
@@ -38,10 +31,7 @@ use crate::{
         filter_membrane_events, get_request_event_data, AzeroContractError,
         CrosschainTransferRequestData, Membrane, MembraneInstance,
     },
-    listeners::{
-        azero::Value::Seq,
-        eth::{get_next_finalized_block_number_eth, ETH_BLOCK_PROD_TIME_SEC},
-    },
+    listeners::eth::{get_next_finalized_block_number_eth, ETH_BLOCK_PROD_TIME_SEC},
 };
 
 #[derive(Debug, Error)]
