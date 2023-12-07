@@ -20,7 +20,7 @@ module.exports = {
         gasPrice: 20e9,
       },
       bridgenet: {
-        url: "https://rpc-eth-node2-bridgenet.dev.azero.dev",
+        url: "https://rpc-eth-bridgenet.dev.azero.dev",
         accounts: {
             mnemonic: DEV_MNEMONIC,
         },
