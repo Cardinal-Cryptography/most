@@ -14,30 +14,19 @@ async function main() {
     );
 
     const {
-        'governance': governanceEthereumAddress,
         'membrane': membraneEthereumAddress,
         'weth': wethEthereumAddress
     } = JSON.parse(
         fs.readFileSync(WETH_ETHEREUM_ADDRESS_PATH, 'utf8'),
     );
 
-    const governance = await hre.ethers.getContractAt('Governance', governanceEthereumAddress);
     const membrane = await hre.ethers.getContractAt('Membrane', membraneEthereumAddress);
 
-    await governance.setOwner(governanceEthereumAddress);
-    await membrane.setOwner(governanceEthereumAddress);
-    console.log('wethAleph: ', wethAlephAddress);
-    console.log('wethEthereum: ', wethEthereumAddress);
-
-    const keyring = new Keyring({ type: 'sr25519'});
+    const keyring = new Keyring({ type: 'sr25519' });
     const wethAlephAddressBytes32 = keyring.decodeAddress(wethAlephAddress);
-    console.log('wethAlephBytes32: ', wethAlephAddressBytes32);
     const wethEthereumAddressBytes32 = hre.ethers.zeroPadValue(wethEthereumAddress, 32);
-    console.log('wethEthereumBytes32: ', wethEthereumAddressBytes32);
-    console.log('randomAlephBytes32: ', hre.ethers.solidityPackedKeccak256(["uint"], [5]));
 
-    const governanceSigner = await hre.ethers.getSigner(governance.address);
-    await membrane.connect(governanceSigner).addPair(
+    await membrane.addPair(
         wethEthereumAddressBytes32,
         wethAlephAddressBytes32
     );
