@@ -34,7 +34,10 @@ use crate::{
         azero::SignedAzeroWsConnection,
         eth::{EthConnectionError, EthWsConnection, SignedEthWsConnection},
     },
-    contracts::{AzeroContractError, Membrane, MembraneInstance},
+    contracts::{
+        filter_membrane_events, get_request_event_data, AzeroContractError,
+        CrosschainTransferRequestData, Membrane, MembraneInstance,
+    },
     listeners::{
         azero::Value::Seq,
         eth::{get_next_finalized_block_number_eth, ETH_BLOCK_PROD_TIME_SEC},
@@ -159,9 +162,9 @@ impl AlephZeroListener {
                     .await?
                     .events()
                     .await?;
-                let filtered_events = filter_events(
+                let filtered_events = filter_membrane_events(
                     events,
-                    &[&membrane_instance.contract],
+                    &membrane_instance,
                     BlockDetails {
                         block_number,
                         block_hash,
@@ -254,95 +257,6 @@ async fn handle_events(
     Ok(())
 }
 
-struct CrosschainTransferRequestData {
-    pub dest_token_address: [u8; 32],
-    pub amount: u128,
-    pub dest_receiver_address: [u8; 32],
-    pub request_nonce: u128,
-}
-
-fn filter_events(
-    events: Events<AlephConfig>,
-    contracts: &[&ContractInstance],
-    block_details: BlockDetails,
-) -> Vec<ContractEvent> {
-    translate_events(events.iter(), contracts, Some(block_details))
-        .into_iter()
-        .filter_map(|event_res| {
-            if let Ok(event) = event_res {
-                Some(event)
-            } else {
-                trace!("Failed to translate event: {:?}", event_res);
-                None
-            }
-        })
-        .collect()
-}
-
-fn get_event_data(
-    data: &HashMap<String, Value>,
-) -> Result<CrosschainTransferRequestData, AzeroListenerError> {
-    let dest_token_address: [u8; 32] = decode_seq_field(data, "dest_token_address")?;
-    let amount: u128 = decode_uint_field(data, "amount")?;
-    let dest_receiver_address: [u8; 32] = decode_seq_field(data, "dest_receiver_address")?;
-    let request_nonce: u128 = decode_uint_field(data, "request_nonce")?;
-
-    Ok(CrosschainTransferRequestData {
-        dest_token_address,
-        amount,
-        dest_receiver_address,
-        request_nonce,
-    })
-}
-
-fn decode_seq_field(
-    data: &HashMap<String, Value>,
-    field: &str,
-) -> Result<[u8; 32], AzeroListenerError> {
-    if let Some(Seq(seq_data)) = data.get(field) {
-        match seq_data
-            .elems()
-            .iter()
-            .try_fold(Vec::new(), |mut v, x| match x {
-                Value::UInt(x) => {
-                    v.push(*x as u8);
-                    Ok(v)
-                }
-                _ => Err(AzeroListenerError::MissingEventData(format!(
-                    "Seq under data field {:?} contains elements of incorrect type",
-                    field
-                ))),
-            })?
-            .try_into()
-        {
-            Ok(x) => Ok(x),
-            Err(_) => Err(AzeroListenerError::MissingEventData(format!(
-                "Seq under data field {:?} has incorrect length",
-                field
-            ))),
-        }
-    } else {
-        Err(AzeroListenerError::MissingEventData(format!(
-            "Data field {:?} couldn't be found or has incorrect format",
-            field
-        )))
-    }
-}
-
-fn decode_uint_field(
-    data: &HashMap<String, Value>,
-    field: &str,
-) -> Result<u128, AzeroListenerError> {
-    if let Some(Value::UInt(x)) = data.get(field) {
-        Ok(*x)
-    } else {
-        Err(AzeroListenerError::MissingEventData(format!(
-            "Data field {:?} couldn't be found or has incorrect format",
-            field
-        )))
-    }
-}
-
 async fn handle_event(
     config: Arc<Config>,
     eth_connection: Arc<SignedEthWsConnection>,
@@ -366,19 +280,16 @@ async fn handle_event(
                 amount,
                 dest_receiver_address,
                 request_nonce,
-            } = get_event_data(&data)?;
+            } = get_request_event_data(&data)?;
 
-            info!(" Decoded event data:");
+            info!("Decoded event data:");
+            info!(" dest_token_address: 0x{}", hex::encode(dest_token_address));
+            info!(" amount: {amount}");
             info!(
-                "     dest_token_address: 0x{}",
-                hex::encode(dest_token_address)
-            );
-            info!("     amount: {amount}");
-            info!(
-                "     dest_receiver_address: 0x{}",
+                " dest_receiver_address: 0x{}",
                 hex::encode(dest_receiver_address)
             );
-            info!("     request_nonce: {request_nonce}\n");
+            info!(" request_nonce: {request_nonce}\n");
 
             // hash event data
             // NOTE: for some reason, ethers-rs's `encode_packed` does not properly encode the data
