@@ -24,10 +24,7 @@ pub struct Config {
     #[arg(long, default_value = "")]
     pub eth_keystore_password: String,
 
-    #[arg(
-        long,
-        default_value = ""
-    )]
+    #[arg(long, default_value = "")]
     pub eth_keystore_path: String,
 
     #[arg(long, default_value = "ws://127.0.0.1:8546")]

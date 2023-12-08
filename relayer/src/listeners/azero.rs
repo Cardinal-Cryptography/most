@@ -13,13 +13,13 @@ use ethers::{
     utils::keccak256,
 };
 use log::{debug, error, info, warn};
+use redis::{aio::Connection as RedisConnection, RedisError};
 use subxt::utils::H256;
 use thiserror::Error;
 use tokio::{
     sync::{Mutex, OwnedSemaphorePermit, Semaphore},
     time::{sleep, Duration},
 };
-use redis::{RedisError, aio::Connection as RedisConnection};
 
 use crate::{
     config::Config,
@@ -130,10 +130,9 @@ impl AlephZeroListener {
             )
             .await;
 
-            log::info!(
+            info!(
                 "Processing events from blocks {} - {}",
-                first_unprocessed_block_number,
-                to_block
+                first_unprocessed_block_number, to_block
             );
 
             // Process events from the next unknown finalized block.
@@ -154,6 +153,7 @@ impl AlephZeroListener {
                     .await?
                     .events()
                     .await?;
+
                 let filtered_events = filter_membrane_events(
                     events,
                     &membrane_instance,
@@ -244,7 +244,13 @@ async fn handle_events(
         .expect("There should always be a pending block in the set)");
 
     // Note: `earliest_still_pending` will never be 0
-    write_last_processed_block(name.clone(), ALEPH_LAST_BLOCK_KEY.to_string(), redis_connection, earliest_still_pending - 1).await?;
+    write_last_processed_block(
+        name.clone(),
+        ALEPH_LAST_BLOCK_KEY.to_string(),
+        redis_connection,
+        earliest_still_pending - 1,
+    )
+    .await?;
 
     Ok(())
 }
@@ -274,11 +280,10 @@ async fn handle_event(
 
             info!(
                 "Decoded event data: [dest_token_address: 0x{}, amount: {amount}, dest_receiver_address: 0x{}, request_nonce: {request_nonce}]", 
-                hex::encode(dest_token_address), 
+                hex::encode(dest_token_address),
                 hex::encode(dest_receiver_address)
             );
 
-            // hash event data
             // NOTE: for some reason, ethers-rs's `encode_packed` does not properly encode the data
             // (it does not pad uint to 32 bytes, but uses the actual number of bytes required to store the value)
             // so we use `abi::encode` instead (it only differs for signed and dynamic size types, which we don't use here)

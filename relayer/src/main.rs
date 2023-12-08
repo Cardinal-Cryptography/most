@@ -3,12 +3,7 @@ use std::{env, process, sync::Arc};
 use clap::Parser;
 use config::Config;
 use connections::EthConnectionError;
-use ethers::{
-    signers::{
-        coins_bip39::English,
-        LocalWallet, MnemonicBuilder, WalletError,
-    },
-};
+use ethers::signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, WalletError};
 use eyre::Result;
 use log::{error, info};
 use redis::Client as RedisClient;
@@ -73,8 +68,11 @@ fn main() -> Result<()> {
         } else {
             // If no keystore path is provided, we use the default development mnemonic
             MnemonicBuilder::<English>::default()
-            .phrase("harsh master island dirt equip search awesome double turn crush wool grant")
-            .build().expect("Mnemonic is correct")
+                .phrase(
+                    "harsh master island dirt equip search awesome double turn crush wool grant",
+                )
+                .build()
+                .expect("Mnemonic is correct")
         };
 
         let eth_connection = Arc::new(

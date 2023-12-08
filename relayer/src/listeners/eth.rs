@@ -10,7 +10,7 @@ use ethers::{
     utils::keccak256,
 };
 use log::{debug, info, trace, warn};
-use redis::{RedisError, aio::Connection as RedisConnection};
+use redis::{aio::Connection as RedisConnection, RedisError};
 use thiserror::Error;
 use tokio::{
     sync::Mutex,
