@@ -441,7 +441,7 @@ pub mod membrane {
 
         /// Query request nonce
         ///
-        /// An amount of the native token that is tranferred with every request
+        /// Nonce is incremented with every request
         #[ink(message)]
         pub fn get_request_nonce(&self) -> u128 {
             self.request_nonce
