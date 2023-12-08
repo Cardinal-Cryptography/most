@@ -43,8 +43,8 @@ pub mod membrane {
     #[derive(Debug)]
     #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
     pub struct RequestProcessed {
-        #[ink(topic)]
         pub request_hash: HashedRequest,
+        #[ink(topic)]
         pub dest_token_address: [u8; 32],
     }
 
@@ -52,17 +52,15 @@ pub mod membrane {
     #[derive(Debug)]
     #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
     pub struct RequestSigned {
+        pub request_hash: HashedRequest,
         #[ink(topic)]
         pub signer: AccountId,
-        #[ink(topic)]
-        pub request_hash: HashedRequest,
     }
 
     #[ink(event)]
     #[derive(Debug)]
     #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
     pub struct SignedProcessedRequest {
-        #[ink(topic)]
         pub request_hash: HashedRequest,
         #[ink(topic)]
         pub signer: AccountId,
