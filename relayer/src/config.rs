@@ -15,8 +15,8 @@ pub struct Config {
     #[arg(long, default_value = "//Alice")]
     pub azero_sudo_seed: String,
 
-    #[arg(long, default_value = "20")]
-    pub azero_max_block_processing_tasks: usize,
+    #[arg(long, default_value = "1000")]
+    pub azero_max_event_handler_tasks: usize,
 
     #[arg(long)]
     pub eth_contract_address: String,

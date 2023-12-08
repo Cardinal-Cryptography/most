@@ -19,6 +19,7 @@ use thiserror::Error;
 use tokio::{
     sync::{Mutex, OwnedSemaphorePermit, Semaphore},
     time::{sleep, Duration},
+    task::JoinHandle,
 };
 
 use crate::{
@@ -99,14 +100,15 @@ impl AlephZeroListener {
         let Config {
             azero_contract_metadata,
             azero_contract_address,
-            azero_max_block_processing_tasks,
+            azero_max_event_handler_tasks,
             name,
             default_sync_from_block_azero,
             ..
         } = &*config;
 
         let pending_blocks: Arc<Mutex<BTreeSet<u32>>> = Arc::new(Mutex::new(BTreeSet::new()));
-        let block_task_semaphore = Arc::new(Semaphore::new(*azero_max_block_processing_tasks));
+        let event_handler_tasks_semaphore =
+            Arc::new(Semaphore::new(*azero_max_event_handler_tasks));
 
         let membrane_instance =
             MembraneInstance::new(azero_contract_address, azero_contract_metadata)?;
@@ -163,32 +165,15 @@ impl AlephZeroListener {
                     },
                 );
 
-                let config = config.clone();
-                let eth_connection = eth_connection.clone();
-                let redis_connection = redis_connection.clone();
-                let pending_blocks = pending_blocks.clone();
-
-                // Acquire a permit to spawn a task to handle the events.
-                let _permit = block_task_semaphore
-                    .clone()
-                    .acquire_owned()
-                    .await
-                    .expect("Semaphore permit acquisition failed");
-
-                // Spawn a task to handle the events.
-                tokio::spawn(async move {
-                    handle_events(
-                        eth_connection,
-                        config,
-                        filtered_events,
-                        block_number,
-                        pending_blocks.clone(),
-                        redis_connection.clone(),
-                        _permit,
-                    )
-                    .await
-                    .expect("Block events handler failed");
-                });
+                handle_events(
+                    config.clone(),
+                    eth_connection.clone(),
+                    filtered_events,
+                    block_number,
+                    pending_blocks.clone(),
+                    redis_connection.clone(),
+                    event_handler_tasks_semaphore.clone(),
+                ).await?;
             }
 
             // Update the last block number.
@@ -204,22 +189,27 @@ async fn add_to_pending(block_number: u32, pending_blocks: Arc<Mutex<BTreeSet<u3
 
 // handle all events present in one block
 async fn handle_events(
-    eth_connection: Arc<SignedEthWsConnection>,
     config: Arc<Config>,
+    eth_connection: Arc<SignedEthWsConnection>,
     events: Vec<ContractEvent>,
     block_number: u32,
     pending_blocks: Arc<Mutex<BTreeSet<u32>>>,
     redis_connection: Arc<Mutex<RedisConnection>>,
-    _permit: OwnedSemaphorePermit,
+    event_handler_tasks_semaphore: Arc<Semaphore>,
 ) -> Result<(), AzeroListenerError> {
-    let Config { name, .. } = &*config;
     let mut event_tasks = Vec::new();
     for event in events {
         let config = config.clone();
         let eth_connection = eth_connection.clone();
+        let permit = event_handler_tasks_semaphore
+            .clone()
+            .acquire_owned()
+            .await
+            .expect("Failed to acquire semaphore permit");
+
         // Spawn a new task for handling each event.
         event_tasks.push(tokio::spawn(async move {
-            handle_event(config, eth_connection, event)
+            handle_event(config, eth_connection, event, permit)
                 .await
                 .expect("Event handler failed");
         }));
@@ -228,30 +218,17 @@ async fn handle_events(
         }
     }
 
-    // Wait for all event processing tasks to finish.
-    for task in event_tasks {
-        task.await.expect("Event processing task has failed");
-    }
-
-    // Lock the pending blocks set and remove the current block number (as we managed to process all events from it).
-    let mut pending_blocks = pending_blocks.lock().await;
-    pending_blocks.remove(&block_number);
-
-    // Now we know that all blocks before the pending block with the lowest number have been processed.
-    // We can update the last processed block number in Redis.
-    let earliest_still_pending = pending_blocks
-        .first()
-        .expect("There should always be a pending block in the set)");
-
-    // Note: `earliest_still_pending` will never be 0
-    write_last_processed_block(
-        name.clone(),
-        ALEPH_LAST_BLOCK_KEY.to_string(),
-        redis_connection,
-        earliest_still_pending - 1,
-    )
-    .await?;
-
+    tokio::spawn(async move {
+        handle_processed_block(
+            config.clone(),
+            block_number,
+            event_tasks,
+            pending_blocks.clone(),
+            redis_connection.clone(),
+        )
+        .await
+        .expect("Failed to seal block");
+    });
     Ok(())
 }
 
@@ -259,6 +236,7 @@ async fn handle_event(
     config: Arc<Config>,
     eth_connection: Arc<SignedEthWsConnection>,
     event: ContractEvent,
+    _permit: OwnedSemaphorePermit,
 ) -> Result<(), AzeroListenerError> {
     let Config {
         eth_contract_address,
@@ -336,6 +314,43 @@ async fn handle_event(
     Ok(())
 }
 
+// Awaits for all requests from the block to be processed, then updates the last processed block number in Redis.
+async fn handle_processed_block(
+    config: Arc<Config>,
+    block_number: u32,
+    event_tasks: Vec<JoinHandle<()>>,
+    pending_blocks: Arc<Mutex<BTreeSet<u32>>>,
+    redis_connection: Arc<Mutex<RedisConnection>>,
+) -> Result<(), AzeroListenerError> {
+    let Config { name, .. } = &*config;
+
+    // Wait for all event processing tasks to finish.
+    for task in event_tasks {
+        task.await.expect("Event processing task has failed");
+    }
+
+    // Lock the pending blocks set and remove the current block number (as we managed to process all events from it).
+    let mut pending_blocks = pending_blocks.lock().await;
+    pending_blocks.remove(&block_number);
+
+    // Now we know that all blocks before the pending block with the lowest number have been processed.
+    // We can update the last processed block number in Redis.
+    let earliest_still_pending = pending_blocks
+        .first()
+        .expect("There should always be a pending block in the set)");
+
+    // Note: `earliest_still_pending` will never be 0
+    write_last_processed_block(
+        name.clone(),
+        ALEPH_LAST_BLOCK_KEY.to_string(),
+        redis_connection,
+        earliest_still_pending - 1,
+    )
+    .await?;
+
+    Ok(())
+}
+
 pub async fn wait_for_eth_tx_finality(
     eth_connection: Arc<SignedEthWsConnection>,
     tx_hash: H256,
@@ -364,7 +379,7 @@ pub async fn wait_for_eth_tx_finality(
     }
 }
 
-pub async fn get_next_finalized_block_number_azero(
+async fn get_next_finalized_block_number_azero(
     azero_connection: Arc<SignedAzeroWsConnection>,
     not_older_than: u32,
 ) -> u32 {
