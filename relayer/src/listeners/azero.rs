@@ -260,8 +260,6 @@ async fn handle_event(
     } = &*config;
     if let Some(name) = &event.name {
         if name.eq("CrosschainTransferRequest") {
-            info!("Handling A0 contract event...");
-
             let data = event.data;
 
             // decode event data
@@ -272,14 +270,11 @@ async fn handle_event(
                 request_nonce,
             } = get_request_event_data(&data)?;
 
-            info!("Decoded event data:");
-            info!(" dest_token_address: 0x{}", hex::encode(dest_token_address));
-            info!(" amount: {amount}");
             info!(
-                " dest_receiver_address: 0x{}",
+                "Decoded event data: [dest_token_address: 0x{}, amount: {amount}, dest_receiver_address: 0x{}, request_nonce: {request_nonce}]", 
+                hex::encode(dest_token_address), 
                 hex::encode(dest_receiver_address)
             );
-            info!(" request_nonce: {request_nonce}\n");
 
             // hash event data
             // NOTE: for some reason, ethers-rs's `encode_packed` does not properly encode the data
@@ -310,7 +305,11 @@ async fn handle_event(
                 request_nonce.into(),
             );
 
-            info!("Sending tx with nonce {request_nonce} to the Ethereum network and waiting for {eth_tx_min_confirmations} confirmations");
+            info!(
+                "Sending tx with request nonce {} to the Ethereum network and waiting for {} confirmations",
+                request_nonce,
+                eth_tx_min_confirmations
+            );
 
             // This shouldn't fail unless there is something wrong with our config.
             let tx_hash = call
