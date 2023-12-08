@@ -18,8 +18,8 @@ use subxt::utils::H256;
 use thiserror::Error;
 use tokio::{
     sync::{Mutex, OwnedSemaphorePermit, Semaphore},
-    time::{sleep, Duration},
     task::JoinHandle,
+    time::{sleep, Duration},
 };
 
 use crate::{
@@ -173,7 +173,8 @@ impl AlephZeroListener {
                     pending_blocks.clone(),
                     redis_connection.clone(),
                     event_handler_tasks_semaphore.clone(),
-                ).await?;
+                )
+                .await?;
             }
 
             // Update the last block number.
@@ -227,7 +228,9 @@ async fn handle_events(
             redis_connection.clone(),
         )
         .await
-        .expect("Failed to seal block");
+        .expect(
+            "Failed to wait for event handler tasks or to update the last processed block number.",
+        );
     });
     Ok(())
 }
@@ -337,7 +340,7 @@ async fn handle_processed_block(
     // We can update the last processed block number in Redis.
     let earliest_still_pending = pending_blocks
         .first()
-        .expect("There should always be a pending block in the set)");
+        .expect("There should always be a pending block in the set");
 
     // Note: `earliest_still_pending` will never be 0
     write_last_processed_block(
