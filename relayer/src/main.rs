@@ -21,6 +21,9 @@ mod contracts;
 mod helpers;
 mod listeners;
 
+const DEV_MNEMONIC: &str =
+    "harsh master island dirt equip search awesome double turn crush wool grant";
+
 #[derive(Debug, Error)]
 #[error(transparent)]
 #[non_exhaustive]
@@ -68,9 +71,7 @@ fn main() -> Result<()> {
         } else {
             // If no keystore path is provided, we use the default development mnemonic
             MnemonicBuilder::<English>::default()
-                .phrase(
-                    "harsh master island dirt equip search awesome double turn crush wool grant",
-                )
+                .phrase(DEV_MNEMONIC)
                 .build()
                 .expect("Mnemonic is correct")
         };
