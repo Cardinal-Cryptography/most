@@ -1,13 +1,4 @@
 name: Devnet eth nodes - Re-create
-# This workflow re-creates ethereum nodes in devnet by doing the following
-# steps:
-# * stops all nodes by setting kubernetes statefulset's replicas to 0
-# * removes all attached disks (kuberetes pvc's)
-# * remove data from membrane-bridge s3 bucket
-# * bootstraps new data
-# * uploads data to membrane-bridge s3 bucket
-# * starts the nodes by setting replicas to 1 (each node is separate
-#   statefulset)
 
 on:
   workflow_dispatch:
@@ -25,18 +16,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Download geth
-        shell: bash
-        env:
-          GETH_VER: geth-linux-amd64-1.13.2-dc34fe82
-        run: |
-          mkdir -p .bin
-          cd .bin
-          wget https://gethstore.blob.core.windows.net/builds/${GETH_VER}.tar.gz
-          tar -zxvf ${GETH_VER}.tar.gz
-          mv ${GETH_VER}/geth .
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3.2
+        with:
+          version: 'v1.23.6'
 
-      - name: Configure AWS credentials for S3 AWS
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v3
         env:
           AWS_REGION: eu-central-1
@@ -45,11 +30,6 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_DEVNET_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Setup kubectl
-        uses: azure/setup-kubectl@v3.2
-        with:
-          version: 'v1.23.6'
-
       - name: Scale replicas to 0 and remove PVC's
         shell: bash
         env:
@@ -57,51 +37,14 @@ jobs:
         run: |
           aws eks --region eu-central-1 update-kubeconfig --name alephzero-devnet-eu-central-1-eks
 
-          kubectl scale --replicas=0 statefulset/eth-node2 -n ${{ env.K8S_NAMESPACE }}
-          kubectl scale --replicas=0 statefulset/eth-node -n ${{ env.K8S_NAMESPACE }}
-          kubectl scale --replicas=0 statefulset/eth-bootnode -n ${{ env.K8S_NAMESPACE }}
-          kubectl delete pvc -l app=eth-node2 -n ${{ env.K8S_NAMESPACE }} --ignore-not-found=true
-          kubectl delete pvc -l app=eth-node -n ${{ env.K8S_NAMESPACE }} --ignore-not-found=true
-          kubectl delete pvc -l app=eth-bootnode -n ${{ env.K8S_NAMESPACE }} --ignore-not-found=true
-
-      - name: Remove existing bootstrapped data
-        shell: bash
-        env:
-          S3BUCKET_NAME: ${{ secrets.MEMBRANE_BRIDGE_S3BUCKET_NAME }}
-        run: |
-          for i in \
-            0x129b9daee478e7bc5edada471982e31fa7705622 \
-            0x7f938fd203fcabc449312661ab1d36b7fdb45118 \
-            0xf2f0930c3b7bdf1734ee173272bd8cdc0a08f038;
-          do
-            for f in geth history jwt.hex geth.ipc; do
-              rm -rf ${i}/${f};
-              aws s3 rm --recursive s3://${{ env.S3BUCKET_NAME }}/eth/${i}/${f}
-            done;
-          done
-
-      - name: Run geth to bootstrap
-        shell: bash
-        env:
-          S3BUCKET_NAME: ${{ secrets.MEMBRANE_BRIDGE_S3BUCKET_NAME }}
-        run: |
-          for i in \
-            0x129b9daee478e7bc5edada471982e31fa7705622 \
-            0x7f938fd203fcabc449312661ab1d36b7fdb45118 \
-            0xf2f0930c3b7bdf1734ee173272bd8cdc0a08f038;
-          do
-            ./.bin/geth init --datadir ./${i} ./eth_genesis.json;
-            aws s3 cp --recursive ${i} s3://${{ env.S3BUCKET_NAME }}/eth/${i}
-          done
+          kubectl scale --replicas=0 statefulset/eth -n ${{ env.K8S_NAMESPACE }}
+          kubectl delete pvc -l app=eth -n ${{ env.K8S_NAMESPACE }} --ignore-not-found=true
+          sleep 10
 
       - name: Scale replicas back to 1
         shell: bash
         env:
           K8S_NAMESPACE: membrane-bridge
         run: |
-          kubectl scale --replicas=1 statefulset/eth-bootnode -n ${{ env.K8S_NAMESPACE }}
-          sleep 10
-          kubectl scale --replicas=1 statefulset/eth-node -n ${{ env.K8S_NAMESPACE }}
-          sleep 10
-          kubectl scale --replicas=1 statefulset/eth-node2 -n ${{ env.K8S_NAMESPACE }}
+          kubectl scale --replicas=1 statefulset/eth -n ${{ env.K8S_NAMESPACE }}
           sleep 10
