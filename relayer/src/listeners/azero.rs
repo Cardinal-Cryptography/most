@@ -13,19 +13,20 @@ use ethers::{
     utils::keccak256,
 };
 use log::{debug, error, info, warn};
-use redis::{aio::Connection as RedisConnection, AsyncCommands, RedisError};
 use subxt::utils::H256;
 use thiserror::Error;
 use tokio::{
     sync::{Mutex, OwnedSemaphorePermit, Semaphore},
     time::{sleep, Duration},
 };
+use redis::{RedisError, aio::Connection as RedisConnection};
 
 use crate::{
     config::Config,
     connections::{
         azero::SignedAzeroWsConnection,
         eth::{EthConnectionError, EthWsConnection, SignedEthWsConnection},
+        redis_helpers::{read_first_unprocessed_block_number, write_last_processed_block},
     },
     contracts::{
         filter_membrane_events, get_request_event_data, AzeroContractError,
@@ -111,6 +112,7 @@ impl AlephZeroListener {
             MembraneInstance::new(azero_contract_address, azero_contract_metadata)?;
         let mut first_unprocessed_block_number = read_first_unprocessed_block_number(
             name.clone(),
+            ALEPH_LAST_BLOCK_KEY.to_string(),
             redis_connection.clone(),
             *default_sync_from_block_azero,
         )
@@ -242,7 +244,7 @@ async fn handle_events(
         .expect("There should always be a pending block in the set)");
 
     // Note: `earliest_still_pending` will never be 0
-    write_last_processed_block(name.clone(), redis_connection, earliest_still_pending - 1).await?;
+    write_last_processed_block(name.clone(), ALEPH_LAST_BLOCK_KEY.to_string(), redis_connection, earliest_still_pending - 1).await?;
 
     Ok(())
 }
@@ -383,35 +385,4 @@ pub async fn get_next_finalized_block_number_azero(
         // If we are up to date, we can sleep for a longer time.
         sleep(Duration::from_secs(10 * ALEPH_BLOCK_PROD_TIME_SEC)).await;
     }
-}
-
-async fn read_first_unprocessed_block_number(
-    name: String,
-    redis_connection: Arc<Mutex<RedisConnection>>,
-    default_block: u32,
-) -> u32 {
-    let mut connection = redis_connection.lock().await;
-
-    match connection
-        .get::<_, u32>(format!("{name}:{ALEPH_LAST_BLOCK_KEY}"))
-        .await
-    {
-        Ok(value) => value + 1,
-        Err(why) => {
-            warn!("Redis connection error {why:?}");
-            default_block
-        }
-    }
-}
-
-async fn write_last_processed_block(
-    name: String,
-    redis_connection: Arc<Mutex<RedisConnection>>,
-    last_block_number: u32,
-) -> Result<(), AzeroListenerError> {
-    let mut connection = redis_connection.lock().await;
-    connection
-        .set(format!("{name}:{ALEPH_LAST_BLOCK_KEY}"), last_block_number)
-        .await?;
-    Ok(())
 }

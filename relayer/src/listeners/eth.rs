@@ -10,7 +10,7 @@ use ethers::{
     utils::keccak256,
 };
 use log::{debug, info, trace, warn};
-use redis::{aio::Connection as RedisConnection, AsyncCommands, RedisError};
+use redis::{RedisError, aio::Connection as RedisConnection};
 use thiserror::Error;
 use tokio::{
     sync::Mutex,
@@ -19,7 +19,11 @@ use tokio::{
 
 use crate::{
     config::Config,
-    connections::{azero::SignedAzeroWsConnection, eth::SignedEthWsConnection},
+    connections::{
+        azero::SignedAzeroWsConnection,
+        eth::SignedEthWsConnection,
+        redis_helpers::{read_first_unprocessed_block_number, write_last_processed_block},
+    },
     contracts::{
         AzeroContractError, CrosschainTransferRequestFilter, Membrane, MembraneEvents,
         MembraneInstance,
@@ -75,6 +79,7 @@ impl EthListener {
 
         let mut first_unprocessed_block_number = read_first_unprocessed_block_number(
             name.clone(),
+            ETH_LAST_BLOCK_KEY.to_string(),
             redis_connection.clone(),
             *default_sync_from_block_eth,
         )
@@ -118,7 +123,13 @@ impl EthListener {
             first_unprocessed_block_number = to_block + 1;
 
             // Cache the last processed block number.
-            write_last_processed_block(name.clone(), redis_connection.clone(), to_block).await?;
+            write_last_processed_block(
+                name.clone(),
+                ETH_LAST_BLOCK_KEY.to_string(),
+                redis_connection.clone(),
+                to_block,
+            )
+            .await?;
         }
     }
 }
@@ -204,35 +215,4 @@ pub async fn get_next_finalized_block_number_eth(
 
         sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
     }
-}
-
-async fn read_first_unprocessed_block_number(
-    name: String,
-    redis_connection: Arc<Mutex<RedisConnection>>,
-    default_block: u32,
-) -> u32 {
-    let mut connection = redis_connection.lock().await;
-
-    match connection
-        .get::<_, u32>(format!("{name}:{ETH_LAST_BLOCK_KEY}"))
-        .await
-    {
-        Ok(value) => value + 1,
-        Err(why) => {
-            warn!("Redis connection error {why:?}");
-            default_block
-        }
-    }
-}
-
-async fn write_last_processed_block(
-    name: String,
-    redis_connection: Arc<Mutex<RedisConnection>>,
-    last_block_number: u32,
-) -> Result<(), EthListenerError> {
-    let mut connection = redis_connection.lock().await;
-    connection
-        .set(format!("{name}:{ETH_LAST_BLOCK_KEY}"), last_block_number)
-        .await?;
-    Ok(())
 }
