@@ -215,7 +215,7 @@ pub mod membrane {
                 .get(src_token_address)
                 .ok_or(MembraneError::UnsupportedPair)?;
 
-            let current_base_fee = self.base_fee()?;
+            let current_base_fee = self.get_base_fee()?;
             let base_fee = self.env().transferred_value();
 
             if base_fee.lt(&current_base_fee) {
@@ -439,12 +439,58 @@ pub mod membrane {
 
         // ---  getter txs
 
+        /// Query request nonce
+        ///
+        /// An amount of the native token that is tranferred with every request
+        #[ink(message)]
+        pub fn get_request_nonce(&self) -> u128 {
+            self.request_nonce
+        }
+
+        /// Query comission
+        ///
+        /// The value returned is a commission per 10000 (dix mille)
+        #[ink(message)]
+        pub fn get_commission_per_dix_mille(&self) -> u128 {
+            self.commission_per_dix_mille
+        }
+
         /// Query pocket money
         ///
         /// An amount of the native token that is tranferred with every request
         #[ink(message)]
         pub fn get_pocket_money(&self) -> Balance {
             self.pocket_money
+        }
+
+        /// Query minimal value that can be transferred across the bridge
+        ///
+        /// The value is denominated in USDT
+        #[ink(message)]
+        pub fn get_minimum_transfer_amount_usd(&self) -> u128 {
+            self.minimum_transfer_amount_usd
+        }
+
+        /// Returns current active committee id
+        #[ink(message)]
+        pub fn get_current_committee_id(&self) -> u128 {
+            self.committee_id
+        }
+
+        /// Returns current address of the USDT contract
+        ///
+        /// USDT is ERC20/PSP22 contract
+        #[ink(message)]
+        pub fn get_usdt(&self) -> [u8; 32] {
+            USDT_TOKEN_ID
+        }
+
+        /// Returns current address of the wETH contract
+        ///
+        /// wETH is ERC20/PSP22 contract
+        #[ink(message)]
+        pub fn get_weth(&self) -> [u8; 32] {
+            WETH_TOKEN_ID
         }
 
         /// Query total rewards for this committee
@@ -508,7 +554,7 @@ pub mod membrane {
 
         /// Queries a gas price oracle and returns the current base_fee charged per cross chain transfer denominated in AZERO
         #[ink(message)]
-        pub fn base_fee(&self) -> Result<Balance, MembraneError> {
+        pub fn get_base_fee(&self) -> Result<Balance, MembraneError> {
             // TODO: implement
             // return a current gas price in WEI
             let do_query_gas_fee = || 39106342561;
@@ -519,12 +565,6 @@ pub mod membrane {
                 .ok_or(MembraneError::Arithmetic)?;
 
             self.query_price(amount, WETH_TOKEN_ID, NATIVE_TOKEN_ID)
-        }
-
-        /// Returns current active committee id
-        #[ink(message)]
-        pub fn current_committee_id(&self) -> u128 {
-            self.committee_id
         }
 
         /// Returns an error (reverts) if account is not in the committee with `committee_id`
@@ -543,11 +583,6 @@ pub mod membrane {
                 true => Ok(()),
                 false => Err(MembraneError::NotInCommittee),
             }
-        }
-
-        #[ink(message)]
-        pub fn get_commission_per_dix_mille(&self) -> u128 {
-            self.commission_per_dix_mille
         }
 
         // ---  setter txs
@@ -766,9 +801,9 @@ pub mod membrane {
             .expect("Threshold is valid.");
 
             for account in guardian_accounts() {
-                assert!(membrane.is_in_committee(membrane.current_committee_id(), account));
+                assert!(membrane.is_in_committee(membrane.get_current_committee_id(), account));
             }
-            assert!(!membrane.is_in_committee(membrane.current_committee_id(), accounts.alice));
+            assert!(!membrane.is_in_committee(membrane.get_current_committee_id(), accounts.alice));
         }
 
         #[ink::test]
@@ -810,9 +845,9 @@ pub mod membrane {
             )
             .expect("Threshold is valid.");
 
-            assert!(!membrane.is_in_committee(membrane.current_committee_id(), accounts.alice));
+            assert!(!membrane.is_in_committee(membrane.get_current_committee_id(), accounts.alice));
             assert_eq!(membrane.set_committee(vec![accounts.alice], 1), Ok(()));
-            assert!(membrane.is_in_committee(membrane.current_committee_id(), accounts.alice));
+            assert!(membrane.is_in_committee(membrane.get_current_committee_id(), accounts.alice));
         }
 
         #[ink::test]
@@ -829,9 +864,9 @@ pub mod membrane {
             )
             .expect("Threshold is valid.");
 
-            assert!(membrane.is_in_committee(membrane.current_committee_id(), accounts.bob));
+            assert!(membrane.is_in_committee(membrane.get_current_committee_id(), accounts.bob));
             assert_eq!(membrane.set_committee(vec![accounts.alice], 1), Ok(()));
-            assert!(!membrane.is_in_committee(membrane.current_committee_id(), accounts.bob));
+            assert!(!membrane.is_in_committee(membrane.get_current_committee_id(), accounts.bob));
         }
     }
 }
