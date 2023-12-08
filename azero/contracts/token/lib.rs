@@ -5,8 +5,9 @@ pub use self::token::TokenRef;
 #[ink::contract]
 pub mod token {
     use ink::prelude::{string::String, vec::Vec};
-    use psp22::{PSP22Data, PSP22Error, PSP22Event, PSP22Metadata, PSP22};
-    use psp22_traits::{Burnable, Mintable};
+    use psp22::{
+        PSP22Burnable, PSP22Data, PSP22Error, PSP22Event, PSP22Metadata, PSP22Mintable, PSP22,
+    };
 
     #[ink(event)]
     #[derive(Debug)]
@@ -37,6 +38,8 @@ pub mod token {
         symbol: Option<String>,
         decimals: u8,
     }
+
+    // impl PSP22Data {}
 
     impl Token {
         #[ink(constructor)]
@@ -169,7 +172,7 @@ pub mod token {
     }
 
     // TODO : access control (roles)
-    impl Mintable for Token {
+    impl PSP22Mintable for Token {
         #[ink(message)]
         fn mint(&mut self, to: AccountId, value: u128) -> Result<(), PSP22Error> {
             let events = self.data.mint(to, value)?;
@@ -179,9 +182,16 @@ pub mod token {
     }
 
     // TODO : access control (roles)
-    impl Burnable for Token {
+    impl PSP22Burnable for Token {
         #[ink(message)]
-        fn burn(&mut self, from: AccountId, value: u128) -> Result<(), PSP22Error> {
+        fn burn(&mut self, value: u128) -> Result<(), PSP22Error> {
+            let events = self.data.burn(self.env().caller(), value)?;
+            self.emit_events(events);
+            Ok(())
+        }
+
+        #[ink(message)]
+        fn burn_from(&mut self, from: AccountId, value: u128) -> Result<(), PSP22Error> {
             let events = self.data.burn(from, value)?;
             self.emit_events(events);
             Ok(())

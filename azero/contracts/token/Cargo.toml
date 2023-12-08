@@ -6,8 +6,9 @@ edition = "2021"
 
 [dependencies]
 ink = { version = "=4.3.0", default-features = false }
-psp22 = { version = "0.2.0", default-features = false }
-psp22-traits = { path = "../psp22-traits", default-features = false }
+# psp22 = { version = "0.2.0", default-features = false }
+# psp22-traits = { path = "../psp22-traits", default-features = false }
+psp22 = { path = "/home/filip/CloudStation/aleph/PSP22", default-features = false }
 
 scale = { package = "parity-scale-codec", version = "3", default-features = false, features = [
       "derive",
@@ -25,7 +26,6 @@ std = [
     "ink/std",
     "scale/std",
     "scale-info/std",
-    "psp22/std",
-    "psp22-traits/std",
+    "psp22/std"
 ]
 ink-as-dependency = []

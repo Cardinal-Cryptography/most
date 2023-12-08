@@ -13,8 +13,7 @@ pub mod membrane {
         prelude::{format, string::String, vec, vec::Vec},
         storage::Mapping,
     };
-    use psp22::PSP22Error;
-    use psp22_traits::{Burnable, Mintable};
+    use psp22::{PSP22Burnable, PSP22Error, PSP22Mintable};
     use scale::{Decode, Encode};
     use shared::{concat_u8_arrays, keccak256, Keccak256HashOutput as HashedRequest, Selector};
 
@@ -684,7 +683,7 @@ pub mod membrane {
         ///
         /// Membrane contract needs to have a Minter role on the token contract
         fn mint_to(&self, token: AccountId, to: AccountId, amount: u128) -> Result<(), PSP22Error> {
-            let mut psp22: ink::contract_ref!(Mintable) = token.into();
+            let mut psp22: ink::contract_ref!(PSP22Mintable) = token.into();
             psp22.mint(to, amount)
         }
 
@@ -697,8 +696,8 @@ pub mod membrane {
             from: AccountId,
             amount: u128,
         ) -> Result<(), PSP22Error> {
-            let mut psp22: ink::contract_ref!(Burnable) = token.into();
-            psp22.burn(from, amount)
+            let mut psp22: ink::contract_ref!(PSP22Burnable) = token.into();
+            psp22.burn_from(from, amount)
         }
     }
 
