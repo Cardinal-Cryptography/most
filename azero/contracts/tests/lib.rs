@@ -695,9 +695,7 @@ mod e2e {
         .await;
 
         assert_eq!(
-            send_request_res
-                .err()
-                .expect("Request should fail without allowance"),
+            send_request_res.expect_err("Request should fail without allowance"),
             MembraneError::BaseFeeTooLow
         );
     }
@@ -1184,7 +1182,7 @@ mod e2e {
             client,
             &alice(),
             membrane,
-            |membrane| membrane.base_fee(),
+            |membrane| membrane.get_base_fee(),
             None,
         )
         .await
@@ -1237,7 +1235,7 @@ mod e2e {
         membrane_address: AccountId,
     ) -> Result<u128, MembraneError> {
         let call = build_message::<MembraneRef>(membrane_address)
-            .call(|membrane| membrane.current_committee_id());
+            .call(|membrane| membrane.get_current_committee_id());
 
         Ok(client
             .call_dry_run(&alice(), &call, 0, None)
