@@ -387,7 +387,7 @@ describe("Membrane", function () {
     describe("Upgrade", function () {
         it("Membrane contract can be upgraded", async () => {
             exec('cp ./contracts/Membrane.sol ./contracts/MembraneV2.sol',
-                 (error, stdout, stderr) => {
+                 (error) => {
                      if (error !== null) {
                          console.log('exec error: ' + error);
                      }
