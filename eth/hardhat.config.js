@@ -1,5 +1,7 @@
-require("@nomicfoundation/hardhat-ethers");
+require("@nomicfoundation/hardhat-toolbox");
+require('@openzeppelin/hardhat-upgrades');
 require("@nomicfoundation/hardhat-chai-matchers");
+require("@nomiclabs/hardhat-truffle5");
 
 // The default account generated from this mnemonic is Ee88da44b4901d7F86970c52dC5139Af80C83edD.
 // This account is pre-seeded with money locally and on bridgenet.
@@ -32,7 +34,7 @@ module.exports = {
     solidity: {
         compilers: [
             {
-                version: "0.8.0",
+                version: "0.8.20",
                 settings: {
                     optimizer: {
                         enabled: true,
