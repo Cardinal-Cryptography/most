@@ -4,6 +4,7 @@ services:
   # a deterministic set of 8 validators.
   create-beacon-chain-genesis:
     image: "gcr.io/prysmaticlabs/prysm/cmd/prysmctl:HEAD-ec954e"
+    container_name: create-beacon-chain-genesis
     command:
       - testnet
       - generate-genesis
@@ -20,6 +21,7 @@ services:
   # Sets up the genesis configuration for the go-ethereum client from a JSON file.
   geth-genesis:
     image: "ethereum/client-go:latest"
+    container_name: geth-genesis
     command: --datadir=/execution init /execution/genesis.json
     volumes:
       - ./execution:/execution
@@ -34,6 +36,7 @@ services:
   # proposed via the validators attached to the beacon node.
   beacon-chain:
     image: "gcr.io/prysmaticlabs/prysm/beacon-chain:v4.0.8"
+    container_name: beacon-chain
     command:
       - --datadir=/consensus/beacondata
       # No peers to sync with in this testnet, so setting to 0
@@ -72,6 +75,7 @@ services:
   # APIs to allow for proof-of-stake consensus via Prysm.
   geth:
     image: "ethereum/client-go:latest"
+    container_name: geth
     command:
       - --http
       - --http.api=eth,net,web3
@@ -108,6 +112,7 @@ services:
   # The validator keys present in the beacon chain genesis state generated a few steps above.
   validator:
     image: "gcr.io/prysmaticlabs/prysm/validator:v4.0.8"
+    container_name: validator
     command:
       - --beacon-rpc-provider=beacon-chain:4000
       - --datadir=/consensus/validatordata

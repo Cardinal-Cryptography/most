@@ -12,7 +12,7 @@ psp22 = "0.2.0"
 scale = { package = "parity-scale-codec", version = "3", default-features = false, features = ["derive"] }
 shared = { path = "../shared" }
 subxt = "0.31.0"
-wrapped_token = { path = "../psp22", package = "token", features = ["ink-as-dependency"] }
+wrapped_token = { path = "../token", package = "token", features = ["ink-as-dependency"] }
 
 [lib]
 path = "lib.rs"
