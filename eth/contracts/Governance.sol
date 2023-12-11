@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
-contract Governance {
-    address public owner;
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+
+contract Governance is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     uint256 public quorum;
     uint256 public nextId;
 
@@ -24,26 +28,26 @@ contract Governance {
 
     event ProposalExecuted(address by, uint256 id, bytes data);
 
-    modifier _onlyOwner() {
-        require(msg.sender == owner, "Caller is not the owner");
-        _;
-    }
-
     modifier _onlyMember() {
         require(isMember(msg.sender), "NotMember");
         _;
     }
 
-    constructor(address[] memory _members, uint256 _quorum) {
+    function initialize(address[] calldata _members, uint256 _quorum) public initializer {
         require(_members.length >= _quorum, "Not enough members specified");
 
-        owner = msg.sender;
         quorum = _quorum;
 
         for (uint256 i = 0; i < _members.length; i++) {
             members[_members[i]] = true;
         }
+
+        // inititialize the OwnableUpgradeable
+        __Ownable_init(msg.sender);
     }
+
+    // required by the OZ UUPS module
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 
     function submitProposal(
         address destination,
@@ -113,19 +117,15 @@ contract Governance {
         return pendingProposals[id].signatures[member];
     }
 
-    function setQuorum(uint256 _quorum) external _onlyOwner {
+    function setQuorum(uint256 _quorum) external onlyOwner {
         quorum = _quorum;
     }
 
-    function setOwner(address _owner) external _onlyOwner {
-        owner = _owner;
-    }
-
-    function addMember(address member) external _onlyOwner {
+    function addMember(address member) external onlyOwner {
         members[member] = true;
     }
 
-    function removeMember(address member) external _onlyOwner {
+    function removeMember(address member) external onlyOwner {
         members[member] = false;
     }
 }

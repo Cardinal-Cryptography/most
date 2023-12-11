@@ -15,10 +15,14 @@ clean-azero:
 	5*/chainspec.json \
 	&& echo "Done azero clean"
 
+.PHONY: clean-eth
+clean-eth: # Remove eth node data
+clean-eth:
+	cd devnet-eth && ./clean.sh && echo "Done clean"
+
 .PHONY: clean
 clean: # Remove all node data
-clean: clean-azero
-	cd devnet-eth && ./clean.sh && echo "Done clean"
+clean: clean-azero clean-eth
 
 .PHONY: bootstrap-azero
 bootstrap-azero: # Bootstrap the node data
@@ -71,8 +75,13 @@ compile-eth: eth-deps
 deploy-eth: # Deploy eth contracts
 deploy-eth: compile-eth
 	cd eth && \
-	npx hardhat run --network $(NETWORK) scripts/1_initial_migration.js && \
-	npx hardhat run --network $(NETWORK) scripts/2_deploy_contracts.js
+	npx hardhat run --network $(NETWORK) scripts/1_deploy_contracts.js
+
+.PHONY: setup-eth
+setup-eth: # Setup eth contracts
+setup-eth: compile-eth
+	cd eth && \
+	npx hardhat run --network $(NETWORK) scripts/2_setup_contracts.js
 
 .PHONY: membrane-builder
 membrane-builder: # Build an image in which contracts can be built
@@ -150,7 +159,7 @@ test-ink: test-ink-e2e
 	cargo test && \
 	cd ../governance && \
 	cargo test && \
-	cd ../psp22 && \
+	cd ../token && \
 	cargo test
 
 .PHONY: check-js-format
@@ -173,7 +182,7 @@ ink-lint: # Lint ink contracts
 ink-lint:
 	cd azero/contracts/membrane && cargo clippy -- --no-deps -D warnings
 	cd azero/contracts/governance && cargo clippy -- --no-deps -D warnings
-	cd azero/contracts/psp22 && cargo clippy -- --no-deps -D warnings
+	cd azero/contracts/token && cargo clippy -- --no-deps -D warnings
 	cd azero/contracts/psp22-traits && cargo clippy -- --no-deps -D warnings
 	cd azero/contracts/tests && cargo clippy -- --no-deps -D warnings
 

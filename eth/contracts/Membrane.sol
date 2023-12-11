@@ -1,19 +1,20 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-contract Membrane {
+contract Membrane is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     uint256 constant DIX_MILLE = 10000;
 
-    address public owner;
     uint256 public requestNonce;
-    /* uint256 public signatureThreshold; */
     uint256 public commissionPerDixMille;
     uint256 public minimumTransferAmountUsd;
     uint256 public committeeId;
-    bytes32 public USDT = 0x1000000000000000000000000000000000000000000000000000000000000000;
+    bytes32 public USDT;
 
     struct Request {
         uint256 signatureCount;
@@ -42,22 +43,18 @@ contract Membrane {
 
     event RequestProcessed(bytes32 requestHash);
 
-    modifier _onlyOwner() {
-        require(msg.sender == owner, "CallerIsNotOwner");
-        _;
-    }
-
     modifier _onlyCurrentCommitteeMember() {
         require(isInCommittee(committeeId, msg.sender), "NotInCommittee");
         _;
     }
 
-    constructor(
-        address[] memory _committee,
+    function initialize(
+        address[] calldata _committee,
         uint256 _signatureThreshold,
         uint256 _commissionPerDixMille,
-        uint256 _minimumTransferAmountUsd
-    ) {
+        uint256 _minimumTransferAmountUsd,
+        address owner
+    ) public initializer {
         require(
             _signatureThreshold > 0,
             "Signature threshold must be greater than 0"
@@ -67,7 +64,6 @@ contract Membrane {
             "Not enough guardians specified"
         );
 
-        owner = msg.sender;
         commissionPerDixMille = _commissionPerDixMille;
         minimumTransferAmountUsd = _minimumTransferAmountUsd;
         committeeId = 0;
@@ -80,7 +76,13 @@ contract Membrane {
 
         committeeSize[committeeId] = _committee.length;
         signatureThreshold[committeeId] = _signatureThreshold;
+
+        // inititialize the OwnableUpgradeable
+        __Ownable_init(owner);
     }
+
+    // required by the OZ UUPS module
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 
     // Invoke this tx to transfer funds to the destination chain.
     // Account needs to approve the Membrane contract to spend the `srcTokenAmount`
@@ -282,7 +284,7 @@ contract Membrane {
     function setCommittee(
         address[] memory _committee,
         uint256 _signatureThreshold
-    ) external _onlyOwner {
+    ) external onlyOwner {
         require(
             _signatureThreshold > 0,
             "Signature threshold must be greater than 0"
@@ -304,19 +306,15 @@ contract Membrane {
         signatureThreshold[committeeId] = _signatureThreshold;
     }
 
-    function setOwner(address _owner) external _onlyOwner {
-        owner = _owner;
-    }
-
-    function addPair(bytes32 from, bytes32 to) external _onlyOwner {
+    function addPair(bytes32 from, bytes32 to) external onlyOwner {
         supportedPairs[from] = to;
     }
 
-    function removePair(bytes32 from) external _onlyOwner {
+    function removePair(bytes32 from) external onlyOwner {
         delete supportedPairs[from];
     }
 
-    function setUSDT(bytes32 _USDT) external _onlyOwner {
+    function setUSDT(bytes32 _USDT) external onlyOwner {
         USDT = _USDT;
     }
 }
