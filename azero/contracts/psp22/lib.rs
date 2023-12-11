@@ -278,7 +278,7 @@ pub mod token {
         }
 
         #[ink::test]
-        fn admin_can_set_minter() {
+        fn admin_can_set_minter_burner() {
             let mut token = init_contract(INIT_SUPPLY_TEST);
             let alice = default_accounts::<E>().alice;
             let bob = default_accounts::<E>().bob;
@@ -289,7 +289,7 @@ pub mod token {
         }
 
         #[ink::test]
-        fn non_admin_cannot_set_minter() {
+        fn non_admin_cannot_set_minter_burner() {
             let mut token = init_contract(INIT_SUPPLY_TEST);
             let bob = default_accounts::<E>().bob;
 
