@@ -136,7 +136,7 @@ run-relayer: # Run the relayer
 run-relayer:
 	cd relayer && ./scripts/run.sh
 
-.PHONY: make bridge
+.PHONY: bridge
 bridge: # Run the bridge
 bridge: local-bridgenet deploy run-relayer
 
