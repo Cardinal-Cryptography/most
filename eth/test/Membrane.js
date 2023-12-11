@@ -409,13 +409,13 @@ describe("Membrane", function () {
 
                               const address = await membraneV2.getAddress();
                               // address is preserved
-                              await expect(address).to.be.equal(membraneAddress);
+                              expect(address).to.be.equal(membraneAddress);
 
                               // state is preserved
-                              await expect((membrane.isInCommittee (committee[0])));
+                              expect((membrane.isInCommittee(committee[0])));
 
                               // no state overwrite
-                              await expect((membrane.test ())).to.be.equal(0);
+                              expect((membrane.test())).to.be.equal(0);
 
                           });
                  });
