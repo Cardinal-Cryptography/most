@@ -7,7 +7,7 @@ edition = "2021"
 [dev-dependencies]
 ink = { version = "=4.3.0", default-features = false }
 ink_e2e = "=4.3.0"
-membrane = { path = "../membrane", package = "membrane", features = ["ink-as-dependency"] }
+most = { path = "../most", package = "most", features = ["ink-as-dependency"] }
 psp22 = "0.2.0"
 scale = { package = "parity-scale-codec", version = "3", default-features = false, features = ["derive"] }
 shared = { path = "../shared" }
@@ -19,6 +19,6 @@ path = "lib.rs"
 
 [features]
 default = ["std", "e2e-tests"]
-std = ["ink/std", "membrane/std", "wrapped_token/std"]
+std = ["ink/std", "most/std", "wrapped_token/std"]
 ink-as-dependency = []
 e2e-tests = []

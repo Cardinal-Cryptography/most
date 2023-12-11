@@ -30,7 +30,7 @@ use crate::{
         azero::SignedAzeroWsConnection,
         eth::{EthConnectionError, EthWsConnection, SignedEthWsConnection},
     },
-    contracts::{AzeroContractError, Membrane, MembraneInstance},
+    contracts::{AzeroContractError, Most, MostInstance},
     helpers::chunks,
 };
 
@@ -120,7 +120,7 @@ impl AlephZeroPastEventsListener {
             .await?
             .ok_or(AzeroListenerError::BlockNotFound)?;
 
-        let instance = MembraneInstance::new(azero_contract_address, azero_contract_metadata)?;
+        let instance = MostInstance::new(azero_contract_address, azero_contract_metadata)?;
         let contracts = vec![&instance.contract];
 
         for (from, to) in chunks(last_known_block_number, last_block_number, *sync_step) {
@@ -174,7 +174,7 @@ impl AlephZeroListener {
             ..
         } = &*config;
 
-        let instance = MembraneInstance::new(azero_contract_address, azero_contract_metadata)?;
+        let instance = MostInstance::new(azero_contract_address, azero_contract_metadata)?;
 
         let contracts = vec![&instance.contract];
 
@@ -289,7 +289,7 @@ async fn handle_event(
             debug!("hashed event encoding: {request_hash:?}");
 
             let address = eth_contract_address.parse::<Address>()?;
-            let contract = Membrane::new(address, eth_connection);
+            let contract = Most::new(address, eth_connection);
 
             //  forward transfer & vote
             let call: ContractCall<SignedEthWsConnection, ()> = contract.receive_request(

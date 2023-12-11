@@ -17,8 +17,8 @@ use crate::{
     config::Config,
     connections::{azero::SignedAzeroWsConnection, eth::SignedEthWsConnection},
     contracts::{
-        AzeroContractError, CrosschainTransferRequestFilter, Membrane, MembraneEvents,
-        MembraneInstance,
+        AzeroContractError, CrosschainTransferRequestFilter, Most, MostEvents,
+        MostInstance,
     },
     helpers::{chunks, concat_u8_arrays},
 };
@@ -66,7 +66,7 @@ impl EthPastEventsListener {
         } = &*config;
 
         let address = eth_contract_address.parse::<Address>()?;
-        let contract = Membrane::new(address, Arc::clone(&eth_connection));
+        let contract = Most::new(address, Arc::clone(&eth_connection));
 
         let mut connection = redis_connection.lock().await;
 
@@ -119,7 +119,7 @@ impl EthListener {
         } = &*config;
 
         let address = eth_contract_address.parse::<Address>()?;
-        let contract = Membrane::new(address, Arc::clone(&eth_connection));
+        let contract = Most::new(address, Arc::clone(&eth_connection));
 
         let last_block_number = eth_connection.get_block_number().await.unwrap().as_u32();
 
@@ -146,11 +146,11 @@ impl EthListener {
 }
 
 async fn handle_event(
-    event: &MembraneEvents,
+    event: &MostEvents,
     config: &Config,
     azero_connection: Arc<SignedAzeroWsConnection>,
 ) -> Result<(), EthListenerError> {
-    if let MembraneEvents::CrosschainTransferRequestFilter(
+    if let MostEvents::CrosschainTransferRequestFilter(
         crosschain_transfer_event @ CrosschainTransferRequestFilter {
             dest_token_address,
             amount,
@@ -181,7 +181,7 @@ async fn handle_event(
         let request_hash = keccak256(bytes);
         debug!("hashed event encoding: {request_hash:?}");
 
-        let contract = MembraneInstance::new(azero_contract_address, azero_contract_metadata)?;
+        let contract = MostInstance::new(azero_contract_address, azero_contract_metadata)?;
 
         // send vote
         contract

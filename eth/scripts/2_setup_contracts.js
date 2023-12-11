@@ -18,19 +18,19 @@ async function main() {
     await governance.transferOwnership(contracts.governance);
     console.log("Governance ownership transferred successfully");
 
-    const Membrane = artifacts.require ("Membrane");
-    const membrane = await Membrane.at (contracts.membrane);
+    const Most = artifacts.require ("Most");
+    const most = await Most.at (contracts.most);
 
     const payload = ethers.zeroPadValue(ethers.getBytes(
         contracts.usdt
     ), 32);
-    console.log("Setting USDT address in Membrane to:", payload);
-    await membrane.setUSDT(payload);
+    console.log("Setting USDT address in Most to:", payload);
+    await most.setUSDT(payload);
 
-    let initialMembraneOwner = await membrane.owner();
-    console.log("Transferring Membrane ownership from ", initialMembraneOwner, "to", contracts.governance);
-    await membrane.transferOwnership(contracts.governance);
-    console.log("Membrane ownership transferred successfully");
+    let initialMostOwner = await most.owner();
+    console.log("Transferring Most ownership from ", initialMostOwner, "to", contracts.governance);
+    await most.transferOwnership(contracts.governance);
+    console.log("Most ownership transferred successfully");
 
     const Migrations = artifacts.require ("Migrations");
     const migrations = await Migrations.at (contracts.migrations);

@@ -1,5 +1,5 @@
 import { ApiPromise, WsProvider, Keyring } from '@polkadot/api';
-import MembraneConstructors from '../types/constructors/membrane';
+import MostConstructors from '../types/constructors/most';
 import TokenConstructors from '../types/constructors/token';
 import GovernanceConstructors from '../types/constructors/governance';
 import { uploadCode, Addresses, storeAddresses, estimateContractInit } from './utils';
@@ -32,17 +32,17 @@ async function main(): Promise<void> {
   const tokenCodeHash = await uploadCode(api, deployer, "token.contract");
   console.log('token code hash:', tokenCodeHash);
 
-  const membraneCodeHash = await uploadCode(api, deployer, "membrane.contract");
-  console.log('membrane code hash:', membraneCodeHash);
+  const mostCodeHash = await uploadCode(api, deployer, "most.contract");
+  console.log('most code hash:', mostCodeHash);
 
   const governanceCodeHash = await uploadCode(api, deployer, "governance.contract");
   console.log('governance code hash:', governanceCodeHash);
 
   const governanceConstructors = new GovernanceConstructors(api, deployer);
-  const membraneConstructors = new MembraneConstructors(api, deployer);
+  const mostConstructors = new MostConstructors(api, deployer);
   const tokenConstructors = new TokenConstructors(api, deployer);
 
-  let estimatedGas = await estimateContractInit(api, deployer, 'membrane.contract', [
+  let estimatedGas = await estimateContractInit(api, deployer, 'most.contract', [
     [authority],
     signature_threshold!,
     commission_per_dix_mille!,
@@ -51,7 +51,7 @@ async function main(): Promise<void> {
     relay_gas_usage!,
   ]);
 
-  const { address: membraneAddress } = await membraneConstructors.new(
+  const { address: mostAddress } = await mostConstructors.new(
     [authority],
     signature_threshold!,
     commission_per_dix_mille!,
@@ -60,7 +60,7 @@ async function main(): Promise<void> {
     relay_gas_usage!,
    { gasLimit: estimatedGas },
   );
-  console.log('membrane address:', membraneAddress);
+  console.log('most address:', mostAddress);
 
   const { address: wethAddress } = await tokenConstructors.new(
     0, // initial supply
@@ -77,7 +77,7 @@ async function main(): Promise<void> {
 
   const addresses: Addresses = {
     governance: governanceAddress,
-    membrane: membraneAddress,
+    most: mostAddress,
     weth: wethAddress
   };
   console.log('addresses:', addresses);

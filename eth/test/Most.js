@@ -13,14 +13,14 @@ const COMMISSION_PER_DIX_MILLE = 30;
 const MINIMUM_TRANSFER_AMOUNT_USD = 50;
 const DIX_MILLE = 10000;
 
-describe("Membrane", function () {
+describe("Most", function () {
     describe("Constructor", function () {
         it("Reverts if threshold is 0", async () => {
             const signers = await ethers.getSigners();
             const accounts = signers.map(s => s.address)
 
-            const Membrane = await ethers.getContractFactory("Membrane");
-            await expect(upgrades.deployProxy(Membrane,
+            const Most = await ethers.getContractFactory("Most");
+            await expect(upgrades.deployProxy(Most,
                                               [
                                                   [accounts[0]],
                                                   0,
@@ -37,8 +37,8 @@ describe("Membrane", function () {
             const signers = await ethers.getSigners();
             const accounts = signers.map(s => s.address)
 
-            const Membrane = await ethers.getContractFactory("Membrane");
-            await expect(upgrades.deployProxy(Membrane,
+            const Most = await ethers.getContractFactory("Most");
+            await expect(upgrades.deployProxy(Most,
                                               [
                                                   [accounts[0]],
                                                   2,
@@ -54,12 +54,12 @@ describe("Membrane", function () {
         });
     });
 
-    async function deployEightGuardianMembraneFixture() {
+    async function deployEightGuardianMostFixture() {
         const signers = await ethers.getSigners();
         const accounts = signers.map(s => s.address)
 
-        const Membrane = await ethers.getContractFactory("Membrane");
-        const membrane = await upgrades.deployProxy(Membrane,
+        const Most = await ethers.getContractFactory("Most");
+        const most = await upgrades.deployProxy(Most,
                                                     [
                                                         accounts.slice(1, 9),
                                                         5,
@@ -71,7 +71,7 @@ describe("Membrane", function () {
                                                         initializer: "initialize",
                                                         kind: 'uups'
                                                     });
-        const membraneAddress = await membrane.getAddress();
+        const mostAddress = await most.getAddress();
 
         const Token = await ethers.getContractFactory("Token");
         const token = await Token.deploy("10000000000000000000000000", "Shittoken", "SHIT");
@@ -80,23 +80,23 @@ describe("Membrane", function () {
         const usdt = await Token.deploy("12000000000000000000000000", "Tether", "USDT");
         const usdtAddressBytes32 = addressToBytes32(await usdt.getAddress());
 
-        await membrane.setUSDT(usdtAddressBytes32);
-        return { membrane, token, tokenAddressBytes32, usdtAddressBytes32, membraneAddress };
+        await most.setUSDT(usdtAddressBytes32);
+        return { most, token, tokenAddressBytes32, usdtAddressBytes32, mostAddress };
     }
 
     describe("sendRequest", function () {
         it("Reverts if the USD value of the transfer amount is below the minimum", async () => {
-            const { membrane, tokenAddressBytes32, usdtAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
+            const { most, tokenAddressBytes32, usdtAddressBytes32 } = await loadFixture(deployEightGuardianMostFixture);
 
-            await membrane.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
+            await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
 
-            amountToSend = await membrane.queryPrice(MINIMUM_TRANSFER_AMOUNT_USD - 1,
+            amountToSend = await most.queryPrice(MINIMUM_TRANSFER_AMOUNT_USD - 1,
                                                      usdtAddressBytes32, // of
                                                      tokenAddressBytes32 // in
                                                     );
 
             await expect(
-                membrane.sendRequest(
+                most.sendRequest(
                     tokenAddressBytes32,
                     amountToSend,
                     ALEPH_ACCOUNT
@@ -105,11 +105,11 @@ describe("Membrane", function () {
         });
 
         it("Reverts if token is not whitelisted", async () => {
-            const { membrane, token, tokenAddressBytes32, membraneAddress } = await loadFixture(deployEightGuardianMembraneFixture);
+            const { most, token, tokenAddressBytes32, mostAddress } = await loadFixture(deployEightGuardianMostFixture);
 
-            await token.approve(membraneAddress, TOKEN_AMOUNT);
+            await token.approve(mostAddress, TOKEN_AMOUNT);
             await expect(
-                membrane.sendRequest(
+                most.sendRequest(
                     tokenAddressBytes32,
                     TOKEN_AMOUNT,
                     ALEPH_ACCOUNT
@@ -118,11 +118,11 @@ describe("Membrane", function () {
         });
 
         it("Reverts if token transfer is not approved", async () => {
-            const { membrane, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
+            const { most, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMostFixture);
 
-            await membrane.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
+            await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
             await expect(
-                membrane.sendRequest(
+                most.sendRequest(
                     tokenAddressBytes32,
                     TOKEN_AMOUNT,
                     ALEPH_ACCOUNT
@@ -130,32 +130,32 @@ describe("Membrane", function () {
             ).to.be.reverted;
         });
 
-        it("Transfers tokens to Membrane", async () => {
-            const { membrane, token, tokenAddressBytes32, membraneAddress } = await loadFixture(deployEightGuardianMembraneFixture);
+        it("Transfers tokens to Most", async () => {
+            const { most, token, tokenAddressBytes32, mostAddress } = await loadFixture(deployEightGuardianMostFixture);
 
-            await token.approve(membraneAddress, TOKEN_AMOUNT);
-            await membrane.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
-            await membrane.sendRequest(
+            await token.approve(mostAddress, TOKEN_AMOUNT);
+            await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
+            await most.sendRequest(
                 tokenAddressBytes32,
                 TOKEN_AMOUNT,
                 ALEPH_ACCOUNT
             );
 
-            expect(await token.balanceOf(membraneAddress)).to.equal(TOKEN_AMOUNT);
+            expect(await token.balanceOf(mostAddress)).to.equal(TOKEN_AMOUNT);
         });
 
         it("Emits correct event", async () => {
-            const { membrane, token, tokenAddressBytes32, membraneAddress } = await loadFixture(deployEightGuardianMembraneFixture);
+            const { most, token, tokenAddressBytes32, mostAddress } = await loadFixture(deployEightGuardianMostFixture);
 
-            await token.approve(membraneAddress, TOKEN_AMOUNT);
-            await membrane.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
+            await token.approve(mostAddress, TOKEN_AMOUNT);
+            await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
             await expect(
-                membrane.sendRequest(
+                most.sendRequest(
                     tokenAddressBytes32,
                     TOKEN_AMOUNT,
                     ALEPH_ACCOUNT
                 )
-            ).to.emit(membrane, "CrosschainTransferRequest").withArgs(
+            ).to.emit(most, "CrosschainTransferRequest").withArgs(
                 0,
                 WRAPPED_TOKEN_ADDRESS,
                 TOKEN_AMOUNT,
@@ -167,7 +167,7 @@ describe("Membrane", function () {
 
     describe("receiveRequest", function () {
         it("Reverts if caller is not a guardian", async () => {
-            const { membrane, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
+            const { most, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMostFixture);
             const accounts = await ethers.getSigners();
             const ethAddress = addressToBytes32(accounts[10].address);
             const requestHash = ethers.solidityPackedKeccak256(
@@ -176,7 +176,7 @@ describe("Membrane", function () {
             );
 
             await expect(
-                membrane.connect(accounts[0]).receiveRequest(
+                most.connect(accounts[0]).receiveRequest(
                     requestHash,
                     tokenAddressBytes32,
                     TOKEN_AMOUNT,
@@ -187,7 +187,7 @@ describe("Membrane", function () {
         });
 
         it("Reverts if request has already been signed by a guardian", async () => {
-            const { membrane, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
+            const { most, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMostFixture);
             const accounts = await ethers.getSigners();
             const ethAddress = addressToBytes32(accounts[10].address);
             const requestHash = ethers.solidityPackedKeccak256(
@@ -195,7 +195,7 @@ describe("Membrane", function () {
                 [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0]
             );
 
-            await membrane.connect(accounts[1]).receiveRequest(
+            await most.connect(accounts[1]).receiveRequest(
                 requestHash,
                 tokenAddressBytes32,
                 TOKEN_AMOUNT,
@@ -203,7 +203,7 @@ describe("Membrane", function () {
                 0,
             );
             await expect(
-                membrane.connect(accounts[1]).receiveRequest(
+                most.connect(accounts[1]).receiveRequest(
                     requestHash,
                     tokenAddressBytes32,
                     TOKEN_AMOUNT,
@@ -214,7 +214,7 @@ describe("Membrane", function () {
         });
 
         it("Reverts if request has already been executed", async () => {
-            const { membrane, token, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
+            const { most, token, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMostFixture);
             const accounts = await ethers.getSigners();
             const ethAddress = addressToBytes32(accounts[10].address);
             const requestHash = ethers.solidityPackedKeccak256(
@@ -222,11 +222,11 @@ describe("Membrane", function () {
                 [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0]
             );
 
-            // Provide funds for Membrane
-            await token.transfer(await membrane.getAddress(), TOKEN_AMOUNT * 2);
+            // Provide funds for Most
+            await token.transfer(await most.getAddress(), TOKEN_AMOUNT * 2);
 
             for (let i = 1; i < 6; i++) {
-                await membrane.connect(accounts[i]).receiveRequest(
+                await most.connect(accounts[i]).receiveRequest(
                     requestHash,
                     tokenAddressBytes32,
                     TOKEN_AMOUNT,
@@ -236,7 +236,7 @@ describe("Membrane", function () {
             }
 
             await expect(
-                membrane.connect(accounts[6]).receiveRequest(
+                most.connect(accounts[6]).receiveRequest(
                     requestHash,
                     tokenAddressBytes32,
                     TOKEN_AMOUNT,
@@ -247,7 +247,7 @@ describe("Membrane", function () {
         });
 
         it("Unlocks tokens for the user", async () => {
-            const { membrane, token, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
+            const { most, token, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMostFixture);
             const accounts = await ethers.getSigners();
             const ethAddress = addressToBytes32(accounts[10].address);
             const requestHash = ethers.solidityPackedKeccak256(
@@ -255,11 +255,11 @@ describe("Membrane", function () {
                 [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0]
             );
 
-            // Provide funds for Membrane
-            await token.transfer(await membrane.getAddress(), TOKEN_AMOUNT * 2);
+            // Provide funds for Most
+            await token.transfer(await most.getAddress(), TOKEN_AMOUNT * 2);
 
             for (let i = 1; i < 6; i++) {
-                await membrane.connect(accounts[i]).receiveRequest(
+                await most.connect(accounts[i]).receiveRequest(
                     requestHash,
                     tokenAddressBytes32,
                     TOKEN_AMOUNT,
@@ -272,7 +272,7 @@ describe("Membrane", function () {
         });
 
         it("Reverts on non-matching hash", async () => {
-            const { membrane, token, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
+            const { most, token, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMostFixture);
             const accounts = await ethers.getSigners();
             const ethAddress = addressToBytes32(accounts[10].address);
             const requestHash = ethers.solidityPackedKeccak256(
@@ -280,11 +280,11 @@ describe("Membrane", function () {
                 [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 1]
             );
 
-            // Provide funds for Membrane
-            await token.transfer(await membrane.getAddress(), TOKEN_AMOUNT * 2);
+            // Provide funds for Most
+            await token.transfer(await most.getAddress(), TOKEN_AMOUNT * 2);
 
             await expect(
-                membrane.connect(accounts[1]).receiveRequest(
+                most.connect(accounts[1]).receiveRequest(
                     requestHash,
                     tokenAddressBytes32,
                     TOKEN_AMOUNT,
@@ -297,7 +297,7 @@ describe("Membrane", function () {
 
     describe("payoutRewards", function () {
         it("account can request a payout", async () => {
-            const { membrane, token, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
+            const { most, token, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMostFixture);
             const accounts = await ethers.getSigners();
             const ethAddress = addressToBytes32(accounts[10].address);
             const requestHash = ethers.solidityPackedKeccak256(
@@ -305,11 +305,11 @@ describe("Membrane", function () {
                 [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0]
             );
 
-            // Provide funds for Membrane
-            await token.transfer(await membrane.getAddress(), TOKEN_AMOUNT * 2);
+            // Provide funds for Most
+            await token.transfer(await most.getAddress(), TOKEN_AMOUNT * 2);
 
             for (let i = 1; i < 6 ; i++) {
-                await membrane.connect(accounts[i]).receiveRequest(
+                await most.connect(accounts[i]).receiveRequest(
                     requestHash,
                     tokenAddressBytes32,
                     TOKEN_AMOUNT,
@@ -318,8 +318,8 @@ describe("Membrane", function () {
                 );
             }
 
-            currentCommitteeId = await membrane.committeeId ();
-            totalRewards = await membrane.getCollectedCommitteeRewards (currentCommitteeId, tokenAddressBytes32);
+            currentCommitteeId = await most.committeeId ();
+            totalRewards = await most.getCollectedCommitteeRewards (currentCommitteeId, tokenAddressBytes32);
 
             await expect(
                 currentCommitteeId
@@ -327,7 +327,7 @@ describe("Membrane", function () {
 
             signerBalanceBefore = await token.balanceOf(accounts[1].address);
 
-            await membrane.payoutRewards (currentCommitteeId,
+            await most.payoutRewards (currentCommitteeId,
                                          accounts[1].address,
                                          tokenAddressBytes32);
 
@@ -336,7 +336,7 @@ describe("Membrane", function () {
         });
 
         it("past committee member can still request a payout", async () => {
-            const { membrane, token, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMembraneFixture);
+            const { most, token, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMostFixture);
             const accounts = await ethers.getSigners();
             const ethAddress = addressToBytes32(accounts[10].address);
             const requestHash = ethers.solidityPackedKeccak256(
@@ -344,11 +344,11 @@ describe("Membrane", function () {
                 [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0]
             );
 
-            // Provide funds for Membrane
-            await token.transfer(await membrane.getAddress(), TOKEN_AMOUNT * 2);
+            // Provide funds for Most
+            await token.transfer(await most.getAddress(), TOKEN_AMOUNT * 2);
 
             for (let i = 1; i < 6 ; i++) {
-                await membrane.connect(accounts[i]).receiveRequest(
+                await most.connect(accounts[i]).receiveRequest(
                     requestHash,
                     tokenAddressBytes32,
                     TOKEN_AMOUNT,
@@ -357,7 +357,7 @@ describe("Membrane", function () {
                 );
             }
 
-            previousCommitteeId = await membrane.committeeId ();
+            previousCommitteeId = await most.committeeId ();
 
             await expect(
                 previousCommitteeId
@@ -366,16 +366,16 @@ describe("Membrane", function () {
             let committee = accounts.slice(2, 9).map((x) => x.address);
             let threshold = 4;
 
-            await membrane.setCommittee (committee, threshold);
+            await most.setCommittee (committee, threshold);
 
             await expect(
-                await membrane.committeeId ()
+                await most.committeeId ()
             ).to.be.equal(1);
 
-            totalRewards = await membrane.getCollectedCommitteeRewards (previousCommitteeId, tokenAddressBytes32);
+            totalRewards = await most.getCollectedCommitteeRewards (previousCommitteeId, tokenAddressBytes32);
             signerBalanceBefore = await token.balanceOf(accounts[1].address);
 
-            await membrane.payoutRewards (previousCommitteeId,
+            await most.payoutRewards (previousCommitteeId,
                                          accounts[1].address,
                                          tokenAddressBytes32);
 
@@ -385,43 +385,43 @@ describe("Membrane", function () {
     });
 
     describe("Upgrade", function () {
-        it("Membrane contract can be upgraded", async () => {
-            exec('cp ./contracts/Membrane.sol ./contracts/MembraneV2.sol',
+        it("Most contract can be upgraded", async () => {
+            exec('cp ./contracts/Most.sol ./contracts/MostV2.sol',
                  (error) => {
                      if (error !== null) {
                          console.log('exec error: ' + error);
                      }
-                     exec('sed -i "17 a \ \ \ \ uint256 public test;" ./contracts/MembraneV2.sol',
+                     exec('sed -i "17 a \ \ \ \ uint256 public test;" ./contracts/MostV2.sol',
                           async (error, stdout, stderr) => {
                               if (error !== null) {
                                   console.log('exec error: ' + error);
                               }
 
-                              const { membrane, membraneAddress } = await loadFixture(deployEightGuardianMembraneFixture);
+                              const { most, mostAddress } = await loadFixture(deployEightGuardianMostFixture);
 
                               const accounts = await ethers.getSigners();
                               let committee = accounts.slice(2, 9).map((x) => x.address);
                               let threshold = 4;
-                              await membrane.setCommittee (committee, threshold);
+                              await most.setCommittee (committee, threshold);
 
-                              const MembraneV2 = await ethers.getContractFactory("MembraneV2");
-                              const membraneV2 = await upgrades.upgradeProxy(membraneAddress, MembraneV2);
+                              const MostV2 = await ethers.getContractFactory("MostV2");
+                              const mostV2 = await upgrades.upgradeProxy(mostAddress, MostV2);
 
-                              const address = await membraneV2.getAddress();
+                              const address = await mostV2.getAddress();
                               // address is preserved
-                              expect(address).to.be.equal(membraneAddress);
+                              expect(address).to.be.equal(mostAddress);
 
                               // state is preserved
-                              expect((membrane.isInCommittee(committee[0])));
+                              expect((most.isInCommittee(committee[0])));
 
                               // no state overwrite
-                              expect((membrane.test())).to.be.equal(0);
+                              expect((most.test())).to.be.equal(0);
 
                           });
                  });
 
             // clean up
-            exec('rm ./contracts/MembraneV2.sol',
+            exec('rm ./contracts/MostV2.sol',
                  (error, stdout, stderr) => {
                      if (error !== null) {
                          console.log('exec error: ' + error);

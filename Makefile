@@ -83,19 +83,19 @@ setup-eth: compile-eth
 	cd eth && \
 	npx hardhat run --network $(NETWORK) scripts/2_setup_contracts.js
 
-.PHONY: membrane-builder
-membrane-builder: # Build an image in which contracts can be built
-membrane-builder:
-	docker build -t membrane-builder -f docker/membrane_builder.dockerfile .
+.PHONY: most-builder
+most-builder: # Build an image in which contracts can be built
+most-builder:
+	docker build -t most-builder -f docker/most_builder.dockerfile .
 
 .PHONY: compile-azero-docker
 compile-azero-docker: # Compile azero contracts in docker
-compile-azero-docker: azero-deps membrane-builder
+compile-azero-docker: azero-deps most-builder
 	docker run --rm --network host \
 		--volume "$(shell pwd)":/code \
 		--workdir /code \
-		--name membrane-builder \
-		membrane-builder \
+		--name most-builder \
+		most-builder \
 		make compile-azero
 
 .PHONY: deploy-azero-docker
@@ -143,7 +143,7 @@ bridge: local-bridgenet deploy run-relayer
 .PHONY: test-solidity
 test-solidity: # Run solidity tests
 test-solidity: eth-deps
-	cd eth && npx hardhat test ./test/Membrane.js ./test/WrappedEther.js
+	cd eth && npx hardhat test ./test/Most.js ./test/WrappedEther.js
 
 .PHONY: test-ink-e2e
 test-ink-e2e: # Run ink e2e tests
@@ -155,7 +155,7 @@ test-ink-e2e: bootstrap-azero
 .PHONY: test-ink
 test-ink: # Run ink tests
 test-ink: test-ink-e2e
-	cd azero/contracts/membrane && \
+	cd azero/contracts/most && \
 	cargo test && \
 	cd ../governance && \
 	cargo test && \
@@ -180,7 +180,7 @@ relayer-lint: compile-azero-docker compile-eth
 .PHONY: ink-lint
 ink-lint: # Lint ink contracts
 ink-lint:
-	cd azero/contracts/membrane && cargo clippy -- --no-deps -D warnings
+	cd azero/contracts/most && cargo clippy -- --no-deps -D warnings
 	cd azero/contracts/governance && cargo clippy -- --no-deps -D warnings
 	cd azero/contracts/token && cargo clippy -- --no-deps -D warnings
 	cd azero/contracts/psp22-traits && cargo clippy -- --no-deps -D warnings

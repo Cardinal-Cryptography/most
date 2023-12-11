@@ -1,5 +1,5 @@
 [package]
-name = "membrane"
+name = "most"
 version = "1.0.0"
 authors = ["Cardinal Cryptography"]
 edition = "2021"

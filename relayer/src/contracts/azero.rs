@@ -21,11 +21,11 @@ pub enum AzeroContractError {
 }
 
 #[derive(Debug)]
-pub struct MembraneInstance {
+pub struct MostInstance {
     pub contract: ContractInstance,
 }
 
-impl MembraneInstance {
+impl MostInstance {
     pub fn new(address: &str, metadata_path: &str) -> Result<Self, AzeroContractError> {
         let address = AccountId::from_str(address)
             .map_err(|why| AzeroContractError::NotAccountId(why.to_string()))?;

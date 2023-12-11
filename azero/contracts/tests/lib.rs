@@ -28,9 +28,9 @@ mod e2e {
         account_id, alice, bob, build_message, charlie, dave, eve, ferdie, subxt::dynamic::Value,
         AccountKeyring, Keypair, PolkadotConfig,
     };
-    use membrane::{
-        membrane::{CrosschainTransferRequest, RequestProcessed, RequestSigned},
-        MembraneError, MembraneRef,
+    use most::{
+        most::{CrosschainTransferRequest, RequestProcessed, RequestSigned},
+        MostError, MostRef,
     };
     use psp22::{PSP22Error, PSP22};
     use scale::{Decode, Encode};
@@ -55,7 +55,7 @@ mod e2e {
         let minimum_transfer_amount_usd = 50;
         let relay_gas_usage = 50000;
 
-        let _membrane_address = instantiate_membrane(
+        let _most_address = instantiate_most(
             &mut client,
             &alice(),
             guardian_ids(),
@@ -78,7 +78,7 @@ mod e2e {
         let token_address =
             instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
 
-        let membrane_address = instantiate_membrane(
+        let most_address = instantiate_most(
             &mut client,
             &alice(),
             guardian_ids(),
@@ -90,10 +90,10 @@ mod e2e {
         )
         .await;
 
-        let add_pair_res = membrane_add_pair(
+        let add_pair_res = most_add_pair(
             &mut client,
             &alice(),
-            membrane_address,
+            most_address,
             token_address,
             REMOTE_TOKEN,
         )
@@ -112,7 +112,7 @@ mod e2e {
         let token_address =
             instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
 
-        let membrane_address = instantiate_membrane(
+        let most_address = instantiate_most(
             &mut client,
             &alice(),
             guardian_ids(),
@@ -124,10 +124,10 @@ mod e2e {
         )
         .await;
 
-        let add_pair_res = membrane_add_pair(
+        let add_pair_res = most_add_pair(
             &mut client,
             &bob(),
-            membrane_address,
+            most_address,
             token_address,
             REMOTE_TOKEN,
         )
@@ -135,7 +135,7 @@ mod e2e {
 
         assert_eq!(
             add_pair_res.expect_err("Bob should not be able to add a pair as he is not the owner"),
-            MembraneError::NotOwner(account_id(AccountKeyring::Bob))
+            MostError::NotOwner(account_id(AccountKeyring::Bob))
         );
     }
 
@@ -149,7 +149,7 @@ mod e2e {
         let token_address =
             instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
 
-        let membrane_address = instantiate_membrane(
+        let most_address = instantiate_most(
             &mut client,
             &alice(),
             guardian_ids(),
@@ -161,17 +161,17 @@ mod e2e {
         )
         .await;
 
-        membrane_add_pair(
+        most_add_pair(
             &mut client,
             &alice(),
-            membrane_address,
+            most_address,
             token_address,
             REMOTE_TOKEN,
         )
         .await
         .expect("Adding a pair should succeed");
 
-        let base_fee = membrane_base_fee(&mut client, membrane_address)
+        let base_fee = most_base_fee(&mut client, most_address)
             .await
             .expect("should return base fee");
 
@@ -188,10 +188,10 @@ mod e2e {
         .expect("balance before");
 
         let amount_to_send = 1000;
-        _ = membrane_send_request(
+        _ = most_send_request(
             &mut client,
             &alice(),
-            membrane_address,
+            most_address,
             token_address,
             amount_to_send,
             REMOTE_RECEIVER,
@@ -234,7 +234,7 @@ mod e2e {
         let token_address =
             instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
 
-        let membrane_address = instantiate_membrane(
+        let most_address = instantiate_most(
             &mut client,
             &alice(),
             guardian_ids(),
@@ -248,14 +248,14 @@ mod e2e {
 
         let amount_to_send = 1000;
 
-        let base_fee = membrane_base_fee(&mut client, membrane_address)
+        let base_fee = most_base_fee(&mut client, most_address)
             .await
             .expect("base fee");
 
-        let send_request_res = membrane_send_request(
+        let send_request_res = most_send_request(
             &mut client,
             &alice(),
-            membrane_address,
+            most_address,
             token_address,
             amount_to_send,
             REMOTE_RECEIVER,
@@ -265,7 +265,7 @@ mod e2e {
 
         assert_eq!(
             send_request_res.expect_err("Request should fail for a non-whitelisted token"),
-            MembraneError::UnsupportedPair
+            MostError::UnsupportedPair
         );
     }
 
@@ -279,7 +279,7 @@ mod e2e {
         let token_address =
             instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
 
-        let membrane_address = instantiate_membrane(
+        let most_address = instantiate_most(
             &mut client,
             &alice(),
             guardian_ids(),
@@ -293,24 +293,24 @@ mod e2e {
 
         let amount_to_send = 1000;
 
-        membrane_add_pair(
+        most_add_pair(
             &mut client,
             &alice(),
-            membrane_address,
+            most_address,
             token_address,
             REMOTE_TOKEN,
         )
         .await
         .expect("Adding a pair should succeed");
 
-        let base_fee = membrane_base_fee(&mut client, membrane_address)
+        let base_fee = most_base_fee(&mut client, most_address)
             .await
             .expect("should return base fee");
 
-        let send_request_res = membrane_send_request(
+        let send_request_res = most_send_request(
             &mut client,
             &alice(),
-            membrane_address,
+            most_address,
             token_address,
             amount_to_send,
             REMOTE_RECEIVER,
@@ -352,7 +352,7 @@ mod e2e {
 
         let token_address =
             instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
-        let membrane_address = instantiate_membrane(
+        let most_address = instantiate_most(
             &mut client,
             &alice(),
             guardian_ids(),
@@ -371,10 +371,10 @@ mod e2e {
         let request_hash =
             hash_request_data(token_address, amount, receiver_address, request_nonce);
 
-        let alice_receive_request_res = membrane_receive_request(
+        let alice_receive_request_res = most_receive_request(
             &mut client,
             &alice(),
-            membrane_address,
+            most_address,
             request_hash,
             *token_address.as_ref(),
             amount,
@@ -385,7 +385,7 @@ mod e2e {
 
         assert_eq!(
             alice_receive_request_res.expect_err("Receive request should fail for non-guardians"),
-            MembraneError::NotInCommittee
+            MostError::NotInCommittee
         );
     }
 
@@ -399,7 +399,7 @@ mod e2e {
         let token_address =
             instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
 
-        let membrane_address = instantiate_membrane(
+        let most_address = instantiate_most(
             &mut client,
             &alice(),
             guardian_ids(),
@@ -416,10 +416,10 @@ mod e2e {
         let request_nonce = 1;
 
         let incorrect_hash = [0x3; 32];
-        let receive_request_res = membrane_receive_request(
+        let receive_request_res = most_receive_request(
             &mut client,
             &bob(),
-            membrane_address,
+            most_address,
             incorrect_hash,
             *token_address.as_ref(),
             amount,
@@ -430,7 +430,7 @@ mod e2e {
 
         assert_eq!(
             receive_request_res.expect_err("Receive request should fail for non-matching hash"),
-            MembraneError::HashDoesNotMatchData
+            MostError::HashDoesNotMatchData
         );
     }
 
@@ -446,7 +446,7 @@ mod e2e {
         let token_address =
             instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
 
-        let membrane_address = instantiate_membrane(
+        let most_address = instantiate_most(
             &mut client,
             &alice(),
             guardian_ids(),
@@ -468,10 +468,10 @@ mod e2e {
 
         for i in 0..(DEFAULT_THRESHOLD as usize) {
             let signer = &guardian_keys()[i];
-            let receive_res = membrane_receive_request(
+            let receive_res = most_receive_request(
                 &mut client,
                 signer,
-                membrane_address,
+                most_address,
                 request_hash,
                 *token_address.as_ref(),
                 amount,
@@ -521,7 +521,7 @@ mod e2e {
 
         let token_address =
             instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
-        let membrane_address = instantiate_membrane(
+        let most_address = instantiate_most(
             &mut client,
             &alice(),
             guardian_ids(),
@@ -542,10 +542,10 @@ mod e2e {
 
         for i in 0..(DEFAULT_THRESHOLD - 1) as usize {
             let signer = &guardian_keys()[i];
-            let receive_res = membrane_receive_request(
+            let receive_res = most_receive_request(
                 &mut client,
                 signer,
-                membrane_address,
+                most_address,
                 request_hash,
                 *token_address.as_ref(),
                 amount,
@@ -590,7 +590,7 @@ mod e2e {
         let token_address =
             instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
 
-        let membrane_address = instantiate_membrane(
+        let most_address = instantiate_most(
             &mut client,
             &alice(),
             guardian_ids(),
@@ -602,24 +602,24 @@ mod e2e {
         )
         .await;
 
-        membrane_add_pair(
+        most_add_pair(
             &mut client,
             &alice(),
-            membrane_address,
+            most_address,
             token_address,
             REMOTE_TOKEN,
         )
         .await
         .expect("Adding a pair should succeed");
 
-        let base_fee = membrane_base_fee(&mut client, membrane_address)
+        let base_fee = most_base_fee(&mut client, most_address)
             .await
             .expect("should return base fee");
 
         // amount is set by query_fee result
-        let amount_to_send = membrane_query_price(
+        let amount_to_send = most_query_price(
             &mut client,
-            membrane_address,
+            most_address,
             minimum_transfer_amount_usd - 1,
             USDT_TOKEN_ID, // of
             REMOTE_TOKEN,  // in
@@ -627,10 +627,10 @@ mod e2e {
         .await
         .expect("price query result");
 
-        let send_request_res = membrane_send_request(
+        let send_request_res = most_send_request(
             &mut client,
             &alice(),
-            membrane_address,
+            most_address,
             token_address,
             amount_to_send,
             REMOTE_RECEIVER,
@@ -640,7 +640,7 @@ mod e2e {
 
         assert_eq!(
             send_request_res.expect_err("Request should because the amount is below the minimum"),
-            MembraneError::AmountBelowMinimum
+            MostError::AmountBelowMinimum
         );
     }
 
@@ -655,7 +655,7 @@ mod e2e {
         let token_address =
             instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
 
-        let membrane_address = instantiate_membrane(
+        let most_address = instantiate_most(
             &mut client,
             &alice(),
             guardian_ids(),
@@ -667,26 +667,26 @@ mod e2e {
         )
         .await;
 
-        membrane_add_pair(
+        most_add_pair(
             &mut client,
             &alice(),
-            membrane_address,
+            most_address,
             token_address,
             REMOTE_TOKEN,
         )
         .await
         .expect("Adding a pair should succeed");
 
-        let base_fee = membrane_base_fee(&mut client, membrane_address)
+        let base_fee = most_base_fee(&mut client, most_address)
             .await
             .expect("should return base fee");
 
         let amount = 841189100000000;
 
-        let send_request_res = membrane_send_request(
+        let send_request_res = most_send_request(
             &mut client,
             &alice(),
-            membrane_address,
+            most_address,
             token_address,
             amount,
             REMOTE_RECEIVER,
@@ -696,7 +696,7 @@ mod e2e {
 
         assert_eq!(
             send_request_res.expect_err("Request should fail without allowance"),
-            MembraneError::BaseFeeTooLow
+            MostError::BaseFeeTooLow
         );
     }
 
@@ -710,7 +710,7 @@ mod e2e {
         let token_address =
             instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
 
-        let membrane_address = instantiate_membrane(
+        let most_address = instantiate_most(
             &mut client,
             &alice(),
             guardian_ids(),
@@ -724,7 +724,7 @@ mod e2e {
 
         // seed contract with some funds for pocket money transfers
         let call_data = vec![
-            Value::unnamed_variant("Id", [Value::from_bytes(membrane_address)]),
+            Value::unnamed_variant("Id", [Value::from_bytes(most_address)]),
             Value::u128(10 * pocket_money),
         ];
 
@@ -746,10 +746,10 @@ mod e2e {
             .expect("native balance before");
 
         for signer in &guardian_keys()[0..(DEFAULT_THRESHOLD as usize)] {
-            membrane_receive_request(
+            most_receive_request(
                 &mut client,
                 signer,
-                membrane_address,
+                most_address,
                 request_hash,
                 *token_address.as_ref(),
                 amount,
@@ -778,7 +778,7 @@ mod e2e {
         let token_address =
             instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
 
-        let membrane_address = instantiate_membrane(
+        let most_address = instantiate_most(
             &mut client,
             &alice(),
             guardian_ids(),
@@ -790,7 +790,7 @@ mod e2e {
         )
         .await;
 
-        let commission = membrane_commission_per_dix_mille(&mut client, membrane_address).await;
+        let commission = most_commission_per_dix_mille(&mut client, most_address).await;
 
         assert_eq!(commission, commission_per_dix_mille);
 
@@ -806,10 +806,10 @@ mod e2e {
             .expect("balance before");
 
         for signer in &guardian_keys()[0..(DEFAULT_THRESHOLD as usize)] {
-            membrane_receive_request(
+            most_receive_request(
                 &mut client,
                 signer,
-                membrane_address,
+                most_address,
                 request_hash,
                 *token_address.as_ref(),
                 amount,
@@ -829,13 +829,13 @@ mod e2e {
             token_balance_before + ((amount * (10000 - commission)) / 10000)
         );
 
-        let committee_id = membrane_committee_id(&mut client, membrane_address)
+        let committee_id = most_committee_id(&mut client, most_address)
             .await
             .expect("committe id");
 
-        let total_rewards = membrane_committee_rewards(
+        let total_rewards = most_committee_rewards(
             &mut client,
-            membrane_address,
+            most_address,
             committee_id,
             *token_address.as_ref(),
         )
@@ -853,10 +853,10 @@ mod e2e {
                 .await
                 .expect("signer balance before");
 
-            membrane_request_payout(
+            most_request_payout(
                 &mut client,
                 signer,
-                membrane_address,
+                most_address,
                 committee_id,
                 member_id,
                 *token_address.as_ref(),
@@ -880,10 +880,10 @@ mod e2e {
                 .await
                 .expect("signer balance before");
 
-        membrane_request_payout(
+        most_request_payout(
             &mut client,
             &alice(),
-            membrane_address,
+            most_address,
             committee_id,
             account_id(AccountKeyring::Bob),
             *token_address.as_ref(),
@@ -909,7 +909,7 @@ mod e2e {
         let token_address =
             instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
 
-        let membrane_address = instantiate_membrane(
+        let most_address = instantiate_most(
             &mut client,
             &alice(),
             guardian_ids(),
@@ -929,10 +929,10 @@ mod e2e {
             hash_request_data(token_address, amount, receiver_address, request_nonce);
 
         for signer in &guardian_keys()[0..(DEFAULT_THRESHOLD as usize)] {
-            membrane_receive_request(
+            most_receive_request(
                 &mut client,
                 signer,
-                membrane_address,
+                most_address,
                 request_hash,
                 *token_address.as_ref(),
                 amount,
@@ -943,16 +943,16 @@ mod e2e {
             .expect("Receive request should succeed");
         }
 
-        let previous_committee_id = membrane_committee_id(&mut client, membrane_address)
+        let previous_committee_id = most_committee_id(&mut client, most_address)
             .await
             .expect("committe id");
 
         let previous_committee_size = guardian_ids().len();
 
-        membrane_set_committee(
+        most_set_committee(
             &mut client,
             &alice(),
-            membrane_address,
+            most_address,
             &guardian_ids()[1..],
             DEFAULT_THRESHOLD - 1,
         )
@@ -965,10 +965,10 @@ mod e2e {
             .await
             .expect("signer balance before");
 
-        membrane_request_payout(
+        most_request_payout(
             &mut client,
             &alice(),
-            membrane_address,
+            most_address,
             previous_committee_id,
             member_id,
             *token_address.as_ref(),
@@ -976,9 +976,9 @@ mod e2e {
         .await
         .expect("request payout");
 
-        let total_rewards = membrane_committee_rewards(
+        let total_rewards = most_committee_rewards(
             &mut client,
-            membrane_address,
+            most_address,
             previous_committee_id,
             *token_address.as_ref(),
         )
@@ -1035,7 +1035,7 @@ mod e2e {
     type E2EClient = ink_e2e::Client<PolkadotConfig, DefaultEnvironment>;
 
     #[allow(clippy::too_many_arguments)]
-    async fn instantiate_membrane(
+    async fn instantiate_most(
         client: &mut E2EClient,
         caller: &Keypair,
         guardians: Vec<AccountId>,
@@ -1045,7 +1045,7 @@ mod e2e {
         minimum_transfer_amount_usd: u128,
         relay_gas_usage: u128,
     ) -> AccountId {
-        let membrane_constructor = MembraneRef::new(
+        let most_constructor = MostRef::new(
             guardians,
             threshold,
             commission_per_dix_mille,
@@ -1054,9 +1054,9 @@ mod e2e {
             relay_gas_usage,
         );
         client
-            .instantiate("membrane", caller, membrane_constructor, 0, None)
+            .instantiate("most", caller, most_constructor, 0, None)
             .await
-            .expect("Membrane instantiation failed")
+            .expect("Most instantiation failed")
             .account_id
     }
 
@@ -1074,76 +1074,76 @@ mod e2e {
             .account_id
     }
 
-    async fn membrane_add_pair(
+    async fn most_add_pair(
         client: &mut E2EClient,
         caller: &Keypair,
-        membrane: AccountId,
+        most: AccountId,
         token: AccountId,
         remote_token: [u8; 32],
-    ) -> CallResult<(), MembraneError> {
-        call_message::<MembraneRef, (), _, _, _>(
+    ) -> CallResult<(), MostError> {
+        call_message::<MostRef, (), _, _, _>(
             client,
             caller,
-            membrane,
-            |membrane| membrane.add_pair(*token.as_ref(), remote_token),
+            most,
+            |most| most.add_pair(*token.as_ref(), remote_token),
             None,
         )
         .await
     }
 
-    async fn membrane_set_committee(
+    async fn most_set_committee(
         client: &mut E2EClient,
         caller: &Keypair,
-        membrane: AccountId,
+        most: AccountId,
         members: &[AccountId],
         threshold: u128,
-    ) -> CallResult<(), MembraneError> {
-        call_message::<MembraneRef, _, _, _, _>(
+    ) -> CallResult<(), MostError> {
+        call_message::<MostRef, _, _, _, _>(
             client,
             caller,
-            membrane,
-            |membrane| membrane.set_committee(members.to_vec(), threshold),
+            most,
+            |most| most.set_committee(members.to_vec(), threshold),
             None,
         )
         .await
     }
 
-    async fn membrane_send_request(
+    async fn most_send_request(
         client: &mut E2EClient,
         caller: &Keypair,
-        membrane: AccountId,
+        most: AccountId,
         token: AccountId,
         amount: u128,
         receiver_address: [u8; 32],
         base_fee: u128,
-    ) -> CallResult<(), MembraneError> {
-        call_message::<MembraneRef, (), _, _, _>(
+    ) -> CallResult<(), MostError> {
+        call_message::<MostRef, (), _, _, _>(
             client,
             caller,
-            membrane,
-            |membrane| membrane.send_request(*token.as_ref(), amount, receiver_address),
+            most,
+            |most| most.send_request(*token.as_ref(), amount, receiver_address),
             Some(base_fee),
         )
         .await
     }
 
     #[allow(clippy::too_many_arguments)]
-    async fn membrane_receive_request(
+    async fn most_receive_request(
         client: &mut E2EClient,
         caller: &Keypair,
-        membrane: AccountId,
+        most: AccountId,
         request_hash: Keccak256HashOutput,
         token: [u8; 32],
         amount: u128,
         receiver_address: [u8; 32],
         request_nonce: u128,
-    ) -> CallResult<(), MembraneError> {
-        call_message::<MembraneRef, (), _, _, _>(
+    ) -> CallResult<(), MostError> {
+        call_message::<MostRef, (), _, _, _>(
             client,
             caller,
-            membrane,
-            |membrane| {
-                membrane.receive_request(
+            most,
+            |most| {
+                most.receive_request(
                     request_hash,
                     token,
                     amount,
@@ -1156,33 +1156,33 @@ mod e2e {
         .await
     }
 
-    async fn membrane_request_payout(
+    async fn most_request_payout(
         client: &mut E2EClient,
         caller: &Keypair,
-        membrane: AccountId,
+        most: AccountId,
         committee_id: u128,
         member_id: AccountId,
         token_id: [u8; 32],
-    ) -> CallResult<(), MembraneError> {
-        call_message::<MembraneRef, _, _, _, _>(
+    ) -> CallResult<(), MostError> {
+        call_message::<MostRef, _, _, _, _>(
             client,
             caller,
-            membrane,
-            |membrane| membrane.payout_rewards(committee_id, member_id, token_id),
+            most,
+            |most| most.payout_rewards(committee_id, member_id, token_id),
             None,
         )
         .await
     }
 
-    async fn membrane_base_fee(
+    async fn most_base_fee(
         client: &mut E2EClient,
-        membrane: AccountId,
-    ) -> Result<u128, MembraneError> {
-        call_message::<MembraneRef, u128, _, _, _>(
+        most: AccountId,
+    ) -> Result<u128, MostError> {
+        call_message::<MostRef, u128, _, _, _>(
             client,
             &alice(),
-            membrane,
-            |membrane| membrane.get_base_fee(),
+            most,
+            |most| most.get_base_fee(),
             None,
         )
         .await
@@ -1215,14 +1215,14 @@ mod e2e {
             .return_value())
     }
 
-    async fn membrane_committee_rewards(
+    async fn most_committee_rewards(
         client: &mut E2EClient,
-        membrane_address: AccountId,
+        most_address: AccountId,
         committee_id: u128,
         token_id: [u8; 32],
-    ) -> Result<u128, MembraneError> {
-        let call = build_message::<MembraneRef>(membrane_address)
-            .call(|membrane| membrane.get_collected_committee_rewards(committee_id, token_id));
+    ) -> Result<u128, MostError> {
+        let call = build_message::<MostRef>(most_address)
+            .call(|most| most.get_collected_committee_rewards(committee_id, token_id));
 
         Ok(client
             .call_dry_run(&alice(), &call, 0, None)
@@ -1230,12 +1230,12 @@ mod e2e {
             .return_value())
     }
 
-    async fn membrane_committee_id(
+    async fn most_committee_id(
         client: &mut E2EClient,
-        membrane_address: AccountId,
-    ) -> Result<u128, MembraneError> {
-        let call = build_message::<MembraneRef>(membrane_address)
-            .call(|membrane| membrane.get_current_committee_id());
+        most_address: AccountId,
+    ) -> Result<u128, MostError> {
+        let call = build_message::<MostRef>(most_address)
+            .call(|most| most.get_current_committee_id());
 
         Ok(client
             .call_dry_run(&alice(), &call, 0, None)
@@ -1243,12 +1243,12 @@ mod e2e {
             .return_value())
     }
 
-    async fn membrane_commission_per_dix_mille(
+    async fn most_commission_per_dix_mille(
         client: &mut E2EClient,
-        membrane_address: AccountId,
+        most_address: AccountId,
     ) -> u128 {
-        let call = build_message::<MembraneRef>(membrane_address)
-            .call(|membrane| membrane.get_commission_per_dix_mille());
+        let call = build_message::<MostRef>(most_address)
+            .call(|most| most.get_commission_per_dix_mille());
 
         client
             .call_dry_run(&alice(), &call, 0, None)
@@ -1256,15 +1256,15 @@ mod e2e {
             .return_value()
     }
 
-    async fn membrane_query_price(
+    async fn most_query_price(
         client: &mut E2EClient,
-        membrane_address: AccountId,
+        most_address: AccountId,
         amount_of: u128,
         of_token: [u8; 32],
         in_token: [u8; 32],
-    ) -> Result<u128, MembraneError> {
-        let call = build_message::<MembraneRef>(membrane_address)
-            .call(|membrane| membrane.query_price(amount_of, of_token, in_token));
+    ) -> Result<u128, MostError> {
+        let call = build_message::<MostRef>(most_address)
+            .call(|most| most.query_price(amount_of, of_token, in_token));
 
         client
             .call_dry_run(&alice(), &call, 0, None)

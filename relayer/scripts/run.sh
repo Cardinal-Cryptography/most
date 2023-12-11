@@ -18,4 +18,4 @@ function get_address {
 
 # --- RUN
 
-cargo run -- --rust-log=info --name "guardian1" --azero-contract-address=$(get_address $AZERO_ADDRESSES_FILE membrane) --eth-contract-address=$(get_address $ETH_ADDRESSES_FILE membrane)
+cargo run -- --rust-log=info --name "guardian1" --azero-contract-address=$(get_address $AZERO_ADDRESSES_FILE most) --eth-contract-address=$(get_address $ETH_ADDRESSES_FILE most)
