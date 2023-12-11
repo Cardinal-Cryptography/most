@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
 const { loadFixture } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
+const { execSync: exec } = require('child_process');
 
 // Import utils
 const { addressToBytes32, getRandomAlephAccount } = require("./TestUtils");
@@ -385,11 +386,47 @@ describe("Membrane", function () {
 
     describe("Upgrade", function () {
         it("Membrane contract can be upgraded", async () => {
-            const { membrane, membraneAddress } = await loadFixture(deployEightGuardianMembraneFixture);
-            const MembraneV2 = await ethers.getContractFactory("Membrane");
-            const membraneV2 = await upgrades.upgradeProxy(membraneAddress, MembraneV2);
-            const address = await membraneV2.getAddress();
-            await expect(address).to.be.equal(membraneAddress);
+            exec('cp ./contracts/Membrane.sol ./contracts/MembraneV2.sol',
+                 (error, stdout, stderr) => {
+                     if (error !== null) {
+                         console.log('exec error: ' + error);
+                     }
+                     exec('sed -i "17 a \ \ \ \ uint256 public test;" ./contracts/MembraneV2.sol',
+                          async (error, stdout, stderr) => {
+                              if (error !== null) {
+                                  console.log('exec error: ' + error);
+                              }
+
+                              const { membrane, membraneAddress } = await loadFixture(deployEightGuardianMembraneFixture);
+
+                              const accounts = await ethers.getSigners();
+                              let committee = accounts.slice(2, 9).map((x) => x.address);
+                              let threshold = 4;
+                              await membrane.setCommittee (committee, threshold);
+
+                              const MembraneV2 = await ethers.getContractFactory("MembraneV2");
+                              const membraneV2 = await upgrades.upgradeProxy(membraneAddress, MembraneV2);
+
+                              const address = await membraneV2.getAddress();
+                              // address is preserved
+                              await expect(address).to.be.equal(membraneAddress);
+
+                              // state is preserved
+                              await expect((membrane.isInCommittee (committee[0])));
+
+                              // no state overwrite
+                              await expect((membrane.test ())).to.be.equal(0);
+
+                          });
+                 });
+
+            // clean up
+            exec('rm ./contracts/MembraneV2.sol',
+                 (error, stdout, stderr) => {
+                     if (error !== null) {
+                         console.log('exec error: ' + error);
+                     }
+                 });
         });
     });
 
