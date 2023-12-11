@@ -49,7 +49,7 @@ contract Membrane is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     }
 
     function initialize(
-        address[] memory _committee,
+        address[] calldata _committee,
         uint256 _signatureThreshold,
         uint256 _commissionPerDixMille,
         uint256 _minimumTransferAmountUsd,
