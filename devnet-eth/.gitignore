@@ -1,6 +1,7 @@
 consensus/beacondata
 consensus/genesis.ssz
 consensus/validatordata
+execution/genesis.json
 execution/geth
 execution/geth.ipc
 .idea/

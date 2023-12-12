@@ -12,11 +12,12 @@ services:
       - --num-validators=8
       - --output-ssz=/consensus/genesis.ssz
       - --chain-config-file=/consensus/config.yml
-      - --geth-genesis-json-in=/execution/genesis.json
+      - --geth-genesis-json-in=/genesis.json
       - --geth-genesis-json-out=/execution/genesis.json
     volumes:
       - ./consensus:/consensus
       - ./execution:/execution
+      - ./genesis.json:/genesis.json
 
   # Sets up the genesis configuration for the go-ethereum client from a JSON file.
   geth-genesis:

@@ -4143,6 +4143,7 @@ dependencies = [
  "ethers",
  "eyre",
  "futures",
+ "hex",
  "log",
  "parity-scale-codec",
  "redis",

@@ -43,8 +43,8 @@ pub mod membrane {
     #[derive(Debug)]
     #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
     pub struct RequestProcessed {
-        #[ink(topic)]
         pub request_hash: HashedRequest,
+        #[ink(topic)]
         pub dest_token_address: [u8; 32],
     }
 
@@ -52,10 +52,18 @@ pub mod membrane {
     #[derive(Debug)]
     #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
     pub struct RequestSigned {
+        pub request_hash: HashedRequest,
         #[ink(topic)]
         pub signer: AccountId,
-        #[ink(topic)]
+    }
+
+    #[ink(event)]
+    #[derive(Debug)]
+    #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
+    pub struct SignedProcessedRequest {
         pub request_hash: HashedRequest,
+        #[ink(topic)]
+        pub signer: AccountId,
     }
 
     #[derive(Default, Debug, Encode, Decode, Clone, Copy, PartialEq, Eq)]
@@ -290,8 +298,14 @@ pub mod membrane {
 
             self.only_current_committee_member(caller)?;
 
+            // Don't revert if the request has already been processed as
+            // such a call can be made during regular guardian operation.
             if self.processed_requests.contains(request_hash) {
-                return Err(MembraneError::RequestAlreadyProcessed);
+                self.env().emit_event(SignedProcessedRequest {
+                    request_hash,
+                    signer: caller,
+                });
+                return Ok(());
             }
 
             let bytes = concat_u8_arrays(vec![
@@ -624,7 +638,6 @@ pub mod membrane {
             }
 
             let committee_id = self.committee_id + 1;
-
             let mut committee_set = Mapping::new();
             committee.into_iter().for_each(|account| {
                 committee_set.insert((committee_id, account), &());
