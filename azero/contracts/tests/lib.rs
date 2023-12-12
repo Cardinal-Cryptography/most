@@ -46,49 +46,32 @@ mod e2e {
     const DECIMALS: u8 = 8;
     const REMOTE_TOKEN: [u8; 32] = [0x1; 32];
     const REMOTE_RECEIVER: [u8; 32] = [0x2; 32];
+
     const USDT_TOKEN_ID: [u8; 32] = [0x2; 32];
+    const DEFAULT_COMMISSION_PER_DIX_MILLE: u128 = 30;
+    const DEFAULT_POCKET_MONEY: u128 = 1000000000000;
+    const DEFAULT_MINIMUM_TRANSFER_AMOUNT_USD: u128 = 50;
+    const DEFAULT_RELAY_GAS_USAGE: u128 = 50000;
 
     #[ink_e2e::test]
     fn simple_deploy_works(mut client: ink_e2e::Client<C, E>) {
-        let commission_per_dix_mille = 30;
-        let pocket_money = 1000000000000;
-        let minimum_transfer_amount_usd = 50;
-        let relay_gas_usage = 50000;
-
         let _membrane_address = instantiate_membrane(
             &mut client,
             &alice(),
             guardian_ids(),
             DEFAULT_THRESHOLD,
-            commission_per_dix_mille,
-            pocket_money,
-            minimum_transfer_amount_usd,
-            relay_gas_usage,
+            DEFAULT_COMMISSION_PER_DIX_MILLE,
+            DEFAULT_POCKET_MONEY,
+            DEFAULT_MINIMUM_TRANSFER_AMOUNT_USD,
+            DEFAULT_RELAY_GAS_USAGE,
         )
         .await;
     }
 
     #[ink_e2e::test]
     fn owner_can_add_a_new_pair(mut client: ink_e2e::Client<C, E>) {
-        let commission_per_dix_mille = 30;
-        let pocket_money = 1000000000000;
-        let minimum_transfer_amount_usd = 50;
-        let relay_gas_usage = 50000;
-
-        let token_address =
-            instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
-
-        let membrane_address = instantiate_membrane(
-            &mut client,
-            &alice(),
-            guardian_ids(),
-            DEFAULT_THRESHOLD,
-            commission_per_dix_mille,
-            pocket_money,
-            minimum_transfer_amount_usd,
-            relay_gas_usage,
-        )
-        .await;
+        let (membrane_address, token_address) =
+            setup_default_membrane_and_token(&mut client, false).await;
 
         let add_pair_res = membrane_add_pair(
             &mut client,
@@ -104,25 +87,8 @@ mod e2e {
 
     #[ink_e2e::test]
     fn non_owner_cannot_add_a_new_pair(mut client: ink_e2e::Client<C, E>) {
-        let commission_per_dix_mille = 30;
-        let pocket_money = 1000000000000;
-        let minimum_transfer_amount_usd = 50;
-        let relay_gas_usage = 50000;
-
-        let token_address =
-            instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
-
-        let membrane_address = instantiate_membrane(
-            &mut client,
-            &alice(),
-            guardian_ids(),
-            DEFAULT_THRESHOLD,
-            commission_per_dix_mille,
-            pocket_money,
-            minimum_transfer_amount_usd,
-            relay_gas_usage,
-        )
-        .await;
+        let (membrane_address, token_address) =
+            setup_default_membrane_and_token(&mut client, false).await;
 
         let add_pair_res = membrane_add_pair(
             &mut client,
@@ -141,35 +107,8 @@ mod e2e {
 
     #[ink_e2e::test]
     fn send_request_burns_tokens(mut client: ink_e2e::Client<C, E>) {
-        let commission_per_dix_mille = 30;
-        let pocket_money = 1000000000000;
-        let minimum_transfer_amount_usd = 50;
-        let relay_gas_usage = 50000;
-
-        let token_address =
-            instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
-
-        let membrane_address = instantiate_membrane(
-            &mut client,
-            &alice(),
-            guardian_ids(),
-            DEFAULT_THRESHOLD,
-            commission_per_dix_mille,
-            pocket_money,
-            minimum_transfer_amount_usd,
-            relay_gas_usage,
-        )
-        .await;
-
-        membrane_add_pair(
-            &mut client,
-            &alice(),
-            membrane_address,
-            token_address,
-            REMOTE_TOKEN,
-        )
-        .await
-        .expect("Adding a pair should succeed");
+        let (membrane_address, token_address) =
+            setup_default_membrane_and_token(&mut client, true).await;
 
         let base_fee = membrane_base_fee(&mut client, membrane_address)
             .await
@@ -226,25 +165,8 @@ mod e2e {
 
     #[ink_e2e::test]
     fn send_request_fails_on_non_whitelisted_token(mut client: ink_e2e::Client<C, E>) {
-        let commission_per_dix_mille = 30;
-        let pocket_money = 1000000000000;
-        let minimum_transfer_amount_usd = 50;
-        let relay_gas_usage = 50000;
-
-        let token_address =
-            instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
-
-        let membrane_address = instantiate_membrane(
-            &mut client,
-            &alice(),
-            guardian_ids(),
-            DEFAULT_THRESHOLD,
-            commission_per_dix_mille,
-            pocket_money,
-            minimum_transfer_amount_usd,
-            relay_gas_usage,
-        )
-        .await;
+        let (membrane_address, token_address) =
+            setup_default_membrane_and_token(&mut client, false).await;
 
         let amount_to_send = 1000;
 
@@ -271,37 +193,10 @@ mod e2e {
 
     #[ink_e2e::test]
     fn correct_request(mut client: ink_e2e::Client<C, E>) {
-        let commission_per_dix_mille = 300;
-        let pocket_money = 1000000000000;
-        let minimum_transfer_amount_usd = 50;
-        let relay_gas_usage = 50000;
-
-        let token_address =
-            instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
-
-        let membrane_address = instantiate_membrane(
-            &mut client,
-            &alice(),
-            guardian_ids(),
-            DEFAULT_THRESHOLD,
-            commission_per_dix_mille,
-            pocket_money,
-            minimum_transfer_amount_usd,
-            relay_gas_usage,
-        )
-        .await;
+        let (membrane_address, token_address) =
+            setup_default_membrane_and_token(&mut client, true).await;
 
         let amount_to_send = 1000;
-
-        membrane_add_pair(
-            &mut client,
-            &alice(),
-            membrane_address,
-            token_address,
-            REMOTE_TOKEN,
-        )
-        .await
-        .expect("Adding a pair should succeed");
 
         let base_fee = membrane_base_fee(&mut client, membrane_address)
             .await
@@ -345,24 +240,8 @@ mod e2e {
 
     #[ink_e2e::test]
     fn receive_request_can_only_be_called_by_guardians(mut client: ink_e2e::Client<C, E>) {
-        let commission_per_dix_mille = 30;
-        let pocket_money = 1000000000000;
-        let minimum_transfer_amount_usd = 50;
-        let relay_gas_usage = 50000;
-
-        let token_address =
-            instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
-        let membrane_address = instantiate_membrane(
-            &mut client,
-            &alice(),
-            guardian_ids(),
-            DEFAULT_THRESHOLD,
-            commission_per_dix_mille,
-            pocket_money,
-            minimum_transfer_amount_usd,
-            relay_gas_usage,
-        )
-        .await;
+        let (membrane_address, token_address) =
+            setup_default_membrane_and_token(&mut client, false).await;
 
         let amount = 20;
         let receiver_address = account_id(AccountKeyring::One);
@@ -391,25 +270,8 @@ mod e2e {
 
     #[ink_e2e::test]
     fn receive_request_non_matching_hash(mut client: ink_e2e::Client<C, E>) {
-        let commission_per_dix_mille = 30;
-        let pocket_money = 1000000000000;
-        let minimum_transfer_amount_usd = 50;
-        let relay_gas_usage = 50000;
-
-        let token_address =
-            instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
-
-        let membrane_address = instantiate_membrane(
-            &mut client,
-            &alice(),
-            guardian_ids(),
-            DEFAULT_THRESHOLD,
-            commission_per_dix_mille,
-            pocket_money,
-            minimum_transfer_amount_usd,
-            relay_gas_usage,
-        )
-        .await;
+        let (membrane_address, token_address) =
+            setup_default_membrane_and_token(&mut client, false).await;
 
         let amount = 20;
         let receiver_address = account_id(AccountKeyring::One);
@@ -438,25 +300,8 @@ mod e2e {
     fn receive_request_executes_request_after_enough_confirmations(
         mut client: ink_e2e::Client<C, E>,
     ) {
-        let commission_per_dix_mille = 30;
-        let pocket_money = 1000000000000;
-        let minimum_transfer_amount_usd = 50;
-        let relay_gas_usage = 50000;
-
-        let token_address =
-            instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
-
-        let membrane_address = instantiate_membrane(
-            &mut client,
-            &alice(),
-            guardian_ids(),
-            DEFAULT_THRESHOLD,
-            commission_per_dix_mille,
-            pocket_money,
-            minimum_transfer_amount_usd,
-            relay_gas_usage,
-        )
-        .await;
+        let (membrane_address, token_address) =
+            setup_default_membrane_and_token(&mut client, false).await;
 
         let amount = 841189100000000;
 
@@ -507,31 +352,14 @@ mod e2e {
 
         assert_eq!(
             balance,
-            ((amount * (10000 - commission_per_dix_mille)) / 10000)
+            ((amount * (10000 - DEFAULT_COMMISSION_PER_DIX_MILLE)) / 10000)
         );
     }
 
     #[ink_e2e::test]
     fn receive_request_not_enough_signatures(mut client: ink_e2e::Client<C, E>) {
-        let guardians_threshold = 5;
-        let commission_per_dix_mille = 30;
-        let pocket_money = 1000000000000;
-        let minimum_transfer_amount_usd = 50;
-        let relay_gas_usage = 50000;
-
-        let token_address =
-            instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
-        let membrane_address = instantiate_membrane(
-            &mut client,
-            &alice(),
-            guardian_ids(),
-            guardians_threshold,
-            commission_per_dix_mille,
-            pocket_money,
-            minimum_transfer_amount_usd,
-            relay_gas_usage,
-        )
-        .await;
+        let (membrane_address, token_address) =
+            setup_default_membrane_and_token(&mut client, false).await;
 
         let amount = 20;
         let receiver_address = account_id(AccountKeyring::One);
@@ -581,36 +409,8 @@ mod e2e {
 
     #[ink_e2e::test]
     fn amount_below_minimum(mut client: ink_e2e::Client<C, E>) {
-        let guardians_threshold = 5;
-        let commission_per_dix_mille = 30;
-        let pocket_money = 1000000000000;
-        let minimum_transfer_amount_usd = 50;
-        let relay_gas_usage = 50000;
-
-        let token_address =
-            instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
-
-        let membrane_address = instantiate_membrane(
-            &mut client,
-            &alice(),
-            guardian_ids(),
-            guardians_threshold,
-            commission_per_dix_mille,
-            pocket_money,
-            minimum_transfer_amount_usd,
-            relay_gas_usage,
-        )
-        .await;
-
-        membrane_add_pair(
-            &mut client,
-            &alice(),
-            membrane_address,
-            token_address,
-            REMOTE_TOKEN,
-        )
-        .await
-        .expect("Adding a pair should succeed");
+        let (membrane_address, token_address) =
+            setup_default_membrane_and_token(&mut client, true).await;
 
         let base_fee = membrane_base_fee(&mut client, membrane_address)
             .await
@@ -620,7 +420,7 @@ mod e2e {
         let amount_to_send = membrane_query_price(
             &mut client,
             membrane_address,
-            minimum_transfer_amount_usd - 1,
+            DEFAULT_MINIMUM_TRANSFER_AMOUNT_USD - 1,
             USDT_TOKEN_ID, // of
             REMOTE_TOKEN,  // in
         )
@@ -646,36 +446,8 @@ mod e2e {
 
     #[ink_e2e::test]
     fn base_fee_too_low(mut client: ink_e2e::Client<C, E>) {
-        let guardians_threshold = 5;
-        let commission_per_dix_mille = 30;
-        let pocket_money = 1000000000000;
-        let minimum_transfer_amount_usd = 50;
-        let relay_gas_usage = 50000;
-
-        let token_address =
-            instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
-
-        let membrane_address = instantiate_membrane(
-            &mut client,
-            &alice(),
-            guardian_ids(),
-            guardians_threshold,
-            commission_per_dix_mille,
-            pocket_money,
-            minimum_transfer_amount_usd,
-            relay_gas_usage,
-        )
-        .await;
-
-        membrane_add_pair(
-            &mut client,
-            &alice(),
-            membrane_address,
-            token_address,
-            REMOTE_TOKEN,
-        )
-        .await
-        .expect("Adding a pair should succeed");
+        let (membrane_address, token_address) =
+            setup_default_membrane_and_token(&mut client, true).await;
 
         let base_fee = membrane_base_fee(&mut client, membrane_address)
             .await
@@ -702,30 +474,13 @@ mod e2e {
 
     #[ink_e2e::test]
     fn pocket_money(mut client: ink_e2e::Client<C, E>) {
-        let commission_per_dix_mille = 300;
-        let pocket_money = 1000000000000;
-        let minimum_transfer_amount_usd = 50;
-        let relay_gas_usage = 50000;
-
-        let token_address =
-            instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
-
-        let membrane_address = instantiate_membrane(
-            &mut client,
-            &alice(),
-            guardian_ids(),
-            DEFAULT_THRESHOLD,
-            commission_per_dix_mille,
-            pocket_money,
-            minimum_transfer_amount_usd,
-            relay_gas_usage,
-        )
-        .await;
+        let (membrane_address, token_address) =
+            setup_default_membrane_and_token(&mut client, false).await;
 
         // seed contract with some funds for pocket money transfers
         let call_data = vec![
             Value::unnamed_variant("Id", [Value::from_bytes(membrane_address)]),
-            Value::u128(10 * pocket_money),
+            Value::u128(10 * DEFAULT_POCKET_MONEY),
         ];
 
         client
@@ -765,34 +520,20 @@ mod e2e {
             .await
             .expect("native balance after");
 
-        assert_eq!(azero_balance_after, azero_balance_before + pocket_money);
+        assert_eq!(
+            azero_balance_after,
+            azero_balance_before + DEFAULT_POCKET_MONEY
+        );
     }
 
     #[ink_e2e::test]
     fn committee_rewards(mut client: ink_e2e::Client<C, E>) {
-        let commission_per_dix_mille = 300;
-        let pocket_money = 1000000000000;
-        let minimum_transfer_amount_usd = 50;
-        let relay_gas_usage = 50000;
-
-        let token_address =
-            instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
-
-        let membrane_address = instantiate_membrane(
-            &mut client,
-            &alice(),
-            guardian_ids(),
-            DEFAULT_THRESHOLD,
-            commission_per_dix_mille,
-            pocket_money,
-            minimum_transfer_amount_usd,
-            relay_gas_usage,
-        )
-        .await;
+        let (membrane_address, token_address) =
+            setup_default_membrane_and_token(&mut client, false).await;
 
         let commission = membrane_commission_per_dix_mille(&mut client, membrane_address).await;
 
-        assert_eq!(commission, commission_per_dix_mille);
+        assert_eq!(commission, DEFAULT_COMMISSION_PER_DIX_MILLE);
 
         let amount = 841189100000000;
         let receiver_address = account_id(AccountKeyring::One);
@@ -901,25 +642,8 @@ mod e2e {
 
     #[ink_e2e::test]
     fn past_committee_rewards(mut client: ink_e2e::Client<C, E>) {
-        let commission_per_dix_mille = 300;
-        let pocket_money = 1000000000000;
-        let minimum_transfer_amount_usd = 50;
-        let relay_gas_usage = 50000;
-
-        let token_address =
-            instantiate_token(&mut client, &alice(), TOKEN_INITIAL_SUPPLY, DECIMALS).await;
-
-        let membrane_address = instantiate_membrane(
-            &mut client,
-            &alice(),
-            guardian_ids(),
-            DEFAULT_THRESHOLD,
-            commission_per_dix_mille,
-            pocket_money,
-            minimum_transfer_amount_usd,
-            relay_gas_usage,
-        )
-        .await;
+        let (membrane_address, token_address) =
+            setup_default_membrane_and_token(&mut client, false).await;
 
         let amount = 841189100000000;
         let receiver_address = account_id(AccountKeyring::One);
@@ -1065,13 +789,54 @@ mod e2e {
         caller: &Keypair,
         total_supply: u128,
         decimals: u8,
+        admin: AccountId,
     ) -> AccountId {
-        let token_constructor = TokenRef::new(total_supply, None, None, decimals);
+        let token_constructor = TokenRef::new(total_supply, None, None, decimals, admin);
         client
             .instantiate("token", caller, token_constructor, 0, None)
             .await
             .expect("Token instantiation failed")
             .account_id
+    }
+
+    async fn setup_default_membrane_and_token(
+        client: &mut E2EClient,
+        add_pair: bool,
+    ) -> (AccountId, AccountId) {
+        let membrane_address = instantiate_membrane(
+            client,
+            &alice(),
+            guardian_ids(),
+            DEFAULT_THRESHOLD,
+            DEFAULT_COMMISSION_PER_DIX_MILLE,
+            DEFAULT_POCKET_MONEY,
+            DEFAULT_MINIMUM_TRANSFER_AMOUNT_USD,
+            DEFAULT_RELAY_GAS_USAGE,
+        )
+        .await;
+
+        let token_address = instantiate_token(
+            client,
+            &alice(),
+            TOKEN_INITIAL_SUPPLY,
+            DECIMALS,
+            membrane_address,
+        )
+        .await;
+
+        if add_pair {
+            membrane_add_pair(
+                client,
+                &alice(),
+                membrane_address,
+                token_address,
+                REMOTE_TOKEN,
+            )
+            .await
+            .expect("Add pair should succeed");
+        }
+
+        (membrane_address, token_address)
     }
 
     async fn membrane_add_pair(
