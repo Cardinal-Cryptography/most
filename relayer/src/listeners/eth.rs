@@ -25,8 +25,7 @@ use crate::{
         redis_helpers::{read_first_unprocessed_block_number, write_last_processed_block},
     },
     contracts::{
-        AzeroContractError, CrosschainTransferRequestFilter, Most, MostEvents,
-        MostInstance,
+        AzeroContractError, CrosschainTransferRequestFilter, Most, MostEvents, MostInstance,
     },
     helpers::concat_u8_arrays,
 };

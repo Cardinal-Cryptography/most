@@ -194,7 +194,7 @@ contracts-lint: solidity-lint ink-lint
 rust-format-check: # Check rust code formatting
 rust-format-check:
 	cd relayer && cargo fmt -- --check
-	cd azero/contracts/membrane && cargo fmt -- --check
+	cd azero/contracts/most && cargo fmt -- --check
 	cd azero/contracts/governance && cargo fmt -- --check
 	cd azero/contracts/token && cargo fmt -- --check
 	cd azero/contracts/psp22-traits && cargo fmt -- --check
@@ -204,7 +204,7 @@ rust-format-check:
 rust-format: # Format rust code
 rust-format:
 	cd relayer && cargo fmt
-	cd azero/contracts/membrane && cargo fmt
+	cd azero/contracts/most && cargo fmt
 	cd azero/contracts/governance && cargo fmt
 	cd azero/contracts/token && cargo fmt
 	cd azero/contracts/psp22-traits && cargo fmt
@@ -225,3 +225,7 @@ js-format:
 .PHONY: format-check
 format-check: # Check code formatting
 format-check: rust-format-check js-format-check
+
+.PHONY: format
+format: # Format code
+format: rust-format js-format

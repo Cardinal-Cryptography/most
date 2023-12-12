@@ -70,8 +70,7 @@ mod e2e {
 
     #[ink_e2e::test]
     fn owner_can_add_a_new_pair(mut client: ink_e2e::Client<C, E>) {
-        let (most_address, token_address) =
-            setup_default_most_and_token(&mut client, false).await;
+        let (most_address, token_address) = setup_default_most_and_token(&mut client, false).await;
 
         let add_pair_res = most_add_pair(
             &mut client,
@@ -87,8 +86,7 @@ mod e2e {
 
     #[ink_e2e::test]
     fn non_owner_cannot_add_a_new_pair(mut client: ink_e2e::Client<C, E>) {
-        let (most_address, token_address) =
-            setup_default_most_and_token(&mut client, false).await;
+        let (most_address, token_address) = setup_default_most_and_token(&mut client, false).await;
 
         let add_pair_res = most_add_pair(
             &mut client,
@@ -107,8 +105,7 @@ mod e2e {
 
     #[ink_e2e::test]
     fn send_request_burns_tokens(mut client: ink_e2e::Client<C, E>) {
-        let (most_address, token_address) =
-            setup_default_most_and_token(&mut client, true).await;
+        let (most_address, token_address) = setup_default_most_and_token(&mut client, true).await;
 
         let base_fee = most_base_fee(&mut client, most_address)
             .await
@@ -136,7 +133,8 @@ mod e2e {
             REMOTE_RECEIVER,
             base_fee,
         )
-        .await.expect("send request should succeed");
+        .await
+        .expect("send request should succeed");
 
         let balance_after = psp22_balance_of(
             &mut client,
@@ -165,8 +163,7 @@ mod e2e {
 
     #[ink_e2e::test]
     fn send_request_fails_on_non_whitelisted_token(mut client: ink_e2e::Client<C, E>) {
-        let (most_address, token_address) =
-            setup_default_most_and_token(&mut client, false).await;
+        let (most_address, token_address) = setup_default_most_and_token(&mut client, false).await;
 
         let amount_to_send = 1000;
 
@@ -193,8 +190,7 @@ mod e2e {
 
     #[ink_e2e::test]
     fn correct_request(mut client: ink_e2e::Client<C, E>) {
-        let (most_address, token_address) =
-            setup_default_most_and_token(&mut client, true).await;
+        let (most_address, token_address) = setup_default_most_and_token(&mut client, true).await;
 
         let amount_to_send = 1000;
 
@@ -240,8 +236,7 @@ mod e2e {
 
     #[ink_e2e::test]
     fn receive_request_can_only_be_called_by_guardians(mut client: ink_e2e::Client<C, E>) {
-        let (most_address, token_address) =
-            setup_default_most_and_token(&mut client, false).await;
+        let (most_address, token_address) = setup_default_most_and_token(&mut client, false).await;
 
         let amount = 20;
         let receiver_address = account_id(AccountKeyring::One);
@@ -270,8 +265,7 @@ mod e2e {
 
     #[ink_e2e::test]
     fn receive_request_non_matching_hash(mut client: ink_e2e::Client<C, E>) {
-        let (most_address, token_address) =
-            setup_default_most_and_token(&mut client, false).await;
+        let (most_address, token_address) = setup_default_most_and_token(&mut client, false).await;
 
         let amount = 20;
         let receiver_address = account_id(AccountKeyring::One);
@@ -300,8 +294,7 @@ mod e2e {
     fn receive_request_executes_request_after_enough_confirmations(
         mut client: ink_e2e::Client<C, E>,
     ) {
-        let (most_address, token_address) =
-            setup_default_most_and_token(&mut client, false).await;
+        let (most_address, token_address) = setup_default_most_and_token(&mut client, false).await;
 
         let amount = 841189100000000;
 
@@ -358,8 +351,7 @@ mod e2e {
 
     #[ink_e2e::test]
     fn receive_request_not_enough_signatures(mut client: ink_e2e::Client<C, E>) {
-        let (most_address, token_address) =
-            setup_default_most_and_token(&mut client, false).await;
+        let (most_address, token_address) = setup_default_most_and_token(&mut client, false).await;
 
         let amount = 20;
         let receiver_address = account_id(AccountKeyring::One);
@@ -409,8 +401,7 @@ mod e2e {
 
     #[ink_e2e::test]
     fn amount_below_minimum(mut client: ink_e2e::Client<C, E>) {
-        let (most_address, token_address) =
-            setup_default_most_and_token(&mut client, true).await;
+        let (most_address, token_address) = setup_default_most_and_token(&mut client, true).await;
 
         let base_fee = most_base_fee(&mut client, most_address)
             .await
@@ -446,8 +437,7 @@ mod e2e {
 
     #[ink_e2e::test]
     fn base_fee_too_low(mut client: ink_e2e::Client<C, E>) {
-        let (most_address, token_address) =
-            setup_default_most_and_token(&mut client, true).await;
+        let (most_address, token_address) = setup_default_most_and_token(&mut client, true).await;
 
         let base_fee = most_base_fee(&mut client, most_address)
             .await
@@ -474,8 +464,7 @@ mod e2e {
 
     #[ink_e2e::test]
     fn pocket_money(mut client: ink_e2e::Client<C, E>) {
-        let (most_address, token_address) =
-            setup_default_most_and_token(&mut client, false).await;
+        let (most_address, token_address) = setup_default_most_and_token(&mut client, false).await;
 
         // seed contract with some funds for pocket money transfers
         let call_data = vec![
@@ -528,8 +517,7 @@ mod e2e {
 
     #[ink_e2e::test]
     fn committee_rewards(mut client: ink_e2e::Client<C, E>) {
-        let (most_address, token_address) =
-            setup_default_most_and_token(&mut client, false).await;
+        let (most_address, token_address) = setup_default_most_and_token(&mut client, false).await;
 
         let commission = most_commission_per_dix_mille(&mut client, most_address).await;
 
@@ -642,8 +630,7 @@ mod e2e {
 
     #[ink_e2e::test]
     fn past_committee_rewards(mut client: ink_e2e::Client<C, E>) {
-        let (most_address, token_address) =
-            setup_default_most_and_token(&mut client, false).await;
+        let (most_address, token_address) = setup_default_most_and_token(&mut client, false).await;
 
         let amount = 841189100000000;
         let receiver_address = account_id(AccountKeyring::One);
@@ -825,15 +812,9 @@ mod e2e {
         .await;
 
         if add_pair {
-            most_add_pair(
-                client,
-                &alice(),
-                most_address,
-                token_address,
-                REMOTE_TOKEN,
-            )
-            .await
-            .expect("Add pair should succeed");
+            most_add_pair(client, &alice(), most_address, token_address, REMOTE_TOKEN)
+                .await
+                .expect("Add pair should succeed");
         }
 
         (most_address, token_address)
@@ -908,13 +889,7 @@ mod e2e {
             caller,
             most,
             |most| {
-                most.receive_request(
-                    request_hash,
-                    token,
-                    amount,
-                    receiver_address,
-                    request_nonce,
-                )
+                most.receive_request(request_hash, token, amount, receiver_address, request_nonce)
             },
             None,
         )
@@ -939,10 +914,7 @@ mod e2e {
         .await
     }
 
-    async fn most_base_fee(
-        client: &mut E2EClient,
-        most: AccountId,
-    ) -> Result<u128, MostError> {
+    async fn most_base_fee(client: &mut E2EClient, most: AccountId) -> Result<u128, MostError> {
         call_message::<MostRef, u128, _, _, _>(
             client,
             &alice(),
@@ -999,8 +971,8 @@ mod e2e {
         client: &mut E2EClient,
         most_address: AccountId,
     ) -> Result<u128, MostError> {
-        let call = build_message::<MostRef>(most_address)
-            .call(|most| most.get_current_committee_id());
+        let call =
+            build_message::<MostRef>(most_address).call(|most| most.get_current_committee_id());
 
         Ok(client
             .call_dry_run(&alice(), &call, 0, None)
@@ -1012,8 +984,8 @@ mod e2e {
         client: &mut E2EClient,
         most_address: AccountId,
     ) -> u128 {
-        let call = build_message::<MostRef>(most_address)
-            .call(|most| most.get_commission_per_dix_mille());
+        let call =
+            build_message::<MostRef>(most_address).call(|most| most.get_commission_per_dix_mille());
 
         client
             .call_dry_run(&alice(), &call, 0, None)

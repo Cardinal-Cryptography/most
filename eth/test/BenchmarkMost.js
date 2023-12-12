@@ -24,11 +24,9 @@ describe("MostBenchmark", function () {
     const tokenAddress = await testTokenInstance.getAddress();
 
     const Most = await hre.ethers.getContractFactory("Most");
-    const mostInstance = await Most.deploy(
-      guardianAddresses,
-      threshold,
-      { from: accounts[0] },
-    );
+    const mostInstance = await Most.deploy(guardianAddresses, threshold, {
+      from: accounts[0],
+    });
     const mostInstanceAddress = await mostInstance.getAddress();
 
     // Easy way to get a "random" bytes32 value
