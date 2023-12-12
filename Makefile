@@ -18,7 +18,7 @@ clean-azero:
 .PHONY: clean-eth
 clean-eth: # Remove eth node data
 clean-eth:
-	cd devnet-eth && ./clean.sh && echo "Done clean"
+	cd devnet-eth && ./clean.sh && echo "Done eth clean"
 
 .PHONY: clean
 clean: # Remove all node data
@@ -136,7 +136,7 @@ run-relayer: # Run the relayer
 run-relayer:
 	cd relayer && ./scripts/run.sh
 
-.PHONY: make bridge
+.PHONY: bridge
 bridge: # Run the bridge
 bridge: local-bridgenet deploy run-relayer
 

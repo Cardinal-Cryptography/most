@@ -1,13 +1,13 @@
-import fs from 'fs';
+import fs from "fs";
 
-import { ApiPromise } from '@polkadot/api';
-import { Abi } from '@polkadot/api-contract';
-import { KeyringPair } from '@polkadot/keyring/types';
-import { HexString } from '@polkadot/util/types';
+import { ApiPromise } from "@polkadot/api";
+import { Abi } from "@polkadot/api-contract";
+import { KeyringPair } from "@polkadot/keyring/types";
+import { HexString } from "@polkadot/util/types";
 import {
-    ContractInstantiateResult,
-    WeightV2,
-} from '@polkadot/types/interfaces';
+  ContractInstantiateResult,
+  WeightV2,
+} from "@polkadot/types/interfaces";
 
 export type Addresses = {
   governance: string;
@@ -23,29 +23,29 @@ export type Addresses = {
  * @returns code hash of the deployed contract.
  */
 export async function uploadCode(
-    api: ApiPromise,
-    deployer: KeyringPair,
-    contractName: string,
+  api: ApiPromise,
+  deployer: KeyringPair,
+  contractName: string,
 ): Promise<HexString> {
-    const tokenContractRaw = JSON.parse(
-        fs.readFileSync(__dirname + `/../artifacts/` + contractName, 'utf8'),
-    );
-    const tokenAbi = new Abi(tokenContractRaw);
-    const _txHash = await new Promise(async (resolve, reject) => {
-        const unsub = await api.tx.contracts
-              .uploadCode(tokenAbi.info.source.wasm, null, 0)
-              .signAndSend(deployer, (result) => {
-                  if (result.isFinalized) {
-                      unsub();
-                      resolve(result.txHash);
-                  }
-                  if (result.isError) {
-                      unsub();
-                      reject(result);
-                  }
-              });
-    });
-    return tokenAbi.info.source.wasmHash.toHex();
+  const tokenContractRaw = JSON.parse(
+    fs.readFileSync(__dirname + `/../artifacts/` + contractName, "utf8"),
+  );
+  const tokenAbi = new Abi(tokenContractRaw);
+  const _txHash = await new Promise(async (resolve, reject) => {
+    const unsub = await api.tx.contracts
+      .uploadCode(tokenAbi.info.source.wasm, null, 0)
+      .signAndSend(deployer, (result) => {
+        if (result.isFinalized) {
+          unsub();
+          resolve(result.txHash);
+        }
+        if (result.isError) {
+          unsub();
+          reject(result);
+        }
+      });
+  });
+  return tokenAbi.info.source.wasmHash.toHex();
 }
 
 /**
@@ -53,10 +53,10 @@ export async function uploadCode(
  * @param addresses - The addresses to store.
  */
 export function storeAddresses(addresses: Addresses): void {
-    fs.writeFileSync(
-        __dirname + '/../addresses.json',
-        JSON.stringify(addresses, null, 2),
-    );
+  fs.writeFileSync(
+    __dirname + "/../addresses.json",
+    JSON.stringify(addresses, null, 2),
+  );
 }
 
 /**
@@ -71,7 +71,7 @@ export async function estimateContractInit(
   sampleArgs: unknown[],
 ): Promise<WeightV2> {
   const contractRaw = JSON.parse(
-    fs.readFileSync(__dirname + `/../artifacts/` + contractName, 'utf8'),
+    fs.readFileSync(__dirname + `/../artifacts/` + contractName, "utf8"),
   );
   const contractAbi = new Abi(contractRaw);
   const { gasRequired } = (await api.call.contractsApi.instantiate(
@@ -81,7 +81,7 @@ export async function estimateContractInit(
     null,
     { Upload: contractAbi.info.source.wasm },
     contractAbi.constructors[0].toU8a(sampleArgs),
-    '',
+    "",
   )) as unknown as ContractInstantiateResult;
   return gasRequired;
 }

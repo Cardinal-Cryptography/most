@@ -13,6 +13,7 @@ build/
 eth/artifacts
 eth/build/
 eth/cache/
+eth/.openzeppelin/
 
 # rust compilation
 target/

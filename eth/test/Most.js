@@ -213,7 +213,7 @@ describe("Most", function () {
             ).to.be.revertedWith("This guardian has already signed this request");
         });
 
-        it("Reverts if request has already been executed", async () => {
+        it("Ignores already executed requests", async () => {
             const { most, token, tokenAddressBytes32 } = await loadFixture(deployEightGuardianMostFixture);
             const accounts = await ethers.getSigners();
             const ethAddress = addressToBytes32(accounts[10].address);
@@ -243,7 +243,7 @@ describe("Most", function () {
                     ethAddress,
                     0,
                 )
-            ).to.be.revertedWith("This request has already been processed");
+            ).to.emit(most, "ProcessedRequestSigned").withArgs(requestHash, accounts[6].address);
         });
 
         it("Unlocks tokens for the user", async () => {
