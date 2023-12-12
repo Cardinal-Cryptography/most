@@ -1,5 +1,5 @@
 require("@nomicfoundation/hardhat-toolbox");
-require('@openzeppelin/hardhat-upgrades');
+require("@openzeppelin/hardhat-upgrades");
 require("@nomicfoundation/hardhat-chai-matchers");
 require("@nomiclabs/hardhat-truffle5");
 
@@ -9,57 +9,56 @@ const DEV_MNEMONIC =
   "harsh master island dirt equip search awesome double turn crush wool grant";
 
 module.exports = {
-    defaultNetwork: "hardhat",
-    networks: {
-      hardhat: {
+  defaultNetwork: "hardhat",
+  networks: {
+    hardhat: {},
+    development: {
+      url: "http://127.0.0.1:8545",
+      accounts: {
+        mnemonic: DEV_MNEMONIC,
       },
-      development: {
-        url: "http://127.0.0.1:8545",
-        accounts: {
-            mnemonic: DEV_MNEMONIC,
-        },
-        gas: 25e6, // Gas limit
-        gasPrice: 20e9,
+      gas: 25e6, // Gas limit
+      gasPrice: 20e9,
+    },
+    bridgenet: {
+      url: "https://rpc-eth-bridgenet.dev.azero.dev",
+      accounts: {
+        mnemonic: DEV_MNEMONIC,
       },
-      bridgenet: {
-        url: "https://rpc-eth-bridgenet.dev.azero.dev",
-        accounts: {
-            mnemonic: DEV_MNEMONIC,
+      chainId: 12345,
+      gas: 25e6, // Gas limit
+      gasPrice: 20e9,
+    },
+  },
+  solidity: {
+    compilers: [
+      {
+        version: "0.8.20",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
         },
-        chainId: 12345,
-        gas: 25e6, // Gas limit
-        gasPrice: 20e9,
-      }
-    },
-    solidity: {
-        compilers: [
-            {
-                version: "0.8.20",
-                settings: {
-                    optimizer: {
-                        enabled: true,
-                        runs: 200
-                    }
-                }
-            },
-            {
-                version: "0.4.18",
-                settings: {
-                    optimizer: {
-                        enabled: true,
-                        runs: 200
-                    }
-                }
-            },
-        ]
-    },
-    paths: {
-      sources: "./contracts",
-      tests: "./test",
-      cache: "./cache",
-      artifacts: "./artifacts"
-    },
-    mocha: {
-      timeout: 40000
-    }
-  }
+      },
+      {
+        version: "0.4.18",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+        },
+      },
+    ],
+  },
+  paths: {
+    sources: "./contracts",
+    tests: "./test",
+    cache: "./cache",
+    artifacts: "./artifacts",
+  },
+  mocha: {
+    timeout: 40000,
+  },
+};

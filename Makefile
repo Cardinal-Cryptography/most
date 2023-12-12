@@ -215,14 +215,20 @@ js-format-check: # Check js formatting
 js-format-check:
 	cd eth && npx prettier --check test
 	cd eth && npx prettier --check scripts
+	cd eth && npx prettier --check gulpfile.js
+	cd eth && npx prettier --check hardhat.config.js
 	cd azero && npx prettier --check scripts
+	cd azero && npx prettier --check gulpfile.js
 
 .PHONY: js-format
 js-format: # Format js code
 js-format:
 	cd eth && npx prettier --write test
 	cd eth && npx prettier --write scripts
+	cd eth && npx prettier --write gulpfile.js
+	cd eth && npx prettier --write hardhat.config.js
 	cd azero && npx prettier --write scripts
+	cd azero && npx prettier --write gulpfile.js
 
 .PHONY: format-check
 format-check: # Check code formatting
