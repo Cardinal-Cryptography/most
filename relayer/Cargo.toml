@@ -13,6 +13,7 @@ env_logger = "0.10.0"
 ethers = { version = "2.0.9", features = ["abigen", "rustls", "ws", "ethers-solc"] }
 eyre = "0.6.8"
 futures = "0.3.28"
+hex = "0.4.3"
 log = "0.4.20"
 redis = { version = "*", features = ["tokio-comp", "aio"] }
 rustc-hex = "2.1.0"

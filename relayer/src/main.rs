@@ -3,7 +3,7 @@ use std::{env, process, sync::Arc};
 use clap::Parser;
 use config::Config;
 use connections::EthConnectionError;
-use ethers::signers::{LocalWallet, WalletError};
+use ethers::signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, WalletError};
 use eyre::Result;
 use log::{error, info};
 use redis::Client as RedisClient;
@@ -12,10 +12,7 @@ use tokio::{runtime::Runtime, sync::Mutex};
 
 use crate::{
     connections::{azero, eth},
-    listeners::{
-        AlephZeroListener, AlephZeroPastEventsListener, AzeroListenerError, EthListener,
-        EthListenerError, EthPastEventsListener,
-    },
+    listeners::{AlephZeroListener, AzeroListenerError, EthListener, EthListenerError},
 };
 
 mod config;
@@ -23,6 +20,9 @@ mod connections;
 mod contracts;
 mod helpers;
 mod listeners;
+
+const DEV_MNEMONIC: &str =
+    "harsh master island dirt equip search awesome double turn crush wool grant";
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -65,9 +65,16 @@ fn main() -> Result<()> {
             &keypair,
         ));
 
-        let wallet =
+        let wallet = if !config.eth_keystore_path.is_empty() {
             LocalWallet::decrypt_keystore(&config.eth_keystore_path, &config.eth_keystore_password)
-                .expect("Cannot decrypt eth wallet");
+                .expect("Cannot decrypt eth wallet")
+        } else {
+            // If no keystore path is provided, we use the default development mnemonic
+            MnemonicBuilder::<English>::default()
+                .phrase(DEV_MNEMONIC)
+                .build()
+                .expect("Mnemonic is correct")
+        };
 
         let eth_connection = Arc::new(
             eth::sign(
@@ -86,14 +93,14 @@ fn main() -> Result<()> {
         let redis_connection_rc1 = Arc::clone(&redis_connection);
 
         tasks.push(tokio::spawn(async {
-            EthPastEventsListener::run(
+            EthListener::run(
                 config_rc1,
                 azero_connection_rc1,
                 eth_connection_rc1,
                 redis_connection_rc1,
             )
             .await
-            .expect("Ethereum past events listener task has failed")
+            .expect("Ethereum listener task has failed")
         }));
 
         let config_rc2 = Arc::clone(&config);
@@ -102,43 +109,11 @@ fn main() -> Result<()> {
         let redis_connection_rc2 = Arc::clone(&redis_connection);
 
         tasks.push(tokio::spawn(async {
-            EthListener::run(
+            AlephZeroListener::run(
                 config_rc2,
                 azero_connection_rc2,
                 eth_connection_rc2,
                 redis_connection_rc2,
-            )
-            .await
-            .expect("Ethereum listener task has failed")
-        }));
-
-        let config_rc3 = Arc::clone(&config);
-        let azero_connection_rc3 = Arc::clone(&azero_connection);
-        let eth_connection_rc3 = Arc::clone(&eth_connection);
-        let redis_connection_rc3 = Arc::clone(&redis_connection);
-
-        tasks.push(tokio::spawn(async {
-            AlephZeroPastEventsListener::run(
-                config_rc3,
-                azero_connection_rc3,
-                eth_connection_rc3,
-                redis_connection_rc3,
-            )
-            .await
-            .expect("AlephZero past events listener task has failed")
-        }));
-
-        let config_rc4 = Arc::clone(&config);
-        let azero_connection_rc4 = Arc::clone(&azero_connection);
-        let eth_connection_rc4 = Arc::clone(&eth_connection);
-        let redis_connection_rc4 = Arc::clone(&redis_connection);
-
-        tasks.push(tokio::spawn(async {
-            AlephZeroListener::run(
-                config_rc4,
-                azero_connection_rc4,
-                eth_connection_rc4,
-                redis_connection_rc4,
             )
             .await
             .expect("AlephZero listener task has failed")

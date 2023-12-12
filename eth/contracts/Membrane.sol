@@ -43,6 +43,9 @@ contract Membrane is Initializable, UUPSUpgradeable, OwnableUpgradeable {
 
     event RequestProcessed(bytes32 requestHash);
 
+    // Emitted when guardian signs a request that has already been processed
+    event ProcessedRequestSigned(bytes32 requestHash, address signer);
+
     modifier _onlyCurrentCommitteeMember() {
         require(isInCommittee(committeeId, msg.sender), "NotInCommittee");
         _;
@@ -132,10 +135,12 @@ contract Membrane is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         bytes32 destReceiverAddress,
         uint256 _requestNonce
     ) external _onlyCurrentCommitteeMember {
-        require(
-            !processedRequests[_requestHash],
-            "This request has already been processed"
-        );
+        // Don't revert if the request has already been processed as
+        // such a call can be made during regular guardian operation.
+        if (processedRequests[_requestHash]) {
+            emit ProcessedRequestSigned(_requestHash, msg.sender);
+            return;
+        }
 
         bytes32 requestHash = keccak256(
             abi.encodePacked(
@@ -204,11 +209,10 @@ contract Membrane is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         }
     }
 
-    function getCollectedCommitteeRewards(uint256 _committeeId, bytes32 token)
-        public
-        view
-        returns (uint256)
-    {
+    function getCollectedCommitteeRewards(
+        uint256 _committeeId,
+        bytes32 token
+    ) public view returns (uint256) {
         return
             collectedCommitteeRewards[
                 keccak256(abi.encodePacked(_committeeId, token))
@@ -256,21 +260,18 @@ contract Membrane is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         return amountOf;
     }
 
-    function hasSignedRequest(address guardian, bytes32 hash)
-        external
-        view
-        returns (bool)
-    {
+    function hasSignedRequest(
+        address guardian,
+        bytes32 hash
+    ) external view returns (bool) {
         return pendingRequests[hash].signatures[guardian];
     }
 
-    function isInCommittee(uint256 _committeeId, address account)
-        public
-        view
-        returns (bool)
-    {
-        return
-            committee[keccak256(abi.encodePacked(_committeeId, account))];
+    function isInCommittee(
+        uint256 _committeeId,
+        address account
+    ) public view returns (bool) {
+        return committee[keccak256(abi.encodePacked(_committeeId, account))];
     }
 
     function bytes32ToAddress(bytes32 data) internal pure returns (address) {
