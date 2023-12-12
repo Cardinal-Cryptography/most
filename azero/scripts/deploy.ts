@@ -1,10 +1,15 @@
-import { ApiPromise, WsProvider, Keyring } from '@polkadot/api';
-import MostConstructors from '../types/constructors/most';
-import TokenConstructors from '../types/constructors/token';
-import GovernanceConstructors from '../types/constructors/governance';
-import { uploadCode, Addresses, storeAddresses, estimateContractInit } from './utils';
-import 'dotenv/config';
-import '@polkadot/api-augment';
+import { ApiPromise, WsProvider, Keyring } from "@polkadot/api";
+import MostConstructors from "../types/constructors/most";
+import TokenConstructors from "../types/constructors/token";
+import GovernanceConstructors from "../types/constructors/governance";
+import {
+  uploadCode,
+  Addresses,
+  storeAddresses,
+  estimateContractInit,
+} from "./utils";
+import "dotenv/config";
+import "@polkadot/api-augment";
 
 const envFile = process.env.AZERO_ENV || "dev";
 async function import_env() {
@@ -20,7 +25,7 @@ async function main(): Promise<void> {
     commission_per_dix_mille,
     pocket_money,
     minimum_transfer_amount_usd,
-    relay_gas_usage
+    relay_gas_usage,
   } = await import_env();
 
   let wsProvider = new WsProvider(ws_node);
@@ -33,7 +38,7 @@ async function main(): Promise<void> {
   console.log("token code hash:", tokenCodeHash);
 
   const mostCodeHash = await uploadCode(api, deployer, "most.contract");
-  console.log('most code hash:', mostCodeHash);
+  console.log("most code hash:", mostCodeHash);
 
   const governanceCodeHash = await uploadCode(
     api,
@@ -46,14 +51,19 @@ async function main(): Promise<void> {
   const mostConstructors = new MostConstructors(api, deployer);
   const tokenConstructors = new TokenConstructors(api, deployer);
 
-  let estimatedGasMost = await estimateContractInit(api, deployer, 'most.contract', [
-    [authority],
-    signature_threshold!,
-    commission_per_dix_mille!,
-    pocket_money!,
-    minimum_transfer_amount_usd!,
-    relay_gas_usage!,
-  ]);
+  let estimatedGasMost = await estimateContractInit(
+    api,
+    deployer,
+    "most.contract",
+    [
+      [authority],
+      signature_threshold!,
+      commission_per_dix_mille!,
+      pocket_money!,
+      minimum_transfer_amount_usd!,
+      relay_gas_usage!,
+    ],
+  );
 
   const { address: mostAddress } = await mostConstructors.new(
     [authority],
@@ -65,7 +75,7 @@ async function main(): Promise<void> {
     { gasLimit: estimatedGasMost },
   );
 
-  console.log('most address:', mostAddress);
+  console.log("most address:", mostAddress);
 
   let estimatedGasToken = await estimateContractInit(
     api,
@@ -98,7 +108,7 @@ async function main(): Promise<void> {
   const addresses: Addresses = {
     governance: governanceAddress,
     most: mostAddress,
-    weth: wethAddress
+    weth: wethAddress,
   };
   console.log("addresses:", addresses);
 

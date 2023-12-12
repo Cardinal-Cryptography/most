@@ -589,10 +589,7 @@ pub mod most {
 
         /// Returns an error (reverts) if account is not in the currently active committee
         #[ink(message)]
-        pub fn only_current_committee_member(
-            &self,
-            account: AccountId,
-        ) -> Result<(), MostError> {
+        pub fn only_current_committee_member(&self, account: AccountId) -> Result<(), MostError> {
             match self.is_in_committee(self.committee_id, account) {
                 true => Ok(()),
                 false => Err(MostError::NotInCommittee),
@@ -833,10 +830,7 @@ pub mod most {
             )
             .expect("Threshold is valid.");
             set_caller::<DefEnv>(accounts.bob);
-            assert_eq!(
-                most.ensure_owner(),
-                Err(MostError::NotOwner(accounts.bob))
-            );
+            assert_eq!(most.ensure_owner(), Err(MostError::NotOwner(accounts.bob)));
             set_caller::<DefEnv>(accounts.alice);
             assert_eq!(most.ensure_owner(), Ok(()));
             assert_eq!(most.set_owner(accounts.bob), Ok(()));

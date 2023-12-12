@@ -110,8 +110,7 @@ impl AlephZeroListener {
         let event_handler_tasks_semaphore =
             Arc::new(Semaphore::new(*azero_max_event_handler_tasks));
 
-        let most_instance =
-            MostInstance::new(azero_contract_address, azero_contract_metadata)?;
+        let most_instance = MostInstance::new(azero_contract_address, azero_contract_metadata)?;
         let mut first_unprocessed_block_number = read_first_unprocessed_block_number(
             name.clone(),
             ALEPH_LAST_BLOCK_KEY.to_string(),
