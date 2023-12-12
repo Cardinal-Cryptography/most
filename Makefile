@@ -189,3 +189,39 @@ ink-lint:
 .PHONY: contracts-lint
 contracts-lint: # Lint contracts
 contracts-lint: solidity-lint ink-lint
+
+.PHONY: rust-format-check
+rust-format-check: # Check rust code formatting
+rust-format-check:
+	cd relayer && cargo fmt -- --check
+	cd azero/contracts/membrane && cargo fmt -- --check
+	cd azero/contracts/governance && cargo fmt -- --check
+	cd azero/contracts/token && cargo fmt -- --check
+	cd azero/contracts/psp22-traits && cargo fmt -- --check
+	cd azero/contracts/tests && cargo fmt -- --check
+
+.PHONY: rust-format
+rust-format: # Format rust code
+rust-format:
+	cd relayer && cargo fmt
+	cd azero/contracts/membrane && cargo fmt
+	cd azero/contracts/governance && cargo fmt
+	cd azero/contracts/token && cargo fmt
+	cd azero/contracts/psp22-traits && cargo fmt
+	cd azero/contracts/tests && cargo fmt
+
+.PHONY: js-format-check
+js-format-check: # Check js formatting
+js-format-check:
+	cd eth && npx prettier --check test
+	cd azero && npx prettier --check scripts
+
+.PHONY: js-format
+js-format: # Format js code
+js-format:
+	cd eth && npx prettier --write test
+	cd azero && npx prettier --write scripts
+
+.PHONY: format-check
+format-check: # Check code formatting
+format-check: rust-format-check js-format-check
