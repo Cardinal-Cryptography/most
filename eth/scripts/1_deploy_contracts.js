@@ -1,5 +1,5 @@
 const fs = require("node:fs");
-const { ethers, upgrades, artifacts } = require("hardhat");
+const { ethers, upgrades } = require("hardhat");
 
 const COMMISSION_PER_DIX_MILLE=30
 const MINIMUM_TRANSFER_AMOUNT_USD=50
@@ -23,8 +23,8 @@ async function main() {
     const Governance = await ethers.getContractFactory("Governance");
     const governance = await upgrades.deployProxy(Governance,
                                                   [
-                                                      accounts.slice(1, 9),
-                                                      5
+                                                      accounts.slice(0, 1),
+                                                      1
                                                   ],
                                                   {
                                                       initializer: "initialize",
@@ -37,8 +37,8 @@ async function main() {
     console.log("Deploying Membrane...");
     const membrane = await upgrades.deployProxy(Membrane,
                                                 [
-                                                    accounts.slice(1, 9),
-                                                    5,
+                                                    accounts.slice(0, 1),
+                                                    1,
                                                     COMMISSION_PER_DIX_MILLE,
                                                     MINIMUM_TRANSFER_AMOUNT_USD,
                                                     accounts [0],

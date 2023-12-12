@@ -18,7 +18,7 @@ clean-azero:
 .PHONY: clean-eth
 clean-eth: # Remove eth node data
 clean-eth:
-	cd devnet-eth && ./clean.sh && echo "Done clean"
+	cd devnet-eth && ./clean.sh && echo "Done eth clean"
 
 .PHONY: clean
 clean: # Remove all node data
