@@ -214,12 +214,14 @@ rust-format:
 js-format-check: # Check js formatting
 js-format-check:
 	cd eth && npx prettier --check test
+	cd eth && npx prettier --check scripts
 	cd azero && npx prettier --check scripts
 
 .PHONY: js-format
 js-format: # Format js code
 js-format:
 	cd eth && npx prettier --write test
+	cd eth && npx prettier --write scripts
 	cd azero && npx prettier --write scripts
 
 .PHONY: format-check
