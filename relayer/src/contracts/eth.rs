@@ -1,6 +1,6 @@
 use ethers::contract::abigen;
 
 abigen!(
-    Membrane,
-    "../eth/artifacts/contracts/Membrane.sol/Membrane.json"
+    Most,
+    "../eth/artifacts/contracts/Most.sol/Most.json"
 );

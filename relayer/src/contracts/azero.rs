@@ -34,11 +34,11 @@ pub enum AzeroContractError {
 }
 
 #[derive(Debug)]
-pub struct MembraneInstance {
+pub struct MostInstance {
     pub contract: ContractInstance,
 }
 
-impl MembraneInstance {
+impl MostInstance {
     pub fn new(address: &str, metadata_path: &str) -> Result<Self, AzeroContractError> {
         let address = AccountId::from_str(address)
             .map_err(|why| AzeroContractError::NotAccountId(why.to_string()))?;
@@ -97,14 +97,14 @@ pub fn get_request_event_data(
     })
 }
 
-pub fn filter_membrane_events(
+pub fn filter_most_events(
     events: Events<AlephConfig>,
-    membrane_instance: &MembraneInstance,
+    most_instance: &MostInstance,
     block_details: BlockDetails,
 ) -> Vec<ContractEvent> {
     translate_events(
         events.iter(),
-        &[&membrane_instance.contract],
+        &[&most_instance.contract],
         Some(block_details),
     )
     .into_iter()

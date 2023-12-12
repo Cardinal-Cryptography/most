@@ -1,6 +1,6 @@
 [![Built with ink!](https://raw.githubusercontent.com/paritytech/ink/master/.images/badge_flat.svg)](https://github.com/paritytech/ink)
 
-# AlephZero Membrane (Guardian) Bridge
+# AlephZero MOST (Guardian) Bridge
 
 ## Prerequisites
 
@@ -24,7 +24,7 @@ This will start a local development environment with the following components:
 ## Running local development chains
 
 To run the development chain without deploying the contracts or running the relayer, run:
-    
+
 ```bash
 make devnet-eth
 ```
@@ -81,12 +81,12 @@ cd eth && npx hardhat console --network development
 Interact with the deployed contracts instance:
 
 ```javascript
-let Membrane = await ethers.getContractFactory("Membrane")
-let membrane = Membrane.attach("insert contract address here")
+let Most = await ethers.getContractFactory("Most")
+let most = most.attach("insert contract address here")
 let accounts = await ethers.getSigners();
 
-await membrane.isGuardian(accounts[0])
-await membrane.isGuardian(accounts[1])
+await most.isGuardian(accounts[0])
+await most.isGuardian(accounts[1])
 ```
 
 To deploy the contracts on the azero chain:

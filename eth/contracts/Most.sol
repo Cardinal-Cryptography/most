@@ -7,7 +7,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-contract Membrane is Initializable, UUPSUpgradeable, OwnableUpgradeable {
+contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     uint256 constant DIX_MILLE = 10000;
 
     uint256 public requestNonce;
@@ -88,7 +88,7 @@ contract Membrane is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
     // Invoke this tx to transfer funds to the destination chain.
-    // Account needs to approve the Membrane contract to spend the `srcTokenAmount`
+    // Account needs to approve the Most contract to spend the `srcTokenAmount`
     // of `srcTokenAddress` tokens on their behalf before executing the tx.
     //
     // Tx emits a CrosschainTransferRequest event that the relayers listen to

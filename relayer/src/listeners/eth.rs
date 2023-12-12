@@ -25,8 +25,8 @@ use crate::{
         redis_helpers::{read_first_unprocessed_block_number, write_last_processed_block},
     },
     contracts::{
-        AzeroContractError, CrosschainTransferRequestFilter, Membrane, MembraneEvents,
-        MembraneInstance,
+        AzeroContractError, CrosschainTransferRequestFilter, Most, MostEvents,
+        MostInstance,
     },
     helpers::concat_u8_arrays,
 };
@@ -75,7 +75,7 @@ impl EthListener {
         } = &*config;
 
         let address = eth_contract_address.parse::<Address>()?;
-        let contract = Membrane::new(address, Arc::clone(&eth_connection));
+        let contract = Most::new(address, Arc::clone(&eth_connection));
 
         let mut first_unprocessed_block_number = read_first_unprocessed_block_number(
             name.clone(),
@@ -135,11 +135,11 @@ impl EthListener {
 }
 
 async fn handle_event(
-    event: &MembraneEvents,
+    event: &MostEvents,
     config: &Config,
     azero_connection: Arc<SignedAzeroWsConnection>,
 ) -> Result<(), EthListenerError> {
-    if let MembraneEvents::CrosschainTransferRequestFilter(
+    if let MostEvents::CrosschainTransferRequestFilter(
         crosschain_transfer_event @ CrosschainTransferRequestFilter {
             dest_token_address,
             amount,
@@ -170,7 +170,7 @@ async fn handle_event(
         let request_hash = keccak256(bytes);
         debug!("hashed event encoding: {request_hash:?}");
 
-        let contract = MembraneInstance::new(azero_contract_address, azero_contract_metadata)?;
+        let contract = MostInstance::new(azero_contract_address, azero_contract_metadata)?;
 
         // send vote
         contract

@@ -1,9 +1,9 @@
 {
-    "name": "membrane-bridge",
+    "name": "most-bridge",
     "version": "1.0.0",
     "author": "fbielejec",
     "license": "MIT",
-    "description": "azero membrane bridge",
+    "description": "azero most bridge",
     "scripts": {
         "watch": "gulp default",        
         "compile": "typechain-compiler --release --toolchain nightly-2023-05-31",

@@ -3,7 +3,7 @@ const hre = require("hardhat");
 // Import utils
 const { addressToBytes32, getRandomAlephAccount } = require("./TestUtils");
 
-describe("MembraneBenchmark", function () {
+describe("MostBenchmark", function () {
   it(" deploy + estimate gas cost and successfully call sendRequest and receiveRequest.", async () => {
     const accounts = await hre.ethers.getSigners();
 
@@ -23,20 +23,20 @@ describe("MembraneBenchmark", function () {
     const testTokenInstance = await TestToken.deploy();
     const tokenAddress = await testTokenInstance.getAddress();
 
-    const Membrane = await hre.ethers.getContractFactory("Membrane");
-    const membraneInstance = await Membrane.deploy(
+    const Most = await hre.ethers.getContractFactory("Most");
+    const mostInstance = await Most.deploy(
       guardianAddresses,
       threshold,
       { from: accounts[0] },
     );
-    const membraneInstanceAddress = await membraneInstance.getAddress();
+    const mostInstanceAddress = await mostInstance.getAddress();
 
     // Easy way to get a "random" bytes32 value
     let azContract = getRandomAlephAccount(42);
     let tokenAddressBytes32 = addressToBytes32(tokenAddress);
 
     // Add pair of linked contracts
-    let addPairResult = await membraneInstance.addPair(
+    let addPairResult = await mostInstance.addPair(
       tokenAddressBytes32,
       azContract,
       { from: accounts[0] },
@@ -47,12 +47,12 @@ describe("MembraneBenchmark", function () {
     // bytes32 "address" of account on Aleph
     let azAccount = getRandomAlephAccount(0);
 
-    // Allow Membrane to spend tokens
-    await testTokenInstance.approve(membraneInstanceAddress, 1000, {
+    // Allow Most to spend tokens
+    await testTokenInstance.approve(mostInstanceAddress, 1000, {
       from: accounts[0],
     });
 
-    const gasEstimateSend = await membraneInstance.sendRequest.estimateGas(
+    const gasEstimateSend = await mostInstance.sendRequest.estimateGas(
       tokenAddressBytes32,
       1000,
       azAccount,
@@ -61,7 +61,7 @@ describe("MembraneBenchmark", function () {
 
     console.log("Gas estimate for sendRequest: ", Number(gasEstimateSend));
 
-    const sendRequestTx = await membraneInstance.sendRequest(
+    const sendRequestTx = await mostInstance.sendRequest(
       tokenAddressBytes32,
       1000,
       azAccount,
@@ -79,7 +79,7 @@ describe("MembraneBenchmark", function () {
     let gasEstimates = [...Array(threshold).keys()];
     for (let i = 0; i < threshold; i++) {
       gasEstimates[i] = Number(
-        await membraneInstance
+        await mostInstance
           .connect(guardianKeys[i])
           .receiveRequest.estimateGas(
             requestHash,
@@ -91,7 +91,7 @@ describe("MembraneBenchmark", function () {
       );
 
       // Check if gas estimate is high enough
-      await membraneInstance
+      await mostInstance
         .connect(guardianKeys[i])
         .receiveRequest(requestHash, tokenAddressBytes32, 1000, ethAccount, 1, {
           gas: gasEstimates[i],

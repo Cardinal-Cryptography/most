@@ -11,7 +11,7 @@ import {
 
 export type Addresses = {
   governance: string;
-  membrane: string;
+  most: string;
   weth: string;
 };
 

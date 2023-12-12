@@ -2584,7 +2584,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "membrane"
+name = "most"
 version = "1.0.0"
 dependencies = [
  "ink",
@@ -4666,7 +4666,7 @@ version = "1.0.0"
 dependencies = [
  "ink",
  "ink_e2e",
- "membrane",
+ "most",
  "parity-scale-codec",
  "psp22",
  "shared",

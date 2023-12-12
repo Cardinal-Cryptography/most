@@ -33,9 +33,9 @@ async function main() {
     await governance.waitForDeployment();
     console.log("Governance deployed to:", governance.target);
 
-    const Membrane = await ethers.getContractFactory("Membrane");
-    console.log("Deploying Membrane...");
-    const membrane = await upgrades.deployProxy(Membrane,
+    const Most = await ethers.getContractFactory("Most");
+    console.log("Deploying Most...");
+    const most = await upgrades.deployProxy(Most,
                                                 [
                                                     accounts.slice(0, 1),
                                                     1,
@@ -47,8 +47,8 @@ async function main() {
                                                     initializer: "initialize",
                                                     kind: 'uups'
                                                 });
-    await membrane.waitForDeployment();
-    console.log("Membrane deployed to:",  membrane.target);
+    await most.waitForDeployment();
+    console.log("Most deployed to:",  most.target);
 
     const Migrations = await ethers.getContractFactory("Migrations");
     const migrations = await Migrations.deploy();
@@ -62,7 +62,7 @@ async function main() {
     const addresses = {
         migrations: migrations.target,
         governance: governance.target,
-        membrane: membrane.target,
+        most: most.target,
         weth9: weth9.target,
         usdt: usdt.target,
     };

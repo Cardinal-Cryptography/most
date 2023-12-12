@@ -1,9 +1,9 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
 
-pub use self::membrane::{MembraneError, MembraneRef};
+pub use self::most::{MostError, MostRef};
 
 #[ink::contract]
-pub mod membrane {
+pub mod most {
 
     use ink::{
         env::{
@@ -76,7 +76,7 @@ pub mod membrane {
     }
 
     #[ink(storage)]
-    pub struct Membrane {
+    pub struct Most {
         /// an account that can perform a subset of actions
         owner: AccountId,
         /// nonce for outgoing cross-chain transfer requests
@@ -116,7 +116,7 @@ pub mod membrane {
 
     #[derive(Debug, PartialEq, Eq, Encode, Decode)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
-    pub enum MembraneError {
+    pub enum MostError {
         Constructor,
         InvalidThreshold,
         NotInCommittee,
@@ -135,19 +135,19 @@ pub mod membrane {
         NoMoreRewards,
     }
 
-    impl From<InkEnvError> for MembraneError {
+    impl From<InkEnvError> for MostError {
         fn from(why: InkEnvError) -> Self {
             Self::InkEnvError(format!("{:?}", why))
         }
     }
 
-    impl From<PSP22Error> for MembraneError {
+    impl From<PSP22Error> for MostError {
         fn from(inner: PSP22Error) -> Self {
-            MembraneError::PSP22(inner)
+            MostError::PSP22(inner)
         }
     }
 
-    impl Membrane {
+    impl Most {
         #[ink(constructor)]
         pub fn new(
             committee: Vec<AccountId>,
@@ -156,13 +156,13 @@ pub mod membrane {
             pocket_money: Balance,
             minimum_transfer_amount_usd: u128,
             relay_gas_usage: u128,
-        ) -> Result<Self, MembraneError> {
+        ) -> Result<Self, MostError> {
             if commission_per_dix_mille.gt(&DIX_MILLE) {
-                return Err(MembraneError::Constructor);
+                return Err(MostError::Constructor);
             }
 
             if signature_threshold == 0 || committee.len().lt(&(signature_threshold as usize)) {
-                return Err(MembraneError::InvalidThreshold);
+                return Err(MostError::InvalidThreshold);
             }
 
             let committee_id = 0;
@@ -210,24 +210,24 @@ pub mod membrane {
             src_token_address: [u8; 32],
             amount: u128,
             dest_receiver_address: [u8; 32],
-        ) -> Result<(), MembraneError> {
+        ) -> Result<(), MostError> {
             if self
                 .query_price(amount, src_token_address, USDT_TOKEN_ID)?
                 .lt(&self.minimum_transfer_amount_usd)
             {
-                return Err(MembraneError::AmountBelowMinimum);
+                return Err(MostError::AmountBelowMinimum);
             }
 
             let dest_token_address = self
                 .supported_pairs
                 .get(src_token_address)
-                .ok_or(MembraneError::UnsupportedPair)?;
+                .ok_or(MostError::UnsupportedPair)?;
 
             let current_base_fee = self.get_base_fee()?;
             let base_fee = self.env().transferred_value();
 
             if base_fee.lt(&current_base_fee) {
-                return Err(MembraneError::BaseFeeTooLow);
+                return Err(MostError::BaseFeeTooLow);
             }
 
             let sender = self.env().caller();
@@ -244,7 +244,7 @@ pub mod membrane {
                 .get((self.committee_id, NATIVE_TOKEN_ID))
                 .unwrap_or(0)
                 .checked_add(base_fee)
-                .ok_or(MembraneError::Arithmetic)?;
+                .ok_or(MostError::Arithmetic)?;
 
             self.collected_committee_rewards
                 .insert((self.committee_id, NATIVE_TOKEN_ID), &base_fee_total);
@@ -258,7 +258,7 @@ pub mod membrane {
                 .get((self.committee_id, NATIVE_TOKEN_ID))
                 .unwrap_or(0)
                 .checked_add(base_fee)
-                .ok_or(MembraneError::Arithmetic)?;
+                .ok_or(MostError::Arithmetic)?;
 
             self.collected_committee_rewards
                 .insert((self.committee_id, NATIVE_TOKEN_ID), &base_fee_total);
@@ -274,7 +274,7 @@ pub mod membrane {
             self.request_nonce = self
                 .request_nonce
                 .checked_add(1)
-                .ok_or(MembraneError::Arithmetic)?;
+                .ok_or(MostError::Arithmetic)?;
 
             // return surplus if any
             if let Some(surplus) = base_fee.checked_sub(current_base_fee) {
@@ -293,7 +293,7 @@ pub mod membrane {
             amount: u128,
             dest_receiver_address: [u8; 32],
             request_nonce: u128,
-        ) -> Result<(), MembraneError> {
+        ) -> Result<(), MostError> {
             let caller = self.env().caller();
 
             self.only_current_committee_member(caller)?;
@@ -318,11 +318,11 @@ pub mod membrane {
             let hash = keccak256(&bytes);
 
             if !request_hash.eq(&hash) {
-                return Err(MembraneError::HashDoesNotMatchData);
+                return Err(MostError::HashDoesNotMatchData);
             }
 
             if self.signatures.contains((request_hash, caller)) {
-                return Err(MembraneError::RequestAlreadySigned);
+                return Err(MostError::RequestAlreadySigned);
             }
 
             let mut request = self.pending_requests.get(request_hash).unwrap_or_default(); //  {
@@ -339,26 +339,26 @@ pub mod membrane {
             let signature_threshold = self
                 .signature_thresholds
                 .get(self.committee_id)
-                .ok_or(MembraneError::InvalidThreshold)?;
+                .ok_or(MostError::InvalidThreshold)?;
 
             if request.signature_count >= signature_threshold {
                 let commission = amount
                     .checked_mul(self.commission_per_dix_mille)
-                    .ok_or(MembraneError::Arithmetic)?
+                    .ok_or(MostError::Arithmetic)?
                     .checked_div(DIX_MILLE)
-                    .ok_or(MembraneError::Arithmetic)?;
+                    .ok_or(MostError::Arithmetic)?;
 
                 let updated_commission_total = self
                     .get_collected_committee_rewards(self.committee_id, dest_token_address)
                     .checked_add(commission)
-                    .ok_or(MembraneError::Arithmetic)?;
+                    .ok_or(MostError::Arithmetic)?;
 
                 self.mint_to(
                     dest_token_address.into(),
                     dest_receiver_address.into(),
                     amount
                         .checked_sub(commission)
-                        .ok_or(MembraneError::Arithmetic)?,
+                        .ok_or(MostError::Arithmetic)?,
                 )?;
 
                 // bootstrap account with pocket money
@@ -396,7 +396,7 @@ pub mod membrane {
             committee_id: CommitteeId,
             member_id: AccountId,
             token_id: [u8; 32],
-        ) -> Result<(), MembraneError> {
+        ) -> Result<(), MostError> {
             let paid_out_rewards =
                 self.get_paid_out_member_rewards(committee_id, member_id, token_id);
 
@@ -417,7 +417,7 @@ pub mod membrane {
                     (member_id, committee_id, token_id),
                     &paid_out_rewards
                         .checked_add(outstanding_rewards)
-                        .ok_or(MembraneError::Arithmetic)?,
+                        .ok_or(MostError::Arithmetic)?,
                 );
             }
 
@@ -430,7 +430,7 @@ pub mod membrane {
             &mut self,
             code_hash: [u8; 32],
             callback: Option<Selector>,
-        ) -> Result<(), MembraneError> {
+        ) -> Result<(), MostError> {
             self.ensure_owner()?;
             set_code_hash(&code_hash)?;
 
@@ -444,7 +444,7 @@ pub mod membrane {
                 build_call::<DefaultEnvironment>()
                     .delegate(Hash::from(code_hash))
                     .exec_input(ExecutionInput::new(ink::env::call::Selector::new(selector)))
-                    .returns::<Result<(), MembraneError>>()
+                    .returns::<Result<(), MostError>>()
                     .invoke()?;
             }
 
@@ -550,15 +550,15 @@ pub mod membrane {
             committee_id: CommitteeId,
             member_id: AccountId,
             token_id: [u8; 32],
-        ) -> Result<u128, MembraneError> {
+        ) -> Result<u128, MostError> {
             let total_amount = self
                 .get_collected_committee_rewards(committee_id, token_id)
                 .checked_div(
                     self.committee_sizes
                         .get(committee_id)
-                        .ok_or(MembraneError::NotInCommittee)?,
+                        .ok_or(MostError::NotInCommittee)?,
                 )
-                .ok_or(MembraneError::Arithmetic)?;
+                .ok_or(MostError::Arithmetic)?;
 
             let collected_amount =
                 self.get_paid_out_member_rewards(committee_id, member_id, token_id);
@@ -568,7 +568,7 @@ pub mod membrane {
 
         /// Queries a gas price oracle and returns the current base_fee charged per cross chain transfer denominated in AZERO
         #[ink(message)]
-        pub fn get_base_fee(&self) -> Result<Balance, MembraneError> {
+        pub fn get_base_fee(&self) -> Result<Balance, MostError> {
             // TODO: implement
             // return a current gas price in WEI
             let do_query_gas_fee = || 39106342561;
@@ -576,7 +576,7 @@ pub mod membrane {
             let amount = self
                 .relay_gas_usage
                 .checked_mul(do_query_gas_fee())
-                .ok_or(MembraneError::Arithmetic)?;
+                .ok_or(MostError::Arithmetic)?;
 
             self.query_price(amount, WETH_TOKEN_ID, NATIVE_TOKEN_ID)
         }
@@ -592,10 +592,10 @@ pub mod membrane {
         pub fn only_current_committee_member(
             &self,
             account: AccountId,
-        ) -> Result<(), MembraneError> {
+        ) -> Result<(), MostError> {
             match self.is_in_committee(self.committee_id, account) {
                 true => Ok(()),
-                false => Err(MembraneError::NotInCommittee),
+                false => Err(MostError::NotInCommittee),
             }
         }
 
@@ -605,7 +605,7 @@ pub mod membrane {
         ///
         /// Can only be called by the contracts owner
         #[ink(message)]
-        pub fn remove_pair(&mut self, from: [u8; 32]) -> Result<(), MembraneError> {
+        pub fn remove_pair(&mut self, from: [u8; 32]) -> Result<(), MostError> {
             self.ensure_owner()?;
             self.supported_pairs.remove(from);
             Ok(())
@@ -615,7 +615,7 @@ pub mod membrane {
         ///
         /// Can only be called by the contracts owner
         #[ink(message)]
-        pub fn add_pair(&mut self, from: [u8; 32], to: [u8; 32]) -> Result<(), MembraneError> {
+        pub fn add_pair(&mut self, from: [u8; 32], to: [u8; 32]) -> Result<(), MostError> {
             self.ensure_owner()?;
             self.supported_pairs.insert(from, &to);
             Ok(())
@@ -630,11 +630,11 @@ pub mod membrane {
             &mut self,
             committee: Vec<AccountId>,
             signature_threshold: u128,
-        ) -> Result<(), MembraneError> {
+        ) -> Result<(), MostError> {
             self.ensure_owner()?;
 
             if signature_threshold == 0 || committee.len().lt(&(signature_threshold as usize)) {
-                return Err(MembraneError::InvalidThreshold);
+                return Err(MostError::InvalidThreshold);
             }
 
             let committee_id = self.committee_id + 1;
@@ -656,7 +656,7 @@ pub mod membrane {
         ///
         /// Can only be called by contracts owner
         #[ink(message)]
-        pub fn set_owner(&mut self, new_owner: AccountId) -> Result<(), MembraneError> {
+        pub fn set_owner(&mut self, new_owner: AccountId) -> Result<(), MostError> {
             self.ensure_owner()?;
             self.owner = new_owner;
             Ok(())
@@ -673,7 +673,7 @@ pub mod membrane {
             amount_of: u128,
             of_token_address: [u8; 32],
             in_token_address: [u8; 32],
-        ) -> Result<u128, MembraneError> {
+        ) -> Result<u128, MostError> {
             if in_token_address == USDT_TOKEN_ID {
                 return Ok(amount_of * 2);
             }
@@ -685,17 +685,17 @@ pub mod membrane {
             Ok(amount_of)
         }
 
-        fn ensure_owner(&mut self) -> Result<(), MembraneError> {
+        fn ensure_owner(&mut self) -> Result<(), MostError> {
             let caller = self.env().caller();
             match caller.eq(&self.owner) {
                 true => Ok(()),
-                false => Err(MembraneError::NotOwner(caller)),
+                false => Err(MostError::NotOwner(caller)),
             }
         }
 
         /// Mints the specified amount of token to the designated account
         ///
-        /// Membrane contract needs to have a Minter role on the token contract
+        /// Most contract needs to have a Minter role on the token contract
         fn mint_to(&self, token: AccountId, to: AccountId, amount: u128) -> Result<(), PSP22Error> {
             let mut psp22: ink::contract_ref!(Mintable) = token.into();
             psp22.mint(to, amount)
@@ -703,7 +703,7 @@ pub mod membrane {
 
         /// Burn the specified amount of token from the designated account
         ///
-        /// Membrane contract needs to have a Burner role on the token contract
+        /// Most contract needs to have a Burner role on the token contract
         fn burn_from(
             &self,
             token: AccountId,
@@ -748,7 +748,7 @@ pub mod membrane {
         fn new_fails_on_zero_threshold() {
             set_caller::<DefEnv>(default_accounts::<DefEnv>().alice);
             assert_eq!(
-                Membrane::new(
+                Most::new(
                     guardian_accounts(),
                     0,
                     COMMISSION_PER_DIX_MILLE,
@@ -757,7 +757,7 @@ pub mod membrane {
                     RELAY_GAS_USAGE
                 )
                 .expect_err("Threshold is zero, instantiation should fail."),
-                MembraneError::InvalidThreshold
+                MostError::InvalidThreshold
             );
         }
 
@@ -765,7 +765,7 @@ pub mod membrane {
         fn new_fails_on_threshold_large_than_guardians() {
             set_caller::<DefEnv>(default_accounts::<DefEnv>().alice);
             assert_eq!(
-                Membrane::new(
+                Most::new(
                     guardian_accounts(),
                     (guardian_accounts().len() + 1) as u128,
                     COMMISSION_PER_DIX_MILLE,
@@ -774,14 +774,14 @@ pub mod membrane {
                     RELAY_GAS_USAGE
                 )
                 .expect_err("Threshold is larger than guardians, instantiation should fail."),
-                MembraneError::InvalidThreshold
+                MostError::InvalidThreshold
             );
         }
 
         #[ink::test]
         fn new_sets_caller_as_owner() {
             set_caller::<DefEnv>(default_accounts::<DefEnv>().alice);
-            let mut membrane = Membrane::new(
+            let mut most = Most::new(
                 guardian_accounts(),
                 THRESHOLD,
                 COMMISSION_PER_DIX_MILLE,
@@ -791,11 +791,11 @@ pub mod membrane {
             )
             .expect("Threshold is valid.");
 
-            assert_eq!(membrane.ensure_owner(), Ok(()));
+            assert_eq!(most.ensure_owner(), Ok(()));
             set_caller::<DefEnv>(guardian_accounts()[0]);
             assert_eq!(
-                membrane.ensure_owner(),
-                Err(MembraneError::NotOwner(guardian_accounts()[0]))
+                most.ensure_owner(),
+                Err(MostError::NotOwner(guardian_accounts()[0]))
             );
         }
 
@@ -803,7 +803,7 @@ pub mod membrane {
         fn new_sets_correct_guardians() {
             let accounts = default_accounts::<DefEnv>();
             set_caller::<DefEnv>(accounts.alice);
-            let membrane = Membrane::new(
+            let most = Most::new(
                 guardian_accounts(),
                 THRESHOLD,
                 COMMISSION_PER_DIX_MILLE,
@@ -814,16 +814,16 @@ pub mod membrane {
             .expect("Threshold is valid.");
 
             for account in guardian_accounts() {
-                assert!(membrane.is_in_committee(membrane.get_current_committee_id(), account));
+                assert!(most.is_in_committee(most.get_current_committee_id(), account));
             }
-            assert!(!membrane.is_in_committee(membrane.get_current_committee_id(), accounts.alice));
+            assert!(!most.is_in_committee(most.get_current_committee_id(), accounts.alice));
         }
 
         #[ink::test]
         fn set_owner_works() {
             let accounts = default_accounts::<DefEnv>();
             set_caller::<DefEnv>(accounts.alice);
-            let mut membrane = Membrane::new(
+            let mut most = Most::new(
                 guardian_accounts(),
                 THRESHOLD,
                 COMMISSION_PER_DIX_MILLE,
@@ -834,21 +834,21 @@ pub mod membrane {
             .expect("Threshold is valid.");
             set_caller::<DefEnv>(accounts.bob);
             assert_eq!(
-                membrane.ensure_owner(),
-                Err(MembraneError::NotOwner(accounts.bob))
+                most.ensure_owner(),
+                Err(MostError::NotOwner(accounts.bob))
             );
             set_caller::<DefEnv>(accounts.alice);
-            assert_eq!(membrane.ensure_owner(), Ok(()));
-            assert_eq!(membrane.set_owner(accounts.bob), Ok(()));
+            assert_eq!(most.ensure_owner(), Ok(()));
+            assert_eq!(most.set_owner(accounts.bob), Ok(()));
             set_caller::<DefEnv>(accounts.bob);
-            assert_eq!(membrane.ensure_owner(), Ok(()));
+            assert_eq!(most.ensure_owner(), Ok(()));
         }
 
         #[ink::test]
         fn add_guardian_works() {
             let accounts = default_accounts::<DefEnv>();
             set_caller::<DefEnv>(accounts.alice);
-            let mut membrane = Membrane::new(
+            let mut most = Most::new(
                 guardian_accounts(),
                 THRESHOLD,
                 COMMISSION_PER_DIX_MILLE,
@@ -858,16 +858,16 @@ pub mod membrane {
             )
             .expect("Threshold is valid.");
 
-            assert!(!membrane.is_in_committee(membrane.get_current_committee_id(), accounts.alice));
-            assert_eq!(membrane.set_committee(vec![accounts.alice], 1), Ok(()));
-            assert!(membrane.is_in_committee(membrane.get_current_committee_id(), accounts.alice));
+            assert!(!most.is_in_committee(most.get_current_committee_id(), accounts.alice));
+            assert_eq!(most.set_committee(vec![accounts.alice], 1), Ok(()));
+            assert!(most.is_in_committee(most.get_current_committee_id(), accounts.alice));
         }
 
         #[ink::test]
         fn remove_guardian_works() {
             let accounts = default_accounts::<DefEnv>();
             set_caller::<DefEnv>(accounts.alice);
-            let mut membrane = Membrane::new(
+            let mut most = Most::new(
                 guardian_accounts(),
                 THRESHOLD,
                 COMMISSION_PER_DIX_MILLE,
@@ -877,9 +877,9 @@ pub mod membrane {
             )
             .expect("Threshold is valid.");
 
-            assert!(membrane.is_in_committee(membrane.get_current_committee_id(), accounts.bob));
-            assert_eq!(membrane.set_committee(vec![accounts.alice], 1), Ok(()));
-            assert!(!membrane.is_in_committee(membrane.get_current_committee_id(), accounts.bob));
+            assert!(most.is_in_committee(most.get_current_committee_id(), accounts.bob));
+            assert_eq!(most.set_committee(vec![accounts.alice], 1), Ok(()));
+            assert!(!most.is_in_committee(most.get_current_committee_id(), accounts.bob));
         }
     }
 }

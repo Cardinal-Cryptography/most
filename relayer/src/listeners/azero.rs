@@ -30,8 +30,8 @@ use crate::{
         redis_helpers::{read_first_unprocessed_block_number, write_last_processed_block},
     },
     contracts::{
-        filter_membrane_events, get_request_event_data, AzeroContractError,
-        CrosschainTransferRequestData, Membrane, MembraneInstance,
+        filter_most_events, get_request_event_data, AzeroContractError,
+        CrosschainTransferRequestData, Most, MostInstance,
     },
     listeners::eth::{get_next_finalized_block_number_eth, ETH_BLOCK_PROD_TIME_SEC},
 };
@@ -110,8 +110,8 @@ impl AlephZeroListener {
         let event_handler_tasks_semaphore =
             Arc::new(Semaphore::new(*azero_max_event_handler_tasks));
 
-        let membrane_instance =
-            MembraneInstance::new(azero_contract_address, azero_contract_metadata)?;
+        let most_instance =
+            MostInstance::new(azero_contract_address, azero_contract_metadata)?;
         let mut first_unprocessed_block_number = read_first_unprocessed_block_number(
             name.clone(),
             ALEPH_LAST_BLOCK_KEY.to_string(),
@@ -156,9 +156,9 @@ impl AlephZeroListener {
                     .events()
                     .await?;
 
-                let filtered_events = filter_membrane_events(
+                let filtered_events = filter_most_events(
                     events,
-                    &membrane_instance,
+                    &most_instance,
                     BlockDetails {
                         block_number,
                         block_hash,
@@ -282,7 +282,7 @@ async fn handle_event(
             info!("hashed event encoding: 0x{}", hex::encode(request_hash));
 
             let address = eth_contract_address.parse::<Address>()?;
-            let contract = Membrane::new(address, eth_connection.clone());
+            let contract = Most::new(address, eth_connection.clone());
 
             // forward transfer & vote
             let call: ContractCall<SignedEthWsConnection, ()> = contract.receive_request(
