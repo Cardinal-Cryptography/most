@@ -10,7 +10,7 @@ function bytes32ToAddress(bytes32) {
   return "0x" + bytes32.slice(26, 66);
 }
 
-function getRandomAlephAccount(number) {
+function getBytes32FromSeed(number) {
   return hre.ethers.solidityPackedKeccak256(["uint"], [number]);
 }
 
@@ -20,6 +20,10 @@ function ethToWei(ethAmount) {
 
 const COMMISSION_PER_DIX_MILLE = 30;
 const MINIMUM_TRANSFER_AMOUNT_USD = 50;
+const TOKEN_AMOUNT = 1000;
+const ALEPH_ACCOUNT = getBytes32FromSeed(3);
+const WRAPPED_TOKEN_ADDRESS = getBytes32FromSeed(5);
+const DIX_MILLE = 10000;
 
 async function deployEightGuardianMostFixture() {
   const signers = await ethers.getSigners();
@@ -71,8 +75,12 @@ module.exports = {
   addressToBytes32,
   bytes32ToAddress,
   ethToWei,
-  getRandomAlephAccount,
+  getBytes32FromSeed,
   deployEightGuardianMostFixture,
   COMMISSION_PER_DIX_MILLE,
   MINIMUM_TRANSFER_AMOUNT_USD,
+  TOKEN_AMOUNT,
+  ALEPH_ACCOUNT,
+  WRAPPED_TOKEN_ADDRESS,
+  DIX_MILLE,
 };

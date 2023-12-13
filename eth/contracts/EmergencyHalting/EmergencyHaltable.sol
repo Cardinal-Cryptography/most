@@ -29,7 +29,7 @@ contract EmergencyHaltable is Initializable, ContextUpgradeable, OwnableUpgradea
         __Ownable_init(initialOwner);
     }
 
-    function emergencyHalt() external {
+    function emergencyHalt() external onlyEmergencyHalter {
         require(
             block.timestamp > lastEmergencyHalt + emergencyHaltFrequency,
             "EmergencyHaltFrequency"
@@ -47,7 +47,7 @@ contract EmergencyHaltable is Initializable, ContextUpgradeable, OwnableUpgradea
         emergencyHaltFrequency = _emergencyHaltFrequency;
     }
 
-    function resetEmergencyTimestamp() external onlyOwner {
+    function resetEmergencyHaltTimestamp() external onlyOwner {
         lastEmergencyHalt = 0;
     }
 }

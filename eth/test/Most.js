@@ -6,12 +6,16 @@ const {
 const { execSync: exec } = require("child_process");
 
 // Import utils
-const { addressToBytes32, getRandomAlephAccount, deployEightGuardianMostFixture, COMMISSION_PER_DIX_MILLE, MINIMUM_TRANSFER_AMOUNT_USD } = require("./TestUtils");
-
-const TOKEN_AMOUNT = 1000;
-const ALEPH_ACCOUNT = getRandomAlephAccount(3);
-const WRAPPED_TOKEN_ADDRESS = getRandomAlephAccount(5);
-const DIX_MILLE = 10000;
+const {
+  addressToBytes32,
+  deployEightGuardianMostFixture,
+  COMMISSION_PER_DIX_MILLE,
+  MINIMUM_TRANSFER_AMOUNT_USD,
+  WRAPPED_TOKEN_ADDRESS,
+  ALEPH_ACCOUNT,
+  DIX_MILLE,
+  TOKEN_AMOUNT,
+} = require("./TestUtils");
 
 describe("Most", function () {
   describe("Constructor", function () {
