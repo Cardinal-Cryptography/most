@@ -6,13 +6,11 @@ const {
 const { execSync: exec } = require("child_process");
 
 // Import utils
-const { addressToBytes32, getRandomAlephAccount } = require("./TestUtils");
+const { addressToBytes32, getRandomAlephAccount, deployEightGuardianMostFixture, COMMISSION_PER_DIX_MILLE, MINIMUM_TRANSFER_AMOUNT_USD } = require("./TestUtils");
 
 const TOKEN_AMOUNT = 1000;
 const ALEPH_ACCOUNT = getRandomAlephAccount(3);
 const WRAPPED_TOKEN_ADDRESS = getRandomAlephAccount(5);
-const COMMISSION_PER_DIX_MILLE = 30;
-const MINIMUM_TRANSFER_AMOUNT_USD = 50;
 const DIX_MILLE = 10000;
 
 describe("Most", function () {
@@ -62,52 +60,6 @@ describe("Most", function () {
       ).to.be.revertedWith("Not enough guardians specified");
     });
   });
-
-  async function deployEightGuardianMostFixture() {
-    const signers = await ethers.getSigners();
-    const accounts = signers.map((s) => s.address);
-
-    const Most = await ethers.getContractFactory("Most");
-    const most = await upgrades.deployProxy(
-      Most,
-      [
-        accounts.slice(1, 9),
-        5,
-        COMMISSION_PER_DIX_MILLE,
-        MINIMUM_TRANSFER_AMOUNT_USD,
-        accounts[0],
-      ],
-      {
-        initializer: "initialize",
-        kind: "uups",
-      },
-    );
-    const mostAddress = await most.getAddress();
-
-    const Token = await ethers.getContractFactory("Token");
-    const token = await Token.deploy(
-      "10000000000000000000000000",
-      "Shittoken",
-      "SHIT",
-    );
-    const tokenAddressBytes32 = addressToBytes32(await token.getAddress());
-
-    const usdt = await Token.deploy(
-      "12000000000000000000000000",
-      "Tether",
-      "USDT",
-    );
-    const usdtAddressBytes32 = addressToBytes32(await usdt.getAddress());
-
-    await most.setUSDT(usdtAddressBytes32);
-    return {
-      most,
-      token,
-      tokenAddressBytes32,
-      usdtAddressBytes32,
-      mostAddress,
-    };
-  }
 
   describe("sendRequest", function () {
     it("Reverts if the USD value of the transfer amount is below the minimum", async () => {
@@ -444,7 +396,7 @@ describe("Most", function () {
         }
         exec(
           'sed -i "17 a     uint256 public test;" ./contracts/MostV2.sol',
-          async (error, stdout, stderr) => {
+          async (error) => {
             if (error !== null) {
               console.log("exec error: " + error);
             }
@@ -475,7 +427,7 @@ describe("Most", function () {
       });
 
       // clean up
-      exec("rm ./contracts/MostV2.sol", (error, stdout, stderr) => {
+      exec("rm ./contracts/MostV2.sol", (error) => {
         if (error !== null) {
           console.log("exec error: " + error);
         }

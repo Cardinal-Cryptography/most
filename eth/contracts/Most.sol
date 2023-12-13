@@ -6,8 +6,9 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "./EmergencyHalting/EmergencyHaltable.sol";
 
-contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
+contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable, EmergencyHaltable {
     uint256 constant DIX_MILLE = 10000;
 
     uint256 public requestNonce;
@@ -15,6 +16,10 @@ contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     uint256 public minimumTransferAmountUsd;
     uint256 public committeeId;
     bytes32 public USDT;
+    address public emergencyHalter;
+    uint256 public lastEmergencyHalt;
+    uint256 public emergencyHaltDuration;
+    uint256 public emergencyHaltFrequency;
 
     struct Request {
         uint256 signatureCount;
@@ -46,8 +51,21 @@ contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     // Emitted when guardian signs a request that has already been processed
     event ProcessedRequestSigned(bytes32 requestHash, address signer);
 
-    modifier _onlyCurrentCommitteeMember() {
+    modifier onlyCurrentCommitteeMember() {
         require(isInCommittee(committeeId, msg.sender), "NotInCommittee");
+        _;
+    }
+
+    modifier onlyEmergencyHalter() {
+        require(msg.sender == emergencyHalter, "NotEmergencyHalter");
+        _;
+    }
+
+    modifier noEmergencyHalt() {
+        require(
+            lastEmergencyHalt + emergencyHaltDuration < block.timestamp,
+            "EmergencyHalt"
+        );
         _;
     }
 
@@ -97,7 +115,7 @@ contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         bytes32 srcTokenAddress,
         uint256 amount,
         bytes32 destReceiverAddress
-    ) external {
+    ) external noEmergencyHalt {
         require(
             queryPrice(amount, srcTokenAddress, USDT) >
                 minimumTransferAmountUsd,
@@ -134,7 +152,7 @@ contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         uint256 amount,
         bytes32 destReceiverAddress,
         uint256 _requestNonce
-    ) external _onlyCurrentCommitteeMember {
+    ) external onlyCurrentCommitteeMember noEmergencyHalt {
         // Don't revert if the request has already been processed as
         // such a call can be made during regular guardian operation.
         if (processedRequests[_requestHash]) {
@@ -317,5 +335,27 @@ contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
 
     function setUSDT(bytes32 _USDT) external onlyOwner {
         USDT = _USDT;
+    }
+
+    function setEmergencyHaltParams(
+        address _emergencyHalter,
+        uint256 _emergencyHaltDuration,
+        uint256 _emergencyHaltFrequency
+    ) external onlyOwner {
+        emergencyHalter = _emergencyHalter;
+        emergencyHaltDuration = _emergencyHaltDuration;
+        emergencyHaltFrequency = _emergencyHaltFrequency;
+    }
+
+    function resetEmergencyTimestamp() external onlyOwner {
+        lastEmergencyHalt = 0;
+    }
+
+    function emergencyHalt() external override onlyEmergencyHalter {
+        require(
+            block.timestamp - lastEmergencyHalt > emergencyHaltFrequency,
+            "Emergency halt was already called recently"
+        );
+        lastEmergencyHalt = block.timestamp;
     }
 }
