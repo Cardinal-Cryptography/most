@@ -124,6 +124,16 @@ mod e2e {
         .expect("balance_of should succeed");
 
         let amount_to_send = 1000;
+
+        _ = psp22_approve(
+            &mut client,
+            &alice(),
+            token_address,
+            most_address,
+            amount_to_send,
+        )
+        .await;
+
         most_send_request(
             &mut client,
             &alice(),
@@ -197,6 +207,15 @@ mod e2e {
         let base_fee = most_base_fee(&mut client, most_address)
             .await
             .expect("should return base fee");
+
+        _ = psp22_approve(
+            &mut client,
+            &alice(),
+            token_address,
+            most_address,
+            amount_to_send,
+        )
+        .await;
 
         let send_request_res = most_send_request(
             &mut client,
@@ -950,6 +969,23 @@ mod e2e {
             .call_dry_run(&alice(), &call, 0, None)
             .await
             .return_value())
+    }
+
+    async fn psp22_approve(
+        client: &mut E2EClient,
+        caller: &Keypair,
+        token: AccountId,
+        spender: AccountId,
+        amount: u128,
+    ) -> CallResult<(), PSP22Error> {
+        call_message::<TokenRef, _, _, _, _>(
+            client,
+            caller,
+            token,
+            |token| token.approve(spender, amount),
+            None,
+        )
+        .await
     }
 
     async fn most_committee_rewards(
