@@ -135,7 +135,96 @@ describe("EmergencyHalt", function () {
     });
   });
 
-  describe("Owner calls on EmergencyHalter contract", async () => {});
+  describe("EmergencyHalter contract", async () => {
+    async function deployEmergencyHalterFixture() {
+      const { most, mostAddress } = await deployEightGuardianMostFixture();
+      const EmergencyHalter = await ethers.getContractFactory("EmergencyHalter");
+      const accounts = await ethers.getSigners();
+
+      const emergencyHalter = await EmergencyHalter.deploy([accounts[13], accounts[14]], mostAddress);
+      const emergencyHalterAddress = await emergencyHalter.getAddress();
+      await most.setEmergencyHaltParams(emergencyHalterAddress, 100, 1000);
+
+      return {
+        most,
+        emergencyHalter,
+      };
+    }
+
+    it("Halter can halt", async () => {
+      const { emergencyHalter } = await loadFixture(
+        deployEmergencyHalterFixture,
+      );
+      const accounts = await ethers.getSigners();
+
+      await expect(
+        emergencyHalter.connect(accounts[13]).halt(),
+      ).not.to.be.reverted;
+    });
+
+    it("Halter cannot halt if not in the list", async () => {
+      const { emergencyHalter } = await loadFixture(
+        deployEmergencyHalterFixture,
+      );
+      const accounts = await ethers.getSigners();
+
+      await expect(
+        emergencyHalter.connect(accounts[1]).halt(),
+      ).to.be.reverted;
+    });
+
+    it("Owner can add halter", async () => {
+      const { emergencyHalter } = await loadFixture(
+        deployEmergencyHalterFixture,
+      );
+      const accounts = await ethers.getSigners();
+
+      await expect(
+        emergencyHalter.addHalter(accounts[1].address),
+      ).not.to.be.reverted;
+
+      await expect(
+        emergencyHalter.connect(accounts[1]).halt(),
+      ).not.to.be.reverted;
+    });
+
+    it("Owner can remove halter", async () => {
+      const { emergencyHalter } = await loadFixture(
+        deployEmergencyHalterFixture,
+      );
+      const accounts = await ethers.getSigners();
+
+      await expect(
+        emergencyHalter.removeHalter(accounts[13].address),
+      ).not.to.be.reverted;
+
+      await expect(
+        emergencyHalter.connect(accounts[13]).halt(),
+      ).to.be.reverted;
+    });
+
+    it("Integrates with Most contract", async () => {
+      const { most, emergencyHalter } = await loadFixture(
+        deployEmergencyHalterFixture,
+      );
+      const accounts = await ethers.getSigners();
+
+      await expect(
+        emergencyHalter.connect(accounts[13]).halt(),
+      ).not.to.be.reverted;
+
+      await expect(
+        most.sendRequest(WRAPPED_TOKEN_ADDRESS, TOKEN_AMOUNT, ALEPH_ACCOUNT),
+      ).to.be.revertedWith("EmergencyHalt");
+
+      // wait for the halting period to elapse
+      await ethers.provider.send("evm_increaseTime", [101]);
+
+      await expect(
+        most.sendRequest(WRAPPED_TOKEN_ADDRESS, TOKEN_AMOUNT, ALEPH_ACCOUNT),
+      ).to.be.revertedWith("Unsupported pair");
+    });
+  });
 
   describe("Owner calls on Most contract", async () => {
     it("EmergencyHalt params can be set", async () => {
@@ -180,6 +269,4 @@ describe("EmergencyHalt", function () {
       expect(await most.lastEmergencyHalt()).to.equal(0);
     });
   });
-
-  describe("EmergencyHalter -> Most integration", async () => {});
 });
