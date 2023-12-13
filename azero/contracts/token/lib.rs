@@ -350,7 +350,7 @@ pub mod token {
             let alice_balance_before = token.balance_of(alice);
 
             set_caller::<E>(charlie);
-            assert!(token.burn(alice, 100).is_ok());
+            assert!(token.burn_from(alice, 100).is_ok());
             assert_eq!(token.balance_of(alice), alice_balance_before - 100);
         }
 
@@ -362,7 +362,7 @@ pub mod token {
 
             set_caller::<E>(bob);
             assert_eq!(
-                token.burn(alice, 100),
+                token.burn_from(alice, 100),
                 Err(PSP22Error::Custom(String::from(
                     "Caller has to be the minter/burner."
                 )))
