@@ -708,7 +708,7 @@ pub mod most {
             amount: u128,
         ) -> Result<(), PSP22Error> {
             let mut psp22: ink::contract_ref!(Burnable) = token.into();
-            psp22.burn(from, amount)
+            psp22.burn_from(from, amount)
         }
     }
 

@@ -232,9 +232,21 @@ pub mod token {
 
     impl Burnable for Token {
         #[ink(message)]
-        fn burn(&mut self, from: AccountId, value: u128) -> Result<(), PSP22Error> {
+        fn burn(&mut self, value: u128) -> Result<(), PSP22Error> {
+            let events = self.data.burn(self.env().caller(), value)?;
+            self.emit_events(events);
+            Ok(())
+        }
+
+        #[ink(message)]
+        fn burn_from(&mut self, from: AccountId, value: u128) -> Result<(), PSP22Error> {
             self.ensure_minter_burner()?;
+            let caller = self.env().caller();
+            if self.data.allowance(from, caller) < value {
+                return Err(PSP22Error::InsufficientAllowance);
+            }
             let events = self.data.burn(from, value)?;
+            self.data.decrease_allowance(from, caller, value)?;
             self.emit_events(events);
             Ok(())
         }
