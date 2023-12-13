@@ -6,7 +6,8 @@ pub use self::token::TokenRef;
 pub mod token {
     use ink::prelude::{string::String, vec::Vec};
     use psp22::{
-        PSP22Burnable, PSP22Data, PSP22Error, PSP22Event, PSP22Metadata, PSP22Mintable, PSP22,
+        HasPSP22Data, PSP22Burnable, PSP22Data, PSP22Error, PSP22Event, PSP22Hooks, PSP22Metadata,
+        PSP22Mintable, PSP22,
     };
 
     #[ink(event)]
@@ -39,7 +40,15 @@ pub mod token {
         decimals: u8,
     }
 
-    // impl PSP22Data {}
+    impl HasPSP22Data for Token {
+        fn data(&self) -> &PSP22Data {
+            &self.data
+        }
+
+        fn data_mut(&mut self) -> &mut PSP22Data {
+            &mut self.data
+        }
+    }
 
     impl Token {
         #[ink(constructor)]
@@ -192,7 +201,16 @@ pub mod token {
 
         #[ink(message)]
         fn burn_from(&mut self, from: AccountId, value: u128) -> Result<(), PSP22Error> {
+            let caller = self.env().caller();
+
+            // before
+            self.before_burn(caller, from, value)?;
+
             let events = self.data.burn(from, value)?;
+
+            // after
+            self.after_burn(caller, from, value)?;
+
             self.emit_events(events);
             Ok(())
         }
