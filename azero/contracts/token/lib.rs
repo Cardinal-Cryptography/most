@@ -345,9 +345,11 @@ pub mod token {
         fn minter_burner_can_burn() {
             let mut token = init_contract(INIT_SUPPLY_TEST);
             let alice = default_accounts::<E>().alice;
-            let bob = default_accounts::<E>().bob;
             let charlie = default_accounts::<E>().charlie;
             let alice_balance_before = token.balance_of(alice);
+
+            set_caller::<E>(alice);
+            assert!(token.approve(charlie, 100).is_ok());
 
             set_caller::<E>(charlie);
             assert!(token.burn_from(alice, 100).is_ok());
