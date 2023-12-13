@@ -16,10 +16,6 @@ contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable, EmergencyHa
     uint256 public minimumTransferAmountUsd;
     uint256 public committeeId;
     bytes32 public USDT;
-    address public emergencyHalter;
-    uint256 public lastEmergencyHalt;
-    uint256 public emergencyHaltDuration;
-    uint256 public emergencyHaltFrequency;
 
     struct Request {
         uint256 signatureCount;
@@ -56,19 +52,6 @@ contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable, EmergencyHa
         _;
     }
 
-    modifier onlyEmergencyHalter() {
-        require(msg.sender == emergencyHalter, "NotEmergencyHalter");
-        _;
-    }
-
-    modifier noEmergencyHalt() {
-        require(
-            lastEmergencyHalt + emergencyHaltDuration < block.timestamp,
-            "EmergencyHalt"
-        );
-        _;
-    }
-
     function initialize(
         address[] calldata _committee,
         uint256 _signatureThreshold,
@@ -99,6 +82,7 @@ contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable, EmergencyHa
         signatureThreshold[committeeId] = _signatureThreshold;
 
         // inititialize the OwnableUpgradeable
+        __EmergencyHaltable_init(owner);
         __Ownable_init(owner);
     }
 
@@ -335,27 +319,5 @@ contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable, EmergencyHa
 
     function setUSDT(bytes32 _USDT) external onlyOwner {
         USDT = _USDT;
-    }
-
-    function setEmergencyHaltParams(
-        address _emergencyHalter,
-        uint256 _emergencyHaltDuration,
-        uint256 _emergencyHaltFrequency
-    ) external onlyOwner {
-        emergencyHalter = _emergencyHalter;
-        emergencyHaltDuration = _emergencyHaltDuration;
-        emergencyHaltFrequency = _emergencyHaltFrequency;
-    }
-
-    function resetEmergencyTimestamp() external onlyOwner {
-        lastEmergencyHalt = 0;
-    }
-
-    function emergencyHalt() external override onlyEmergencyHalter {
-        require(
-            block.timestamp - lastEmergencyHalt > emergencyHaltFrequency,
-            "Emergency halt was already called recently"
-        );
-        lastEmergencyHalt = block.timestamp;
     }
 }
