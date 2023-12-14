@@ -109,7 +109,7 @@ pub mod most {
         /// accounting helper
         committee_sizes: Mapping<CommitteeId, u128, ManualKey<0x53495A45>>,
         /// number of signatures required to reach a quorum and costsxecute a transfer
-        signature_thresholds: Mapping<CommitteeId, u128, ManualKey<0x5448524553>>,
+        signature_thresholds: Mapping<CommitteeId, u128, ManualKey<0x54485245>>,
         /// source - destination token pairs that can be transferred across the bridge
         supported_pairs: Mapping<[u8; 32], [u8; 32], ManualKey<0x53555050>>,
         /// rewards collected by the commitee for relaying cross-chain transfer requests
