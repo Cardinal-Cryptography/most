@@ -17,5 +17,8 @@ pub trait Mintable {
 #[ink::trait_definition]
 pub trait Burnable {
     #[ink(message)]
-    fn burn(&mut self, from: AccountId, amount: Balance) -> Result<(), PSP22Error>;
+    fn burn(&mut self, amount: Balance) -> Result<(), PSP22Error>;
+
+    #[ink(message)]
+    fn burn_from(&mut self, from: AccountId, amount: Balance) -> Result<(), PSP22Error>;
 }
