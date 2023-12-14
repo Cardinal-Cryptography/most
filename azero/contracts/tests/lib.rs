@@ -125,14 +125,15 @@ mod e2e {
 
         let amount_to_send = 1000;
 
-        _ = psp22_approve(
+        psp22_approve(
             &mut client,
             &alice(),
             token_address,
             most_address,
             amount_to_send,
         )
-        .await;
+        .await
+        .expect("approval should succeed");
 
         most_send_request(
             &mut client,
@@ -208,14 +209,15 @@ mod e2e {
             .await
             .expect("should return base fee");
 
-        _ = psp22_approve(
+        psp22_approve(
             &mut client,
             &alice(),
             token_address,
             most_address,
             amount_to_send,
         )
-        .await;
+        .await
+        .expect("approval should succeed");
 
         let send_request_res = most_send_request(
             &mut client,
