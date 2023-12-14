@@ -138,10 +138,14 @@ describe("EmergencyHalt", function () {
   describe("EmergencyHalter contract", async () => {
     async function deployEmergencyHalterFixture() {
       const { most, mostAddress } = await deployEightGuardianMostFixture();
-      const EmergencyHalter = await ethers.getContractFactory("EmergencyHalter");
+      const EmergencyHalter =
+        await ethers.getContractFactory("EmergencyHalter");
       const accounts = await ethers.getSigners();
 
-      const emergencyHalter = await EmergencyHalter.deploy([accounts[13], accounts[14]], mostAddress);
+      const emergencyHalter = await EmergencyHalter.deploy(
+        [accounts[13], accounts[14]],
+        mostAddress,
+      );
       const emergencyHalterAddress = await emergencyHalter.getAddress();
       await most.setEmergencyHaltParams(emergencyHalterAddress, 100, 1000);
 
@@ -157,9 +161,8 @@ describe("EmergencyHalt", function () {
       );
       const accounts = await ethers.getSigners();
 
-      await expect(
-        emergencyHalter.connect(accounts[13]).halt(),
-      ).not.to.be.reverted;
+      await expect(emergencyHalter.connect(accounts[13]).halt()).not.to.be
+        .reverted;
     });
 
     it("Halter cannot halt if not in the list", async () => {
@@ -168,9 +171,7 @@ describe("EmergencyHalt", function () {
       );
       const accounts = await ethers.getSigners();
 
-      await expect(
-        emergencyHalter.connect(accounts[1]).halt(),
-      ).to.be.reverted;
+      await expect(emergencyHalter.connect(accounts[1]).halt()).to.be.reverted;
     });
 
     it("Owner can add halter", async () => {
@@ -179,13 +180,11 @@ describe("EmergencyHalt", function () {
       );
       const accounts = await ethers.getSigners();
 
-      await expect(
-        emergencyHalter.addHalter(accounts[1].address),
-      ).not.to.be.reverted;
+      await expect(emergencyHalter.addHalter(accounts[1].address)).not.to.be
+        .reverted;
 
-      await expect(
-        emergencyHalter.connect(accounts[1]).halt(),
-      ).not.to.be.reverted;
+      await expect(emergencyHalter.connect(accounts[1]).halt()).not.to.be
+        .reverted;
     });
 
     it("Owner can remove halter", async () => {
@@ -194,13 +193,10 @@ describe("EmergencyHalt", function () {
       );
       const accounts = await ethers.getSigners();
 
-      await expect(
-        emergencyHalter.removeHalter(accounts[13].address),
-      ).not.to.be.reverted;
+      await expect(emergencyHalter.removeHalter(accounts[13].address)).not.to.be
+        .reverted;
 
-      await expect(
-        emergencyHalter.connect(accounts[13]).halt(),
-      ).to.be.reverted;
+      await expect(emergencyHalter.connect(accounts[13]).halt()).to.be.reverted;
     });
 
     it("Integrates with Most contract", async () => {
@@ -209,9 +205,8 @@ describe("EmergencyHalt", function () {
       );
       const accounts = await ethers.getSigners();
 
-      await expect(
-        emergencyHalter.connect(accounts[13]).halt(),
-      ).not.to.be.reverted;
+      await expect(emergencyHalter.connect(accounts[13]).halt()).not.to.be
+        .reverted;
 
       await expect(
         most.sendRequest(WRAPPED_TOKEN_ADDRESS, TOKEN_AMOUNT, ALEPH_ACCOUNT),
