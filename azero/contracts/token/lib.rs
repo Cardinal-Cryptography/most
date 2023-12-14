@@ -232,9 +232,21 @@ pub mod token {
 
     impl Burnable for Token {
         #[ink(message)]
-        fn burn(&mut self, from: AccountId, value: u128) -> Result<(), PSP22Error> {
+        fn burn(&mut self, value: u128) -> Result<(), PSP22Error> {
+            let events = self.data.burn(self.env().caller(), value)?;
+            self.emit_events(events);
+            Ok(())
+        }
+
+        #[ink(message)]
+        fn burn_from(&mut self, from: AccountId, value: u128) -> Result<(), PSP22Error> {
             self.ensure_minter_burner()?;
+            let caller = self.env().caller();
+            if self.data.allowance(from, caller) < value {
+                return Err(PSP22Error::InsufficientAllowance);
+            }
             let events = self.data.burn(from, value)?;
+            self.data.decrease_allowance(from, caller, value)?;
             self.emit_events(events);
             Ok(())
         }
@@ -333,12 +345,14 @@ pub mod token {
         fn minter_burner_can_burn() {
             let mut token = init_contract(INIT_SUPPLY_TEST);
             let alice = default_accounts::<E>().alice;
-            let bob = default_accounts::<E>().bob;
             let charlie = default_accounts::<E>().charlie;
             let alice_balance_before = token.balance_of(alice);
 
+            set_caller::<E>(alice);
+            assert!(token.approve(charlie, 100).is_ok());
+
             set_caller::<E>(charlie);
-            assert!(token.burn(alice, 100).is_ok());
+            assert!(token.burn_from(alice, 100).is_ok());
             assert_eq!(token.balance_of(alice), alice_balance_before - 100);
         }
 
@@ -350,7 +364,7 @@ pub mod token {
 
             set_caller::<E>(bob);
             assert_eq!(
-                token.burn(alice, 100),
+                token.burn_from(alice, 100),
                 Err(PSP22Error::Custom(String::from(
                     "Caller has to be the minter/burner."
                 )))
