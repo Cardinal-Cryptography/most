@@ -739,10 +739,6 @@ pub mod most {
         fn data(&self) -> Result<Data, MostError> {
             self.data.get().ok_or(MostError::CorruptedStorage)
         }
-
-        // fn data_mut(&self) -> Result<Data, MostError> {
-        //     self.data.get().ok_or(MostError::CorruptedStorage)
-        // }
     }
 
     #[cfg(test)]
@@ -844,9 +840,9 @@ pub mod most {
             .expect("Threshold is valid.");
 
             for account in guardian_accounts() {
-                assert!(most.is_in_committee(most.get_current_committee_id(), account));
+                assert!(most.is_in_committee(most.get_current_committee_id().unwrap(), account));
             }
-            assert!(!most.is_in_committee(most.get_current_committee_id(), accounts.alice));
+            assert!(!most.is_in_committee(most.get_current_committee_id().unwrap(), accounts.alice));
         }
 
         #[ink::test]
@@ -885,9 +881,9 @@ pub mod most {
             )
             .expect("Threshold is valid.");
 
-            assert!(!most.is_in_committee(most.get_current_committee_id(), accounts.alice));
+            assert!(!most.is_in_committee(most.get_current_committee_id().unwrap(), accounts.alice));
             assert_eq!(most.set_committee(vec![accounts.alice], 1), Ok(()));
-            assert!(most.is_in_committee(most.get_current_committee_id(), accounts.alice));
+            assert!(most.is_in_committee(most.get_current_committee_id().unwrap(), accounts.alice));
         }
 
         #[ink::test]
@@ -904,9 +900,9 @@ pub mod most {
             )
             .expect("Threshold is valid.");
 
-            assert!(most.is_in_committee(most.get_current_committee_id(), accounts.bob));
+            assert!(most.is_in_committee(most.get_current_committee_id().unwrap(), accounts.bob));
             assert_eq!(most.set_committee(vec![accounts.alice], 1), Ok(()));
-            assert!(!most.is_in_committee(most.get_current_committee_id(), accounts.bob));
+            assert!(!most.is_in_committee(most.get_current_committee_id().unwrap(), accounts.bob));
         }
     }
 }
