@@ -58,11 +58,12 @@ fn main() -> Result<()> {
             .expect("Cannot connect to the redis cluster instance");
         let redis_connection = Arc::new(Mutex::new(client.get_async_connection().await.unwrap()));
 
-        let keypair = aleph_client::keypair_from_string(&config.azero_sudo_seed);
+        let azero_seed = "//".to_owned() + &config.dev_account_index.to_string();
+        let azero_keypair = aleph_client::keypair_from_string(&azero_seed);
 
         let azero_connection = Arc::new(azero::sign(
             &azero::init(&config.azero_node_wss_url).await,
-            &keypair,
+            &azero_keypair,
         ));
 
         let wallet = if !config.eth_keystore_path.is_empty() {
@@ -72,7 +73,7 @@ fn main() -> Result<()> {
             // If no keystore path is provided, we use the default development mnemonic
             MnemonicBuilder::<English>::default()
                 .phrase(DEV_MNEMONIC)
-                .index(config.eth_dev_account_index)
+                .index(config.dev_account_index)
                 .expect("Provided index is an integer between 0 and 9")
                 .build()
                 .expect("Mnemonic is correct")
@@ -96,6 +97,8 @@ fn main() -> Result<()> {
         let eth_connection_rc1 = Arc::clone(&eth_connection);
         let redis_connection_rc1 = Arc::clone(&redis_connection);
 
+        log::info!("Starting Ethereum listener");
+
         tasks.push(tokio::spawn(async {
             EthListener::run(
                 config_rc1,
@@ -111,6 +114,8 @@ fn main() -> Result<()> {
         let azero_connection_rc2 = Arc::clone(&azero_connection);
         let eth_connection_rc2 = Arc::clone(&eth_connection);
         let redis_connection_rc2 = Arc::clone(&redis_connection);
+
+        log::info!("Starting AlephZero listener");
 
         tasks.push(tokio::spawn(async {
             AlephZeroListener::run(

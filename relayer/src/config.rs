@@ -12,9 +12,6 @@ pub struct Config {
     #[arg(long, default_value = "ws://127.0.0.1:9944")]
     pub azero_node_wss_url: String,
 
-    #[arg(long, default_value = "//Alice")]
-    pub azero_sudo_seed: String,
-
     #[arg(long, default_value = "1000")]
     pub azero_max_event_handler_tasks: usize,
 
@@ -25,7 +22,7 @@ pub struct Config {
     pub eth_keystore_password: String,
 
     #[arg(long, default_value = "0")]
-    pub eth_dev_account_index: u32,
+    pub dev_account_index: u32,
 
     #[arg(long, default_value = "")]
     pub eth_keystore_path: String,
