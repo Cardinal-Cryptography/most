@@ -3,7 +3,7 @@ use std::{env, process, sync::Arc};
 use clap::Parser;
 use config::Config;
 use connections::EthConnectionError;
-use ethers::signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, WalletError};
+use ethers::signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, Signer, WalletError};
 use eyre::Result;
 use log::{error, info};
 use redis::Client as RedisClient;
@@ -72,9 +72,13 @@ fn main() -> Result<()> {
             // If no keystore path is provided, we use the default development mnemonic
             MnemonicBuilder::<English>::default()
                 .phrase(DEV_MNEMONIC)
+                .index(config.eth_dev_account_index)
+                .expect("Provided index is an integer between 0 and 9")
                 .build()
                 .expect("Mnemonic is correct")
         };
+
+        log::info!("Wallet address: {}", wallet.address());
 
         let eth_connection = Arc::new(
             eth::sign(

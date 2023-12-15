@@ -24,6 +24,9 @@ pub struct Config {
     #[arg(long, default_value = "")]
     pub eth_keystore_password: String,
 
+    #[arg(long, default_value = "0")]
+    pub eth_dev_account_index: u32,
+
     #[arg(long, default_value = "")]
     pub eth_keystore_path: String,
 
