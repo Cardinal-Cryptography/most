@@ -140,6 +140,7 @@ pub mod most {
         Arithmetic,
         NoRewards,
         NoMoreRewards,
+        CorruptedStorage,
     }
 
     impl From<InkEnvError> for MostError {
@@ -223,7 +224,7 @@ pub mod most {
             amount: u128,
             dest_receiver_address: [u8; 32],
         ) -> Result<(), MostError> {
-            let mut data = self.data.get().unwrap();
+            let mut data = self.data()?;
             if self
                 .query_price(amount, src_token_address, USDT_TOKEN_ID)?
                 .lt(&data.minimum_transfer_amount_usd)
@@ -312,7 +313,7 @@ pub mod most {
             let caller = self.env().caller();
             self.only_current_committee_member(caller)?;
 
-            let data = self.data.get().unwrap();
+            let data = self.data()?;
 
             // Don't revert if the request has already been processed as
             // such a call can be made during regular guardian operation.
@@ -473,38 +474,38 @@ pub mod most {
         ///
         /// Nonce is incremented with every request
         #[ink(message)]
-        pub fn get_request_nonce(&self) -> u128 {
-            self.data.get().unwrap().request_nonce
+        pub fn get_request_nonce(&self) -> Result<u128, MostError> {
+            Ok(self.data()?.request_nonce)
         }
 
         /// Query comission
         ///
         /// The value returned is a commission per 10000 (dix mille)
         #[ink(message)]
-        pub fn get_commission_per_dix_mille(&self) -> u128 {
-            self.data.get().unwrap().commission_per_dix_mille
+        pub fn get_commission_per_dix_mille(&self) -> Result<u128, MostError> {
+            Ok(self.data()?.commission_per_dix_mille)
         }
 
         /// Query pocket money
         ///
         /// An amount of the native token that is tranferred with every request
         #[ink(message)]
-        pub fn get_pocket_money(&self) -> Balance {
-            self.data.get().unwrap().pocket_money
+        pub fn get_pocket_money(&self) -> Result<Balance, MostError> {
+            Ok(self.data()?.pocket_money)
         }
 
         /// Query minimal value that can be transferred across the bridge
         ///
         /// The value is denominated in USDT
         #[ink(message)]
-        pub fn get_minimum_transfer_amount_usd(&self) -> u128 {
-            self.data.get().unwrap().minimum_transfer_amount_usd
+        pub fn get_minimum_transfer_amount_usd(&self) -> Result<u128, MostError> {
+            Ok(self.data()?.minimum_transfer_amount_usd)
         }
 
         /// Returns current active committee id
         #[ink(message)]
-        pub fn get_current_committee_id(&self) -> u128 {
-            self.data.get().unwrap().committee_id
+        pub fn get_current_committee_id(&self) -> Result<u128, MostError> {
+            Ok(self.data()?.committee_id)
         }
 
         /// Returns current address of the USDT contract
@@ -588,7 +589,7 @@ pub mod most {
             // TODO: implement
             // return a current gas price in WEI
             let do_query_gas_fee = || 39106342561;
-            let data = self.data.get().unwrap();
+            let data = self.data()?;
 
             let amount = data
                 .relay_gas_usage
@@ -607,7 +608,7 @@ pub mod most {
         /// Returns an error (reverts) if account is not in the currently active committee
         #[ink(message)]
         pub fn only_current_committee_member(&self, account: AccountId) -> Result<(), MostError> {
-            match self.is_in_committee(self.data.get().unwrap().committee_id, account) {
+            match self.is_in_committee(self.data()?.committee_id, account) {
                 true => Ok(()),
                 false => Err(MostError::NotInCommittee),
             }
@@ -647,7 +648,7 @@ pub mod most {
         ) -> Result<(), MostError> {
             self.ensure_owner()?;
 
-            let mut data = self.data.get().unwrap();
+            let mut data = self.data()?;
 
             if signature_threshold == 0 || committee.len().lt(&(signature_threshold as usize)) {
                 return Err(MostError::InvalidThreshold);
@@ -676,7 +677,7 @@ pub mod most {
         #[ink(message)]
         pub fn set_owner(&mut self, new_owner: AccountId) -> Result<(), MostError> {
             self.ensure_owner()?;
-            let mut data = self.data.get().unwrap();
+            let mut data = self.data()?;
             data.owner = new_owner;
             self.data.set(&data);
             Ok(())
@@ -707,7 +708,7 @@ pub mod most {
 
         fn ensure_owner(&mut self) -> Result<(), MostError> {
             let caller = self.env().caller();
-            let data = self.data.get().unwrap();
+            let data = self.data()?;
             match caller.eq(&data.owner) {
                 true => Ok(()),
                 false => Err(MostError::NotOwner(caller)),
@@ -734,6 +735,14 @@ pub mod most {
             let mut psp22: ink::contract_ref!(Burnable) = token.into();
             psp22.burn_from(from, amount)
         }
+
+        fn data(&self) -> Result<Data, MostError> {
+            self.data.get().ok_or(MostError::CorruptedStorage)
+        }
+
+        // fn data_mut(&self) -> Result<Data, MostError> {
+        //     self.data.get().ok_or(MostError::CorruptedStorage)
+        // }
     }
 
     #[cfg(test)]
