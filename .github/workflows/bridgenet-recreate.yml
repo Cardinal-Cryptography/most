@@ -12,12 +12,6 @@ on:
           - testnet
           - mainnet
         default: testnet
-  workflow_call:
-    inputs:
-      start:
-        description: 'mainnet or testnet'
-        required: true
-        type: string
 
 jobs:
   check-vars-and-secrets:
@@ -42,7 +36,7 @@ jobs:
     needs: [check-inputs]
     name: Delete existing bridgenet
     # yamllint disable-line rule:line-length
-    uses: Cardinal-Cryptography/github-actions/.github/workflows/_featurenet-delete.yml@v5
+    uses: Cardinal-Cryptography/github-actions/.github/workflows/_featurenet-delete.yml@v6
     secrets: inherit
     with:
       featurenet-name: updnet-bridgenet
@@ -58,16 +52,33 @@ jobs:
           echo "Waiting for 3 minutes until featurenet-watchman removes PVC's..."
           sleep 180
 
-  create-bridgenet:
+  get-full-docker-image-path-testnet:
+    name: Get full aleph-node full docker path path for testnet
     needs: [wait-for-deletion]
+    runs-on: ubuntu-20.04
+    outputs:
+      fqdn-image: ${{ steps.get-aleph-node-fqdn-image.outputs.fqdn-image }}
+      ref: ${{ steps.get-aleph-node-fqdn-image.outputs.ref }}
+      image-exists: ${{ steps.get-aleph-node-fqdn-image.outputs.image-exists }}
+    steps:
+      - name: Get aleph-node fqdn path
+        id: get-aleph-node-fqdn-image
+        uses: Cardinal-Cryptography/github-actions/get-aleph-node-fqdn-image@v6
+        with:
+          ref: 'testnet'
+          test-binary: 'false'
+          ecr-dev-node-repo: ${{ vars.ECR_DEV_ALEPH_NODE_REPO }}
+          ecr-prod-node-repo: ${{ vars.ECR_ALEPH_NODE_REPO }}
+
+  create-bridgenet:
+    needs: [get-full-docker-image-path-testnet]
     name: Create new bridgenet
     # yamllint disable-line rule:line-length
-    uses: Cardinal-Cryptography/github-actions/.github/workflows/_featurenet-create.yml@v5
+    uses: Cardinal-Cryptography/github-actions/.github/workflows/_featurenet-create.yml@v6
     secrets: inherit
     with:
       featurenet-name: bridgenet
-      aleph-node-image: 'testnet'
+      aleph-node-image: ${{ needs.get-full-docker-image-path-testnet.outputs.fqdn-image }}
       expiration: 'never'
-      replicas: '5'
       internal: true
       delete-first: false

@@ -540,7 +540,9 @@ mod e2e {
     fn committee_rewards(mut client: ink_e2e::Client<C, E>) {
         let (most_address, token_address) = setup_default_most_and_token(&mut client, false).await;
 
-        let commission = most_commission_per_dix_mille(&mut client, most_address).await;
+        let commission = most_commission_per_dix_mille(&mut client, most_address)
+            .await
+            .expect("commission value");
 
         assert_eq!(commission, DEFAULT_COMMISSION_PER_DIX_MILLE);
 
@@ -1012,16 +1014,16 @@ mod e2e {
         let call =
             build_message::<MostRef>(most_address).call(|most| most.get_current_committee_id());
 
-        Ok(client
+        client
             .call_dry_run(&alice(), &call, 0, None)
             .await
-            .return_value())
+            .return_value()
     }
 
     async fn most_commission_per_dix_mille(
         client: &mut E2EClient,
         most_address: AccountId,
-    ) -> u128 {
+    ) -> Result<u128, MostError> {
         let call =
             build_message::<MostRef>(most_address).call(|most| most.get_commission_per_dix_mille());
 
