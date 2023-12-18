@@ -20,9 +20,14 @@ clean-eth: # Remove eth node data
 clean-eth:
 	cd devnet-eth && ./clean.sh && echo "Done eth clean"
 
+.PHONY: clean-redis
+clean-redis: # Remove redis data
+clean-redis:
+	docker-compose -f ./relayer/scripts/redis-compose.yml down -v && echo "Done redis clean"
+
 .PHONY: clean
 clean: # Remove all node data
-clean: clean-azero clean-eth
+clean: clean-azero clean-eth clean-redis
 
 .PHONY: bootstrap-azero
 bootstrap-azero: # Bootstrap the node data
