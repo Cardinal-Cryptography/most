@@ -2,7 +2,6 @@ name: Devnet eth nodes - Re-create
 
 on:
   workflow_dispatch:
-  workflow_call:
 
 concurrency:
   group: "${{ github.ref }}-${{ github.workflow }}"
@@ -33,7 +32,7 @@ jobs:
       - name: Scale replicas to 0 and remove PVC's
         shell: bash
         env:
-          K8S_NAMESPACE: membrane-bridge
+          K8S_NAMESPACE: bridge
         run: |
           aws eks --region eu-central-1 update-kubeconfig --name alephzero-devnet-eu-central-1-eks
 
@@ -44,7 +43,7 @@ jobs:
       - name: Scale replicas back to 1
         shell: bash
         env:
-          K8S_NAMESPACE: membrane-bridge
+          K8S_NAMESPACE: bridge
         run: |
           kubectl scale --replicas=1 statefulset/eth -n ${{ env.K8S_NAMESPACE }}
           sleep 10
