@@ -4,8 +4,8 @@ name: Bridgenet - Update
 on:
   workflow_dispatch:
     inputs:
-      aleph-node-image:
-        description: Git ref from main branch
+      ref:
+        description: 'git ref: full commit hash, branch, tag'
         required: true
         type: string
 
@@ -22,13 +22,13 @@ jobs:
       - name: Validate inputs
         shell: bash
         run: |
-          if [[ ! '${{ inputs.aleph-node-image }}' =~ ^[a-z0-9][a-z0-9\._\-]{1,48}$ ]]; then
+          if [[ ! '${{ inputs.ref }}' =~ ^[a-z0-9][a-z0-9\._\-]{1,48}$ ]]; then
             echo "!!! Invalid aleph-node image"
             exit 1
           fi
 
   get-full-docker-image-path-from-ref:
-    name: Get full aleph-node full docker path path for mainnet
+    name: Get full aleph-node full docker path path for ref
     needs: [check-inputs]
     runs-on: ubuntu-20.04
     outputs:
@@ -40,7 +40,7 @@ jobs:
         id: get-aleph-node-fqdn-image
         uses: Cardinal-Cryptography/github-actions/get-aleph-node-fqdn-image@v6
         with:
-          ref: ${{ inputs.aleph-node-image }}
+          ref: ${{ inputs.ref }}
           test-binary: 'false'
           ecr-dev-node-repo: ${{ vars.ECR_DEV_ALEPH_NODE_REPO }}
           ecr-prod-node-repo: ${{ vars.ECR_ALEPH_NODE_REPO }}
@@ -53,7 +53,7 @@ jobs:
     steps:
       - name: Exit 1
         run: |
-          echo "Aleph-node image '${{ inputs.aleph-node-image }}' does not exist"
+          echo "Aleph-node image '${{ needs.get-full-docker-image-path-main-branch.outputs.fqdn-image }}' does not exist"
           exit 1
 
   update-bridgenet:
@@ -68,5 +68,4 @@ jobs:
       aleph-node-image: ${{ needs.get-full-docker-image-path-main-branch.outputs.fqdn-image }}
       rolling-update-partition: '0'
       expiration: 'never'
-      validators: '5'
       internal: true

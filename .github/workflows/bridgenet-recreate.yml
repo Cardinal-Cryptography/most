@@ -80,6 +80,5 @@ jobs:
       featurenet-name: bridgenet
       aleph-node-image: ${{ needs.get-full-docker-image-path-testnet.outputs.fqdn-image }}
       expiration: 'never'
-      validators: '5'
       internal: true
       delete-first: false
