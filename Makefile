@@ -18,11 +18,12 @@ clean-azero:
 .PHONY: clean-eth
 clean-eth: # Remove eth node data
 clean-eth:
-	cd devnet-eth && ./clean.sh && echo "Done eth clean"
+	cd devnet-eth && ./clean.sh && echo "Done devnet-eth clean"
+	cd eth && rm -rf .openzeppelin && echo "Done eth clean"
 
 .PHONY: clean
 clean: # Remove all node data
-clean: clean-azero clean-eth
+clean: stop-local-bridgenet clean-azero clean-eth
 
 .PHONY: bootstrap-azero
 bootstrap-azero: # Bootstrap the node data
