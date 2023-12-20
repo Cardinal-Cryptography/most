@@ -27,7 +27,7 @@ async function main() {
   const Governance = await ethers.getContractFactory("Governance");
   const governance = await upgrades.deployProxy(
     Governance,
-    [accounts.slice(0, 1), 1],
+    [accounts.slice(1, 4), 2],
     {
       initializer: "initialize",
       kind: "uups",
@@ -41,8 +41,8 @@ async function main() {
   const most = await upgrades.deployProxy(
     Most,
     [
-      accounts.slice(0, 1),
-      1,
+      accounts.slice(1, 4),
+      2,
       COMMISSION_PER_DIX_MILLE,
       MINIMUM_TRANSFER_AMOUNT_USD,
       accounts[0],

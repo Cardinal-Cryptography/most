@@ -25,6 +25,8 @@ REDIS=${REDIS:-"redis://127.0.0.1:6379"}
 KEYSTORE_PATH=${KEYSTORE_PATH:-""}
 RELAYER_ID=${RELAYER_ID:-0}
 
+AZERO_MOST_METADATA=${AZERO_MOST_METADATA:-"/usr/local/most.json"}
+
 ARGS=(
   --name "guardian_${RELAYER_ID}"
   --azero-contract-address=$(get_address $AZERO_ADDRESSES_FILE most)
@@ -34,6 +36,7 @@ ARGS=(
   --dev-account-index=${RELAYER_ID}
   --redis-node=${REDIS}
   --rust-log=info
+  --azero-contract-metadata=${AZERO_MOST_METADATA}
 )
 
 if [[ -n "$KEYSTORE_PATH" ]]; then

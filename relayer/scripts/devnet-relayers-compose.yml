@@ -1,0 +1,29 @@
+version: '3.9'
+
+services:
+
+  Relayer1:
+    image: most-relayer
+    container_name: most-relayer-1
+    restart: on-failure
+    network_mode: host
+    environment:
+      - RELAYER_ID=1
+  
+  Relayer2:
+    image: most-relayer
+    container_name: most-relayer-2
+    restart: on-failure
+    network_mode: host
+    environment:
+      - RELAYER_ID=2
+
+  Relayer3:
+    image: most-relayer
+    container_name: most-relayer-3
+    restart: on-failure
+    network_mode: host
+    environment:
+      - RELAYER_ID=3
+
+    

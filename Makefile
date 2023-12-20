@@ -55,7 +55,8 @@ stop-local-bridgenet:
 stop-local-bridgenet:
 	docker-compose -f ./devnet-azero/devnet-azero-compose.yml down && \
 	docker-compose -f ./devnet-eth/devnet-eth-compose.yml down && \
-	docker-compose -f ./relayer/scripts/redis-compose.yml down
+	docker-compose -f ./relayer/scripts/redis-compose.yml down && \
+	docker-compose -f ./relayer/scripts/devnet-relayers-compose.yml down
 
 .PHONY: eth-deps
 eth-deps: # Install eth dependencies
@@ -132,10 +133,10 @@ deploy: deploy-azero deploy-eth
 watch-relayer:
 	cd relayer && cargo watch -s 'cargo clippy' -c
 
-.PHONY: run-relayer
+.PHONY: run-dev-relayers
 run-relayer: # Run the relayer
 run-relayer: build-docker-relayer
-	docker run most-relayer
+	docker-compose -f ./relayer/scripts/devnet-relayers-compose.yml up -d
 
 .PHONY: bridge
 bridge: # Run the bridge
@@ -245,5 +246,6 @@ build-docker-relayer: compile-azero compile-eth
 	cd relayer && cargo build --release
 	cp azero/addresses.json relayer/azero_addresses.json
 	cp eth/addresses.json relayer/eth_addresses.json
+	cp azero/artifacts/most.json relayer/most.json
 	cd relayer && docker build -t most-relayer .
-	rm relayer/azero_addresses.json relayer/eth_addresses.json 
+	rm relayer/azero_addresses.json relayer/eth_addresses.json relayer/most.json
