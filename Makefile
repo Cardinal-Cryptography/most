@@ -18,16 +18,12 @@ clean-azero:
 .PHONY: clean-eth
 clean-eth: # Remove eth node data
 clean-eth:
-	cd devnet-eth && ./clean.sh && echo "Done eth clean"
-
-.PHONY: clean-redis
-clean-redis: # Remove redis data
-clean-redis:
-	docker-compose -f ./relayer/scripts/redis-compose.yml down -v && echo "Done redis clean"
+	cd devnet-eth && ./clean.sh && echo "Done devnet-eth clean"
+	cd eth && rm -rf .openzeppelin && echo "Done eth clean"
 
 .PHONY: clean
 clean: # Remove all node data
-clean: clean-azero clean-eth clean-redis
+clean: stop-local-bridgenet clean-azero clean-eth
 
 .PHONY: bootstrap-azero
 bootstrap-azero: # Bootstrap the node data
@@ -138,8 +134,8 @@ watch-relayer:
 
 .PHONY: run-relayer
 run-relayer: # Run the relayer
-run-relayer:
-	cd relayer && ./scripts/run.sh
+run-relayer: build-docker-relayer
+	docker run most-relayer
 
 .PHONY: bridge
 bridge: # Run the bridge
@@ -242,3 +238,12 @@ format-check: rust-format-check js-format-check
 .PHONY: format
 format: # Format code
 format: rust-format js-format
+
+.PHONY: build-docker-relayer
+build-docker-relayer: # Build relayer docker image
+build-docker-relayer: compile-azero compile-eth
+	cd relayer && cargo build --release
+	cp azero/addresses.json relayer/azero_addresses.json
+	cp eth/addresses.json relayer/eth_addresses.json
+	cd relayer && docker build -t most-relayer .
+	rm relayer/azero_addresses.json relayer/eth_addresses.json 
