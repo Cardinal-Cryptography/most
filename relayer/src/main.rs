@@ -58,15 +58,24 @@ fn main() -> Result<()> {
             .expect("Cannot connect to the redis cluster instance");
         let redis_connection = Arc::new(Mutex::new(client.get_async_connection().await.unwrap()));
 
-        let azero_seed = "//".to_owned() + &config.dev_account_index.to_string();
-        let azero_keypair = aleph_client::keypair_from_string(&azero_seed);
+        let azero_keypair = if config.dev {
+            let azero_seed = "//".to_owned() + &config.dev_account_index.to_string();
+            aleph_client::keypair_from_string(&azero_seed)
+        } else {
+            unimplemented!("Only dev mode is supported for now");
+        };
 
         let azero_connection = Arc::new(azero::sign(
             &azero::init(&config.azero_node_wss_url).await,
             &azero_keypair,
         ));
 
-        let wallet = if !config.eth_keystore_path.is_empty() {
+        let wallet = if !config.dev {
+            assert!(
+                !config.eth_keystore_path.is_empty(),
+                "Keystore path must be provided unless relayer is run in dev mode"
+            );
+
             LocalWallet::decrypt_keystore(&config.eth_keystore_path, &config.eth_keystore_password)
                 .expect("Cannot decrypt eth wallet")
         } else {

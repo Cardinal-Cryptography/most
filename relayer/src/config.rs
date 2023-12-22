@@ -4,6 +4,9 @@ pub struct Config {
     pub name: String,
 
     #[arg(long)]
+    pub dev: bool,
+
+    #[arg(long)]
     pub azero_contract_address: String,
 
     #[arg(long, default_value = "../azero/artifacts/most.json")]

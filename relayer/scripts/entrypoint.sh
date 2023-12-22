@@ -39,8 +39,12 @@ ARGS=(
   --azero-contract-metadata=${AZERO_MOST_METADATA}
 )
 
-if [[ -n "$KEYSTORE_PATH" ]]; then
+if [[ -n "${KEYSTORE_PATH}" ]]; then
   ARGS+=(--keystore-path=${KEYSTORE_PATH})
+fi
+
+if [[ -n "${DEV_MODE}" ]]; then
+  ARGS+=(--dev)
 fi
 
 # --- RUN

@@ -134,13 +134,13 @@ watch-relayer:
 	cd relayer && cargo watch -s 'cargo clippy' -c
 
 .PHONY: run-dev-relayers
-run-relayer: # Run the relayer
-run-relayer: build-docker-relayer
+run-relayers: # Run the relayer
+run-relayers: build-docker-relayer
 	docker-compose -f ./relayer/scripts/devnet-relayers-compose.yml up -d
 
 .PHONY: bridge
 bridge: # Run the bridge
-bridge: local-bridgenet deploy run-relayer
+bridge: local-bridgenet deploy run-relayers
 
 .PHONY: test-solidity
 test-solidity: # Run solidity tests
