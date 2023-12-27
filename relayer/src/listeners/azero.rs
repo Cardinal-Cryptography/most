@@ -26,7 +26,7 @@ use crate::{
     config::Config,
     connections::{
         azero::SignedAzeroWsConnection,
-        eth::{EthConnectionError, EthWsConnection, SignedEthWsConnection},
+        eth::{EthConnectionError, EthConnection, SignedEthConnection},
         redis_helpers::{read_first_unprocessed_block_number, write_last_processed_block},
     },
     contracts::{
@@ -59,10 +59,10 @@ pub enum AzeroListenerError {
     EthConnection(#[from] EthConnectionError),
 
     #[error("eth contract error")]
-    EthContractListen(#[from] ContractError<EthWsConnection>),
+    EthContractListen(#[from] ContractError<EthConnection>),
 
     #[error("eth contract error")]
-    EthContractTx(#[from] ContractError<SignedEthWsConnection>),
+    EthContractTx(#[from] ContractError<SignedEthConnection>),
 
     #[error("no block found")]
     BlockNotFound,
@@ -94,7 +94,7 @@ impl AlephZeroListener {
     pub async fn run(
         config: Arc<Config>,
         azero_connection: Arc<SignedAzeroWsConnection>,
-        eth_connection: Arc<SignedEthWsConnection>,
+        eth_connection: Arc<SignedEthConnection>,
         redis_connection: Arc<Mutex<RedisConnection>>,
     ) -> Result<(), AzeroListenerError> {
         let Config {
@@ -190,7 +190,7 @@ async fn add_to_pending(block_number: u32, pending_blocks: Arc<Mutex<BTreeSet<u3
 // handle all events present in one block
 async fn handle_events(
     config: Arc<Config>,
-    eth_connection: Arc<SignedEthWsConnection>,
+    eth_connection: Arc<SignedEthConnection>,
     events: Vec<ContractEvent>,
     block_number: u32,
     pending_blocks: Arc<Mutex<BTreeSet<u32>>>,
@@ -236,7 +236,7 @@ async fn handle_events(
 
 async fn handle_event(
     config: Arc<Config>,
-    eth_connection: Arc<SignedEthWsConnection>,
+    eth_connection: Arc<SignedEthConnection>,
     event: ContractEvent,
     _permit: OwnedSemaphorePermit,
 ) -> Result<(), AzeroListenerError> {
@@ -284,7 +284,7 @@ async fn handle_event(
             let contract = Most::new(address, eth_connection.clone());
 
             // forward transfer & vote
-            let call: ContractCall<SignedEthWsConnection, ()> = contract.receive_request(
+            let call: ContractCall<SignedEthConnection, ()> = contract.receive_request(
                 request_hash,
                 dest_token_address,
                 amount.into(),
@@ -354,7 +354,7 @@ async fn handle_processed_block(
 }
 
 pub async fn wait_for_eth_tx_finality(
-    eth_connection: Arc<SignedEthWsConnection>,
+    eth_connection: Arc<SignedEthConnection>,
     tx_hash: H256,
 ) -> Result<(), AzeroListenerError> {
     info!("Waiting for tx finality: {tx_hash:?}");

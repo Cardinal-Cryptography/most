@@ -4,7 +4,7 @@ use ethers::{
     abi::EncodePackedError,
     core::types::Address,
     prelude::{k256::ecdsa::SigningKey, ContractError, SignerMiddleware},
-    providers::{Middleware, Provider, ProviderError, Ws},
+    providers::{Middleware, ProviderError},
     signers::Wallet,
     types::BlockNumber,
     utils::keccak256,
@@ -21,7 +21,7 @@ use crate::{
     config::Config,
     connections::{
         azero::SignedAzeroWsConnection,
-        eth::SignedEthWsConnection,
+        eth::{EthConnection, SignedEthConnection},
         redis_helpers::{read_first_unprocessed_block_number, write_last_processed_block},
     },
     contracts::{
@@ -41,7 +41,7 @@ pub enum EthListenerError {
     FromHex(#[from] rustc_hex::FromHexError),
 
     #[error("contract error")]
-    Contract(#[from] ContractError<SignerMiddleware<Provider<Ws>, Wallet<SigningKey>>>),
+    Contract(#[from] ContractError<SignerMiddleware<EthConnection, Wallet<SigningKey>>>),
 
     #[error("azero contract error")]
     AzeroContract(#[from] AzeroContractError),
@@ -62,7 +62,7 @@ impl EthListener {
     pub async fn run(
         config: Arc<Config>,
         azero_connection: Arc<SignedAzeroWsConnection>,
-        eth_connection: Arc<SignedEthWsConnection>,
+        eth_connection: Arc<SignedEthConnection>,
         redis_connection: Arc<Mutex<RedisConnection>>,
     ) -> Result<(), EthListenerError> {
         let Config {
@@ -188,7 +188,7 @@ async fn handle_event(
 }
 
 pub async fn get_next_finalized_block_number_eth(
-    eth_connection: Arc<SignedEthWsConnection>,
+    eth_connection: Arc<SignedEthConnection>,
     not_older_than: u32,
 ) -> u32 {
     loop {

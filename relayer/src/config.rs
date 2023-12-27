@@ -30,8 +30,8 @@ pub struct Config {
     #[arg(long, default_value = "")]
     pub eth_keystore_path: String,
 
-    #[arg(long, default_value = "ws://127.0.0.1:8546")]
-    pub eth_node_wss_url: String,
+    #[arg(long, default_value = "http://127.0.0.1:8545")]
+    pub eth_node_http_url: String,
 
     #[arg(long, default_value = "10")]
     pub eth_tx_submission_retries: usize,

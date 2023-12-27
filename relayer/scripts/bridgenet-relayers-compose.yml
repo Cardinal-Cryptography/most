@@ -5,6 +5,8 @@ services:
     environment:
       - RELAYER_ID=1
       - DEV_MODE=true
+      - ETH_NETWORK=https://rpc-eth-bridgenet.dev.azero.dev
+      - AZERO_NETWORK=wss://ws-fe-bridgenet.dev.azero.dev:443
     image: most-relayer
     network_mode: host
     restart: on-failure
@@ -13,6 +15,8 @@ services:
     environment:
       - RELAYER_ID=2
       - DEV_MODE=true
+      - ETH_NETWORK=https://rpc-eth-bridgenet.dev.azero.dev
+      - AZERO_NETWORK=wss://ws-fe-bridgenet.dev.azero.dev:443
     image: most-relayer
     network_mode: host
     restart: on-failure
@@ -21,6 +25,8 @@ services:
     environment:
       - RELAYER_ID=3
       - DEV_MODE=true
+      - ETH_NETWORK=https://rpc-eth-bridgenet.dev.azero.dev
+      - AZERO_NETWORK=wss://ws-fe-bridgenet.dev.azero.dev:443
     image: most-relayer
     network_mode: host
     restart: on-failure

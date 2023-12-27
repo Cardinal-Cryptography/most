@@ -52,11 +52,10 @@ local-bridgenet: devnet-azero devnet-eth redis-instance
 
 .PHONY: stop-local-bridgenet
 stop-local-bridgenet:
-stop-local-bridgenet:
+stop-local-bridgenet: stop-relayers
 	docker-compose -f ./devnet-azero/devnet-azero-compose.yml down && \
 	docker-compose -f ./devnet-eth/devnet-eth-compose.yml down && \
-	docker-compose -f ./relayer/scripts/redis-compose.yml down && \
-	docker-compose -f ./relayer/scripts/devnet-relayers-compose.yml down
+	docker-compose -f ./relayer/scripts/redis-compose.yml down
 
 .PHONY: eth-deps
 eth-deps: # Install eth dependencies
@@ -138,9 +137,30 @@ run-relayers: # Run the relayer
 run-relayers: build-docker-relayer
 	docker-compose -f ./relayer/scripts/devnet-relayers-compose.yml up -d
 
+.PHONY: stop-relayers
+stop-relayers:
+	docker-compose -f ./relayer/scripts/devnet-relayers-compose.yml down
+
 .PHONY: bridge
 bridge: # Run the bridge
-bridge: local-bridgenet deploy run-relayers
+bridge: local-bridgenet deploy run-relayers devnet-relayers-logs
+
+.PHONY: bridgenet-bridge
+bridgenet-bridge: # Run the bridge on bridgenet
+bridgenet-bridge: build-docker-relayer redis-instance
+	NETWORK=bridgenet AZERO_ENV=bridgenet make deploy
+	docker-compose -f ./relayer/scripts/bridgenet-relayers-compose.yml up -d
+	make bridgenet-relayers-logs
+
+.PHONY: devnet-relayers-logs
+devnet-relayers-logs: # Show the logs of the devnet relayers
+devnet-relayers-logs:
+	docker-compose -f ./relayer/scripts/devnet-relayers-compose.yml logs -f
+
+.PHONY: bridgenet-relayers-logs
+bridgenet-relayers-logs: # Show the logs of the bridgenet relayers
+bridgenet-relayers-logs:
+	docker-compose -f ./relayer/scripts/bridgenet-relayers-compose.yml logs -f
 
 .PHONY: test-solidity
 test-solidity: # Run solidity tests

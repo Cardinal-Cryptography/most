@@ -1,12 +1,13 @@
 use ethers::{
     prelude::SignerMiddleware,
-    providers::{Provider, ProviderError, Ws},
+    providers::{Provider, ProviderError, Http},
     signers::{LocalWallet, WalletError},
 };
 use thiserror::Error;
+use ethers::providers::ProviderExt;
 
-pub type EthWsConnection = Provider<Ws>;
-pub type SignedEthWsConnection = SignerMiddleware<EthWsConnection, LocalWallet>;
+pub type EthConnection = Provider<Http>;
+pub type SignedEthConnection = SignerMiddleware<EthConnection, LocalWallet>;
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -19,18 +20,14 @@ pub enum EthConnectionError {
     Wallet(#[from] WalletError),
 }
 
-async fn connect(url: &str) -> Result<Provider<Ws>, EthConnectionError> {
-    Ok(Provider::<Ws>::connect(url).await?)
-}
-
-pub async fn init(url: &str) -> Result<EthWsConnection, EthConnectionError> {
-    connect(url).await
+pub async fn connect(url: &str) -> EthConnection {
+    Provider::<Http>::connect(url).await
 }
 
 pub async fn sign(
-    connection: EthWsConnection,
+    connection: EthConnection,
     wallet: LocalWallet,
-) -> Result<SignedEthWsConnection, EthConnectionError> {
+) -> Result<SignedEthConnection, EthConnectionError> {
     Ok(
         SignerMiddleware::new_with_provider_chain(connection, wallet)
             .await

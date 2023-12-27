@@ -5,7 +5,7 @@ use config::Config;
 use connections::EthConnectionError;
 use ethers::signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, Signer, WalletError};
 use eyre::Result;
-use log::{error, info};
+use log::{error, info, debug};
 use redis::Client as RedisClient;
 use thiserror::Error;
 use tokio::{runtime::Runtime, sync::Mutex};
@@ -70,6 +70,8 @@ fn main() -> Result<()> {
             &azero_keypair,
         ));
 
+        debug!("Established connection to Aleph Zero node");
+
         let wallet = if !config.dev {
             assert!(
                 !config.eth_keystore_path.is_empty(),
@@ -92,14 +94,15 @@ fn main() -> Result<()> {
 
         let eth_connection = Arc::new(
             eth::sign(
-                eth::init(&config.eth_node_wss_url)
-                    .await
-                    .expect("Connection could not be made"),
+                eth::connect(&config.eth_node_http_url)
+                    .await,
                 wallet,
             )
             .await
             .expect("Cannot sign the connection"),
         );
+
+        debug!("Established connection to Ethereum node");
 
         let config_rc1 = Arc::clone(&config);
         let azero_connection_rc1 = Arc::clone(&azero_connection);
