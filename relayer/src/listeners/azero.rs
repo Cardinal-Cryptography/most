@@ -26,7 +26,7 @@ use crate::{
     config::Config,
     connections::{
         azero::SignedAzeroWsConnection,
-        eth::{EthConnectionError, EthConnection, SignedEthConnection},
+        eth::{EthConnection, EthConnectionError, SignedEthConnection},
         redis_helpers::{read_first_unprocessed_block_number, write_last_processed_block},
     },
     contracts::{

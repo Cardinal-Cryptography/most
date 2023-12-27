@@ -1,10 +1,9 @@
 use ethers::{
     prelude::SignerMiddleware,
-    providers::{Provider, ProviderError, Http},
+    providers::{Http, Provider, ProviderError, ProviderExt},
     signers::{LocalWallet, WalletError},
 };
 use thiserror::Error;
-use ethers::providers::ProviderExt;
 
 pub type EthConnection = Provider<Http>;
 pub type SignedEthConnection = SignerMiddleware<EthConnection, LocalWallet>;

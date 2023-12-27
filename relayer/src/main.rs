@@ -5,7 +5,7 @@ use config::Config;
 use connections::EthConnectionError;
 use ethers::signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, Signer, WalletError};
 use eyre::Result;
-use log::{error, info, debug};
+use log::{debug, error, info};
 use redis::Client as RedisClient;
 use thiserror::Error;
 use tokio::{runtime::Runtime, sync::Mutex};
@@ -93,13 +93,9 @@ fn main() -> Result<()> {
         log::info!("Wallet address: {}", wallet.address());
 
         let eth_connection = Arc::new(
-            eth::sign(
-                eth::connect(&config.eth_node_http_url)
-                    .await,
-                wallet,
-            )
-            .await
-            .expect("Cannot sign the connection"),
+            eth::sign(eth::connect(&config.eth_node_http_url).await, wallet)
+                .await
+                .expect("Cannot sign the connection"),
         );
 
         debug!("Established connection to Ethereum node");
