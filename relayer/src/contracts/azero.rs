@@ -9,8 +9,10 @@ use aleph_client::{
         event::{translate_events, BlockDetails, ContractEvent},
         ContractInstance,
     },
-    contract_transcode::{Value, Value::Seq},
-    AccountId, AlephConfig, SignedConnection, TxInfo,
+    contract_transcode::{ContractMessageTranscoder, Value, Value::Seq},
+    pallets::contract::ContractsUserApi,
+    sp_weights::weight_v2::Weight,
+    AccountId, AlephConfig, SignedConnection, TxInfo, TxStatus,
 };
 use log::trace;
 use subxt::events::Events;
@@ -33,17 +35,29 @@ pub enum AzeroContractError {
     MissingOrInvalidField(String),
 }
 
-#[derive(Debug)]
 pub struct MostInstance {
     pub contract: ContractInstance,
+    pub address: AccountId,
+    pub transcoder: ContractMessageTranscoder,
+    pub ref_time_limit: u64,
+    pub proof_size_limit: u64,
 }
 
 impl MostInstance {
-    pub fn new(address: &str, metadata_path: &str) -> Result<Self, AzeroContractError> {
+    pub fn new(
+        address: &str,
+        metadata_path: &str,
+        ref_time_limit: u64,
+        proof_size_limit: u64,
+    ) -> Result<Self, AzeroContractError> {
         let address = AccountId::from_str(address)
             .map_err(|why| AzeroContractError::NotAccountId(why.to_string()))?;
         Ok(Self {
+            address: address.clone(),
+            transcoder: ContractMessageTranscoder::load(metadata_path)?,
             contract: ContractInstance::new(address, metadata_path)?,
+            ref_time_limit,
+            proof_size_limit,
         })
     }
 
@@ -57,20 +71,47 @@ impl MostInstance {
         dest_receiver_address: [u8; 32],
         request_nonce: u128,
     ) -> Result<TxInfo, AzeroContractError> {
-        Ok(self
-            .contract
-            .contract_exec(
-                signed_connection,
-                "receive_request",
-                &[
-                    bytes32_to_str(&request_hash),
-                    bytes32_to_str(&dest_token_address),
-                    amount.to_string(),
-                    bytes32_to_str(&dest_receiver_address),
-                    request_nonce.to_string(),
-                ],
+        let args = [
+            bytes32_to_str(&request_hash),
+            bytes32_to_str(&dest_token_address),
+            amount.to_string(),
+            bytes32_to_str(&dest_receiver_address),
+            request_nonce.to_string(),
+        ];
+
+        let data = self.transcoder.encode("receive_request", args)?;
+        signed_connection
+            .call(
+                self.address.clone(),
+                0,
+                Weight {
+                    ref_time: self.ref_time_limit,
+                    proof_size: self.proof_size_limit,
+                },
+                None,
+                data,
+                TxStatus::Finalized,
             )
-            .await?)
+            .await
+            .map_err(AzeroContractError::AlephClient)
+    }
+
+    pub fn filter_events(
+        &self,
+        events: Events<AlephConfig>,
+        block_details: BlockDetails,
+    ) -> Vec<ContractEvent> {
+        translate_events(events.iter(), &[&self.contract], Some(block_details))
+            .into_iter()
+            .filter_map(|event_res| {
+                if let Ok(event) = event_res {
+                    Some(event)
+                } else {
+                    trace!("Failed to translate event: {:?}", event_res);
+                    None
+                }
+            })
+            .collect()
     }
 }
 
@@ -95,28 +136,6 @@ pub fn get_request_event_data(
         dest_receiver_address,
         request_nonce,
     })
-}
-
-pub fn filter_most_events(
-    events: Events<AlephConfig>,
-    most_instance: &MostInstance,
-    block_details: BlockDetails,
-) -> Vec<ContractEvent> {
-    translate_events(
-        events.iter(),
-        &[&most_instance.contract],
-        Some(block_details),
-    )
-    .into_iter()
-    .filter_map(|event_res| {
-        if let Ok(event) = event_res {
-            Some(event)
-        } else {
-            trace!("Failed to translate event: {:?}", event_res);
-            None
-        }
-    })
-    .collect()
 }
 
 fn decode_seq_field(

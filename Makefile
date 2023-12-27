@@ -133,8 +133,8 @@ watch-relayer:
 	cd relayer && cargo watch -s 'cargo clippy' -c
 
 .PHONY: run-dev-relayers
-run-relayers: # Run the relayer
-run-relayers: build-docker-relayer
+run-dev-relayers: # Run the relayer
+run-dev-relayers: build-docker-relayer
 	docker-compose -f ./relayer/scripts/devnet-relayers-compose.yml up -d
 
 .PHONY: stop-relayers
