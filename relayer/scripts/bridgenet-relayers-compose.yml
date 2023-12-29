@@ -7,6 +7,7 @@ services:
       - DEV_MODE=true
       - ETH_NETWORK=https://rpc-eth-bridgenet.dev.azero.dev
       - AZERO_NETWORK=wss://ws-fe-bridgenet.dev.azero.dev:443
+      - AZERO_START_BLOCK=${AZERO_START_BLOCK}
     image: most-relayer
     network_mode: host
     restart: on-failure
@@ -17,6 +18,7 @@ services:
       - DEV_MODE=true
       - ETH_NETWORK=https://rpc-eth-bridgenet.dev.azero.dev
       - AZERO_NETWORK=wss://ws-fe-bridgenet.dev.azero.dev:443
+      - AZERO_START_BLOCK=${AZERO_START_BLOCK}
     image: most-relayer
     network_mode: host
     restart: on-failure
@@ -27,6 +29,7 @@ services:
       - DEV_MODE=true
       - ETH_NETWORK=https://rpc-eth-bridgenet.dev.azero.dev
       - AZERO_NETWORK=wss://ws-fe-bridgenet.dev.azero.dev:443
+      - AZERO_START_BLOCK=${AZERO_START_BLOCK}
     image: most-relayer
     network_mode: host
     restart: on-failure

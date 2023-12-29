@@ -1,6 +1,8 @@
 NETWORK ?= development
 AZERO_ENV ?= dev
 
+export BRIDGENET_START_BLOCK=`ENDPOINT=https://rpc-fe-bridgenet.dev.azero.dev ./relayer/scripts/azero_best_finalized.sh`
+
 .PHONY: help
 help: # Show help for each of the Makefile recipes.
 	@grep -E '^[a-zA-Z0-9 -]+:.*#'  Makefile | sort | while read -r l; do printf "\033[1;32m$$(echo $$l | cut -f 1 -d':')\033[00m:$$(echo $$l | cut -f 2- -d'#')\n"; done
@@ -149,7 +151,7 @@ bridge: local-bridgenet deploy run-relayers devnet-relayers-logs
 bridgenet-bridge: # Run the bridge on bridgenet
 bridgenet-bridge: build-docker-relayer redis-instance
 	NETWORK=bridgenet AZERO_ENV=bridgenet make deploy
-	docker-compose -f ./relayer/scripts/bridgenet-relayers-compose.yml up -d
+	AZERO_START_BLOCK=${BRIDGENET_START_BLOCK} docker-compose -f ./relayer/scripts/bridgenet-relayers-compose.yml up -d
 	make bridgenet-relayers-logs
 
 .PHONY: devnet-relayers-logs
