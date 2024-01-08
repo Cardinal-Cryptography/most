@@ -36,17 +36,17 @@ bootstrap-azero:
 .PHONY: devnet-azero
 devnet-azero: # Run azero devnet
 devnet-azero: bootstrap-azero
-	docker-compose -f ./devnet-azero/devnet-azero-compose.yml up -d
+	docker compose -f ./devnet-azero/devnet-azero-compose.yml up -d
 
 .PHONY: devnet-eth
 devnet-eth: # Run eth devnet
 devnet-eth:
-	docker-compose -f ./devnet-eth/devnet-eth-compose.yml up -d
+	docker compose -f ./devnet-eth/devnet-eth-compose.yml up -d
 
 .PHONY: redis-instance
 redis-instance: # Run a redis instance
 redis-instance:
-	docker-compose -f ./relayer/scripts/redis-compose.yml up -d
+	docker compose -f ./relayer/scripts/redis-compose.yml up -d
 
 .PHONY: local-bridgenet
 local-bridgenet: # Run both devnets + a redis instance
@@ -55,9 +55,9 @@ local-bridgenet: devnet-azero devnet-eth redis-instance
 .PHONY: stop-local-bridgenet
 stop-local-bridgenet:
 stop-local-bridgenet: stop-relayers
-	docker-compose -f ./devnet-azero/devnet-azero-compose.yml down && \
-	docker-compose -f ./devnet-eth/devnet-eth-compose.yml down && \
-	docker-compose -f ./relayer/scripts/redis-compose.yml down
+	docker compose -f ./devnet-azero/devnet-azero-compose.yml down && \
+	docker compose -f ./devnet-eth/devnet-eth-compose.yml down && \
+	docker compose -f ./relayer/scripts/redis-compose.yml down
 
 .PHONY: eth-deps
 eth-deps: # Install eth dependencies
@@ -134,14 +134,13 @@ deploy: deploy-azero deploy-eth
 watch-relayer:
 	cd relayer && cargo watch -s 'cargo clippy' -c
 
-.PHONY: run-dev-relayers
-run-dev-relayers: # Run the relayer
-run-dev-relayers: build-docker-relayer
-	docker-compose -f ./relayer/scripts/devnet-relayers-compose.yml up -d
+run-relayers: # Run the relayer
+run-relayers: build-docker-relayer
+	docker compose -f ./relayer/scripts/devnet-relayers-compose.yml up -d
 
 .PHONY: stop-relayers
 stop-relayers:
-	docker-compose -f ./relayer/scripts/devnet-relayers-compose.yml down
+	docker compose -f ./relayer/scripts/devnet-relayers-compose.yml down
 
 .PHONY: bridge
 bridge: # Run the bridge
@@ -157,12 +156,12 @@ bridgenet-bridge: build-docker-relayer redis-instance
 .PHONY: devnet-relayers-logs
 devnet-relayers-logs: # Show the logs of the devnet relayers
 devnet-relayers-logs:
-	docker-compose -f ./relayer/scripts/devnet-relayers-compose.yml logs -f
+	docker compose -f ./relayer/scripts/devnet-relayers-compose.yml logs -f
 
 .PHONY: bridgenet-relayers-logs
 bridgenet-relayers-logs: # Show the logs of the bridgenet relayers
 bridgenet-relayers-logs:
-	docker-compose -f ./relayer/scripts/bridgenet-relayers-compose.yml logs -f
+	docker compose -f ./relayer/scripts/bridgenet-relayers-compose.yml logs -f
 
 .PHONY: test-solidity
 test-solidity: # Run solidity tests
@@ -179,12 +178,11 @@ test-ink-e2e: bootstrap-azero
 .PHONY: test-ink
 test-ink: # Run ink tests
 test-ink: test-ink-e2e
-	cd azero/contracts/most && \
-	cargo test && \
-	cd ../governance && \
-	cargo test && \
-	cd ../token && \
-	cargo test
+	cd azero/contracts/most && cargo test
+	cd azero/contracts/governance && cargo test
+	cd azero/contracts/token && cargo test
+	cd azero/contracts/gas-price-oracle/contract && cargo test
+	cd azero/contracts/gas-price-oracle/test-contract && cargo test
 
 .PHONY: check-js-format
 check-js-format: # Check js formatting
@@ -209,6 +207,9 @@ ink-lint:
 	cd azero/contracts/token && cargo clippy -- --no-deps -D warnings
 	cd azero/contracts/psp22-traits && cargo clippy -- --no-deps -D warnings
 	cd azero/contracts/tests && cargo clippy -- --no-deps -D warnings
+	cd azero/contracts/gas-price-oracle/contract && cargo clippy -- --no-deps -D warnings
+	cd azero/contracts/gas-price-oracle/test-contract && cargo clippy -- --no-deps -D warnings
+	cd azero/contracts/gas-price-oracle/trait && cargo clippy -- --no-deps -D warnings
 
 .PHONY: contracts-lint
 contracts-lint: # Lint contracts
@@ -223,6 +224,9 @@ rust-format-check:
 	cd azero/contracts/token && cargo fmt -- --check
 	cd azero/contracts/psp22-traits && cargo fmt -- --check
 	cd azero/contracts/tests && cargo fmt -- --check
+	cd azero/contracts/gas-price-oracle/contract && cargo fmt -- --check
+	cd azero/contracts/gas-price-oracle/test-contract && cargo fmt -- --check
+	cd azero/contracts/gas-price-oracle/trait && cargo fmt -- --check
 
 .PHONY: rust-format
 rust-format: # Format rust code
@@ -233,26 +237,25 @@ rust-format:
 	cd azero/contracts/token && cargo fmt
 	cd azero/contracts/psp22-traits && cargo fmt
 	cd azero/contracts/tests && cargo fmt
+	cd azero/contracts/gas-price-oracle/contract && cargo fmt
+	cd azero/contracts/gas-price-oracle/test-contract && cargo fmt
+	cd azero/contracts/gas-price-oracle/trait && cargo fmt
 
 .PHONY: js-format-check
 js-format-check: # Check js formatting
 js-format-check:
 	cd eth && npx prettier --check test
 	cd eth && npx prettier --check scripts
-	cd eth && npx prettier --check gulpfile.js
 	cd eth && npx prettier --check hardhat.config.js
 	cd azero && npx prettier --check scripts
-	cd azero && npx prettier --check gulpfile.js
 
 .PHONY: js-format
 js-format: # Format js code
 js-format:
 	cd eth && npx prettier --write test
 	cd eth && npx prettier --write scripts
-	cd eth && npx prettier --write gulpfile.js
 	cd eth && npx prettier --write hardhat.config.js
 	cd azero && npx prettier --write scripts
-	cd azero && npx prettier --write gulpfile.js
 
 .PHONY: format-check
 format-check: # Check code formatting

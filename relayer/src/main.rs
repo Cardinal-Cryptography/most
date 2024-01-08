@@ -72,15 +72,7 @@ fn main() -> Result<()> {
 
         debug!("Established connection to Aleph Zero node");
 
-        let wallet = if !config.dev {
-            assert!(
-                !config.eth_keystore_path.is_empty(),
-                "Keystore path must be provided unless relayer is run in dev mode"
-            );
-
-            LocalWallet::decrypt_keystore(&config.eth_keystore_path, &config.eth_keystore_password)
-                .expect("Cannot decrypt eth wallet")
-        } else {
+        let wallet = if config.dev {
             // If no keystore path is provided, we use the default development mnemonic
             MnemonicBuilder::<English>::default()
                 .phrase(DEV_MNEMONIC)
@@ -88,6 +80,14 @@ fn main() -> Result<()> {
                 .expect("Provided index is an integer between 0 and 9")
                 .build()
                 .expect("Mnemonic is correct")
+        } else {
+            assert!(
+                !config.eth_keystore_path.is_empty(),
+                "Keystore path must be provided unless relayer is run in dev mode"
+            );
+
+            LocalWallet::decrypt_keystore(&config.eth_keystore_path, &config.eth_keystore_password)
+                .expect("Cannot decrypt eth wallet")
         };
 
         log::info!("Wallet address: {}", wallet.address());
