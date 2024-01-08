@@ -19,7 +19,7 @@ async function import_env() {
 async function main(): Promise<void> {
   let {
     ws_node,
-    authority,
+    relayers_keys,
     authority_seed,
     signature_threshold,
     commission_per_dix_mille,
@@ -56,7 +56,7 @@ async function main(): Promise<void> {
     deployer,
     "most.contract",
     [
-      [authority],
+      relayers_keys,
       signature_threshold!,
       commission_per_dix_mille!,
       pocket_money!,
@@ -66,7 +66,7 @@ async function main(): Promise<void> {
   );
 
   const { address: mostAddress } = await mostConstructors.new(
-    [authority],
+    relayers_keys,
     signature_threshold!,
     commission_per_dix_mille!,
     pocket_money!,

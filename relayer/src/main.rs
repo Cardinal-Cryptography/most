@@ -3,9 +3,9 @@ use std::{env, process, sync::Arc};
 use clap::Parser;
 use config::Config;
 use connections::EthConnectionError;
-use ethers::signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, WalletError};
+use ethers::signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, Signer, WalletError};
 use eyre::Result;
-use log::{error, info};
+use log::{debug, error, info};
 use redis::Client as RedisClient;
 use thiserror::Error;
 use tokio::{runtime::Runtime, sync::Mutex};
@@ -58,39 +58,54 @@ fn main() -> Result<()> {
             .expect("Cannot connect to the redis cluster instance");
         let redis_connection = Arc::new(Mutex::new(client.get_async_connection().await.unwrap()));
 
-        let keypair = aleph_client::keypair_from_string(&config.azero_sudo_seed);
+        let azero_keypair = if config.dev {
+            let azero_seed = "//".to_owned() + &config.dev_account_index.to_string();
+            aleph_client::keypair_from_string(&azero_seed)
+        } else {
+            unimplemented!("Only dev mode is supported for now");
+        };
 
         let azero_connection = Arc::new(azero::sign(
             &azero::init(&config.azero_node_wss_url).await,
-            &keypair,
+            &azero_keypair,
         ));
 
-        let wallet = if !config.eth_keystore_path.is_empty() {
-            LocalWallet::decrypt_keystore(&config.eth_keystore_path, &config.eth_keystore_password)
-                .expect("Cannot decrypt eth wallet")
-        } else {
+        debug!("Established connection to Aleph Zero node");
+
+        let wallet = if config.dev {
             // If no keystore path is provided, we use the default development mnemonic
             MnemonicBuilder::<English>::default()
                 .phrase(DEV_MNEMONIC)
+                .index(config.dev_account_index)
+                .expect("Provided index is an integer between 0 and 9")
                 .build()
                 .expect("Mnemonic is correct")
+        } else {
+            assert!(
+                !config.eth_keystore_path.is_empty(),
+                "Keystore path must be provided unless relayer is run in dev mode"
+            );
+
+            LocalWallet::decrypt_keystore(&config.eth_keystore_path, &config.eth_keystore_password)
+                .expect("Cannot decrypt eth wallet")
         };
 
+        log::info!("Wallet address: {}", wallet.address());
+
         let eth_connection = Arc::new(
-            eth::sign(
-                eth::init(&config.eth_node_wss_url)
-                    .await
-                    .expect("Connection could not be made"),
-                wallet,
-            )
-            .await
-            .expect("Cannot sign the connection"),
+            eth::sign(eth::connect(&config.eth_node_http_url).await, wallet)
+                .await
+                .expect("Cannot sign the connection"),
         );
+
+        debug!("Established connection to Ethereum node");
 
         let config_rc1 = Arc::clone(&config);
         let azero_connection_rc1 = Arc::clone(&azero_connection);
         let eth_connection_rc1 = Arc::clone(&eth_connection);
         let redis_connection_rc1 = Arc::clone(&redis_connection);
+
+        log::info!("Starting Ethereum listener");
 
         tasks.push(tokio::spawn(async {
             EthListener::run(
@@ -107,6 +122,8 @@ fn main() -> Result<()> {
         let azero_connection_rc2 = Arc::clone(&azero_connection);
         let eth_connection_rc2 = Arc::clone(&eth_connection);
         let redis_connection_rc2 = Arc::clone(&redis_connection);
+
+        log::info!("Starting AlephZero listener");
 
         tasks.push(tokio::spawn(async {
             AlephZeroListener::run(

@@ -4,6 +4,9 @@ pub struct Config {
     pub name: String,
 
     #[arg(long)]
+    pub dev: bool,
+
+    #[arg(long)]
     pub azero_contract_address: String,
 
     #[arg(long, default_value = "../azero/artifacts/most.json")]
@@ -11,9 +14,6 @@ pub struct Config {
 
     #[arg(long, default_value = "ws://127.0.0.1:9944")]
     pub azero_node_wss_url: String,
-
-    #[arg(long, default_value = "//Alice")]
-    pub azero_sudo_seed: String,
 
     #[arg(long, default_value = "1000")]
     pub azero_max_event_handler_tasks: usize,
@@ -24,11 +24,14 @@ pub struct Config {
     #[arg(long, default_value = "")]
     pub eth_keystore_password: String,
 
+    #[arg(long, default_value = "0")]
+    pub dev_account_index: u32,
+
     #[arg(long, default_value = "")]
     pub eth_keystore_path: String,
 
-    #[arg(long, default_value = "ws://127.0.0.1:8546")]
-    pub eth_node_wss_url: String,
+    #[arg(long, default_value = "http://127.0.0.1:8545")]
+    pub eth_node_http_url: String,
 
     #[arg(long, default_value = "10")]
     pub eth_tx_submission_retries: usize,

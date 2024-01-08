@@ -1,0 +1,33 @@
+---
+services:
+  Relayer1:
+    container_name: most-relayer-1
+    environment:
+      - RELAYER_ID=1
+      - DEV_MODE=true
+      - ETH_NETWORK=https://rpc-eth-bridgenet.dev.azero.dev
+      - AZERO_NETWORK=wss://ws-fe-bridgenet.dev.azero.dev:443
+    image: most-relayer
+    network_mode: host
+    restart: on-failure
+  Relayer2:
+    container_name: most-relayer-2
+    environment:
+      - RELAYER_ID=2
+      - DEV_MODE=true
+      - ETH_NETWORK=https://rpc-eth-bridgenet.dev.azero.dev
+      - AZERO_NETWORK=wss://ws-fe-bridgenet.dev.azero.dev:443
+    image: most-relayer
+    network_mode: host
+    restart: on-failure
+  Relayer3:
+    container_name: most-relayer-3
+    environment:
+      - RELAYER_ID=3
+      - DEV_MODE=true
+      - ETH_NETWORK=https://rpc-eth-bridgenet.dev.azero.dev
+      - AZERO_NETWORK=wss://ws-fe-bridgenet.dev.azero.dev:443
+    image: most-relayer
+    network_mode: host
+    restart: on-failure
+version: '3.9'
