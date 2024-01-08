@@ -20,12 +20,14 @@ target/
 
 # env files
 .env
+.envrc
 
 # logs
 *.log
 
 # contracts
 addresses.json
+contract_spec.json
 azero/artifacts/
 azero/types/
 
