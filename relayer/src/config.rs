@@ -53,4 +53,13 @@ pub struct Config {
 
     #[arg(long, default_value = "info")]
     pub rust_log: log::Level,
+
+    #[arg(long, default_value = "200000")]
+    pub eth_gas_limit: u32,
+
+    #[arg(long, default_value = "100000000000")]
+    pub azero_ref_time_limit: u64,
+
+    #[arg(long, default_value = "10000000")]
+    pub azero_proof_size_limit: u64,
 }

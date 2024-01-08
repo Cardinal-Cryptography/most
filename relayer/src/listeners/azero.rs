@@ -30,8 +30,8 @@ use crate::{
         redis_helpers::{read_first_unprocessed_block_number, write_last_processed_block},
     },
     contracts::{
-        filter_most_events, get_request_event_data, AzeroContractError,
-        CrosschainTransferRequestData, Most, MostInstance,
+        get_request_event_data, AzeroContractError, CrosschainTransferRequestData, Most,
+        MostInstance,
     },
     listeners::eth::{get_next_finalized_block_number_eth, ETH_BLOCK_PROD_TIME_SEC},
 };
@@ -110,7 +110,12 @@ impl AlephZeroListener {
         let event_handler_tasks_semaphore =
             Arc::new(Semaphore::new(*azero_max_event_handler_tasks));
 
-        let most_instance = MostInstance::new(azero_contract_address, azero_contract_metadata)?;
+        let most_instance = MostInstance::new(
+            azero_contract_address,
+            azero_contract_metadata,
+            config.azero_ref_time_limit,
+            config.azero_proof_size_limit,
+        )?;
         let mut first_unprocessed_block_number = read_first_unprocessed_block_number(
             name.clone(),
             ALEPH_LAST_BLOCK_KEY.to_string(),
@@ -155,9 +160,8 @@ impl AlephZeroListener {
                     .events()
                     .await?;
 
-                let filtered_events = filter_most_events(
+                let filtered_events = most_instance.filter_events(
                     events,
-                    &most_instance,
                     BlockDetails {
                         block_number,
                         block_hash,
@@ -299,7 +303,9 @@ async fn handle_event(
             );
 
             // This shouldn't fail unless there is something wrong with our config.
+            // NOTE: this does not check whether the actual tx reverted on-chain. Reverts are only checked on dry-run.
             let tx_hash = call
+                .gas(config.eth_gas_limit)
                 .send()
                 .await?
                 .confirmations(*eth_tx_min_confirmations)

@@ -169,7 +169,12 @@ async fn handle_event(
         let request_hash = keccak256(bytes);
         debug!("hashed event encoding: {request_hash:?}");
 
-        let contract = MostInstance::new(azero_contract_address, azero_contract_metadata)?;
+        let contract = MostInstance::new(
+            azero_contract_address,
+            azero_contract_metadata,
+            config.azero_ref_time_limit,
+            config.azero_proof_size_limit,
+        )?;
 
         // send vote
         contract
