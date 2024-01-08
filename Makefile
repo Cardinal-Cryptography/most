@@ -276,6 +276,6 @@ build-docker-relayer: compile-azero compile-eth
 	cd relayer && docker build -t most-relayer .
 	rm relayer/azero_addresses.json relayer/eth_addresses.json relayer/most.json
 
-contract_spec.json: # Generate a a file describing deployed contracts based on addresses.json filesA
+contract_spec.json: # Generate a a file describing deployed contracts based on addresses.json files
 contract_spec.json: azero/addresses.json eth/addresses.json
 	VERSION=${CONTRACT_VERSION} node scripts/contract_spec.js > contract_spec.json

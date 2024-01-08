@@ -6,49 +6,43 @@ if (version === undefined) throw new Error("VERSION env var not set");
 
 let result = {
     version: "0.1",
+    contract_version: version,
     addresses: {
         azero_governance: {
-            version,
-            contract: "most_azero/governance",
+            contract: "azero_governance",
             address: azero.governance
         },
 
         azero_most: {
-            version,
-            contract: "most_azero/most",
+            contract: "azero_most",
             address: azero.most
         },
 
         azero_weth: {
-            version,
-            contract: "most_azero/weth",
+            contract: "azero_token",
             address: azero.weth
         },
 
         eth_governance: {
-            version,
-            contract: "most_eth/governance",
+            contract: "eth_governance",
             address: eth.governance
         },
 
         eth_most: {
-            version,
-            contract: "most_eth/most",
+            contract: "eth_most",
             address: eth.most
         },
 
         eth_weth9: {
-            version,
-            contract: "most_eth/weth9",
+            contract: "eth_weth9",
             address: eth.weth9
         },
 
         eth_usdt: {
-            version,
-            contract: "most_eth/usdt",
+            contract: "eth_token",
             address: eth.usdt
         },
     }
 }
 
-console.log(result)
+console.log(JSON.stringify(result, null, "  "))
