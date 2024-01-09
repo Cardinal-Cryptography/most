@@ -11,9 +11,6 @@ const { addressToBytes32, getRandomAlephAccount } = require("./TestUtils");
 const TOKEN_AMOUNT = 1000;
 const ALEPH_ACCOUNT = getRandomAlephAccount(3);
 const WRAPPED_TOKEN_ADDRESS = getRandomAlephAccount(5);
-const COMMISSION_PER_DIX_MILLE = 30;
-const MINIMUM_TRANSFER_AMOUNT_USD = 50;
-const DIX_MILLE = 10000;
 
 describe("Most", function () {
   describe("Constructor", function () {
@@ -28,8 +25,6 @@ describe("Most", function () {
           [
             [accounts[0]],
             0,
-            COMMISSION_PER_DIX_MILLE,
-            MINIMUM_TRANSFER_AMOUNT_USD,
             accounts[0],
           ],
           {
@@ -50,8 +45,6 @@ describe("Most", function () {
           [
             [accounts[0]],
             2,
-            COMMISSION_PER_DIX_MILLE,
-            MINIMUM_TRANSFER_AMOUNT_USD,
             accounts[0],
           ],
           {
@@ -73,8 +66,6 @@ describe("Most", function () {
       [
         accounts.slice(1, 9),
         5,
-        COMMISSION_PER_DIX_MILLE,
-        MINIMUM_TRANSFER_AMOUNT_USD,
         accounts[0],
       ],
       {
@@ -87,46 +78,20 @@ describe("Most", function () {
     const Token = await ethers.getContractFactory("Token");
     const token = await Token.deploy(
       "10000000000000000000000000",
-      "Shittoken",
-      "SHIT",
+      "TestToken",
+      "TEST",
     );
     const tokenAddressBytes32 = addressToBytes32(await token.getAddress());
 
-    const usdt = await Token.deploy(
-      "12000000000000000000000000",
-      "Tether",
-      "USDT",
-    );
-    const usdtAddressBytes32 = addressToBytes32(await usdt.getAddress());
-
-    await most.setUSDT(usdtAddressBytes32);
     return {
       most,
       token,
       tokenAddressBytes32,
-      usdtAddressBytes32,
       mostAddress,
     };
   }
 
   describe("sendRequest", function () {
-    it("Reverts if the USD value of the transfer amount is below the minimum", async () => {
-      const { most, tokenAddressBytes32, usdtAddressBytes32 } =
-        await loadFixture(deployEightGuardianMostFixture);
-
-      await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
-
-      amountToSend = await most.queryPrice(
-        MINIMUM_TRANSFER_AMOUNT_USD - 1,
-        usdtAddressBytes32, // of
-        tokenAddressBytes32, // in
-      );
-
-      await expect(
-        most.sendRequest(tokenAddressBytes32, amountToSend, ALEPH_ACCOUNT),
-      ).to.be.revertedWith("AmountBelowMinimum");
-    });
-
     it("Reverts if token is not whitelisted", async () => {
       const { most, token, tokenAddressBytes32, mostAddress } =
         await loadFixture(deployEightGuardianMostFixture);
@@ -299,7 +264,7 @@ describe("Most", function () {
       }
 
       expect(await token.balanceOf(accounts[10].address)).to.equal(
-        (TOKEN_AMOUNT * (DIX_MILLE - COMMISSION_PER_DIX_MILLE)) / DIX_MILLE,
+        TOKEN_AMOUNT,
       );
     });
 
@@ -330,112 +295,7 @@ describe("Most", function () {
       ).to.be.revertedWith("Hash does not match the data");
     });
   });
-
-  describe("payoutRewards", function () {
-    it("account can request a payout", async () => {
-      const { most, token, tokenAddressBytes32 } = await loadFixture(
-        deployEightGuardianMostFixture,
-      );
-      const accounts = await ethers.getSigners();
-      const ethAddress = addressToBytes32(accounts[10].address);
-      const requestHash = ethers.solidityPackedKeccak256(
-        ["bytes32", "uint256", "bytes32", "uint256"],
-        [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
-      );
-
-      // Provide funds for Most
-      await token.transfer(await most.getAddress(), TOKEN_AMOUNT * 2);
-
-      for (let i = 1; i < 6; i++) {
-        await most
-          .connect(accounts[i])
-          .receiveRequest(
-            requestHash,
-            tokenAddressBytes32,
-            TOKEN_AMOUNT,
-            ethAddress,
-            0,
-          );
-      }
-
-      currentCommitteeId = await most.committeeId();
-      totalRewards = await most.getCollectedCommitteeRewards(
-        currentCommitteeId,
-        tokenAddressBytes32,
-      );
-
-      await expect(currentCommitteeId).to.be.equal(0);
-
-      signerBalanceBefore = await token.balanceOf(accounts[1].address);
-
-      await most.payoutRewards(
-        currentCommitteeId,
-        accounts[1].address,
-        tokenAddressBytes32,
-      );
-
-      signerBalanceAfter = await token.balanceOf(accounts[1].address);
-      await expect(signerBalanceAfter).to.be.equal(
-        signerBalanceBefore + totalRewards / BigInt(8),
-      );
-    });
-
-    it("past committee member can still request a payout", async () => {
-      const { most, token, tokenAddressBytes32 } = await loadFixture(
-        deployEightGuardianMostFixture,
-      );
-      const accounts = await ethers.getSigners();
-      const ethAddress = addressToBytes32(accounts[10].address);
-      const requestHash = ethers.solidityPackedKeccak256(
-        ["bytes32", "uint256", "bytes32", "uint256"],
-        [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
-      );
-
-      // Provide funds for Most
-      await token.transfer(await most.getAddress(), TOKEN_AMOUNT * 2);
-
-      for (let i = 1; i < 6; i++) {
-        await most
-          .connect(accounts[i])
-          .receiveRequest(
-            requestHash,
-            tokenAddressBytes32,
-            TOKEN_AMOUNT,
-            ethAddress,
-            0,
-          );
-      }
-
-      previousCommitteeId = await most.committeeId();
-
-      await expect(previousCommitteeId).to.be.equal(0);
-
-      let committee = accounts.slice(2, 9).map((x) => x.address);
-      let threshold = 4;
-
-      await most.setCommittee(committee, threshold);
-
-      await expect(await most.committeeId()).to.be.equal(1);
-
-      totalRewards = await most.getCollectedCommitteeRewards(
-        previousCommitteeId,
-        tokenAddressBytes32,
-      );
-      signerBalanceBefore = await token.balanceOf(accounts[1].address);
-
-      await most.payoutRewards(
-        previousCommitteeId,
-        accounts[1].address,
-        tokenAddressBytes32,
-      );
-
-      signerBalanceAfter = await token.balanceOf(accounts[1].address);
-      await expect(signerBalanceAfter).to.be.equal(
-        signerBalanceBefore + totalRewards / BigInt(8),
-      );
-    });
-  });
-
+  
   describe("Upgrade", function () {
     it("Most contract can be upgraded", async () => {
       exec("cp ./contracts/Most.sol ./contracts/MostV2.sol", (error) => {
