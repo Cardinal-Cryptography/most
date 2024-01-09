@@ -963,22 +963,6 @@ mod e2e {
             .return_value()
     }
 
-    async fn most_query_price(
-        client: &mut E2EClient,
-        most_address: AccountId,
-        amount_of: u128,
-        of_token: [u8; 32],
-        in_token: [u8; 32],
-    ) -> Result<u128, MostError> {
-        let call = build_message::<MostRef>(most_address)
-            .call(|most| most.query_price(amount_of, of_token, in_token));
-
-        client
-            .call_dry_run(&alice(), &call, 0, None)
-            .await
-            .return_value()
-    }
-
     async fn call_message<Ref, RetType, ErrType, Args, F>(
         client: &mut E2EClient,
         caller: &Keypair,

@@ -18,10 +18,6 @@ pub mod most {
     use scale::{Decode, Encode};
     use shared::{concat_u8_arrays, keccak256, Keccak256HashOutput as HashedRequest, Selector};
 
-    const NATIVE_TOKEN_ID: [u8; 32] = [0x0; 32];
-    const WETH_TOKEN_ID: [u8; 32] = [0x1; 32];
-    const USDT_TOKEN_ID: [u8; 32] = [0x2; 32];
-
     type CommitteeId = u128;
 
     #[ink(event)]
@@ -442,22 +438,6 @@ pub mod most {
             Ok(self.data()?.committee_id)
         }
 
-        /// Returns current address of the USDT contract
-        ///
-        /// USDT is ERC20/PSP22 contract
-        #[ink(message)]
-        pub fn get_usdt(&self) -> [u8; 32] {
-            USDT_TOKEN_ID
-        }
-
-        /// Returns current address of the wETH contract
-        ///
-        /// wETH is ERC20/PSP22 contract
-        #[ink(message)]
-        pub fn get_weth(&self) -> [u8; 32] {
-            WETH_TOKEN_ID
-        }
-
         /// Query total rewards for this committee
         ///
         /// Denominated in AZERO
@@ -515,12 +495,9 @@ pub mod most {
             let do_query_gas_fee = || 39106342561;
             let data = self.data()?;
 
-            let amount = data
-                .relay_gas_usage
+            data.relay_gas_usage
                 .checked_mul(do_query_gas_fee())
-                .ok_or(MostError::Arithmetic)?;
-
-            self.query_price(amount, WETH_TOKEN_ID, NATIVE_TOKEN_ID)
+                .ok_or(MostError::Arithmetic)
         }
 
         /// Returns an error (reverts) if account is not in the committee with `committee_id`
@@ -608,28 +585,6 @@ pub mod most {
         }
 
         // ---  helper functions
-
-        /// Queries a price oracle and returns the price of an `amount` number of the `of` tokens denominated in the `in_token`
-        ///
-        /// TODO: this is a mocked method pending an implementation
-        #[ink(message)]
-        pub fn query_price(
-            &self,
-            amount_of: u128,
-            of_token_address: [u8; 32],
-            in_token_address: [u8; 32],
-        ) -> Result<u128, MostError> {
-            if in_token_address == USDT_TOKEN_ID {
-                return Ok(amount_of * 2);
-            }
-
-            if of_token_address == USDT_TOKEN_ID {
-                return Ok(amount_of / 2);
-            }
-
-            Ok(amount_of)
-        }
-
         fn ensure_owner(&mut self) -> Result<(), MostError> {
             let caller = self.env().caller();
             let data = self.data()?;
