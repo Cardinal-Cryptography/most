@@ -35,7 +35,7 @@ describe("Wrapped Ether", function () {
       const { wrapped, owner } = await loadFixture(setupWrappedEtherFixture);
 
       await expect(
-        wrapped.deposit({ value: ethToWei(WRAP_AMOUNT) }),
+        wrapped.deposit({ value: ethToWei(WRAP_AMOUNT) })
       ).to.changeTokenBalance(wrapped, owner, ethToWei(WRAP_AMOUNT));
     });
 
@@ -45,7 +45,7 @@ describe("Wrapped Ether", function () {
       await expect(
         wrapped.deposit({
           value: ethToWei(WRAP_AMOUNT),
-        }),
+        })
       )
         .to.emit(wrapped, "Deposit")
         .withArgs(owner.address, ethToWei(WRAP_AMOUNT));
@@ -76,7 +76,7 @@ describe("Wrapped Ether", function () {
       await wrapped.deposit({ value: ethToWei(WRAP_AMOUNT) });
 
       await expect(
-        wrapped.withdraw(ethToWei(WRAP_AMOUNT)),
+        wrapped.withdraw(ethToWei(WRAP_AMOUNT))
       ).to.changeTokenBalance(wrapped, owner, ethToWei(-WRAP_AMOUNT));
       expect(await wrapped.balanceOf(owner)).to.equal(0n);
     });
@@ -98,11 +98,11 @@ describe("Wrapped Ether", function () {
         balance_init -
           balance_after_deposit -
           ethToWei(WRAP_AMOUNT) -
-          depositGasEstimate,
+          depositGasEstimate
       ).to.be.lessThan(TOLERANCE.toString());
 
       const withdrawGasEstimate = await wrapped.withdraw.estimateGas(
-        ethToWei(WRAP_AMOUNT),
+        ethToWei(WRAP_AMOUNT)
       );
       await wrapped.withdraw(ethToWei(WRAP_AMOUNT));
       const balance_after_withdraw = await provider.getBalance(owner);
@@ -110,14 +110,14 @@ describe("Wrapped Ether", function () {
         balance_after_withdraw -
           balance_after_deposit -
           ethToWei(WRAP_AMOUNT) -
-          withdrawGasEstimate,
+          withdrawGasEstimate
       ).to.be.lessThan(TOLERANCE.toString());
 
       expect(
         balance_after_withdraw -
           balance_init -
           depositGasEstimate -
-          withdrawGasEstimate,
+          withdrawGasEstimate
       ).to.be.lessThan(TOLERANCE.toString());
     });
   });

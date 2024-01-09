@@ -18,7 +18,7 @@ async function main() {
     "Transferring Governance ownership from ",
     initialGovernanceOwner,
     "to ",
-    governance.address,
+    governance.address
   );
   await governance.transferOwnership(contracts.governance);
   console.log("Governance ownership transferred successfully");
@@ -35,7 +35,7 @@ async function main() {
     "Transferring Most ownership from ",
     initialMostOwner,
     "to",
-    contracts.governance,
+    contracts.governance
   );
   await most.transferOwnership(contracts.governance);
   console.log("Most ownership transferred successfully");

@@ -20,7 +20,7 @@ async function main() {
   const usdt = await Token.deploy(
     "12000000000000000000000000",
     "Tether",
-    "USDT",
+    "USDT"
   );
   console.log("USDT deployed to:", usdt.target);
 
@@ -31,7 +31,7 @@ async function main() {
     {
       initializer: "initialize",
       kind: "uups",
-    },
+    }
   );
   await governance.waitForDeployment();
   console.log("Governance deployed to:", governance.target);
@@ -50,7 +50,7 @@ async function main() {
     {
       initializer: "initialize",
       kind: "uups",
-    },
+    }
   );
   await most.waitForDeployment();
   console.log("Most deployed to:", most.target);
