@@ -20,7 +20,7 @@ async function main() {
   const usdt = await Token.deploy(
     "12000000000000000000000000",
     "Tether",
-    "USDT"
+    "USDT",
   );
   console.log("USDT deployed to:", usdt.target);
 
@@ -31,7 +31,7 @@ async function main() {
     {
       initializer: "initialize",
       kind: "uups",
-    }
+    },
   );
   await governance.waitForDeployment();
   console.log("Governance deployed to:", governance.target);
@@ -40,17 +40,11 @@ async function main() {
   console.log("Deploying Most...");
   const most = await upgrades.deployProxy(
     Most,
-    [
-      accounts.slice(1, 4),
-      2,
-      COMMISSION_PER_DIX_MILLE,
-      MINIMUM_TRANSFER_AMOUNT_USD,
-      accounts[0],
-    ],
+    [accounts.slice(1, 4), 2, accounts[0]],
     {
       initializer: "initialize",
       kind: "uups",
-    }
+    },
   );
   await most.waitForDeployment();
   console.log("Most deployed to:", most.target);

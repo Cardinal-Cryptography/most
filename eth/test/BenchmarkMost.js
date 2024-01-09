@@ -22,7 +22,7 @@ describe("MostBenchmark", function () {
       {
         initializer: "initialize",
         kind: "uups",
-      }
+      },
     );
     const mostAddress = await most.getAddress();
 
@@ -47,7 +47,7 @@ describe("MostBenchmark", function () {
       tokenAddressBytes32,
       1000,
       azAccount,
-      { from: accounts[0] }
+      { from: accounts[0] },
     );
 
     console.log("Gas estimate for sendRequest: ", Number(gasEstimateSend));
@@ -61,7 +61,7 @@ describe("MostBenchmark", function () {
     let ethAccount = addressToBytes32(accounts[9].address);
     let requestHash = hre.ethers.solidityPackedKeccak256(
       ["bytes32", "uint256", "bytes32", "uint256"],
-      [tokenAddressBytes32, 1000, ethAccount, 1]
+      [tokenAddressBytes32, 1000, ethAccount, 1],
     );
 
     // Estimate gas for each signature
@@ -75,8 +75,8 @@ describe("MostBenchmark", function () {
             tokenAddressBytes32,
             1000,
             ethAccount,
-            1
-          )
+            1,
+          ),
       );
 
       // Check if gas estimate is high enough
