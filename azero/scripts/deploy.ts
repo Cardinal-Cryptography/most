@@ -43,7 +43,7 @@ async function main(): Promise<void> {
   const governanceCodeHash = await uploadCode(
     api,
     deployer,
-    "governance.contract",
+    "governance.contract"
   );
   console.log("governance code hash:", governanceCodeHash);
 
@@ -62,7 +62,7 @@ async function main(): Promise<void> {
       pocket_money!,
       minimum_transfer_amount_usd!,
       relay_gas_usage!,
-    ],
+    ]
   );
 
   const { address: mostAddress } = await mostConstructors.new(
@@ -72,7 +72,7 @@ async function main(): Promise<void> {
     pocket_money!,
     minimum_transfer_amount_usd!,
     relay_gas_usage!,
-    { gasLimit: estimatedGasMost },
+    { gasLimit: estimatedGasMost }
   );
 
   console.log("most address:", mostAddress);
@@ -81,7 +81,7 @@ async function main(): Promise<void> {
     api,
     deployer,
     "token.contract",
-    [0, "wETH", "wETH", 12, mostAddress],
+    [0, "wETH", "wETH", 12, mostAddress]
   );
   const { address: wethAddress } = await tokenConstructors.new(
     0, // initial supply
@@ -89,7 +89,7 @@ async function main(): Promise<void> {
     "wETH", // symbol
     12, // decimals
     mostAddress, // minter_burner address
-    { gasLimit: estimatedGasToken },
+    { gasLimit: estimatedGasToken }
   );
   console.log("token address:", wethAddress);
 
@@ -97,11 +97,11 @@ async function main(): Promise<void> {
     api,
     deployer,
     "governance.contract",
-    [2],
+    [2]
   );
   const { address: governanceAddress } = await governanceConstructors.new(
     2, // quorum
-    { gasLimit: estimatedGasGovernance },
+    { gasLimit: estimatedGasGovernance }
   );
   console.log("governance address:", governanceAddress);
 

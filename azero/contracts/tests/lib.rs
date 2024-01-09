@@ -360,10 +360,7 @@ mod e2e {
             .await
             .expect("balance before");
 
-        assert_eq!(
-            balance,
-            amount
-        );
+        assert_eq!(balance, amount);
     }
 
     #[ink_e2e::test]
@@ -736,12 +733,7 @@ mod e2e {
         pocket_money: u128,
         relay_gas_usage: u128,
     ) -> AccountId {
-        let most_constructor = MostRef::new(
-            guardians,
-            threshold,
-            pocket_money,
-            relay_gas_usage,
-        );
+        let most_constructor = MostRef::new(guardians, threshold, pocket_money, relay_gas_usage);
         client
             .instantiate("most", caller, most_constructor, 0, None)
             .await

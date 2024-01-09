@@ -20,18 +20,10 @@ describe("Most", function () {
 
       const Most = await ethers.getContractFactory("Most");
       await expect(
-        upgrades.deployProxy(
-          Most,
-          [
-            [accounts[0]],
-            0,
-            accounts[0],
-          ],
-          {
-            initializer: "initialize",
-            kind: "uups",
-          },
-        ),
+        upgrades.deployProxy(Most, [[accounts[0]], 0, accounts[0]], {
+          initializer: "initialize",
+          kind: "uups",
+        }),
       ).to.be.revertedWith("Signature threshold must be greater than 0");
     });
     it("Reverts if threshold is greater than number of guardians", async () => {
@@ -40,18 +32,10 @@ describe("Most", function () {
 
       const Most = await ethers.getContractFactory("Most");
       await expect(
-        upgrades.deployProxy(
-          Most,
-          [
-            [accounts[0]],
-            2,
-            accounts[0],
-          ],
-          {
-            initializer: "initialize",
-            kind: "uups",
-          },
-        ),
+        upgrades.deployProxy(Most, [[accounts[0]], 2, accounts[0]], {
+          initializer: "initialize",
+          kind: "uups",
+        }),
       ).to.be.revertedWith("Not enough guardians specified");
     });
   });
@@ -63,11 +47,7 @@ describe("Most", function () {
     const Most = await ethers.getContractFactory("Most");
     const most = await upgrades.deployProxy(
       Most,
-      [
-        accounts.slice(1, 9),
-        5,
-        accounts[0],
-      ],
+      [accounts.slice(1, 9), 5, accounts[0]],
       {
         initializer: "initialize",
         kind: "uups",
@@ -295,7 +275,7 @@ describe("Most", function () {
       ).to.be.revertedWith("Hash does not match the data");
     });
   });
-  
+
   describe("Upgrade", function () {
     it("Most contract can be upgraded", async () => {
       exec("cp ./contracts/Most.sol ./contracts/MostV2.sol", (error) => {

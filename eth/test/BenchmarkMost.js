@@ -12,21 +12,13 @@ describe("MostBenchmark", function () {
     let threshold = 5;
 
     const Token = await hre.ethers.getContractFactory("Token");
-    const token = await Token.deploy(
-      "10000",
-      "TestToken",
-      "TEST",
-    );
+    const token = await Token.deploy("10000", "TestToken", "TEST");
     const tokenAddress = await token.getAddress();
 
     const Most = await hre.ethers.getContractFactory("Most");
     const most = await upgrades.deployProxy(
       Most,
-      [
-        guardianAddresses,
-        5,
-        accounts[0].address,
-      ],
+      [guardianAddresses, 5, accounts[0].address],
       {
         initializer: "initialize",
         kind: "uups",
@@ -39,11 +31,7 @@ describe("MostBenchmark", function () {
     let tokenAddressBytes32 = addressToBytes32(tokenAddress);
 
     // Add pair of linked contracts
-    await most.addPair(
-      tokenAddressBytes32,
-      azContract,
-      { from: accounts[0] },
-    );
+    await most.addPair(tokenAddressBytes32, azContract, { from: accounts[0] });
 
     // Gas estimate for sendRequest
 
@@ -64,12 +52,10 @@ describe("MostBenchmark", function () {
 
     console.log("Gas estimate for sendRequest: ", Number(gasEstimateSend));
 
-    await most.sendRequest(
-      tokenAddressBytes32,
-      1000,
-      azAccount,
-      { gas: gasEstimateSend, from: accounts[0] },
-    );
+    await most.sendRequest(tokenAddressBytes32, 1000, azAccount, {
+      gas: gasEstimateSend,
+      from: accounts[0],
+    });
 
     // Gas estimate for bridgeReceive
     let ethAccount = addressToBytes32(accounts[9].address);

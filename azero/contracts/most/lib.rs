@@ -110,8 +110,7 @@ pub mod most {
         /// rewards collected by the commitee for relaying cross-chain transfer requests
         collected_committee_rewards: Mapping<CommitteeId, u128, ManualKey<0x434F4C4C>>,
         /// rewards collected by the individual commitee members for relaying cross-chain transfer requests
-        paid_out_member_rewards:
-            Mapping<(AccountId, CommitteeId), u128, ManualKey<0x50414944>>,
+        paid_out_member_rewards: Mapping<(AccountId, CommitteeId), u128, ManualKey<0x50414944>>,
     }
 
     #[derive(Debug, PartialEq, Eq, Encode, Decode)]
@@ -373,8 +372,7 @@ pub mod most {
             committee_id: CommitteeId,
             member_id: AccountId,
         ) -> Result<(), MostError> {
-            let paid_out_rewards =
-                self.get_paid_out_member_rewards(committee_id, member_id);
+            let paid_out_rewards = self.get_paid_out_member_rewards(committee_id, member_id);
 
             let outstanding_rewards =
                 self.get_outstanding_member_rewards(committee_id, member_id)?;
@@ -464,10 +462,7 @@ pub mod most {
         ///
         /// Denominated in AZERO
         #[ink(message)]
-        pub fn get_collected_committee_rewards(
-            &self,
-            committee_id: CommitteeId,
-        ) -> u128 {
+        pub fn get_collected_committee_rewards(&self, committee_id: CommitteeId) -> u128 {
             self.collected_committee_rewards
                 .get(committee_id)
                 .unwrap_or_default()
@@ -507,8 +502,7 @@ pub mod most {
                 )
                 .ok_or(MostError::Arithmetic)?;
 
-            let collected_amount =
-                self.get_paid_out_member_rewards(committee_id, member_id);
+            let collected_amount = self.get_paid_out_member_rewards(committee_id, member_id);
 
             Ok(total_amount.saturating_sub(collected_amount))
         }
@@ -702,13 +696,8 @@ pub mod most {
         fn new_fails_on_zero_threshold() {
             set_caller::<DefEnv>(default_accounts::<DefEnv>().alice);
             assert_eq!(
-                Most::new(
-                    guardian_accounts(),
-                    0,
-                    POCKET_MONEY,
-                    RELAY_GAS_USAGE
-                )
-                .expect_err("Threshold is zero, instantiation should fail."),
+                Most::new(guardian_accounts(), 0, POCKET_MONEY, RELAY_GAS_USAGE)
+                    .expect_err("Threshold is zero, instantiation should fail."),
                 MostError::InvalidThreshold
             );
         }
