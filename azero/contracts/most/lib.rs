@@ -5,7 +5,9 @@ pub use self::most::{MostError, MostRef};
 #[ink::contract]
 pub mod most {
 
+    use gas_oracle_trait::EthGasPriceOracle;
     use ink::{
+        contract_ref,
         env::{
             call::{build_call, ExecutionInput},
             set_code_hash, DefaultEnvironment, Error as InkEnvError,
@@ -19,6 +21,8 @@ pub mod most {
     use shared::{concat_u8_arrays, keccak256, Keccak256HashOutput as HashedRequest, Selector};
 
     type CommitteeId = u128;
+
+    const GAS_ORACLE_MAX_AGE: u64 = 24 * 60 * 60 * 1000; // 1 day
 
     #[ink(event)]
     #[derive(Debug)]
@@ -84,6 +88,14 @@ pub mod most {
         /// How much gas does a single confirmation of a cross-chain transfer request use on the destination chain on average.
         /// This value is calculated by summing the total gas usage of *all* the transactions it takes to relay a single request and dividing it by the current committee size and multiplying by 1.2
         relay_gas_usage: u128,
+        /// minimum fee that can be charged for a cross-chain transfer request
+        min_fee: u128,
+        /// maximum fee that can be charged for a cross-chain transfer request
+        max_fee: u128,
+        /// default fee that is charged for a cross-chain transfer request if the gas price oracle is not available/malfunctioning
+        default_fee: u128,
+        /// gas price oracle that is used to calculate the fee for a cross-chain transfer request
+        gas_price_oracle: Option<AccountId>,
     }
 
     #[ink(storage)]
@@ -149,6 +161,9 @@ pub mod most {
             signature_threshold: u128,
             pocket_money: Balance,
             relay_gas_usage: u128,
+            min_fee: Balance,
+            max_fee: Balance,
+            default_fee: Balance,
         ) -> Result<Self, MostError> {
             if signature_threshold == 0 || committee.len().lt(&(signature_threshold as usize)) {
                 return Err(MostError::InvalidThreshold);
@@ -174,6 +189,10 @@ pub mod most {
                 committee_id,
                 pocket_money,
                 relay_gas_usage,
+                min_fee,
+                max_fee,
+                default_fee,
+                gas_price_oracle: None,
             });
 
             Ok(Self {
@@ -490,14 +509,29 @@ pub mod most {
         /// Queries a gas price oracle and returns the current base_fee charged per cross chain transfer denominated in AZERO
         #[ink(message)]
         pub fn get_base_fee(&self) -> Result<Balance, MostError> {
-            // TODO: implement
-            // return a current gas price in WEI
-            let do_query_gas_fee = || 39106342561;
-            let data = self.data()?;
+            if let Some(gas_price_oracle_address) = self.data()?.gas_price_oracle {
+                let gas_price_oracle: contract_ref!(EthGasPriceOracle) =
+                    gas_price_oracle_address.into();
 
-            data.relay_gas_usage
-                .checked_mul(do_query_gas_fee())
-                .ok_or(MostError::Arithmetic)
+                let (gas_price, timestamp) = gas_price_oracle.get_price();
+                if timestamp + GAS_ORACLE_MAX_AGE < self.env().block_timestamp() {
+                    return Ok(self.data()?.default_fee);
+                }
+
+                let base_fee = gas_price
+                    .checked_mul(self.data()?.relay_gas_usage.into())
+                    .ok_or(MostError::Arithmetic)?;
+
+                if base_fee < self.data()?.min_fee {
+                    Ok(self.data()?.min_fee)
+                } else if base_fee > self.data()?.max_fee {
+                    Ok(self.data()?.max_fee)
+                } else {
+                    Ok(base_fee)
+                }
+            } else {
+                Ok(self.data()?.default_fee)
+            }
         }
 
         /// Returns an error (reverts) if account is not in the committee with `committee_id`
@@ -632,6 +666,9 @@ pub mod most {
         const THRESHOLD: u128 = 3;
         const POCKET_MONEY: Balance = 1000000000000;
         const RELAY_GAS_USAGE: u128 = 50000;
+        const MIN_FEE: Balance = 1000000000000;
+        const MAX_FEE: Balance = 100000000000000;
+        const DEFAULT_FEE: Balance = 30000000000000;
 
         type DefEnv = DefaultEnvironment;
         type AccountId = <DefEnv as Environment>::AccountId;
@@ -651,8 +688,16 @@ pub mod most {
         fn new_fails_on_zero_threshold() {
             set_caller::<DefEnv>(default_accounts::<DefEnv>().alice);
             assert_eq!(
-                Most::new(guardian_accounts(), 0, POCKET_MONEY, RELAY_GAS_USAGE)
-                    .expect_err("Threshold is zero, instantiation should fail."),
+                Most::new(
+                    guardian_accounts(),
+                    0,
+                    POCKET_MONEY,
+                    RELAY_GAS_USAGE,
+                    MIN_FEE,
+                    MAX_FEE,
+                    DEFAULT_FEE
+                )
+                .expect_err("Threshold is zero, instantiation should fail."),
                 MostError::InvalidThreshold
             );
         }
@@ -665,7 +710,10 @@ pub mod most {
                     guardian_accounts(),
                     (guardian_accounts().len() + 1) as u128,
                     POCKET_MONEY,
-                    RELAY_GAS_USAGE
+                    RELAY_GAS_USAGE,
+                    MIN_FEE,
+                    MAX_FEE,
+                    DEFAULT_FEE
                 )
                 .expect_err("Threshold is larger than guardians, instantiation should fail."),
                 MostError::InvalidThreshold
@@ -680,6 +728,9 @@ pub mod most {
                 THRESHOLD,
                 POCKET_MONEY,
                 RELAY_GAS_USAGE,
+                MIN_FEE,
+                MAX_FEE,
+                DEFAULT_FEE,
             )
             .expect("Threshold is valid.");
 
@@ -700,6 +751,9 @@ pub mod most {
                 THRESHOLD,
                 POCKET_MONEY,
                 RELAY_GAS_USAGE,
+                MIN_FEE,
+                MAX_FEE,
+                DEFAULT_FEE,
             )
             .expect("Threshold is valid.");
 
@@ -718,6 +772,9 @@ pub mod most {
                 THRESHOLD,
                 POCKET_MONEY,
                 RELAY_GAS_USAGE,
+                MIN_FEE,
+                MAX_FEE,
+                DEFAULT_FEE,
             )
             .expect("Threshold is valid.");
             set_caller::<DefEnv>(accounts.bob);
@@ -738,6 +795,9 @@ pub mod most {
                 THRESHOLD,
                 POCKET_MONEY,
                 RELAY_GAS_USAGE,
+                MIN_FEE,
+                MAX_FEE,
+                DEFAULT_FEE,
             )
             .expect("Threshold is valid.");
 
@@ -755,6 +815,9 @@ pub mod most {
                 THRESHOLD,
                 POCKET_MONEY,
                 RELAY_GAS_USAGE,
+                MIN_FEE,
+                MAX_FEE,
+                DEFAULT_FEE,
             )
             .expect("Threshold is valid.");
 

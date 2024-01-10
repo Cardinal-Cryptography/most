@@ -15,6 +15,7 @@ mod e2e {
 
     use ink::{
         codegen::TraitCallBuilder,
+        contract_ref,
         env::{
             call::{
                 utils::{ReturnType, Set},
@@ -47,7 +48,9 @@ mod e2e {
     const REMOTE_TOKEN: [u8; 32] = [0x1; 32];
     const REMOTE_RECEIVER: [u8; 32] = [0x2; 32];
 
-    const USDT_TOKEN_ID: [u8; 32] = [0x2; 32];
+    const MIN_FEE: u128 = 10;
+    const MAX_FEE: u128 = 100;
+    const DEFAULT_FEE: u128 = 30;
     const DEFAULT_POCKET_MONEY: u128 = 1000000000000;
     const DEFAULT_RELAY_GAS_USAGE: u128 = 50000;
 
@@ -60,6 +63,9 @@ mod e2e {
             DEFAULT_THRESHOLD,
             DEFAULT_POCKET_MONEY,
             DEFAULT_RELAY_GAS_USAGE,
+            MIN_FEE,
+            MAX_FEE,
+            DEFAULT_FEE,
         )
         .await;
     }
@@ -732,8 +738,19 @@ mod e2e {
         threshold: u128,
         pocket_money: u128,
         relay_gas_usage: u128,
+        min_fee: u128,
+        max_fee: u128,
+        default_fee: u128,
     ) -> AccountId {
-        let most_constructor = MostRef::new(guardians, threshold, pocket_money, relay_gas_usage);
+        let most_constructor = MostRef::new(
+            guardians,
+            threshold,
+            pocket_money,
+            relay_gas_usage,
+            min_fee,
+            max_fee,
+            default_fee,
+        );
         client
             .instantiate("most", caller, most_constructor, 0, None)
             .await
@@ -767,6 +784,9 @@ mod e2e {
             DEFAULT_THRESHOLD,
             DEFAULT_POCKET_MONEY,
             DEFAULT_RELAY_GAS_USAGE,
+            MIN_FEE,
+            MAX_FEE,
+            DEFAULT_FEE,
         )
         .await;
 
