@@ -49,7 +49,11 @@ async function main(): Promise<void> {
   );
   console.log("governance code hash:", governanceCodeHash);
 
-  const testOracleCodeHash = await uploadCode(api, deployer, "test_oracle.contract");
+  const testOracleCodeHash = await uploadCode(
+    api,
+    deployer,
+    "test_oracle.contract",
+  );
   console.log("oracle code hash:", testOracleCodeHash);
 
   const governanceConstructors = new GovernanceConstructors(api, deployer);
@@ -61,7 +65,15 @@ async function main(): Promise<void> {
     api,
     deployer,
     "most.contract",
-    [relayers_keys, signature_threshold!, pocket_money!, relay_gas_usage!, min_fee!, max_fee!, default_fee!],
+    [
+      relayers_keys,
+      signature_threshold!,
+      pocket_money!,
+      relay_gas_usage!,
+      min_fee!,
+      max_fee!,
+      default_fee!,
+    ],
   );
 
   const { address: mostAddress } = await mostConstructors.new(
