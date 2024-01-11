@@ -38,6 +38,12 @@ describe("MostBenchmark", function () {
     // bytes32 "address" of account on Aleph
     let azAccount = getRandomAlephAccount(0);
 
+    const gasEstimateApprove = await token.approve.estimateGas(mostAddress, 1000, {
+      from: accounts[0],
+    });
+
+    console.log("Gas estimate for approve: ", Number(gasEstimateApprove));
+
     // Allow Most to spend tokens
     await token.approve(mostAddress, 1000, {
       from: accounts[0],
