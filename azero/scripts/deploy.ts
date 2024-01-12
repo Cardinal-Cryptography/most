@@ -77,30 +77,34 @@ async function main(): Promise<void> {
 
   console.log("most address:", mostAddress);
 
+  let initialSupply = 0;
+  let symbol = "wETH";
+  let name = symbol;
+  let decimals = 12;
+  let minterBurner = mostAddress
   let estimatedGasToken = await estimateContractInit(
     api,
     deployer,
     "token.contract",
-    [0, "wETH", "wETH", 12, mostAddress],
+    [initialSupply, name, symbol, decimals, minterBurner],
   );
+
   const { address: wethAddress } = await tokenConstructors.new(
-    0, // initial supply
-    "wETH", // name
-    "wETH", // symbol
-    12, // decimals
-    mostAddress, // minter_burner address
+    initialSupply, name, symbol, decimals, minterBurner,
     { gasLimit: estimatedGasToken },
   );
   console.log("token address:", wethAddress);
 
+  let quorum = 2;
   let estimatedGasGovernance = await estimateContractInit(
     api,
     deployer,
     "governance.contract",
-    [2],
+    [quorum],
   );
+
   const { address: governanceAddress } = await governanceConstructors.new(
-    2, // quorum
+    quorum,
     { gasLimit: estimatedGasGovernance },
   );
   console.log("governance address:", governanceAddress);
