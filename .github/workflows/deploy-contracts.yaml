@@ -86,13 +86,13 @@ jobs:
           - from: azero/artifacts/most.contract
             to: azero_most
           - from: azero/artifacts/governance.json
-            to: azero_most
+            to: azero_governance
           - from: azero/artifacts/governance.contract
-            to: azero_most
+            to: azero_governance
           - from: azero/artifacts/token.json
-            to: azero_most
+            to: azero_token
           - from: azero/artifacts/token.contract
-            to: azero_most
+            to: azero_token
 
     steps:
       - name: Checkout code
