@@ -8,10 +8,17 @@ on:
       #- A0-3158-dockerize-relayer
 
 jobs:
+  check-vars-and-secrets:
+    name: Check vars and secrets
+    uses: ./.github/workflows/_check-vars-and-secrets.yml
+    secrets: inherit
+
   test-azero-contracts:
+    needs: [check-vars-and-secrets]
     uses: ./.github/workflows/test-azero-contracts.yml
 
   test-eth-contracts:
+    needs: [check-vars-and-secrets]
     uses: ./.github/workflows/test-eth-contracts.yml
 
   deploy-eth:

@@ -8,7 +8,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  main:
+  check-vars-and-secrets:
+    name: Check vars and secrets
+    uses: ./.github/workflows/_check-vars-and-secrets.yml
+    secrets: inherit
+
+  recreate-eth:
+    needs: [check-vars-and-secrets]
     name: Re-create eth nodes
     runs-on: [self-hosted, Linux, X64, small]
     steps:

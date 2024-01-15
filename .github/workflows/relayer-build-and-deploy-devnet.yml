@@ -10,7 +10,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check-vars-and-secrets:
+    name: Check vars and secrets
+    uses: ./.github/workflows/_check-vars-and-secrets.yml
+    secrets: inherit
+
   build:
+    needs: [check-vars-and-secrets]
     name: Build
     runs-on: [self-hosted, Linux, X64, large]
     env:
@@ -42,15 +48,18 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_DEVNET_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_DEVNET_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: eu-central-1
+        # yamllint disable rule:line-length
         run: |
           mkdir -p azero/artifacts
           aws s3 cp s3://alephzero-devnet-contracts-test/miko-test/most/425a073ca09f83420218ea1e4fdd3d62036bf4da/relayer/fe_bridgenet/azero_addresses.json azero/addresses.json
           aws s3 cp s3://alephzero-devnet-contracts-test/miko-test/most/425a073ca09f83420218ea1e4fdd3d62036bf4da/relayer/fe_bridgenet/eth_addresses.json eth/addresses.json
           aws s3 cp s3://alephzero-devnet-contracts-test/miko-test/most/425a073ca09f83420218ea1e4fdd3d62036bf4da/relayer/fe_bridgenet/most.json azero/artifacts/most.json
+        # yamllint enable rule:line-length
 
       - name: Build relayer
         run: |
-          make build-docker-relayer DOCKER_RELAYER_NAME=most-relayer-${{ steps.get-ref-properties.outputs.sha }}
+          make build-docker-relayer \
+            DOCKER_RELAYER_NAME=most-relayer-${{ steps.get-ref-properties.outputs.sha }}
 
       - name: Login to Amazon ECR
         uses: docker/login-action@v3
