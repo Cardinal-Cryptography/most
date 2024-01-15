@@ -52,8 +52,20 @@ jobs:
         run: |
           make build-docker-relayer DOCKER_RELAYER_NAME=most-relayer-${{ steps.get-ref-properties.outputs.sha }}
 
-      
+      - name: Login to Amazon ECR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.ECR_PRIVATE_HOST }}
+          username: ${{ secrets.AWS_MAINNET_ACCESS_KEY_ID }}
+          password: ${{ secrets.AWS_MAINNET_SECRET_ACCESS_KEY }}
+        env:
+          AWS_REGION: us-east-1
 
-      # Run docker build and if it runs then happy days
-      # Login to AWS and push to ECR as 'membrane-bridge-relayer'
-
+      - name: Push docker image to ECR
+        shell: bash
+        run: |
+          docker tag \
+            most-relayer-${{ steps.get-ref-properties.outputs.sha }} \
+            ${{ secrets.ECR_PRIVATE_HOST }}/most-relayer:${{ steps.get-ref-properties.outputs.sha }}-bridgenet
+          docker push \
+            ${{ secrets.ECR_PRIVATE_HOST }}/most-relayer:${{ steps.get-ref-properties.outputs.sha }}-bridgenet
