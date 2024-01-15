@@ -1,0 +1,62 @@
+name: Build and push relayer
+
+on:
+  push:
+    branches:
+    - A0-3158-dockerize-relayer
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build
+    runs-on: [self-hosted, Linux, X64, large]
+    env:
+      RUST_BACKTRACE: full
+      RUSTC_WRAPPER: sccache
+    steps:
+      - name: Checkout Source code
+        uses: actions/checkout@v2
+
+      - name: Call action get-ref-properties
+        id: get-ref-properties
+        # yamllint disable-line rule:line-length
+        uses: Cardinal-Cryptography/github-actions/get-ref-properties@v6
+
+      - name: Install Rust toolchain
+        uses: Cardinal-Cryptography/github-actions/install-rust-toolchain@v6
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install necessary tools
+        shell: bash
+        run: |
+          npm install typechain
+          cargo install cargo-contract
+
+      - name: Compile contracts
+        shell: bash
+        run: |
+          make azero-deps
+          make compile-azero
+          make eth-deps
+          make compile-eth
+
+      - name: Copy Membrane.json for relayer
+        shell: bash
+        run: |
+          mkdir -p eth/build/contracts/
+          cp eth/artifacts/contracts/Membrane.sol/Membrane.json eth/build/contracts/Membrane.json
+
+      - name: Build relayer
+        run: |
+          cd relayer
+          cargo build
+          ls -al
+          find .
+
+      # Run docker build and if it runs then happy days
+      # Login to AWS and push to ECR as 'membrane-bridge-relayer'
+
