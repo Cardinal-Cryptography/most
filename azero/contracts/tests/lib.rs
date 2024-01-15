@@ -668,7 +668,12 @@ mod e2e {
         assert_eq!(base_fee, DEFAULT_FEE);
 
         // Oracle returning price withing the range
-        let oracle_address = instantiate_oracle(&mut client, &alice(), 2 * DEFAULT_FEE / DEFAULT_RELAY_GAS_USAGE).await;
+        let oracle_address = instantiate_oracle(
+            &mut client,
+            &alice(),
+            2 * DEFAULT_FEE / DEFAULT_RELAY_GAS_USAGE,
+        )
+        .await;
         most_set_gas_oracle(&mut client, &alice(), most_address, oracle_address)
             .await
             .expect("can set gas oracle");
@@ -680,7 +685,8 @@ mod e2e {
         assert_eq!(oracle_fee, 2 * DEFAULT_FEE);
 
         // Oracle returning price larger than the maximum allowed price
-        let oracle_address = instantiate_oracle(&mut client, &alice(), 2 * MAX_FEE / DEFAULT_RELAY_GAS_USAGE).await;
+        let oracle_address =
+            instantiate_oracle(&mut client, &alice(), 2 * MAX_FEE / DEFAULT_RELAY_GAS_USAGE).await;
 
         most_set_gas_oracle(&mut client, &alice(), most_address, oracle_address)
             .await
@@ -693,7 +699,12 @@ mod e2e {
         assert_eq!(oracle_fee, MAX_FEE);
 
         // Oracle returning price smaller than the minimum allowed price
-        let oracle_address = instantiate_oracle(&mut client, &alice(), MIN_FEE / (2 * DEFAULT_RELAY_GAS_USAGE)).await;
+        let oracle_address = instantiate_oracle(
+            &mut client,
+            &alice(),
+            MIN_FEE / (2 * DEFAULT_RELAY_GAS_USAGE),
+        )
+        .await;
 
         most_set_gas_oracle(&mut client, &alice(), most_address, oracle_address)
             .await

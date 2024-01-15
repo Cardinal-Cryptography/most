@@ -558,10 +558,13 @@ pub mod most {
         }
 
         /// Sets address of the gas price oracle
-        /// 
+        ///
         /// Can only be called by the contracts owner
         #[ink(message)]
-        pub fn set_gas_price_oracle(&mut self, gas_price_oracle: AccountId) -> Result<(), MostError> {
+        pub fn set_gas_price_oracle(
+            &mut self,
+            gas_price_oracle: AccountId,
+        ) -> Result<(), MostError> {
             self.ensure_owner()?;
             let mut data = self.data()?;
             data.gas_price_oracle = Some(gas_price_oracle);
