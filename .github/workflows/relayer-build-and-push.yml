@@ -44,13 +44,6 @@ jobs:
           make eth-deps
           make compile-eth
 
-      - name: Copy Membrane.json for relayer
-        shell: bash
-        run: |
-          mkdir -p eth/build/contracts/
-          find .
-          cp eth/artifacts/contracts/Membrane.sol/Membrane.json eth/build/contracts/Membrane.json
-
       - name: Build relayer
         run: |
           cd relayer
