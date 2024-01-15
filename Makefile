@@ -2,6 +2,7 @@ NETWORK ?= development
 AZERO_ENV ?= dev
 
 export BRIDGENET_START_BLOCK=`ENDPOINT=https://rpc-fe-bridgenet.dev.azero.dev ./relayer/scripts/azero_best_finalized.sh`
+export CONTRACT_VERSION ?=`git rev-parse HEAD`
 
 .PHONY: help
 help: # Show help for each of the Makefile recipes.
@@ -274,3 +275,7 @@ build-docker-relayer: compile-azero compile-eth
 	cp azero/artifacts/most.json relayer/most.json
 	cd relayer && docker build -t most-relayer .
 	rm relayer/azero_addresses.json relayer/eth_addresses.json relayer/most.json
+
+contract_spec.json: # Generate a a file describing deployed contracts based on addresses.json files
+contract_spec.json: azero/addresses.json eth/addresses.json
+	VERSION=${CONTRACT_VERSION} node scripts/contract_spec.js > contract_spec.json
