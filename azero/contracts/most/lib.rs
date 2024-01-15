@@ -7,6 +7,7 @@ pub mod most {
 
     use gas_oracle_trait::EthGasPriceOracle;
     use ink::{
+        codegen::TraitCallBuilder,
         contract_ref,
         env::{
             call::{build_call, ExecutionInput},
@@ -23,6 +24,7 @@ pub mod most {
     type CommitteeId = u128;
 
     const GAS_ORACLE_MAX_AGE: u64 = 24 * 60 * 60 * 1000; // 1 day
+    const ORACLE_CALL_GAS_LIMIT: u64 = 2_000_000_000;
 
     #[ink(event)]
     #[derive(Debug)]
@@ -499,7 +501,16 @@ pub mod most {
                 let gas_price_oracle: contract_ref!(EthGasPriceOracle) =
                     gas_price_oracle_address.into();
 
-                let (gas_price, timestamp) = gas_price_oracle.get_price();
+                let (gas_price, timestamp) = match gas_price_oracle
+                    .call()
+                    .get_price()
+                    .gas_limit(ORACLE_CALL_GAS_LIMIT)
+                    .try_invoke()
+                {
+                    Ok(Ok((gas_price, timestamp))) => (gas_price, timestamp),
+                    _ => return Ok(self.data()?.default_fee),
+                };
+
                 if timestamp + GAS_ORACLE_MAX_AGE < self.env().block_timestamp() {
                     return Ok(self.data()?.default_fee);
                 }
