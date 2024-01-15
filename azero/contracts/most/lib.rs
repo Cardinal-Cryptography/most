@@ -505,7 +505,7 @@ pub mod most {
                 }
 
                 let base_fee = gas_price
-                    .checked_mul(self.data()?.relay_gas_usage.into())
+                    .checked_mul(self.data()?.relay_gas_usage)
                     .ok_or(MostError::Arithmetic)?;
 
                 if base_fee < self.data()?.min_fee {
@@ -554,6 +554,18 @@ pub mod most {
         pub fn add_pair(&mut self, from: [u8; 32], to: [u8; 32]) -> Result<(), MostError> {
             self.ensure_owner()?;
             self.supported_pairs.insert(from, &to);
+            Ok(())
+        }
+
+        /// Sets address of the gas price oracle
+        /// 
+        /// Can only be called by the contracts owner
+        #[ink(message)]
+        pub fn set_gas_price_oracle(&mut self, gas_price_oracle: AccountId) -> Result<(), MostError> {
+            self.ensure_owner()?;
+            let mut data = self.data()?;
+            data.gas_price_oracle = Some(gas_price_oracle);
+            self.data.set(&data);
             Ok(())
         }
 

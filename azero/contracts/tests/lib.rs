@@ -35,6 +35,7 @@ mod e2e {
     use psp22::{PSP22Error, PSP22};
     use scale::{Decode, Encode};
     use shared::{keccak256, Keccak256HashOutput};
+    use test_oracle::TestOracleRef;
     use wrapped_token::TokenRef;
 
     use crate::events::{
@@ -656,6 +657,55 @@ mod e2e {
         );
     }
 
+    #[ink_e2e::test]
+    fn use_gas_oracle(mut client: ink_e2e::Client<C, E>) {
+        let (most_address, _token_address) = setup_default_most_and_token(&mut client, true).await;
+
+        let base_fee = most_base_fee(&mut client, most_address)
+            .await
+            .expect("should return base fee");
+
+        assert_eq!(base_fee, DEFAULT_FEE);
+
+        // Oracle returning price withing the range
+        let oracle_address = instantiate_oracle(&mut client, &alice(), 2 * DEFAULT_FEE / DEFAULT_RELAY_GAS_USAGE).await;
+        most_set_gas_oracle(&mut client, &alice(), most_address, oracle_address)
+            .await
+            .expect("can set gas oracle");
+
+        let oracle_fee = most_base_fee(&mut client, most_address)
+            .await
+            .expect("should return base fee");
+
+        assert_eq!(oracle_fee, 2 * DEFAULT_FEE);
+
+        // Oracle returning price larger than the maximum allowed price
+        let oracle_address = instantiate_oracle(&mut client, &alice(), 2 * MAX_FEE / DEFAULT_RELAY_GAS_USAGE).await;
+
+        most_set_gas_oracle(&mut client, &alice(), most_address, oracle_address)
+            .await
+            .expect("can set gas oracle");
+
+        let oracle_fee = most_base_fee(&mut client, most_address)
+            .await
+            .expect("should return base fee");
+
+        assert_eq!(oracle_fee, MAX_FEE);
+
+        // Oracle returning price smaller than the minimum allowed price
+        let oracle_address = instantiate_oracle(&mut client, &alice(), MIN_FEE / (2 * DEFAULT_RELAY_GAS_USAGE)).await;
+
+        most_set_gas_oracle(&mut client, &alice(), most_address, oracle_address)
+            .await
+            .expect("can set gas oracle");
+
+        let oracle_fee = most_base_fee(&mut client, most_address)
+            .await
+            .expect("should return base fee");
+
+        assert_eq!(oracle_fee, MIN_FEE);
+    }
+
     fn guardian_ids() -> Vec<AccountId> {
         vec![
             account_id(AccountKeyring::Bob),
@@ -738,6 +788,19 @@ mod e2e {
             .account_id
     }
 
+    async fn instantiate_oracle(
+        client: &mut E2EClient,
+        caller: &Keypair,
+        price: u128,
+    ) -> AccountId {
+        let oracle_constructor = TestOracleRef::new(price, false);
+        client
+            .instantiate("test_oracle", caller, oracle_constructor, 0, None)
+            .await
+            .expect("Oracle instantiation failed")
+            .account_id
+    }
+
     async fn setup_default_most_and_token(
         client: &mut E2EClient,
         add_pair: bool,
@@ -785,6 +848,22 @@ mod e2e {
             caller,
             most,
             |most| most.add_pair(*token.as_ref(), remote_token),
+            None,
+        )
+        .await
+    }
+
+    async fn most_set_gas_oracle(
+        client: &mut E2EClient,
+        caller: &Keypair,
+        most: AccountId,
+        oracle: AccountId,
+    ) -> CallResult<(), MostError> {
+        call_message::<MostRef, (), _, _, _>(
+            client,
+            caller,
+            most,
+            |most| most.set_gas_price_oracle(oracle),
             None,
         )
         .await
