@@ -17,7 +17,7 @@ async function import_env() {
 }
 
 async function main(): Promise<void> {
-  let {
+  const {
     ws_node,
     relayers_keys,
     authority_seed,
@@ -28,8 +28,8 @@ async function main(): Promise<void> {
     relay_gas_usage,
   } = await import_env();
 
-  let wsProvider = new WsProvider(ws_node);
-  let keyring = new Keyring({ type: "sr25519" });
+  const wsProvider = new WsProvider(ws_node);
+  const keyring = new Keyring({ type: "sr25519" });
 
   const api = await ApiPromise.create({ provider: wsProvider });
   const deployer = keyring.addFromUri(authority_seed);
@@ -51,7 +51,7 @@ async function main(): Promise<void> {
   const mostConstructors = new MostConstructors(api, deployer);
   const tokenConstructors = new TokenConstructors(api, deployer);
 
-  let estimatedGasMost = await estimateContractInit(
+  const estimatedGasMost = await estimateContractInit(
     api,
     deployer,
     "most.contract",
@@ -77,12 +77,12 @@ async function main(): Promise<void> {
 
   console.log("most address:", mostAddress);
 
-  let initialSupply = 0;
-  let symbol = "wETH";
-  let name = symbol;
-  let decimals = 12;
-  let minterBurner = mostAddress
-  let estimatedGasToken = await estimateContractInit(
+  const initialSupply = 0;
+  const symbol = "wETH";
+  const name = symbol;
+  const decimals = 12;
+  const minterBurner = mostAddress
+  const estimatedGasToken = await estimateContractInit(
     api,
     deployer,
     "token.contract",
@@ -95,18 +95,19 @@ async function main(): Promise<void> {
   );
   console.log("token address:", wethAddress);
 
-  let quorum = 2;
-  let estimatedGasGovernance = await estimateContractInit(
+  const quorum = 2;
+  const estimatedGasGovernance = await estimateContractInit(
     api,
     deployer,
     "governance.contract",
     [quorum],
   );
 
-  const { address: governanceAddress } = await governanceConstructors.new(
+  const governance = await governanceConstructors.new(
     quorum,
     { gasLimit: estimatedGasGovernance },
   );
+  const governanceAddress = governance.address;
   console.log("governance address:", governanceAddress);
 
   const addresses: Addresses = {
