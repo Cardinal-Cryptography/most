@@ -271,11 +271,11 @@ format: rust-format js-format
 build-docker-relayer: # Build relayer docker image
 build-docker-relayer: compile-azero compile-eth
 	cd relayer && cargo build --release
-	cp azero/addresses.json relayer/azero_addresses.json
-	cp eth/addresses.json relayer/eth_addresses.json
-	cp azero/artifacts/most.json relayer/most.json
-	cd relayer && docker build -t $(DOCKER_RELAYER_NAME) .
-	rm relayer/azero_addresses.json relayer/eth_addresses.json relayer/most.json
+	#cp azero/addresses.json relayer/azero_addresses.json
+	#cp eth/addresses.json relayer/eth_addresses.json
+	#cp azero/artifacts/most.json relayer/most.json
+	#cd relayer && docker build -t $(DOCKER_RELAYER_NAME) .
+	#rm relayer/azero_addresses.json relayer/eth_addresses.json relayer/most.json
 
 contract_spec.json: # Generate a a file describing deployed contracts based on addresses.json files
 contract_spec.json: azero/addresses.json eth/addresses.json
