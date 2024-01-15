@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - master
-      - A0-3158-dockerize-relayer
+      #- A0-3158-dockerize-relayer
 
 jobs:
   test-azero-contracts:
