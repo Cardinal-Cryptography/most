@@ -36,20 +36,9 @@ jobs:
           npm install typechain
           cargo install cargo-contract
 
-      - name: Compile contracts
-        shell: bash
-        run: |
-          make azero-deps
-          make compile-azero
-          make eth-deps
-          make compile-eth
-
       - name: Build relayer
         run: |
-          cd relayer
-          cargo build
-          ls -al
-          find .
+          make build-docker-relayer DOCKER_RELAYER_NAME=most-relayer-${{ steps.get-ref-properties.outputs.sha }}
 
       # Run docker build and if it runs then happy days
       # Login to AWS and push to ECR as 'membrane-bridge-relayer'

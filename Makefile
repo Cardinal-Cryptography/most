@@ -1,5 +1,6 @@
 NETWORK ?= development
 AZERO_ENV ?= dev
+DOCKER_RELAYER_NAME ?= most-relayer
 
 export BRIDGENET_START_BLOCK=`ENDPOINT=https://rpc-fe-bridgenet.dev.azero.dev ./relayer/scripts/azero_best_finalized.sh`
 export CONTRACT_VERSION ?=`git rev-parse HEAD`
@@ -273,7 +274,7 @@ build-docker-relayer: compile-azero compile-eth
 	cp azero/addresses.json relayer/azero_addresses.json
 	cp eth/addresses.json relayer/eth_addresses.json
 	cp azero/artifacts/most.json relayer/most.json
-	cd relayer && docker build -t most-relayer .
+	cd relayer && docker build -t $(DOCKER_RELAYER_NAME) .
 	rm relayer/azero_addresses.json relayer/eth_addresses.json relayer/most.json
 
 contract_spec.json: # Generate a a file describing deployed contracts based on addresses.json files
