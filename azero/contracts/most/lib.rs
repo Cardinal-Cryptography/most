@@ -255,20 +255,6 @@ pub mod most {
             self.collected_committee_rewards
                 .insert(data.committee_id, &base_fee_total);
 
-            // NOTE: this allows the committee members to take a payout for requests that are not neccessarily finished
-            // by that time (no signature threshold reached yet).
-            // We could be recording the base fee when the request collects quorum, but it could change in the meantime
-            // which is potentially even worse
-            let base_fee_total = self
-                .collected_committee_rewards
-                .get(data.committee_id)
-                .unwrap_or(0)
-                .checked_add(base_fee)
-                .ok_or(MostError::Arithmetic)?;
-
-            self.collected_committee_rewards
-                .insert(data.committee_id, &base_fee_total);
-
             self.env().emit_event(CrosschainTransferRequest {
                 committee_id: data.committee_id,
                 dest_token_address,

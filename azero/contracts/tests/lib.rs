@@ -15,7 +15,6 @@ mod e2e {
 
     use ink::{
         codegen::TraitCallBuilder,
-        contract_ref,
         env::{
             call::{
                 utils::{ReturnType, Set},
@@ -48,9 +47,9 @@ mod e2e {
     const REMOTE_TOKEN: [u8; 32] = [0x1; 32];
     const REMOTE_RECEIVER: [u8; 32] = [0x2; 32];
 
-    const MIN_FEE: u128 = 10;
-    const MAX_FEE: u128 = 100;
-    const DEFAULT_FEE: u128 = 30;
+    const MIN_FEE: u128 = 10000000000000;
+    const MAX_FEE: u128 = 100000000000000;
+    const DEFAULT_FEE: u128 = 30000000000000;
     const DEFAULT_POCKET_MONEY: u128 = 1000000000000;
     const DEFAULT_RELAY_GAS_USAGE: u128 = 50000;
 
@@ -499,101 +498,70 @@ mod e2e {
         );
     }
 
-    /*#[ink_e2e::test]
+    #[ink_e2e::test]
     fn committee_rewards(mut client: ink_e2e::Client<C, E>) {
-        let (most_address, token_address) = setup_default_most_and_token(&mut client, false).await;
+        let (most_address, token_address) = setup_default_most_and_token(&mut client, true).await;
 
-        let commission = most_commission_per_dix_mille(&mut client, most_address)
+        let amount = 1000;
+        let base_fee = most_base_fee(&mut client, most_address)
             .await
-            .expect("commission value");
+            .expect("should return base fee");
 
-        assert_eq!(commission, DEFAULT_COMMISSION_PER_DIX_MILLE);
-
-        let amount = 841189100000000;
-        let receiver_address = account_id(AccountKeyring::One);
-        let request_nonce = 1;
-
-        let request_hash =
-            hash_request_data(token_address, amount, receiver_address, request_nonce);
-
-        let token_balance_before = psp22_balance_of(&mut client, token_address, receiver_address)
+        psp22_approve(&mut client, &alice(), token_address, most_address, amount)
             .await
-            .expect("balance before");
+            .expect("approval should succeed");
 
-        for signer in &guardian_keys()[0..(DEFAULT_THRESHOLD as usize)] {
-            most_receive_request(
-                &mut client,
-                signer,
-                most_address,
-                request_hash,
-                *token_address.as_ref(),
-                amount,
-                *receiver_address.as_ref(),
-                request_nonce,
-            )
-            .await
-            .expect("Receive request should succeed");
-        }
-
-        let token_balance_after = psp22_balance_of(&mut client, token_address, receiver_address)
-            .await
-            .expect("balance after");
-
-        assert_eq!(
-            token_balance_after,
-            token_balance_before + ((amount * (10000 - commission)) / 10000)
-        );
+        most_send_request(
+            &mut client,
+            &alice(),
+            most_address,
+            token_address,
+            amount,
+            REMOTE_RECEIVER,
+            base_fee,
+        )
+        .await
+        .expect("send request should succeed");
 
         let committee_id = most_committee_id(&mut client, most_address)
             .await
             .expect("committe id");
 
-        let total_rewards = most_committee_rewards(
-            &mut client,
-            most_address,
-            committee_id,
-            *token_address.as_ref(),
-        )
-        .await
-        .expect("committee rewards");
+        let total_rewards = most_committee_rewards(&mut client, most_address, committee_id)
+            .await
+            .expect("committee rewards");
 
-        assert_eq!(total_rewards, (amount * commission) / 10000);
+        assert_eq!(total_rewards, base_fee);
 
         let committee_size = guardian_ids().len();
         for i in 0..committee_size {
-            let signer = &guardian_keys()[i];
             let member_id = guardian_ids()[i];
 
-            let signer_balance_before = psp22_balance_of(&mut client, token_address, member_id)
+            let guardian_balance_before = client
+                .balance(member_id)
                 .await
-                .expect("signer balance before");
+                .expect("guardian balance before");
 
-            most_request_payout(
-                &mut client,
-                signer,
-                most_address,
-                committee_id,
-                member_id,
-                *token_address.as_ref(),
-            )
-            .await
-            .expect("request payout");
-
-            let signer_balance_after = psp22_balance_of(&mut client, token_address, member_id)
+            most_request_payout(&mut client, &alice(), most_address, committee_id, member_id)
                 .await
-                .expect("signer balance after");
+                .expect("request payout");
+
+            let guardian_balance_after = client
+                .balance(member_id)
+                .await
+                .expect("guardian balance after");
 
             assert_eq!(
-                signer_balance_after,
-                signer_balance_before + (total_rewards / committee_size as u128)
+                guardian_balance_after,
+                guardian_balance_before + (total_rewards / committee_size as u128)
             );
         }
 
         // no double spend is possible
-        let bob_balance_before =
-            psp22_balance_of(&mut client, token_address, account_id(AccountKeyring::Bob))
-                .await
-                .expect("signer balance before");
+        let bob_balance_before = client
+            .balance(account_id(AccountKeyring::Bob))
+            .await
+            .expect("signer balance before");
 
         most_request_payout(
             &mut client,
@@ -601,44 +569,43 @@ mod e2e {
             most_address,
             committee_id,
             account_id(AccountKeyring::Bob),
-            *token_address.as_ref(),
         )
         .await
         .expect("request payout twice results in a no-op");
 
-        let bob_balance_after =
-            psp22_balance_of(&mut client, token_address, account_id(AccountKeyring::Bob))
-                .await
-                .expect("signer balance before");
+        let bob_balance_after = client
+            .balance(account_id(AccountKeyring::Bob))
+            .await
+            .expect("signer balance after");
 
         assert_eq!(bob_balance_after, bob_balance_before);
     }
 
     #[ink_e2e::test]
     fn past_committee_rewards(mut client: ink_e2e::Client<C, E>) {
-        let (most_address, token_address) = setup_default_most_and_token(&mut client, false).await;
+        let (most_address, token_address) = setup_default_most_and_token(&mut client, true).await;
 
-        let amount = 841189100000000;
-        let receiver_address = account_id(AccountKeyring::One);
-        let request_nonce = 1;
+        let amount = 1000;
 
-        let request_hash =
-            hash_request_data(token_address, amount, receiver_address, request_nonce);
-
-        for signer in &guardian_keys()[0..(DEFAULT_THRESHOLD as usize)] {
-            most_receive_request(
-                &mut client,
-                signer,
-                most_address,
-                request_hash,
-                *token_address.as_ref(),
-                amount,
-                *receiver_address.as_ref(),
-                request_nonce,
-            )
+        let base_fee = most_base_fee(&mut client, most_address)
             .await
-            .expect("Receive request should succeed");
-        }
+            .expect("should return base fee");
+
+        psp22_approve(&mut client, &alice(), token_address, most_address, amount)
+            .await
+            .expect("approval should succeed");
+
+        most_send_request(
+            &mut client,
+            &alice(),
+            most_address,
+            token_address,
+            amount,
+            REMOTE_RECEIVER,
+            base_fee,
+        )
+        .await
+        .expect("send request should succeed");
 
         let previous_committee_id = most_committee_id(&mut client, most_address)
             .await
@@ -658,9 +625,10 @@ mod e2e {
 
         let member_id = guardian_ids()[0];
 
-        let signer_balance_before = psp22_balance_of(&mut client, token_address, member_id)
+        let guardian_balance_before = client
+            .balance(member_id)
             .await
-            .expect("signer balance before");
+            .expect("guardian balance before");
 
         most_request_payout(
             &mut client,
@@ -668,28 +636,25 @@ mod e2e {
             most_address,
             previous_committee_id,
             member_id,
-            *token_address.as_ref(),
         )
         .await
         .expect("request payout");
 
-        let total_rewards = most_committee_rewards(
-            &mut client,
-            most_address,
-            previous_committee_id,
-        )
-        .await
-        .expect("committee rewards");
+        let total_rewards =
+            most_committee_rewards(&mut client, most_address, previous_committee_id)
+                .await
+                .expect("committee rewards");
 
-        let signer_balance_after = psp22_balance_of(&mut client, token_address, member_id)
+        let guardian_balance_after = client
+            .balance(member_id)
             .await
-            .expect("signer balance after");
+            .expect("guardian balance after");
 
         assert_eq!(
-            signer_balance_after,
-            signer_balance_before + (total_rewards / previous_committee_size as u128)
+            guardian_balance_after,
+            guardian_balance_before + (total_rewards / previous_committee_size as u128)
         );
-    }*/
+    }
 
     fn guardian_ids() -> Vec<AccountId> {
         vec![
