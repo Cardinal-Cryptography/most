@@ -51,6 +51,11 @@ contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         _;
     }
 
+    modifier _onlyCommitteeMember(uint256 _committeeId) {
+        require(isInCommittee(_committeeId, msg.sender), "NotInCommittee");
+        _;
+    }
+
     function initialize(
         address[] calldata _committee,
         uint256 _signatureThreshold,
@@ -130,11 +135,12 @@ contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     // aggregates relayer signatures and returns the locked tokens
     function receiveRequest(
         bytes32 _requestHash,
+        uint256 _committeeId,
         bytes32 destTokenAddress,
         uint256 amount,
         bytes32 destReceiverAddress,
         uint256 _requestNonce
-    ) external _onlyCurrentCommitteeMember {
+    ) external _onlyCommitteeMember(_committeeId) {
         // Don't revert if the request has already been processed as
         // such a call can be made during regular guardian operation.
         if (processedRequests[_requestHash]) {
@@ -144,6 +150,7 @@ contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
 
         bytes32 requestHash = keccak256(
             abi.encodePacked(
+                _committeeId,
                 destTokenAddress,
                 amount,
                 destReceiverAddress,

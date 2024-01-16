@@ -181,8 +181,8 @@ describe("Most", function () {
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
       const requestHash = ethers.solidityPackedKeccak256(
-        ["bytes32", "uint256", "bytes32", "uint256"],
-        [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
+        ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
+        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
       );
 
       await expect(
@@ -190,6 +190,7 @@ describe("Most", function () {
           .connect(accounts[0])
           .receiveRequest(
             requestHash,
+            0,
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
@@ -205,14 +206,15 @@ describe("Most", function () {
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
       const requestHash = ethers.solidityPackedKeccak256(
-        ["bytes32", "uint256", "bytes32", "uint256"],
-        [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
+        ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
+        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
       );
 
       await most
         .connect(accounts[1])
         .receiveRequest(
           requestHash,
+          0,
           tokenAddressBytes32,
           TOKEN_AMOUNT,
           ethAddress,
@@ -223,6 +225,7 @@ describe("Most", function () {
           .connect(accounts[1])
           .receiveRequest(
             requestHash,
+            0,
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
@@ -238,8 +241,8 @@ describe("Most", function () {
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
       const requestHash = ethers.solidityPackedKeccak256(
-        ["bytes32", "uint256", "bytes32", "uint256"],
-        [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
+        ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
+        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
       );
 
       // Provide funds for Most
@@ -250,6 +253,7 @@ describe("Most", function () {
           .connect(accounts[i])
           .receiveRequest(
             requestHash,
+            0,
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
@@ -262,6 +266,7 @@ describe("Most", function () {
           .connect(accounts[6])
           .receiveRequest(
             requestHash,
+            0,
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
@@ -279,8 +284,8 @@ describe("Most", function () {
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
       const requestHash = ethers.solidityPackedKeccak256(
-        ["bytes32", "uint256", "bytes32", "uint256"],
-        [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
+        ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
+        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
       );
 
       // Provide funds for Most
@@ -291,6 +296,7 @@ describe("Most", function () {
           .connect(accounts[i])
           .receiveRequest(
             requestHash,
+            0,
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
@@ -310,8 +316,8 @@ describe("Most", function () {
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
       const requestHash = ethers.solidityPackedKeccak256(
-        ["bytes32", "uint256", "bytes32", "uint256"],
-        [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 1],
+        ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
+        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 1],
       );
 
       // Provide funds for Most
@@ -322,6 +328,7 @@ describe("Most", function () {
           .connect(accounts[1])
           .receiveRequest(
             requestHash,
+            0,
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
@@ -339,8 +346,8 @@ describe("Most", function () {
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
       const requestHash = ethers.solidityPackedKeccak256(
-        ["bytes32", "uint256", "bytes32", "uint256"],
-        [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
+        ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
+        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
       );
 
       // Provide funds for Most
@@ -351,6 +358,7 @@ describe("Most", function () {
           .connect(accounts[i])
           .receiveRequest(
             requestHash,
+            0,
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
@@ -364,7 +372,7 @@ describe("Most", function () {
         tokenAddressBytes32,
       );
 
-      await expect(currentCommitteeId).to.be.equal(0);
+      expect(currentCommitteeId).to.be.equal(0);
 
       signerBalanceBefore = await token.balanceOf(accounts[1].address);
 
@@ -375,7 +383,7 @@ describe("Most", function () {
       );
 
       signerBalanceAfter = await token.balanceOf(accounts[1].address);
-      await expect(signerBalanceAfter).to.be.equal(
+      expect(signerBalanceAfter).to.be.equal(
         signerBalanceBefore + totalRewards / BigInt(8),
       );
     });
@@ -387,8 +395,8 @@ describe("Most", function () {
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
       const requestHash = ethers.solidityPackedKeccak256(
-        ["bytes32", "uint256", "bytes32", "uint256"],
-        [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
+        ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
+        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
       );
 
       // Provide funds for Most
@@ -399,6 +407,7 @@ describe("Most", function () {
           .connect(accounts[i])
           .receiveRequest(
             requestHash,
+            0,
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
@@ -408,14 +417,14 @@ describe("Most", function () {
 
       previousCommitteeId = await most.committeeId();
 
-      await expect(previousCommitteeId).to.be.equal(0);
+      expect(previousCommitteeId).to.be.equal(0);
 
       let committee = accounts.slice(2, 9).map((x) => x.address);
       let threshold = 4;
 
       await most.setCommittee(committee, threshold);
 
-      await expect(await most.committeeId()).to.be.equal(1);
+      expect(await most.committeeId()).to.be.equal(1);
 
       totalRewards = await most.getCollectedCommitteeRewards(
         previousCommitteeId,
@@ -430,7 +439,7 @@ describe("Most", function () {
       );
 
       signerBalanceAfter = await token.balanceOf(accounts[1].address);
-      await expect(signerBalanceAfter).to.be.equal(
+      expect(signerBalanceAfter).to.be.equal(
         signerBalanceBefore + totalRewards / BigInt(8),
       );
     });
