@@ -86,7 +86,7 @@ async function main(): Promise<void> {
       min_fee!,
       max_fee!,
       default_fee!,
-      oracleAddress
+      oracleAddress,
     ],
   );
 
