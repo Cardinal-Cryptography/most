@@ -46,13 +46,8 @@ contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     // Emitted when guardian signs a request that has already been processed
     event ProcessedRequestSigned(bytes32 requestHash, address signer);
 
-    modifier _onlyCurrentCommitteeMember() {
-        require(isInCommittee(committeeId, msg.sender), "NotInCommittee");
-        _;
-    }
-
     modifier _onlyCommitteeMember(uint256 _committeeId) {
-        require(isInCommittee(_committeeId, msg.sender), "NotInCommittee");
+        require(isInCommittee(_committeeId, msg.sender), "Not a member of the guardian committee");
         _;
     }
 
