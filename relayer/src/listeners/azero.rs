@@ -245,6 +245,7 @@ async fn handle_event(
     _permit: OwnedSemaphorePermit,
 ) -> Result<(), AzeroListenerError> {
     let Config {
+        committee_id,
         eth_contract_address,
         eth_tx_min_confirmations,
         eth_tx_submission_retries,
@@ -272,6 +273,7 @@ async fn handle_event(
             // (it does not pad uint to 32 bytes, but uses the actual number of bytes required to store the value)
             // so we use `abi::encode` instead (it only differs for signed and dynamic size types, which we don't use here)
             let bytes = abi::encode(&[
+                Token::Uint(committee_id.into()),
                 Token::FixedBytes(dest_token_address.to_vec()),
                 Token::Uint(amount.into()),
                 Token::FixedBytes(dest_receiver_address.to_vec()),
@@ -290,6 +292,7 @@ async fn handle_event(
             // forward transfer & vote
             let call: ContractCall<SignedEthConnection, ()> = contract.receive_request(
                 request_hash,
+                committee_id,
                 dest_token_address,
                 amount.into(),
                 dest_receiver_address,
