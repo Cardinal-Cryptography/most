@@ -25,6 +25,7 @@ pub mod most {
 
     const GAS_ORACLE_MAX_AGE: u64 = 24 * 60 * 60 * 1000; // 1 day
     const ORACLE_CALL_GAS_LIMIT: u64 = 2_000_000_000;
+    const BASE_FEE_BUFFER_PERCENTAGE: u128 = 20;
 
     #[ink(event)]
     #[derive(Debug)]
@@ -157,6 +158,7 @@ pub mod most {
     }
 
     impl Most {
+        #[allow(clippy::too_many_arguments)]
         #[ink(constructor)]
         pub fn new(
             committee: Vec<AccountId>,
@@ -166,6 +168,7 @@ pub mod most {
             min_fee: Balance,
             max_fee: Balance,
             default_fee: Balance,
+            gas_price_oracle: Option<AccountId>,
         ) -> Result<Self, MostError> {
             if signature_threshold == 0 || committee.len().lt(&(signature_threshold as usize)) {
                 return Err(MostError::InvalidThreshold);
@@ -194,7 +197,7 @@ pub mod most {
                 min_fee,
                 max_fee,
                 default_fee,
-                gas_price_oracle: None,
+                gas_price_oracle,
             });
 
             Ok(Self {
@@ -517,6 +520,10 @@ pub mod most {
 
                 let base_fee = gas_price
                     .checked_mul(self.data()?.relay_gas_usage)
+                    .ok_or(MostError::Arithmetic)?
+                    .checked_mul(100u128 + BASE_FEE_BUFFER_PERCENTAGE)
+                    .ok_or(MostError::Arithmetic)?
+                    .checked_div(100u128)
                     .ok_or(MostError::Arithmetic)?;
 
                 if base_fee < self.data()?.min_fee {
@@ -707,7 +714,8 @@ pub mod most {
                     RELAY_GAS_USAGE,
                     MIN_FEE,
                     MAX_FEE,
-                    DEFAULT_FEE
+                    DEFAULT_FEE,
+                    None,
                 )
                 .expect_err("Threshold is zero, instantiation should fail."),
                 MostError::InvalidThreshold
@@ -725,7 +733,8 @@ pub mod most {
                     RELAY_GAS_USAGE,
                     MIN_FEE,
                     MAX_FEE,
-                    DEFAULT_FEE
+                    DEFAULT_FEE,
+                    None,
                 )
                 .expect_err("Threshold is larger than guardians, instantiation should fail."),
                 MostError::InvalidThreshold
@@ -743,6 +752,7 @@ pub mod most {
                 MIN_FEE,
                 MAX_FEE,
                 DEFAULT_FEE,
+                None,
             )
             .expect("Threshold is valid.");
 
@@ -766,6 +776,7 @@ pub mod most {
                 MIN_FEE,
                 MAX_FEE,
                 DEFAULT_FEE,
+                None,
             )
             .expect("Threshold is valid.");
 
@@ -787,6 +798,7 @@ pub mod most {
                 MIN_FEE,
                 MAX_FEE,
                 DEFAULT_FEE,
+                None,
             )
             .expect("Threshold is valid.");
             set_caller::<DefEnv>(accounts.bob);
@@ -810,6 +822,7 @@ pub mod most {
                 MIN_FEE,
                 MAX_FEE,
                 DEFAULT_FEE,
+                None,
             )
             .expect("Threshold is valid.");
 
@@ -830,6 +843,7 @@ pub mod most {
                 MIN_FEE,
                 MAX_FEE,
                 DEFAULT_FEE,
+                None,
             )
             .expect("Threshold is valid.");
 

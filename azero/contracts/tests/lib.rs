@@ -682,7 +682,7 @@ mod e2e {
             .await
             .expect("should return base fee");
 
-        assert_eq!(oracle_fee, 2 * DEFAULT_FEE);
+        assert_eq!(oracle_fee, 2 * DEFAULT_FEE * 120 / 100);
 
         // Oracle returning price larger than the maximum allowed price
         let oracle_address =
@@ -776,6 +776,7 @@ mod e2e {
             min_fee,
             max_fee,
             default_fee,
+            None,
         );
         client
             .instantiate("most", caller, most_constructor, 0, None)

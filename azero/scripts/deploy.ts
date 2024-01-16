@@ -61,6 +61,19 @@ async function main(): Promise<void> {
   const tokenConstructors = new TokenConstructors(api, deployer);
   const testOracleConstructors = new TestOracleConstructors(api, deployer);
 
+  let estimatedGasOracle = await estimateContractInit(
+    api,
+    deployer,
+    "test_oracle.contract",
+    [15, true],
+  );
+
+  const { address: oracleAddress } = await testOracleConstructors.new(
+    100000, // default value
+    true, // randomize
+    { gasLimit: estimatedGasOracle },
+  );
+
   let estimatedGasMost = await estimateContractInit(
     api,
     deployer,
@@ -73,6 +86,7 @@ async function main(): Promise<void> {
       min_fee!,
       max_fee!,
       default_fee!,
+      oracleAddress
     ],
   );
 
@@ -84,6 +98,7 @@ async function main(): Promise<void> {
     min_fee!,
     max_fee!,
     default_fee!,
+    oracleAddress,
     { gasLimit: estimatedGasMost },
   );
 
@@ -116,19 +131,6 @@ async function main(): Promise<void> {
     { gasLimit: estimatedGasGovernance },
   );
   console.log("governance address:", governanceAddress);
-
-  let estimatedGasOracle = await estimateContractInit(
-    api,
-    deployer,
-    "test_oracle.contract",
-    [15, true],
-  );
-
-  const { address: oracleAddress } = await testOracleConstructors.new(
-    100000, // default value
-    true, // randomize
-    { gasLimit: estimatedGasOracle },
-  );
 
   const addresses: Addresses = {
     governance: governanceAddress,
