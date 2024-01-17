@@ -66,12 +66,14 @@ impl MostInstance {
         &self,
         signed_connection: &SignedConnection,
         request_hash: [u8; 32],
+        committee_id: u128,
         dest_token_address: [u8; 32],
         amount: u128,
         dest_receiver_address: [u8; 32],
         request_nonce: u128,
     ) -> Result<TxInfo, AzeroContractError> {
         let args = [
+            committee_id.to_string(),
             bytes32_to_str(&request_hash),
             bytes32_to_str(&dest_token_address),
             amount.to_string(),
