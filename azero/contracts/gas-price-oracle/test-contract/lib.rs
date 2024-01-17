@@ -1,5 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
 
+pub use self::test_oracle::TestOracleRef;
+
 #[ink::contract]
 pub mod test_oracle {
     use gas_oracle_trait::EthGasPriceOracle;

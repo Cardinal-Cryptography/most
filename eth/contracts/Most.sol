@@ -8,13 +8,8 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
-    uint256 constant DIX_MILLE = 10000;
-
     uint256 public requestNonce;
-    uint256 public commissionPerDixMille;
-    uint256 public minimumTransferAmountUsd;
     uint256 public committeeId;
-    bytes32 public USDT;
 
     struct Request {
         uint256 signatureCount;
@@ -28,9 +23,7 @@ contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     mapping(bytes32 => bool) private committee;
     mapping(uint256 => uint256) public committeeSize;
     mapping(uint256 => uint256) public signatureThreshold;
-    mapping(bytes32 => uint256) private collectedCommitteeRewards;
-    mapping(bytes32 => uint256) private paidOutMemberRewards;
-
+    
     event CrosschainTransferRequest(
         uint256 indexed committeeId,
         bytes32 indexed destTokenAddress,
@@ -54,8 +47,6 @@ contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     function initialize(
         address[] calldata _committee,
         uint256 _signatureThreshold,
-        uint256 _commissionPerDixMille,
-        uint256 _minimumTransferAmountUsd,
         address owner
     ) public initializer {
         require(
@@ -67,8 +58,6 @@ contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
             "Not enough guardians specified"
         );
 
-        commissionPerDixMille = _commissionPerDixMille;
-        minimumTransferAmountUsd = _minimumTransferAmountUsd;
         committeeId = 0;
 
         for (uint256 i = 0; i < _committee.length; i++) {
@@ -98,12 +87,6 @@ contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         uint256 amount,
         bytes32 destReceiverAddress
     ) external {
-        require(
-            queryPrice(amount, srcTokenAddress, USDT) >
-                minimumTransferAmountUsd,
-            "AmountBelowMinimum"
-        );
-
         address sender = msg.sender;
 
         IERC20 token = IERC20(bytes32ToAddress(srcTokenAddress));
@@ -165,12 +148,6 @@ contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         emit RequestSigned(requestHash, msg.sender);
 
         if (request.signatureCount >= signatureThreshold[committeeId]) {
-            uint256 commission = (amount * commissionPerDixMille) / DIX_MILLE;
-
-            collectedCommitteeRewards[
-                keccak256(abi.encodePacked(committeeId, destTokenAddress))
-            ] += commission;
-
             processedRequests[requestHash] = true;
             delete pendingRequests[requestHash];
 
@@ -179,85 +156,10 @@ contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
 
             token.transfer(
                 bytes32ToAddress(destReceiverAddress),
-                amount - commission
+                amount
             );
             emit RequestProcessed(requestHash);
         }
-    }
-
-    // Request payout of rewards for signing & relaying cross-chain transfers
-    //
-    // Can be called by anyone on behalf of the committee member,
-    // past or present
-    function payoutRewards(
-        uint256 _committeeId,
-        address member,
-        bytes32 _token
-    ) external {
-        uint256 outstandingRewards = getOutstandingMemberRewards(
-            _committeeId,
-            member,
-            _token
-        );
-
-        if (outstandingRewards > 0) {
-            IERC20 token = IERC20(bytes32ToAddress(_token));
-            token.transfer(member, outstandingRewards);
-            paidOutMemberRewards[
-                keccak256(abi.encodePacked(_committeeId, member, _token))
-            ] += outstandingRewards;
-        }
-    }
-
-    function getCollectedCommitteeRewards(
-        uint256 _committeeId,
-        bytes32 token
-    ) public view returns (uint256) {
-        return
-            collectedCommitteeRewards[
-                keccak256(abi.encodePacked(_committeeId, token))
-            ];
-    }
-
-    function getPaidOutMemberRewards(
-        uint256 _committeeId,
-        address member,
-        bytes32 token
-    ) public view returns (uint256) {
-        return
-            paidOutMemberRewards[
-                keccak256(abi.encodePacked(_committeeId, member, token))
-            ];
-    }
-
-    function getOutstandingMemberRewards(
-        uint256 _committeeId,
-        address member,
-        bytes32 token
-    ) public view returns (uint256) {
-        return
-            (getCollectedCommitteeRewards(_committeeId, token) /
-                committeeSize[_committeeId]) -
-            getPaidOutMemberRewards(_committeeId, member, token);
-    }
-
-    // Queries a price oracle and returns the price of an `amount` number of the `of` tokens denominated in the `in_token`
-    //
-    // TODO: this is a mocked method pending an implementation
-    function queryPrice(
-        uint256 amountOf,
-        bytes32 ofToken,
-        bytes32 inToken
-    ) public view returns (uint256) {
-        if (inToken == USDT) {
-            return amountOf * 2;
-        }
-
-        if (ofToken == USDT) {
-            return amountOf / 2;
-        }
-
-        return amountOf;
     }
 
     function hasSignedRequest(
@@ -313,9 +215,5 @@ contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
 
     function removePair(bytes32 from) external onlyOwner {
         delete supportedPairs[from];
-    }
-
-    function setUSDT(bytes32 _USDT) external onlyOwner {
-        USDT = _USDT;
     }
 }
