@@ -41,6 +41,8 @@ mod e2e {
         filter_decode_events_as, get_contract_emitted_events, ContractEmitted, EventWithTopics,
     };
 
+    type CommitteeId = u128;
+
     const TOKEN_INITIAL_SUPPLY: u128 = 10000;
     const DEFAULT_THRESHOLD: u128 = 3;
     const DECIMALS: u8 = 8;
@@ -52,6 +54,8 @@ mod e2e {
     const DEFAULT_POCKET_MONEY: u128 = 1000000000000;
     const DEFAULT_MINIMUM_TRANSFER_AMOUNT_USD: u128 = 50;
     const DEFAULT_RELAY_GAS_USAGE: u128 = 50000;
+
+    const DEFAULT_COMMITTEE_ID: CommitteeId = 0;
 
     #[ink_e2e::test]
     fn simple_deploy_works(mut client: ink_e2e::Client<C, E>) {
@@ -271,6 +275,7 @@ mod e2e {
             &alice(),
             most_address,
             request_hash,
+            DEFAULT_COMMITTEE_ID,
             *token_address.as_ref(),
             amount,
             *receiver_address.as_ref(),
@@ -298,6 +303,7 @@ mod e2e {
             &bob(),
             most_address,
             incorrect_hash,
+            DEFAULT_COMMITTEE_ID,
             *token_address.as_ref(),
             amount,
             *receiver_address.as_ref(),
@@ -332,6 +338,7 @@ mod e2e {
                 signer,
                 most_address,
                 request_hash,
+                DEFAULT_COMMITTEE_ID,
                 *token_address.as_ref(),
                 amount,
                 *receiver_address.as_ref(),
@@ -388,6 +395,7 @@ mod e2e {
                 signer,
                 most_address,
                 request_hash,
+                DEFAULT_COMMITTEE_ID,
                 *token_address.as_ref(),
                 amount,
                 *receiver_address.as_ref(),
@@ -516,6 +524,7 @@ mod e2e {
                 signer,
                 most_address,
                 request_hash,
+                DEFAULT_COMMITTEE_ID,
                 *token_address.as_ref(),
                 amount,
                 *receiver_address.as_ref(),
@@ -563,6 +572,7 @@ mod e2e {
                 signer,
                 most_address,
                 request_hash,
+                DEFAULT_COMMITTEE_ID,
                 *token_address.as_ref(),
                 amount,
                 *receiver_address.as_ref(),
@@ -668,6 +678,7 @@ mod e2e {
                 signer,
                 most_address,
                 request_hash,
+                DEFAULT_COMMITTEE_ID,
                 *token_address.as_ref(),
                 amount,
                 *receiver_address.as_ref(),
@@ -902,6 +913,7 @@ mod e2e {
         caller: &Keypair,
         most: AccountId,
         request_hash: Keccak256HashOutput,
+        committee_id: CommitteeId,
         token: [u8; 32],
         amount: u128,
         receiver_address: [u8; 32],
@@ -912,7 +924,14 @@ mod e2e {
             caller,
             most,
             |most| {
-                most.receive_request(request_hash, token, amount, receiver_address, request_nonce)
+                most.receive_request(
+                    request_hash,
+                    committee_id,
+                    token,
+                    amount,
+                    receiver_address,
+                    request_nonce,
+                )
             },
             None,
         )

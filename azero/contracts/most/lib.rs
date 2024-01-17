@@ -305,13 +305,14 @@ pub mod most {
         pub fn receive_request(
             &mut self,
             request_hash: HashedRequest,
+            committee_id: CommitteeId,
             dest_token_address: [u8; 32],
             amount: u128,
             dest_receiver_address: [u8; 32],
             request_nonce: u128,
         ) -> Result<(), MostError> {
             let caller = self.env().caller();
-            self.only_current_committee_member(caller)?;
+            self.only_committee_member(committee_id, caller)?;
 
             let data = self.data()?;
 
@@ -607,8 +608,12 @@ pub mod most {
 
         /// Returns an error (reverts) if account is not in the currently active committee
         #[ink(message)]
-        pub fn only_current_committee_member(&self, account: AccountId) -> Result<(), MostError> {
-            match self.is_in_committee(self.data()?.committee_id, account) {
+        pub fn only_committee_member(
+            &self,
+            committee_id: CommitteeId,
+            account: AccountId,
+        ) -> Result<(), MostError> {
+            match self.is_in_committee(committee_id, account) {
                 true => Ok(()),
                 false => Err(MostError::NotInCommittee),
             }
