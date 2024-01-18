@@ -227,6 +227,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6d5a32815ae3f33302d95fdcb2ce17862f8c65363dcfd29360480ba1001fc9c"
 
 [[package]]
+name = "gas-oracle-trait"
+version = "1.0.0"
+dependencies = [
+ "ink",
+ "parity-scale-codec",
+ "scale-info",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -550,6 +559,7 @@ checksum = "f665ee40bc4a3c5590afb1e9677db74a508659dfd71e126420da8274909a0167"
 name = "most"
 version = "1.0.0"
 dependencies = [
+ "gas-oracle-trait",
  "ink",
  "parity-scale-codec",
  "psp22",
