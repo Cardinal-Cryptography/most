@@ -310,6 +310,7 @@ pub mod most {
             }
 
             let bytes = concat_u8_arrays(vec![
+                &committee_id.to_le_bytes(),
                 &dest_token_address,
                 &amount.to_le_bytes(),
                 &dest_receiver_address,
