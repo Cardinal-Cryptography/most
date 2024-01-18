@@ -2,6 +2,7 @@ import { ApiPromise, WsProvider, Keyring } from "@polkadot/api";
 import MostConstructors from "../types/constructors/most";
 import TokenConstructors from "../types/constructors/token";
 import GovernanceConstructors from "../types/constructors/governance";
+import TestOracleConstructors from "../types/constructors/test_oracle";
 import {
   uploadCode,
   Addresses,
@@ -22,10 +23,11 @@ async function main(): Promise<void> {
     relayers_keys,
     authority_seed,
     signature_threshold,
-    commission_per_dix_mille,
     pocket_money,
-    minimum_transfer_amount_usd,
     relay_gas_usage,
+    min_fee,
+    max_fee,
+    default_fee,
   } = await import_env();
 
   let wsProvider = new WsProvider(ws_node);
@@ -47,9 +49,30 @@ async function main(): Promise<void> {
   );
   console.log("governance code hash:", governanceCodeHash);
 
+  const testOracleCodeHash = await uploadCode(
+    api,
+    deployer,
+    "test_oracle.contract",
+  );
+  console.log("oracle code hash:", testOracleCodeHash);
+
   const governanceConstructors = new GovernanceConstructors(api, deployer);
   const mostConstructors = new MostConstructors(api, deployer);
   const tokenConstructors = new TokenConstructors(api, deployer);
+  const testOracleConstructors = new TestOracleConstructors(api, deployer);
+
+  let estimatedGasOracle = await estimateContractInit(
+    api,
+    deployer,
+    "test_oracle.contract",
+    [15, true],
+  );
+
+  const { address: oracleAddress } = await testOracleConstructors.new(
+    100000, // default value
+    true, // randomize
+    { gasLimit: estimatedGasOracle },
+  );
 
   let estimatedGasMost = await estimateContractInit(
     api,
@@ -58,20 +81,24 @@ async function main(): Promise<void> {
     [
       relayers_keys,
       signature_threshold!,
-      commission_per_dix_mille!,
       pocket_money!,
-      minimum_transfer_amount_usd!,
       relay_gas_usage!,
+      min_fee!,
+      max_fee!,
+      default_fee!,
+      oracleAddress,
     ],
   );
 
   const { address: mostAddress } = await mostConstructors.new(
     relayers_keys,
     signature_threshold!,
-    commission_per_dix_mille!,
     pocket_money!,
-    minimum_transfer_amount_usd!,
     relay_gas_usage!,
+    min_fee!,
+    max_fee!,
+    default_fee!,
+    oracleAddress,
     { gasLimit: estimatedGasMost },
   );
 
@@ -109,6 +136,7 @@ async function main(): Promise<void> {
     governance: governanceAddress,
     most: mostAddress,
     weth: wethAddress,
+    test_oracle: oracleAddress,
   };
   console.log("addresses:", addresses);
 
