@@ -109,7 +109,7 @@ jobs:
         run: |
           contracts_sha='${{ inputs.contracts-commit-sha }}'
           contracts_sha_short="${contracts_sha:0:8}"
-          docker_tag=${{ steps.get-ref-properties.outputs.sha }}-${contracts_sha_short}-${{ input.environment }}
+          docker_tag=${{ steps.get-ref-properties.outputs.sha }}-${contracts_sha_short}-${{ inputs.environment }}
           docker_name=most-relayer-${docker_tag}
 
           make build-docker-relayer DOCKER_RELAYER_NAME=${docker_name}
