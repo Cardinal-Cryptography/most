@@ -16,9 +16,6 @@ on:
         description: Docker image tag
         value: ${{ jobs.build-and-push.outputs.docker-tag }}
 
-concurrency:
-  group: ${{ github.ref }}-${{ github.workflow }}
-
 jobs:
   check-vars-and-secrets:
     name: Check vars and secrets
