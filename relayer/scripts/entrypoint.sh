@@ -25,6 +25,13 @@ REDIS=${REDIS:-"redis://127.0.0.1:6379"}
 KEYSTORE_PATH=${KEYSTORE_PATH:-""}
 RELAYER_ID=${RELAYER_ID:-0}
 
+# --- RELAYER ID from MY_POD_NAME coming from statefulset's pod, such as
+# --- relayer-0, relayer-1 etc.
+if [[ "${MY_POD_NAME}" =~ ^relayer-[0-9]+$ && "${RELAYER_ID}" == 0 ]]; then
+  RELAYER_ID=$(echo "${MY_POD_NAME}" | cut -d- -f2)
+  RELAYER_ID=$((RELAYER_ID+1))
+fi
+
 AZERO_MOST_METADATA=${AZERO_MOST_METADATA:-"/usr/local/most.json"}
 
 ARGS=(
