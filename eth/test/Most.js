@@ -126,8 +126,8 @@ describe("Most", function () {
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
       const requestHash = ethers.solidityPackedKeccak256(
-        ["bytes32", "uint256", "bytes32", "uint256"],
-        [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
+        ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
+        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
       );
 
       await expect(
@@ -135,12 +135,13 @@ describe("Most", function () {
           .connect(accounts[0])
           .receiveRequest(
             requestHash,
+            0,
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
             0,
           ),
-      ).to.be.revertedWith("NotInCommittee");
+      ).to.be.revertedWith("Not a member of the guardian committee");
     });
 
     it("Reverts if request has already been signed by a guardian", async () => {
@@ -150,14 +151,15 @@ describe("Most", function () {
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
       const requestHash = ethers.solidityPackedKeccak256(
-        ["bytes32", "uint256", "bytes32", "uint256"],
-        [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
+        ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
+        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
       );
 
       await most
         .connect(accounts[1])
         .receiveRequest(
           requestHash,
+          0,
           tokenAddressBytes32,
           TOKEN_AMOUNT,
           ethAddress,
@@ -168,6 +170,7 @@ describe("Most", function () {
           .connect(accounts[1])
           .receiveRequest(
             requestHash,
+            0,
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
@@ -183,8 +186,8 @@ describe("Most", function () {
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
       const requestHash = ethers.solidityPackedKeccak256(
-        ["bytes32", "uint256", "bytes32", "uint256"],
-        [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
+        ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
+        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
       );
 
       // Provide funds for Most
@@ -195,6 +198,7 @@ describe("Most", function () {
           .connect(accounts[i])
           .receiveRequest(
             requestHash,
+            0,
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
@@ -207,6 +211,7 @@ describe("Most", function () {
           .connect(accounts[6])
           .receiveRequest(
             requestHash,
+            0,
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
@@ -224,8 +229,8 @@ describe("Most", function () {
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
       const requestHash = ethers.solidityPackedKeccak256(
-        ["bytes32", "uint256", "bytes32", "uint256"],
-        [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
+        ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
+        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
       );
 
       // Provide funds for Most
@@ -236,6 +241,7 @@ describe("Most", function () {
           .connect(accounts[i])
           .receiveRequest(
             requestHash,
+            0,
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
@@ -255,8 +261,8 @@ describe("Most", function () {
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
       const requestHash = ethers.solidityPackedKeccak256(
-        ["bytes32", "uint256", "bytes32", "uint256"],
-        [tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 1],
+        ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
+        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 1],
       );
 
       // Provide funds for Most
@@ -267,12 +273,83 @@ describe("Most", function () {
           .connect(accounts[1])
           .receiveRequest(
             requestHash,
+            0,
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
             0,
           ),
       ).to.be.revertedWith("Hash does not match the data");
+    });
+
+    it("Committee rotation", async () => {
+      const { most, token, tokenAddressBytes32 } = await loadFixture(
+        deployEightGuardianMostFixture,
+      );
+      const accounts = await ethers.getSigners();
+      const ethAddress = addressToBytes32(accounts[10].address);
+      const requestHashOld = ethers.solidityPackedKeccak256(
+        ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
+        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
+      );
+      const requestHashNew = ethers.solidityPackedKeccak256(
+        ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
+        [1, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
+      );
+
+      // Provide funds for Most
+      await token.transfer(await most.getAddress(), TOKEN_AMOUNT * 2);
+
+      // Rotate committee
+      await most.connect(accounts[0]).setCommittee(accounts.slice(3, 10), 5);
+
+      await most
+        .connect(accounts[2])
+        .receiveRequest(
+          requestHashOld,
+          0,
+          tokenAddressBytes32,
+          TOKEN_AMOUNT,
+          ethAddress,
+          0,
+        );
+
+      await most
+        .connect(accounts[9])
+        .receiveRequest(
+          requestHashNew,
+          1,
+          tokenAddressBytes32,
+          TOKEN_AMOUNT,
+          ethAddress,
+          0,
+        );
+
+      await expect(
+        most
+          .connect(accounts[2])
+          .receiveRequest(
+            requestHashNew,
+            1,
+            tokenAddressBytes32,
+            TOKEN_AMOUNT,
+            ethAddress,
+            0,
+          ),
+      ).to.be.revertedWith("Not a member of the guardian committee");
+
+      await expect(
+        most
+          .connect(accounts[9])
+          .receiveRequest(
+            requestHashOld,
+            0,
+            tokenAddressBytes32,
+            TOKEN_AMOUNT,
+            ethAddress,
+            0,
+          ),
+      ).to.be.revertedWith("Not a member of the guardian committee");
     });
   });
 
