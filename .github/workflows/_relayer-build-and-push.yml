@@ -35,10 +35,10 @@ jobs:
       - name: Check inputs
         shell: bash
         run: |
-          if [[
+          if [[ \
             '${{ inputs.environment }}' != 'bridgenet' && \
             '${{ inputs.environment }}' != 'testnet' && \
-            '${{ inputs.environment }}' != 'mainnet' &&
+            '${{ inputs.environment }}' != 'mainnet' && \
           ]]; then
             echo 'Invalid environment'
             exit 1
@@ -50,9 +50,9 @@ jobs:
           fi
 
           # TODO: Remove when implemented
-          if [[ 
+          if [[ \
             '${{ inputs.environment }}' == 'testnet' || \
-            '${{ inputs.environment }}' == 'mainnet'
+            '${{ inputs.environment }}' == 'mainnet' \
           ]]; then
             echo 'testnet and mainnet are not implemented yet'
             exit 1
