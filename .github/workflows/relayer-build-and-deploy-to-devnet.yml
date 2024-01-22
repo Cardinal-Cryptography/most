@@ -1,0 +1,25 @@
+name: Build and push relayer to devnet
+
+on:
+  push:
+    branches:
+    - A0-3158-dockerize-relayer
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  check-vars-and-secrets:
+    name: Check vars and secrets
+    uses: ./.github/workflows/_check-vars-and-secrets.yml
+    secrets: inherit
+
+  build-and-push:
+    needs: [check-vars-and-secrets]
+    name: Build and push
+    uses: ./.github/workflow/_relayer-build-and-push.yml
+    secrets: inherit
+    with:
+      environment: bridgenet
+      contracts-commit-sha: 425a073ca09f83420218ea1e4fdd3d62036bf4da
