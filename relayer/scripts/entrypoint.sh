@@ -32,6 +32,8 @@ if [[ "${MY_POD_NAME}" =~ ^relayer-[0-9]+$ && "${RELAYER_ID}" == 0 ]]; then
   RELAYER_ID=$((RELAYER_ID+1))
 fi
 
+echo "RELAYER_ID=${RELAYER_ID}"
+
 AZERO_MOST_METADATA=${AZERO_MOST_METADATA:-"/usr/local/most.json"}
 
 ARGS=(
