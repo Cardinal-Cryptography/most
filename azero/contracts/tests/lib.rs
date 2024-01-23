@@ -42,6 +42,8 @@ mod e2e {
         filter_decode_events_as, get_contract_emitted_events, ContractEmitted, EventWithTopics,
     };
 
+    type CommitteeId = u128;
+
     const TOKEN_INITIAL_SUPPLY: u128 = 10000;
     const DEFAULT_THRESHOLD: u128 = 3;
     const DECIMALS: u8 = 8;
@@ -53,6 +55,8 @@ mod e2e {
     const DEFAULT_FEE: u128 = 30000000000000;
     const DEFAULT_POCKET_MONEY: u128 = 1000000000000;
     const DEFAULT_RELAY_GAS_USAGE: u128 = 50000;
+
+    const DEFAULT_COMMITTEE_ID: CommitteeId = 0;
 
     #[ink_e2e::test]
     fn simple_deploy_works(mut client: ink_e2e::Client<C, E>) {
@@ -265,14 +269,20 @@ mod e2e {
         let receiver_address = account_id(AccountKeyring::One);
         let request_nonce = 1;
 
-        let request_hash =
-            hash_request_data(token_address, amount, receiver_address, request_nonce);
+        let request_hash = hash_request_data(
+            DEFAULT_COMMITTEE_ID,
+            token_address,
+            amount,
+            receiver_address,
+            request_nonce,
+        );
 
         let alice_receive_request_res = most_receive_request(
             &mut client,
             &alice(),
             most_address,
             request_hash,
+            DEFAULT_COMMITTEE_ID,
             *token_address.as_ref(),
             amount,
             *receiver_address.as_ref(),
@@ -300,6 +310,7 @@ mod e2e {
             &bob(),
             most_address,
             incorrect_hash,
+            DEFAULT_COMMITTEE_ID,
             *token_address.as_ref(),
             amount,
             *receiver_address.as_ref(),
@@ -324,8 +335,13 @@ mod e2e {
         let receiver_address = account_id(AccountKeyring::One);
         let request_nonce = 1;
 
-        let request_hash =
-            hash_request_data(token_address, amount, receiver_address, request_nonce);
+        let request_hash = hash_request_data(
+            DEFAULT_COMMITTEE_ID,
+            token_address,
+            amount,
+            receiver_address,
+            request_nonce,
+        );
 
         for i in 0..(DEFAULT_THRESHOLD as usize) {
             let signer = &guardian_keys()[i];
@@ -334,6 +350,7 @@ mod e2e {
                 signer,
                 most_address,
                 request_hash,
+                DEFAULT_COMMITTEE_ID,
                 *token_address.as_ref(),
                 amount,
                 *receiver_address.as_ref(),
@@ -377,8 +394,13 @@ mod e2e {
         let receiver_address = account_id(AccountKeyring::One);
         let request_nonce = 1;
 
-        let request_hash =
-            hash_request_data(token_address, amount, receiver_address, request_nonce);
+        let request_hash = hash_request_data(
+            DEFAULT_COMMITTEE_ID,
+            token_address,
+            amount,
+            receiver_address,
+            request_nonce,
+        );
 
         for i in 0..(DEFAULT_THRESHOLD - 1) as usize {
             let signer = &guardian_keys()[i];
@@ -387,6 +409,7 @@ mod e2e {
                 signer,
                 most_address,
                 request_hash,
+                DEFAULT_COMMITTEE_ID,
                 *token_address.as_ref(),
                 amount,
                 *receiver_address.as_ref(),
@@ -465,8 +488,13 @@ mod e2e {
         let receiver_address = account_id(AccountKeyring::One);
         let request_nonce = 1;
 
-        let request_hash =
-            hash_request_data(token_address, amount, receiver_address, request_nonce);
+        let request_hash = hash_request_data(
+            DEFAULT_COMMITTEE_ID,
+            token_address,
+            amount,
+            receiver_address,
+            request_nonce,
+        );
 
         let azero_balance_before = client
             .balance(receiver_address)
@@ -479,6 +507,7 @@ mod e2e {
                 signer,
                 most_address,
                 request_hash,
+                DEFAULT_COMMITTEE_ID,
                 *token_address.as_ref(),
                 amount,
                 *receiver_address.as_ref(),
@@ -717,6 +746,121 @@ mod e2e {
         assert_eq!(oracle_fee, MIN_FEE);
     }
 
+    #[ink_e2e::test]
+    fn committee_change(mut client: ink_e2e::Client<C, E>) {
+        let (most_address, token_address) = setup_default_most_and_token(&mut client, true).await;
+
+        most_set_committee(
+            &mut client,
+            &alice(),
+            most_address,
+            &guardian_ids()[1..],
+            DEFAULT_THRESHOLD - 1,
+        )
+        .await
+        .expect("can set committee");
+
+        let old_committee_id = 1;
+
+        most_set_committee(
+            &mut client,
+            &alice(),
+            most_address,
+            &guardian_ids()[..guardian_ids().len() - 1],
+            DEFAULT_THRESHOLD - 1,
+        )
+        .await
+        .expect("can set committee");
+
+        let new_committee_id = 2;
+
+        let amount = 20;
+        let receiver_address = account_id(AccountKeyring::One);
+        let request_nonce = 0;
+
+        let old_request_hash = hash_request_data(
+            old_committee_id,
+            token_address,
+            amount,
+            receiver_address,
+            request_nonce,
+        );
+
+        let new_request_hash = hash_request_data(
+            new_committee_id,
+            token_address,
+            amount,
+            receiver_address,
+            request_nonce + 1,
+        );
+
+        let old_request_new_guardian = most_receive_request(
+            &mut client,
+            &guardian_keys()[0],
+            most_address,
+            old_request_hash,
+            old_committee_id,
+            *token_address.as_ref(),
+            amount,
+            *receiver_address.as_ref(),
+            request_nonce,
+        )
+        .await;
+
+        let new_request_old_guardian = most_receive_request(
+            &mut client,
+            &guardian_keys()[guardian_ids().len() - 1],
+            most_address,
+            new_request_hash,
+            new_committee_id,
+            *token_address.as_ref(),
+            amount,
+            *receiver_address.as_ref(),
+            request_nonce + 1,
+        )
+        .await;
+
+        let new_request_new_guardian = most_receive_request(
+            &mut client,
+            &guardian_keys()[0],
+            most_address,
+            new_request_hash,
+            new_committee_id,
+            *token_address.as_ref(),
+            amount,
+            *receiver_address.as_ref(),
+            request_nonce + 1,
+        )
+        .await;
+
+        let old_request_old_guardian = most_receive_request(
+            &mut client,
+            &guardian_keys()[guardian_ids().len() - 1],
+            most_address,
+            old_request_hash,
+            old_committee_id,
+            *token_address.as_ref(),
+            amount,
+            *receiver_address.as_ref(),
+            request_nonce,
+        )
+        .await;
+
+        assert_eq!(
+            old_request_new_guardian.expect_err("Receive request should fail for non-guardians"),
+            MostError::NotInCommittee
+        );
+
+        assert_eq!(
+            new_request_old_guardian.expect_err("Receive request should fail for non-guardians"),
+            MostError::NotInCommittee
+        );
+
+        assert!(new_request_new_guardian.is_ok());
+
+        assert!(old_request_old_guardian.is_ok());
+    }
+
     fn guardian_ids() -> Vec<AccountId> {
         vec![
             account_id(AccountKeyring::Bob),
@@ -732,12 +876,14 @@ mod e2e {
     }
 
     fn hash_request_data(
+        commitee_id: CommitteeId,
         token_address: AccountId,
         amount: u128,
         receiver_address: AccountId,
         request_nonce: u128,
     ) -> Keccak256HashOutput {
         let request_data = [
+            &commitee_id.to_le_bytes(),
             AsRef::<[u8]>::as_ref(&token_address),
             &amount.to_le_bytes(),
             AsRef::<[u8]>::as_ref(&receiver_address),
@@ -923,6 +1069,7 @@ mod e2e {
         caller: &Keypair,
         most: AccountId,
         request_hash: Keccak256HashOutput,
+        committee_id: CommitteeId,
         token: [u8; 32],
         amount: u128,
         receiver_address: [u8; 32],
@@ -933,7 +1080,14 @@ mod e2e {
             caller,
             most,
             |most| {
-                most.receive_request(request_hash, token, amount, receiver_address, request_nonce)
+                most.receive_request(
+                    request_hash,
+                    committee_id,
+                    token,
+                    amount,
+                    receiver_address,
+                    request_nonce,
+                )
             },
             None,
         )
