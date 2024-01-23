@@ -38,7 +38,7 @@ jobs:
           if [[ \
             '${{ inputs.environment }}' != 'bridgenet' && \
             '${{ inputs.environment }}' != 'testnet' && \
-            '${{ inputs.environment }}' != 'mainnet' && \
+            '${{ inputs.environment }}' != 'mainnet' \
           ]]; then
             echo 'Invalid environment'
             exit 1
