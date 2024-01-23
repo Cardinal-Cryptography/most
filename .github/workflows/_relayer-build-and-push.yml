@@ -128,5 +128,5 @@ jobs:
         run: |
           docker_image='${{ secrets.ECR_PRIVATE_HOST }}/most-relayer:${{ steps.build.outputs.docker-tag }}'
 
-          docker tag '${{ steps.build.outputs.docker-name }}' '${docker_image}'
-          docker push '${docker_image}'
+          docker tag '${{ steps.build.outputs.docker-name }}' "${docker_image}"
+          docker push "${docker_image}"
