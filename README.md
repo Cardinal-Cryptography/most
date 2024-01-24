@@ -1,8 +1,12 @@
 [![Built with ink!](https://raw.githubusercontent.com/paritytech/ink/master/.images/badge_flat.svg)](https://github.com/paritytech/ink)
 
-# Aleph Zero MOST (Guardian) Bridge
+<img src="most_logo.png" alt="Most logo">
 
-Contains a guardian-based implementation of a token bridge between Ethereum and Aleph Zero.
+# Aleph Zero MOST<sup>*</sup> (Guardian) Bridge
+
+Bring your assets to Aleph Zero and benefit from its scalable privacy-enhancing ecosystem.
+
+<sup>_\*'bridge' in Slavic languages._</sup>
 
 ## Contents
 
