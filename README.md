@@ -1,6 +1,12 @@
 [![Built with ink!](https://raw.githubusercontent.com/paritytech/ink/master/.images/badge_flat.svg)](https://github.com/paritytech/ink)
 
-# AlephZero MOST (Guardian) Bridge
+<img src="most_logo.png" alt="Most logo">
+
+# AlephZero MOST<sup>*</sup> (Guardian) Bridge
+
+Bring your assets to Aleph Zero and benefit from its scalable privacy-enhancing ecosystem.
+
+<sup>_\*'bridge' in Slavic languages._</sup>
 
 ## Prerequisites
 
