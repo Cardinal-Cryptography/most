@@ -1,6 +1,6 @@
 [![Built with ink!](https://raw.githubusercontent.com/paritytech/ink/master/.images/badge_flat.svg)](https://github.com/paritytech/ink)
 
-<img src="most_logo.png" alt="Most logo" height="50%">
+<img src="most_logo.png" alt="Most logo">
 
 # AlephZero MOST<sup>*</sup> (Guardian) Bridge
 
