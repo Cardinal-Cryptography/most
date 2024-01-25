@@ -274,7 +274,7 @@ mod governance {
 
         /// Sets a new owner account
         ///
-        /// Can only be called by the contracts owner (typically the contract itself)        
+        /// Can only be called by the contracts owner (typically the contract itself)
         #[ink(message)]
         pub fn set_owner(&mut self, new_owner: AccountId) -> Result<(), GovernanceError> {
             self.ensure_owner()?;
