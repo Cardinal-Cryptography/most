@@ -4,7 +4,7 @@ import TokenConstructors from "../types/constructors/token";
 import GovernanceConstructors from "../types/constructors/governance";
 import Governance from "../types/contracts/governance";
 import Most from "../types/contracts/most";
-import Token from "../types/contracts/token"
+import Token from "../types/contracts/token";
 import TestOracleConstructors from "../types/constructors/test_oracle";
 import {
   uploadCode,
@@ -112,7 +112,7 @@ async function main(): Promise<void> {
   const symbol = "wETH";
   const name = symbol;
   const decimals = 12;
-  const minterBurner = mostAddress
+  const minterBurner = mostAddress;
   const estimatedGasToken = await estimateContractInit(
     api,
     deployer,
@@ -121,7 +121,11 @@ async function main(): Promise<void> {
   );
 
   const { address: wethAddress } = await tokenConstructors.new(
-    initialSupply, name, symbol, decimals, minterBurner,
+    initialSupply,
+    name,
+    symbol,
+    decimals,
+    minterBurner,
     { gasLimit: estimatedGasToken },
   );
   console.log("token address:", wethAddress);
