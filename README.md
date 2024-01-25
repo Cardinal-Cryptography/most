@@ -1,6 +1,26 @@
 [![Built with ink!](https://raw.githubusercontent.com/paritytech/ink/master/.images/badge_flat.svg)](https://github.com/paritytech/ink)
 
-# AlephZero MOST (Guardian) Bridge
+<img src="most_logo.png" alt="Most logo">
+
+# Aleph Zero MOST<sup>*</sup> (Guardian) Bridge
+
+Bring your assets to Aleph Zero and benefit from its scalable privacy-enhancing ecosystem.
+
+<sup>_\*'bridge' in Slavic languages._</sup>
+
+## Contents
+
+* `azero` - Aleph Zero contracts
+  * `azero/contracts/most` - the main bridge contract
+  * `azero/contracts/governance` - a contract for making governance decisions about the bridge contracts on Aleph Zero
+  * `azero/contracts/gas-price-oracle` - a contract for informing the guardians about Ethereum gas prices
+  * `azero/contracts/token` - a PSP22 token implementation for the tokens created by the bridge
+* `eth` - Ethereum contracts
+  * `eth/contracts/Most.sol` - the main bridge contract
+  * `eth/contracts/Governance.sol` - a contract for making governance decisions about the bridge contracts on Ethereum
+  * `eth/contracts/WETH9.sol` - a wrapped ethereum implementation for testing purposes
+  * `eth/contract/Token.sol` - an ERC20 token implementation for testing purposes
+* `relayer` - the component doing the actual bridging between the chains
 
 ## Prerequisites
 
@@ -89,7 +109,7 @@ await most.isGuardian(accounts[0])
 await most.isGuardian(accounts[1])
 ```
 
-To deploy the contracts on the azero chain:
+To deploy the contracts on the Aleph Zero chain:
 
 ```bash
 make deploy-azero
