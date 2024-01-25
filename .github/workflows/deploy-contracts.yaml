@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - master
-      #- A0-3158-dockerize-relayer
+      - A0-3158-dockerize-relayer
 
 jobs:
   check-vars-and-secrets:
@@ -78,40 +78,37 @@ jobs:
     strategy:
       matrix:
         include:
+          - from: contract_spec.json
+            to: addresses/bridgenet
+            filename: bridgenet.json
+
+          - from: eth/artifacts/contracts/Governance.sol/Governance.json
+            to: eth_governance
+          - from: eth/artifacts/contracts/Most.sol/Most.json
+            to: eth_most
+          - from: eth/artifacts/contracts/Token.sol/Token.json
+            to: eth_token
+          - from: eth/artifacts/contracts/WETH9.sol/WETH9.json
+            to: eth_weth9
+          - from: azero/artifacts/most.json
+            to: azero_most
+          - from: azero/artifacts/most.contract
+            to: azero_most
+          - from: azero/artifacts/governance.json
+            to: azero_governance
+          - from: azero/artifacts/governance.contract
+            to: azero_governance
+          - from: azero/artifacts/token.json
+            to: azero_token
+          - from: azero/artifacts/token.contract
+            to: azero_token
+
           - from: eth/addresses.json
-            to: relayer/fe_bridgenet
+            to: addresses/bridgenet
             filename: eth_addresses.json
           - from: azero/addresses.json
-            to: relayer/fe_bridgenet
+            to: addresses/bridgenet
             filename: azero_addresses.json
-          - from: azero/artifacts/most.json
-            to: relayer/fe_bridgenet
-            filename: most.json
-
-          #- from: contract_spec.json
-          #  to: addresses/fe_bridgenet
-          #  filname: bridgenet.json
-          #- from: eth/artifacts/contracts/Governance.sol/Governance.json
-          #  to: eth_governace
-          #- from: eth/artifacts/contracts/Most.sol/Most.json
-          #  to: eth_most
-          #- from: eth/artifacts/contracts/Token.sol/Token.json
-          #  to: eth_token
-          #- from: eth/artifacts/contracts/WETH9.sol/WETH9.json
-          #  to: eth_weth9
-          #- from: azero/artifacts/most.json
-          #  to: azero_most
-          #- from: azero/artifacts/most.contract
-          #  to: azero_most
-          #- from: azero/artifacts/governance.json
-          #  to: azero_governance
-          #- from: azero/artifacts/governance.contract
-          #  to: azero_governance
-          #- from: azero/artifacts/token.json
-          #  to: azero_token
-          #- from: azero/artifacts/token.contract
-          #  to: azero_token
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -140,5 +137,5 @@ jobs:
           compression: false
           source-path: ${{ matrix.from }}
           s3-bucket-filename: ${{ matrix.filename }}
-          s3-bucket-path: miko-test/most/${{ github.sha }}/${{ matrix.to }}
+          s3-bucket-path: most/${{ github.sha }}/${{ matrix.to }}
           s3-bucket-name: alephzero-devnet-contracts-test

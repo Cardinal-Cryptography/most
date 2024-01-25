@@ -3,7 +3,7 @@ name: Build and push relayer to devnet
 on:
   push:
     branches:
-    - A0-3158-dockerize-relayer
+    #- A0-3158-dockerize-relayer
 
 concurrency:
   group: ${{ github.ref }}-${{ github.workflow }}
