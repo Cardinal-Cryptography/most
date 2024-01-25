@@ -18,7 +18,7 @@ use subxt::{events::Events, utils::H256};
 use thiserror::Error;
 use tokio::{
     sync::{Mutex, OwnedSemaphorePermit, Semaphore},
-    task::{JoinHandle, JoinSet},
+    task::JoinSet,
     time::{sleep, Duration},
 };
 
@@ -133,7 +133,7 @@ impl AlephZeroListener {
 
         // Main AlephZero event loop
         loop {
-            // Query for the next unknowns finalized block number, if not present we wait for it.
+            // Query for the next unknown finalized block number, if not present we wait for it.
             let mut to_block = get_next_finalized_block_number_azero(
                 azero_connection.clone(),
                 first_unprocessed_block_number,
@@ -186,12 +186,12 @@ async fn fetch_events_in_block_range(
     from_block: u32,
     to_block: u32,
 ) -> Result<Vec<(BlockDetails, Events<AlephConfig>)>, AzeroListenerError> {
-    let mut event_processing_tasks = JoinSet::new();
+    let mut event_fetching_tasks = JoinSet::new();
 
     for block_number in from_block..=to_block {
         let azero_connection = azero_connection.clone();
 
-        event_processing_tasks.spawn(async move {
+        event_fetching_tasks.spawn(async move {
             let block_hash = azero_connection
                 .get_block_hash(block_number)
                 .await?
@@ -219,7 +219,7 @@ async fn fetch_events_in_block_range(
     let mut block_events = Vec::new();
 
     // Wait for all event processing tasks to finish.
-    while let Some(result) = event_processing_tasks.join_next().await {
+    while let Some(result) = event_fetching_tasks.join_next().await {
         block_events.push(result??);
     }
 
@@ -241,7 +241,7 @@ async fn handle_events(
     redis_connection: Arc<Mutex<RedisConnection>>,
     event_handler_tasks_semaphore: Arc<Semaphore>,
 ) -> Result<(), AzeroListenerError> {
-    let mut event_tasks = Vec::new();
+    let mut event_tasks = JoinSet::new();
     for event in events {
         let config = config.clone();
         let eth_connection = eth_connection.clone();
@@ -252,11 +252,7 @@ async fn handle_events(
             .expect("Failed to acquire semaphore permit");
 
         // Spawn a new task for handling each event.
-        event_tasks.push(tokio::spawn(async move {
-            handle_event(config, eth_connection, event, permit)
-                .await
-                .expect("Event handler failed");
-        }));
+        event_tasks.spawn(handle_event(config, eth_connection, event, permit));
         if event_tasks.len() >= ALEPH_MAX_REQUESTS_PER_BLOCK {
             panic!("Too many send_request calls in one block: our benchmark is outdated.");
         }
@@ -369,15 +365,15 @@ async fn handle_event(
 async fn handle_processed_block(
     config: Arc<Config>,
     block_number: u32,
-    event_tasks: Vec<JoinHandle<()>>,
+    mut event_tasks: JoinSet<Result<(), AzeroListenerError>>,
     pending_blocks: Arc<Mutex<BTreeSet<u32>>>,
     redis_connection: Arc<Mutex<RedisConnection>>,
 ) -> Result<(), AzeroListenerError> {
     let Config { name, .. } = &*config;
 
     // Wait for all event processing tasks to finish.
-    for task in event_tasks {
-        task.await.expect("Event processing task has failed");
+    while let Some(result) = event_tasks.join_next().await {
+        result??;
     }
 
     // Lock the pending blocks set and remove the current block number (as we managed to process all events from it).
