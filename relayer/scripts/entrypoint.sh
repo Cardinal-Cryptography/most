@@ -51,5 +51,9 @@ if [[ -n "${AZERO_START_BLOCK}" ]]; then
   ARGS+=(--default-sync-from-block-azero=${AZERO_START_BLOCK})
 fi
 
+if [[ -n "${ETH_START_BLOCK}" ]]; then
+  ARGS+=(--default-sync-from-block-eth=${ETH_START_BLOCK})
+fi
+
 # --- RUN
 xargs most-relayer "${ARGS[@]}"
