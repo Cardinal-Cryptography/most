@@ -6,6 +6,9 @@ pub struct Config {
     #[arg(long)]
     pub dev: bool,
 
+    #[arg(long, default_value = "0")]
+    pub committee_id: u32,
+
     #[arg(long)]
     pub azero_contract_address: String,
 
