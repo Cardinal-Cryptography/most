@@ -2,6 +2,9 @@ import { ApiPromise, WsProvider, Keyring } from "@polkadot/api";
 import MostConstructors from "../types/constructors/most";
 import TokenConstructors from "../types/constructors/token";
 import GovernanceConstructors from "../types/constructors/governance";
+import Governance from "../types/contracts/governance";
+import Most from "../types/contracts/most";
+import Token from "../types/contracts/token"
 import {
   uploadCode,
   Addresses,
@@ -20,6 +23,7 @@ async function main(): Promise<void> {
   const {
     ws_node,
     relayers_keys,
+    governance_keys,
     authority_seed,
     signature_threshold,
     commission_per_dix_mille,
@@ -103,12 +107,26 @@ async function main(): Promise<void> {
     [quorum],
   );
 
-  const governance = await governanceConstructors.new(
+  const { address: governanceAddress } = await governanceConstructors.new(
     quorum,
     { gasLimit: estimatedGasGovernance },
   );
-  const governanceAddress = governance.address;
+  const governance = new Governance(governanceAddress, deployer, api);
   console.log("governance address:", governanceAddress);
+
+  for (const address of governance_keys) {
+    console.log("Adding", address, "as governance member...");
+    await governance.tx.addMember(address);
+  }
+
+  console.log("Transferring ownership of most to governance...");
+  await new Most(mostAddress, deployer, api).tx.setOwner(governanceAddress);
+
+  console.log("Transferring ownership of weth to governance...");
+  await new Token(wethAddress, deployer, api).tx.setAdmin(governanceAddress);
+
+  console.log("Transferring ownership of governance to governance...");
+  await governance.tx.setOwner(governanceAddress);
 
   const addresses: Addresses = {
     governance: governanceAddress,
