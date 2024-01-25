@@ -1,9 +1,9 @@
-use std::{collections::BTreeSet, sync::Arc};
+use std::{cmp::min, collections::BTreeSet, sync::Arc};
 
 use aleph_client::{
     contract::event::{BlockDetails, ContractEvent},
     utility::BlocksApi,
-    AsConnection,
+    AlephConfig, AsConnection,
 };
 use ethers::{
     abi::{self, EncodePackedError, Token},
@@ -14,11 +14,11 @@ use ethers::{
 };
 use log::{debug, error, info, warn};
 use redis::{aio::Connection as RedisConnection, RedisError};
-use subxt::utils::H256;
+use subxt::{events::Events, utils::H256};
 use thiserror::Error;
 use tokio::{
     sync::{Mutex, OwnedSemaphorePermit, Semaphore},
-    task::JoinHandle,
+    task::{JoinHandle, JoinSet},
     time::{sleep, Duration},
 };
 
@@ -79,6 +79,9 @@ pub enum AzeroListenerError {
     #[error("redis connection error")]
     Redis(#[from] RedisError),
 
+    #[error("join error")]
+    Join(#[from] tokio::task::JoinError),
+
     #[error("unexpected error")]
     Unexpected,
 }
@@ -101,8 +104,9 @@ impl AlephZeroListener {
             azero_contract_metadata,
             azero_contract_address,
             azero_max_event_handler_tasks,
-            name,
             default_sync_from_block_azero,
+            name,
+            sync_step,
             ..
         } = &*config;
 
@@ -130,49 +134,40 @@ impl AlephZeroListener {
         // Main AlephZero event loop
         loop {
             // Query for the next unknowns finalized block number, if not present we wait for it.
-            let to_block = get_next_finalized_block_number_azero(
+            let mut to_block = get_next_finalized_block_number_azero(
                 azero_connection.clone(),
                 first_unprocessed_block_number,
             )
             .await;
+
+            to_block = min(to_block, first_unprocessed_block_number + (*sync_step) - 1);
 
             info!(
                 "Processing events from blocks {} - {}",
                 first_unprocessed_block_number, to_block
             );
 
-            // Process events from the next unknown finalized block.
+            // Add the next block numbers now, so that there is always some block number in the set.
             for block_number in first_unprocessed_block_number..=to_block {
-                // Add the next block number now, so that there is always some block number in the set.
                 add_to_pending(block_number + 1, pending_blocks.clone()).await;
+            }
 
-                let block_hash = azero_connection
-                    .get_block_hash(block_number)
-                    .await?
-                    .ok_or(AzeroListenerError::BlockNotFound)?;
+            // Fetch the events in parallel.
+            let block_events = fetch_events_in_block_range(
+                azero_connection.clone(),
+                first_unprocessed_block_number,
+                to_block,
+            )
+            .await?;
 
-                let events = azero_connection
-                    .as_connection()
-                    .as_client()
-                    .blocks()
-                    .at(block_hash)
-                    .await?
-                    .events()
-                    .await?;
-
-                let filtered_events = most_instance.filter_events(
-                    events,
-                    BlockDetails {
-                        block_number,
-                        block_hash,
-                    },
-                );
+            for (block_details, events) in block_events {
+                let filtered_events = most_instance.filter_events(events, block_details.clone());
 
                 handle_events(
                     config.clone(),
                     eth_connection.clone(),
                     filtered_events,
-                    block_number,
+                    block_details.block_number,
                     pending_blocks.clone(),
                     redis_connection.clone(),
                     event_handler_tasks_semaphore.clone(),
@@ -184,6 +179,51 @@ impl AlephZeroListener {
             first_unprocessed_block_number = to_block + 1;
         }
     }
+}
+
+async fn fetch_events_in_block_range(
+    azero_connection: Arc<SignedAzeroWsConnection>,
+    from_block: u32,
+    to_block: u32,
+) -> Result<Vec<(BlockDetails, Events<AlephConfig>)>, AzeroListenerError> {
+    let mut event_processing_tasks = JoinSet::new();
+
+    for block_number in from_block..=to_block {
+        let azero_connection = azero_connection.clone();
+
+        event_processing_tasks.spawn(async move {
+            let block_hash = azero_connection
+                .get_block_hash(block_number)
+                .await?
+                .ok_or(AzeroListenerError::BlockNotFound)?;
+
+            let events = azero_connection
+                .as_connection()
+                .as_client()
+                .blocks()
+                .at(block_hash)
+                .await?
+                .events()
+                .await?;
+
+            Ok::<_, AzeroListenerError>((
+                BlockDetails {
+                    block_number,
+                    block_hash,
+                },
+                events,
+            ))
+        });
+    }
+
+    let mut block_events = Vec::new();
+
+    // Wait for all event processing tasks to finish.
+    while let Some(result) = event_processing_tasks.join_next().await {
+        block_events.push(result??);
+    }
+
+    Ok(block_events)
 }
 
 async fn add_to_pending(block_number: u32, pending_blocks: Arc<Mutex<BTreeSet<u32>>>) {
