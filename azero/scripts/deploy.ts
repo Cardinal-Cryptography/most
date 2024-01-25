@@ -2,6 +2,9 @@ import { ApiPromise, WsProvider, Keyring } from "@polkadot/api";
 import MostConstructors from "../types/constructors/most";
 import TokenConstructors from "../types/constructors/token";
 import GovernanceConstructors from "../types/constructors/governance";
+import Governance from "../types/contracts/governance";
+import Most from "../types/contracts/most";
+import Token from "../types/contracts/token";
 import TestOracleConstructors from "../types/constructors/test_oracle";
 import {
   uploadCode,
@@ -18,9 +21,10 @@ async function import_env() {
 }
 
 async function main(): Promise<void> {
-  let {
+  const {
     ws_node,
     relayers_keys,
+    governance_keys,
     authority_seed,
     signature_threshold,
     pocket_money,
@@ -30,8 +34,8 @@ async function main(): Promise<void> {
     default_fee,
   } = await import_env();
 
-  let wsProvider = new WsProvider(ws_node);
-  let keyring = new Keyring({ type: "sr25519" });
+  const wsProvider = new WsProvider(ws_node);
+  const keyring = new Keyring({ type: "sr25519" });
 
   const api = await ApiPromise.create({ provider: wsProvider });
   const deployer = keyring.addFromUri(authority_seed);
@@ -74,7 +78,7 @@ async function main(): Promise<void> {
     { gasLimit: estimatedGasOracle },
   );
 
-  let estimatedGasMost = await estimateContractInit(
+  const estimatedGasMost = await estimateContractInit(
     api,
     deployer,
     "most.contract",
@@ -104,33 +108,56 @@ async function main(): Promise<void> {
 
   console.log("most address:", mostAddress);
 
-  let estimatedGasToken = await estimateContractInit(
+  const initialSupply = 0;
+  const symbol = "wETH";
+  const name = symbol;
+  const decimals = 12;
+  const minterBurner = mostAddress;
+  const estimatedGasToken = await estimateContractInit(
     api,
     deployer,
     "token.contract",
-    [0, "wETH", "wETH", 12, mostAddress],
+    [initialSupply, name, symbol, decimals, minterBurner],
   );
+
   const { address: wethAddress } = await tokenConstructors.new(
-    0, // initial supply
-    "wETH", // name
-    "wETH", // symbol
-    12, // decimals
-    mostAddress, // minter_burner address
+    initialSupply,
+    name,
+    symbol,
+    decimals,
+    minterBurner,
     { gasLimit: estimatedGasToken },
   );
   console.log("token address:", wethAddress);
 
-  let estimatedGasGovernance = await estimateContractInit(
+  const quorum = 2;
+  const estimatedGasGovernance = await estimateContractInit(
     api,
     deployer,
     "governance.contract",
-    [2],
+    [quorum],
   );
+
   const { address: governanceAddress } = await governanceConstructors.new(
-    2, // quorum
+    quorum,
     { gasLimit: estimatedGasGovernance },
   );
+  const governance = new Governance(governanceAddress, deployer, api);
   console.log("governance address:", governanceAddress);
+
+  for (const address of governance_keys) {
+    console.log("Adding", address, "as governance member...");
+    await governance.tx.addMember(address);
+  }
+
+  console.log("Transferring ownership of most to governance...");
+  await new Most(mostAddress, deployer, api).tx.setOwner(governanceAddress);
+
+  console.log("Transferring ownership of weth to governance...");
+  await new Token(wethAddress, deployer, api).tx.setAdmin(governanceAddress);
+
+  console.log("Transferring ownership of governance to governance...");
+  await governance.tx.setOwner(governanceAddress);
 
   const addresses: Addresses = {
     governance: governanceAddress,
