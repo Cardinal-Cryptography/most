@@ -1,12 +1,10 @@
 const fs = require("node:fs");
-const { ethers, upgrades } = require("hardhat");
-
-const COMMISSION_PER_DIX_MILLE = 30;
-const MINIMUM_TRANSFER_AMOUNT_USD = 50;
+const { network, ethers, upgrades } = require("hardhat");
 
 async function main() {
   const signers = await ethers.getSigners();
   const accounts = signers.map((s) => s.address);
+  const config = network.config.deploymentConfig;
 
   console.log("Using ", accounts[0], "as signer");
 
@@ -27,7 +25,7 @@ async function main() {
   const Governance = await ethers.getContractFactory("Governance");
   const governance = await upgrades.deployProxy(
     Governance,
-    [accounts.slice(1, 4), 2],
+    [config.governanceIds, config.governanceThreshold],
     {
       initializer: "initialize",
       kind: "uups",
@@ -40,7 +38,7 @@ async function main() {
   console.log("Deploying Most...");
   const most = await upgrades.deployProxy(
     Most,
-    [accounts.slice(1, 4), 2, accounts[0]],
+    [config.guardianIds, config.threshold, accounts[0]],
     {
       initializer: "initialize",
       kind: "uups",
