@@ -7,6 +7,10 @@ on:
         description: One of 'bridgenet', 'testnet', 'mainnet'
         type: string
         required: true
+      frontend-environment:
+        description: Environment name for frontend
+        type: string
+        required: true
       contracts-commit-sha:
         description: Commit SHA of contract artefacts
         type: string
@@ -49,6 +53,11 @@ jobs:
             exit 1
           fi
 
+          if [[ ! '${{ inputs.frontend-environment }}' =~ [a-z0-9]+ ]]; then
+            echo 'Invalid frontend environment'
+            exit 1
+          fi
+
           # TODO: Remove when implemented
           if [[ \
             '${{ inputs.environment }}' == 'testnet' || \
@@ -66,17 +75,6 @@ jobs:
         # yamllint disable-line rule:line-length
         uses: Cardinal-Cryptography/github-actions/get-ref-properties@v6
 
-      - name: Install Rust toolchain
-        uses: Cardinal-Cryptography/github-actions/install-rust-toolchain@v6
-        with:
-          targets: wasm32-unknown-unknown
-
-      - name: Install necessary tools
-        shell: bash
-        run: |
-          npm install typechain
-          cargo install cargo-contract
-
       - name: Download files from S3 AWS bucket
         shell: bash
         env:
@@ -85,20 +83,13 @@ jobs:
           AWS_DEFAULT_REGION: eu-central-1
         # yamllint disable rule:line-length
         run: |
-          env_dir='${{ inputs.environment }}'
-          
-          # TODO: Will be renamed/removed
-          if [[ '${{ inputs.environment }}' == 'bridgenet' ]]; then
-            env_dir='fe_bridgenet'
-          fi
-
-          # TODO: For testing now
           mkdir -p azero/artifacts
 
-          s3_path="miko-test/most/${{ inputs.contracts-commit-sha }}/relayer/${env_dir}"
-          aws s3 cp s3://alephzero-devnet-contracts-test/${s3_path}/azero_addresses.json azero/addresses.json
-          aws s3 cp s3://alephzero-devnet-contracts-test/${s3_path}/eth_addresses.json eth/addresses.json
-          aws s3 cp s3://alephzero-devnet-contracts-test/${s3_path}/most.json azero/artifacts/most.json
+          s3_addr_path="most/addresses/${{ inputs.environment }}/${{ inputs.frontend-environment }}/${{ inputs.contracts-commit-sha }}"
+          s3_art_path="most/artifacts/${{ inputs.contracts-commit-sha }}"
+          aws s3 cp s3://alephzero-devnet-contracts-test/${s3_addr_path}/azero_addresses.json azero/addresses.json
+          aws s3 cp s3://alephzero-devnet-contracts-test/${s3_addr_path}/eth_addresses.json eth/addresses.json
+          aws s3 cp s3://alephzero-devnet-contracts-test/${s3_art_path}/most.json azero/artifacts/most.json
         # yamllint enable rule:line-length
 
       - name: Build relayer
@@ -106,7 +97,7 @@ jobs:
         run: |
           contracts_sha='${{ inputs.contracts-commit-sha }}'
           contracts_sha_short="${contracts_sha:0:8}"
-          docker_tag=${{ steps.get-ref-properties.outputs.sha }}-${contracts_sha_short}-${{ inputs.environment }}
+          docker_tag=${{ steps.get-ref-properties.outputs.sha }}-${contracts_sha_short}-${{ inputs.environment }}-${{ inputs.frontend-environment }}
           docker_name=most-relayer-${docker_tag}
 
           make build-docker-relayer DOCKER_RELAYER_NAME=${docker_name}

@@ -1,9 +1,8 @@
-name: Build and push relayer to devnet
+name: Relayer - build and deploy to devnet
 
 on:
-  push:
-    branches:
-    - A0-3158-dockerize-relayer-non-existing
+  workflow_call:
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.ref }}-${{ github.workflow }}
@@ -22,4 +21,5 @@ jobs:
     secrets: inherit
     with:
       environment: bridgenet
-      contracts-commit-sha: 425a073ca09f83420218ea1e4fdd3d62036bf4da
+      frontend-environment: dev
+      contracts-commit-sha: ${{ github.sha }}

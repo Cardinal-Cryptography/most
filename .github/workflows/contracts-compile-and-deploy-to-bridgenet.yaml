@@ -2,10 +2,8 @@
 name: Bridgenet - deploy contracts
 
 on:
-  push:
-    branches:
-      - master
-      - A0-3158-dockerize-relayer
+  workflow_call:
+  workflow_dispatch:
 
 jobs:
   check-vars-and-secrets:
