@@ -22,7 +22,6 @@ jobs:
     with:
       environment: bridgenet
       frontend-environment: dev
-      contracts-commit-sha: ${{ github.sha }}
 
   deploy-to-devnet:
     needs: [build-and-push]

@@ -11,10 +11,6 @@ on:
         description: Environment name for frontend
         type: string
         required: true
-      contracts-commit-sha:
-        description: Commit SHA of contract artefacts
-        type: string
-        required: true
     outputs:
       docker-tag:
         description: Docker image tag
@@ -45,11 +41,6 @@ jobs:
             '${{ inputs.environment }}' != 'mainnet' \
           ]]; then
             echo 'Invalid environment'
-            exit 1
-          fi
-
-          if [[ ! '${{ inputs.contracts-commit-sha }}' =~ [a-z0-9]+ ]]; then
-            echo 'Invalid contracts commit sha'
             exit 1
           fi
 
@@ -85,8 +76,8 @@ jobs:
         run: |
           mkdir -p azero/artifacts
 
-          s3_addr_path="most/addresses/${{ inputs.environment }}/${{ inputs.frontend-environment }}/${{ inputs.contracts-commit-sha }}"
-          s3_art_path="most/artifacts/${{ inputs.contracts-commit-sha }}"
+          s3_addr_path="most/addresses/${{ inputs.environment }}/${{ inputs.frontend-environment }}/${{ github.sha }}"
+          s3_art_path="most/artifacts/${{ github.sha }}"
           aws s3 cp s3://alephzero-devnet-contracts-test/${s3_addr_path}/azero_addresses.json azero/addresses.json
           aws s3 cp s3://alephzero-devnet-contracts-test/${s3_addr_path}/eth_addresses.json eth/addresses.json
           aws s3 cp s3://alephzero-devnet-contracts-test/${s3_art_path}/most.json azero/artifacts/most.json
@@ -95,9 +86,7 @@ jobs:
       - name: Build relayer
         id: build
         run: |
-          contracts_sha='${{ inputs.contracts-commit-sha }}'
-          contracts_sha_short="${contracts_sha:0:8}"
-          docker_tag=${{ steps.get-ref-properties.outputs.sha }}-${contracts_sha_short}-${{ inputs.environment }}-${{ inputs.frontend-environment }}
+          docker_tag=${{ steps.get-ref-properties.outputs.sha }}-${{ inputs.environment }}-${{ inputs.frontend-environment }}
           docker_name=most-relayer-${docker_tag}
 
           make build-docker-relayer DOCKER_RELAYER_NAME=${docker_name}
