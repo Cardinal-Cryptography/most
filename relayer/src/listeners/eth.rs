@@ -149,6 +149,7 @@ async fn handle_event(
     ) = event
     {
         let Config {
+            committee_id,
             azero_contract_address,
             azero_contract_metadata,
             ..
@@ -181,6 +182,7 @@ async fn handle_event(
             .receive_request(
                 &azero_connection,
                 request_hash,
+                *committee_id as u128,
                 *dest_token_address,
                 amount.as_u128(),
                 *dest_receiver_address,

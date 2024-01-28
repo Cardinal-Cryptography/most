@@ -13,11 +13,12 @@ help: # Show help for each of the Makefile recipes.
 clean-azero: # Remove azero node data
 clean-azero:
 	cd devnet-azero && rm -rf \
-	5*/chains/a0dnet1/db \
-	5*/chains/a0dnet1/network \
-	5*/backup-stash \
-	5*/chainspec.json \
-	&& echo "Done azero clean"
+		5*/chains/a0dnet1/db \
+		5*/chains/a0dnet1/network \
+		5*/backup-stash \
+		5*/chainspec.json
+	rm -rf azero/artifacts/*
+	echo "Done azero clean"
 
 .PHONY: clean-eth
 clean-eth: # Remove eth node data

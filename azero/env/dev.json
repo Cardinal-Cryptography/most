@@ -5,10 +5,16 @@
     "5Dfis6XL8J2P6JHUnUtArnFWndn62SydeP8ee8sG2ky9nfm9",
     "5F4H97f7nQovyrbiq4ZetaaviNwThSVcFobcA5aGab6167dK"
   ],
+  "governance_keys": [
+    "5GBNeWRhZc2jXu7D55rBimKYDk8PGk8itRYFTPfC8RJLKG5o",
+    "5Dfis6XL8J2P6JHUnUtArnFWndn62SydeP8ee8sG2ky9nfm9",
+    "5F4H97f7nQovyrbiq4ZetaaviNwThSVcFobcA5aGab6167dK"
+  ],
   "authority_seed": "//Alice",
   "signature_threshold": 2,
-  "commission_per_dix_mille": 300,
   "pocket_money": 1000000000000,
-  "minimum_transfer_amount_usd": 50,
+  "min_fee": 10000000000000,
+  "max_fee": 100000000000000,
+  "default_fee": 30000000000000,
   "relay_gas_usage": 50000
 }

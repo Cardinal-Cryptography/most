@@ -923,7 +923,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "test-oracle"
+name = "test_oracle"
 version = "1.0.0"
 dependencies = [
  "gas-oracle-trait",

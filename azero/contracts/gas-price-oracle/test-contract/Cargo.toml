@@ -1,5 +1,5 @@
 [package]
-name = "test-oracle"
+name = "test_oracle"
 version = "1.0.0"
 authors = ["Cardinal Cryptography"]
 edition = "2021"
