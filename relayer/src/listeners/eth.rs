@@ -198,8 +198,7 @@ async fn handle_event(
                 *dest_receiver_address,
                 request_nonce.as_u128(),
             )
-            .await
-            .expect("msg should be sent");
+            .await?;
     }
 
     Ok(())
