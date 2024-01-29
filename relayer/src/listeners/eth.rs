@@ -140,6 +140,7 @@ async fn handle_event(
 ) -> Result<(), EthListenerError> {
     if let MostEvents::CrosschainTransferRequestFilter(
         crosschain_transfer_event @ CrosschainTransferRequestFilter {
+            committee_id,
             dest_token_address,
             amount,
             dest_receiver_address,
@@ -149,16 +150,25 @@ async fn handle_event(
     ) = event
     {
         let Config {
-            committee_id,
+            relayers_committee_id,
             azero_contract_address,
             azero_contract_metadata,
             ..
         } = config;
 
+        if *relayers_committee_id != committee_id.as_u128() {
+            warn!(
+                "Ignoring event from committee {}, expected {}",
+                committee_id, relayers_committee_id
+            );
+            return Ok(());
+        }
+
         info!("handling eth contract event: {crosschain_transfer_event:?}");
 
         // concat bytes
         let bytes = concat_u8_arrays(vec![
+            &committee_id.as_u128().to_le_bytes(),
             dest_token_address,
             &amount.as_u128().to_le_bytes(),
             dest_receiver_address,
@@ -182,13 +192,14 @@ async fn handle_event(
             .receive_request(
                 &azero_connection,
                 request_hash,
-                *committee_id as u128,
+                committee_id.as_u128(),
                 *dest_token_address,
                 amount.as_u128(),
                 *dest_receiver_address,
                 request_nonce.as_u128(),
             )
-            .await?;
+            .await
+            .expect("msg should be sent");
     }
 
     Ok(())
