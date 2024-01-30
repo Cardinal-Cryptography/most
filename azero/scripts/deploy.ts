@@ -5,7 +5,7 @@ import GovernanceConstructors from "../types/constructors/governance";
 import Governance from "../types/contracts/governance";
 import Most from "../types/contracts/most";
 import Token from "../types/contracts/token";
-import TestOracleConstructors from "../types/constructors/test_oracle";
+import OracleConstructors from "../types/constructors/oracle";
 import {
   uploadCode,
   Addresses,
@@ -32,6 +32,7 @@ async function main(): Promise<void> {
     min_fee,
     max_fee,
     default_fee,
+    authority
   } = await import_env();
 
   const wsProvider = new WsProvider(ws_node);
@@ -53,28 +54,28 @@ async function main(): Promise<void> {
   );
   console.log("governance code hash:", governanceCodeHash);
 
-  const testOracleCodeHash = await uploadCode(
+  const oracleCodeHash = await uploadCode(
     api,
     deployer,
-    "test_oracle.contract",
+    "oracle.contract",
   );
-  console.log("oracle code hash:", testOracleCodeHash);
+  console.log("oracle code hash:", oracleCodeHash);
 
   const governanceConstructors = new GovernanceConstructors(api, deployer);
   const mostConstructors = new MostConstructors(api, deployer);
   const tokenConstructors = new TokenConstructors(api, deployer);
-  const testOracleConstructors = new TestOracleConstructors(api, deployer);
+  const oracleConstructors = new OracleConstructors(api, deployer);
 
   let estimatedGasOracle = await estimateContractInit(
     api,
     deployer,
-    "test_oracle.contract",
-    [15, true],
+    "oracle.contract",
+    [authority, 20000000],
   );
 
-  const { address: oracleAddress } = await testOracleConstructors.new(
-    100000, // default value
-    true, // randomize
+  const { address: oracleAddress } = await oracleConstructors.new(
+    authority, // owner
+    20000000,  // initial value
     { gasLimit: estimatedGasOracle },
   );
 
@@ -163,7 +164,7 @@ async function main(): Promise<void> {
     governance: governanceAddress,
     most: mostAddress,
     weth: wethAddress,
-    test_oracle: oracleAddress,
+    oracle: oracleAddress,
   };
   console.log("addresses:", addresses);
 
