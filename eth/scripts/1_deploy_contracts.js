@@ -23,6 +23,7 @@ async function main() {
   console.log("USDT deployed to:", usdt.target);
 
   const Governance = await ethers.getContractFactory("Governance");
+  console.log("Deploying Governance...");
   const governance = await upgrades.deployProxy(
     Governance,
     [config.governanceIds, config.governanceThreshold],
