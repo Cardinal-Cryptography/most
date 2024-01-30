@@ -70,12 +70,12 @@ async function main(): Promise<void> {
     api,
     deployer,
     "oracle.contract",
-    [authority, 20000000],
+    [authority, 10000000000],
   );
 
   const { address: oracleAddress } = await oracleConstructors.new(
     authority, // owner
-    20000000,  // initial value
+    10000000000,  // initial value
     { gasLimit: estimatedGasOracle },
   );
 
