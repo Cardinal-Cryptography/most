@@ -2,7 +2,8 @@ NETWORK ?= development
 AZERO_ENV ?= dev
 DOCKER_RELAYER_NAME ?= most-relayer
 
-export BRIDGENET_START_BLOCK=`ENDPOINT=https://rpc-fe-bridgenet.dev.azero.dev ./relayer/scripts/azero_best_finalized.sh`
+export BRIDGENET_AZERO_START_BLOCK=`ENDPOINT=https://rpc-fe-bridgenet.dev.azero.dev ./relayer/scripts/azero_best_finalized.sh`
+export BRIDGENET_ETH_START_BLOCK=`ENDPOINT=https://rpc-eth-bridgenet.dev.azero.dev ./relayer/scripts/eth_best_finalized.sh`
 export CONTRACT_VERSION ?=`git rev-parse HEAD`
 
 .PHONY: help
@@ -153,7 +154,7 @@ bridge: local-bridgenet deploy run-relayers devnet-relayers-logs
 bridgenet-bridge: # Run the bridge on bridgenet
 bridgenet-bridge: build-docker-relayer redis-instance
 	NETWORK=bridgenet AZERO_ENV=bridgenet make deploy
-	AZERO_START_BLOCK=${BRIDGENET_START_BLOCK} docker-compose -f ./relayer/scripts/bridgenet-relayers-compose.yml up -d
+	AZERO_START_BLOCK=${BRIDGENET_AZERO_START_BLOCK} ETH_START_BLOCK=${BRIDGENET_ETH_START_BLOCK} docker-compose -f ./relayer/scripts/bridgenet-relayers-compose.yml up -d
 	make bridgenet-relayers-logs
 
 .PHONY: devnet-relayers-logs
