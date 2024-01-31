@@ -32,7 +32,7 @@ async function main(): Promise<void> {
     min_fee,
     max_fee,
     default_fee,
-    authority
+    authority,
   } = await import_env();
 
   const wsProvider = new WsProvider(ws_node);
@@ -54,11 +54,7 @@ async function main(): Promise<void> {
   );
   console.log("governance code hash:", governanceCodeHash);
 
-  const oracleCodeHash = await uploadCode(
-    api,
-    deployer,
-    "oracle.contract",
-  );
+  const oracleCodeHash = await uploadCode(api, deployer, "oracle.contract");
   console.log("oracle code hash:", oracleCodeHash);
 
   const governanceConstructors = new GovernanceConstructors(api, deployer);
@@ -75,7 +71,7 @@ async function main(): Promise<void> {
 
   const { address: oracleAddress } = await oracleConstructors.new(
     authority, // owner
-    10000000000,  // initial value
+    10000000000, // initial value
     { gasLimit: estimatedGasOracle },
   );
 
