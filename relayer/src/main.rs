@@ -90,7 +90,7 @@ fn main() -> Result<()> {
                 .expect("Cannot decrypt eth wallet")
         };
 
-        log::info!("Wallet address: {}", wallet.address());
+        info!("Wallet address: {}", wallet.address());
 
         let eth_connection = Arc::new(
             eth::sign(eth::connect(&config.eth_node_http_url).await, wallet)
@@ -105,7 +105,7 @@ fn main() -> Result<()> {
         let eth_connection_rc1 = Arc::clone(&eth_connection);
         let redis_connection_rc1 = Arc::clone(&redis_connection);
 
-        log::info!("Starting Ethereum listener");
+        info!("Starting Ethereum listener");
 
         tasks.push(tokio::spawn(async {
             EthListener::run(
@@ -123,7 +123,7 @@ fn main() -> Result<()> {
         let eth_connection_rc2 = Arc::clone(&eth_connection);
         let redis_connection_rc2 = Arc::clone(&redis_connection);
 
-        log::info!("Starting AlephZero listener");
+        info!("Starting AlephZero listener");
 
         tasks.push(tokio::spawn(async {
             AlephZeroListener::run(
