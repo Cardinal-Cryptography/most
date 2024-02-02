@@ -27,6 +27,9 @@ pub struct Config {
 
     #[command(flatten)]
     pub test_args: TestArgs,
+
+    #[arg(long, default_value = "info")]
+    pub rust_log: log::Level,
 }
 
 #[derive(Args, Debug)]
