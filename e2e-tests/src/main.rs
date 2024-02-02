@@ -1,10 +1,9 @@
 use std::{env, str::FromStr};
 
 use aleph_client::{
-    api as azero_api, keypair_from_string,
+    keypair_from_string,
     sp_core::{blake2_256, ByteArray},
     sp_runtime::AccountId32,
-    sp_weights::weight_v2::Weight,
 };
 use anyhow;
 use clap::Parser;
@@ -16,6 +15,7 @@ use ethers::{
     utils,
 };
 use log::info;
+use subxt::rpc_params;
 
 mod azero;
 mod config;
@@ -122,26 +122,23 @@ async fn main() -> anyhow::Result<()> {
     info!("'sendRequest' tx receipt: {:?}", send_request_receipt);
 
     let azero_connection = azero::connection(&config.azero_node_ws).await;
-    let azero_client = azero_connection.as_client();
+    let azero_client = azero_connection.as_client().rpc();
 
     let mut call_data = vec![];
     call_data.append(&mut (&blake2_256("balance_of".as_bytes())[0..4]).to_vec());
     call_data.append(&mut azero_account_keypair.account_id().to_raw_vec());
-    let call = azero_api::tx().contracts().call(
-        weth_azero_account_id.into(),
-        0,
-        Weight::new(20_000_000_000, u64::MAX),
-        None,
-        call_data,
-    );
-    let ex_events = azero_client
-        .tx()
-        .create_unsigned(&call)?
-        .submit_and_watch()
-        .await?
-        .wait_for_finalized_success()
-        .await?;
-    let events = ex_events.all_events_in_block(); //.find_first()?.ok_or(anyhow::anyhow!("No events found for the submitted call."))?; //sign_and_submit_then_watch(&call, azero_account_keypair.account_id()).await?.wait;
+
+    let rpc_params = rpc_params![
+        (*azero_account_keypair.account_id()).clone(),
+        weth_azero_account_id,
+        0 as u128,
+        50_000_000_000 as u128,
+        None::<u128>,
+        call_data
+    ];
+
+    let res = azero_client.request("contracts_call", rpc_params).await?;
+    info!("res: {:?}", res);
 
     Ok(())
 }
