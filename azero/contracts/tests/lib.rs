@@ -28,6 +28,7 @@ mod e2e {
         account_id, alice, bob, build_message, charlie, dave, eve, ferdie, subxt::dynamic::Value,
         AccountKeyring, Keypair, PolkadotConfig,
     };
+    use money_box::MoneyBoxContractRef;
     use most::{
         most::{CrosschainTransferRequest, RequestProcessed, RequestSigned},
         MostError, MostRef,
@@ -471,10 +472,23 @@ mod e2e {
     #[ink_e2e::test]
     fn pocket_money(mut client: ink_e2e::Client<C, E>) {
         let (most_address, token_address) = setup_default_most_and_token(&mut client, false).await;
+        let money_box_address = instantiate_money_box(
+            &mut client,
+            &alice(),
+            DEFAULT_POCKET_MONEY,
+            Some(most_address),
+            account_id(AccountKeyring::Alice),
+        )
+        .await;
+
+        // Set money box in most
+        most_set_subsidy_contract(&mut client, &alice(), most_address, money_box_address)
+            .await
+            .expect("set money box");
 
         // seed contract with some funds for pocket money transfers
         let call_data = vec![
-            Value::unnamed_variant("Id", [Value::from_bytes(most_address)]),
+            Value::unnamed_variant("Id", [Value::from_bytes(money_box_address)]),
             Value::u128(10 * DEFAULT_POCKET_MONEY),
         ];
 
@@ -957,6 +971,21 @@ mod e2e {
             .account_id
     }
 
+    async fn instantiate_money_box(
+        client: &mut E2EClient,
+        caller: &Keypair,
+        pocket_money: u128,
+        owner: Option<AccountId>,
+        admin: AccountId,
+    ) -> AccountId {
+        let money_box_constructor = MoneyBoxContractRef::new(pocket_money, owner, admin);
+        client
+            .instantiate("money_box", caller, money_box_constructor, 0, None)
+            .await
+            .expect("Money box instantiation failed")
+            .account_id
+    }
+
     async fn setup_default_most_and_token(
         client: &mut E2EClient,
         add_pair: bool,
@@ -1003,6 +1032,22 @@ mod e2e {
             caller,
             most,
             |most| most.add_pair(*token.as_ref(), remote_token),
+            None,
+        )
+        .await
+    }
+
+    async fn most_set_subsidy_contract(
+        client: &mut E2EClient,
+        caller: &Keypair,
+        most: AccountId,
+        subsidy: AccountId,
+    ) -> CallResult<(), MostError> {
+        call_message::<MostRef, (), _, _, _>(
+            client,
+            caller,
+            most,
+            |most| most.set_subsidy_contract(subsidy),
             None,
         )
         .await

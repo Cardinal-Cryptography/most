@@ -2681,6 +2681,17 @@ version = "1.0.0"
 dependencies = [
  "ink",
  "parity-scale-codec",
+ "scale-info",
+]
+
+[[package]]
+name = "money_box"
+version = "1.0.0"
+dependencies = [
+ "ink",
+ "money-box-trait",
+ "parity-scale-codec",
+ "scale-info",
 ]
 
 [[package]]
@@ -4695,6 +4706,7 @@ version = "1.0.0"
 dependencies = [
  "ink",
  "ink_e2e",
+ "money_box",
  "most",
  "parity-scale-codec",
  "psp22",

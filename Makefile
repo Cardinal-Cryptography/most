@@ -186,7 +186,7 @@ test-ink: test-ink-e2e
 	cd azero/contracts/token && cargo test
 	cd azero/contracts/gas-price-oracle/contract && cargo test
 	cd azero/contracts/gas-price-oracle/test-contract && cargo test
-	cd azero/contracts/money-box && cargo test
+	cd azero/contracts/money-box/contract && cargo test
 
 .PHONY: check-js-format
 check-js-format: # Check js formatting
@@ -214,7 +214,8 @@ ink-lint:
 	cd azero/contracts/gas-price-oracle/contract && cargo clippy -- --no-deps -D warnings
 	cd azero/contracts/gas-price-oracle/test-contract && cargo clippy -- --no-deps -D warnings
 	cd azero/contracts/gas-price-oracle/trait && cargo clippy -- --no-deps -D warnings
-	cd azero/contracts/money-box && cargo clippy -- --no-deps -D warnings
+	cd azero/contracts/money-box/contract && cargo clippy -- --no-deps -D warnings
+	cd azero/contracts/money-box/trait && cargo clippy -- --no-deps -D warnings
 
 .PHONY: contracts-lint
 contracts-lint: # Lint contracts
@@ -232,7 +233,8 @@ rust-format-check:
 	cd azero/contracts/gas-price-oracle/contract && cargo fmt -- --check
 	cd azero/contracts/gas-price-oracle/test-contract && cargo fmt -- --check
 	cd azero/contracts/gas-price-oracle/trait && cargo fmt -- --check
-	cd azero/contracts/money-box && cargo fmt -- --check
+	cd azero/contracts/money-box/contract && cargo fmt -- --check
+	cd azero/contracts/money-box/trait && cargo fmt -- --check
 
 .PHONY: rust-format
 rust-format: # Format rust code
@@ -246,7 +248,8 @@ rust-format:
 	cd azero/contracts/gas-price-oracle/contract && cargo fmt
 	cd azero/contracts/gas-price-oracle/test-contract && cargo fmt
 	cd azero/contracts/gas-price-oracle/trait && cargo fmt
-	cd azero/contracts/money-box && cargo fmt
+	cd azero/contracts/money-box/contract && cargo fmt
+	cd azero/contracts/money-box/trait && cargo fmt
 
 .PHONY: js-format-check
 js-format-check: # Check js formatting

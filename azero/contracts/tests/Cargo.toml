@@ -13,6 +13,7 @@ scale = { package = "parity-scale-codec", version = "3", default-features = fals
 shared = { path = "../shared" }
 subxt = "0.31.0"
 test_oracle = { path = "../gas-price-oracle/test-contract", features = ["ink-as-dependency"] }
+money_box = { path = "../money-box/contract", features = ["ink-as-dependency"] }
 wrapped_token = { path = "../token", package = "token", features = ["ink-as-dependency"] }
 
 [lib]
@@ -20,6 +21,6 @@ path = "lib.rs"
 
 [features]
 default = ["std", "e2e-tests"]
-std = ["ink/std", "most/std", "wrapped_token/std", "test_oracle/std"]
+std = ["ink/std", "most/std", "wrapped_token/std", "test_oracle/std", "money_box/std"]
 ink-as-dependency = []
 e2e-tests = []

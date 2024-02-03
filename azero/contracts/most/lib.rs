@@ -594,6 +594,21 @@ pub mod most {
             Ok(())
         }
 
+        /// Sets address of the subsidy contract
+        ///
+        /// Can only be called by the contracts owner
+        #[ink(message)]
+        pub fn set_subsidy_contract(
+            &mut self,
+            subsidy_contract: AccountId,
+        ) -> Result<(), MostError> {
+            self.ensure_owner()?;
+            let mut data = self.data()?;
+            data.subsidy_contract = Some(subsidy_contract);
+            self.data.set(&data);
+            Ok(())
+        }
+
         /// Change the committee and increase committe id
         /// Can only be called by the contracts owner
         ///
@@ -698,7 +713,6 @@ pub mod most {
         use super::*;
 
         const THRESHOLD: u128 = 3;
-        const POCKET_MONEY: Balance = 1000000000000;
         const RELAY_GAS_USAGE: u128 = 50000;
         const MIN_FEE: Balance = 1000000000000;
         const MAX_FEE: Balance = 100000000000000;
@@ -718,6 +732,20 @@ pub mod most {
             ]
         }
 
+        fn default_most_setup() -> Most {
+            Most::new(
+                guardian_accounts(),
+                THRESHOLD,
+                RELAY_GAS_USAGE,
+                MIN_FEE,
+                MAX_FEE,
+                DEFAULT_FEE,
+                None,
+                None,
+            )
+            .expect("Instantiation should not fail.")
+        }
+
         #[ink::test]
         fn new_fails_on_zero_threshold() {
             set_caller::<DefEnv>(default_accounts::<DefEnv>().alice);
@@ -725,11 +753,11 @@ pub mod most {
                 Most::new(
                     guardian_accounts(),
                     0,
-                    POCKET_MONEY,
                     RELAY_GAS_USAGE,
                     MIN_FEE,
                     MAX_FEE,
                     DEFAULT_FEE,
+                    None,
                     None,
                 )
                 .expect_err("Threshold is zero, instantiation should fail."),
@@ -744,11 +772,11 @@ pub mod most {
                 Most::new(
                     guardian_accounts(),
                     (guardian_accounts().len() + 1) as u128,
-                    POCKET_MONEY,
                     RELAY_GAS_USAGE,
                     MIN_FEE,
                     MAX_FEE,
                     DEFAULT_FEE,
+                    None,
                     None,
                 )
                 .expect_err("Threshold is larger than guardians, instantiation should fail."),
@@ -759,17 +787,7 @@ pub mod most {
         #[ink::test]
         fn new_sets_caller_as_owner() {
             set_caller::<DefEnv>(default_accounts::<DefEnv>().alice);
-            let mut most = Most::new(
-                guardian_accounts(),
-                THRESHOLD,
-                POCKET_MONEY,
-                RELAY_GAS_USAGE,
-                MIN_FEE,
-                MAX_FEE,
-                DEFAULT_FEE,
-                None,
-            )
-            .expect("Threshold is valid.");
+            let mut most = default_most_setup();
 
             assert_eq!(most.ensure_owner(), Ok(()));
             set_caller::<DefEnv>(guardian_accounts()[0]);
@@ -783,17 +801,7 @@ pub mod most {
         fn new_sets_correct_guardians() {
             let accounts = default_accounts::<DefEnv>();
             set_caller::<DefEnv>(accounts.alice);
-            let most = Most::new(
-                guardian_accounts(),
-                THRESHOLD,
-                POCKET_MONEY,
-                RELAY_GAS_USAGE,
-                MIN_FEE,
-                MAX_FEE,
-                DEFAULT_FEE,
-                None,
-            )
-            .expect("Threshold is valid.");
+            let mut most = default_most_setup();
 
             for account in guardian_accounts() {
                 assert!(most.is_in_committee(most.get_current_committee_id().unwrap(), account));
@@ -805,17 +813,8 @@ pub mod most {
         fn set_owner_works() {
             let accounts = default_accounts::<DefEnv>();
             set_caller::<DefEnv>(accounts.alice);
-            let mut most = Most::new(
-                guardian_accounts(),
-                THRESHOLD,
-                POCKET_MONEY,
-                RELAY_GAS_USAGE,
-                MIN_FEE,
-                MAX_FEE,
-                DEFAULT_FEE,
-                None,
-            )
-            .expect("Threshold is valid.");
+            let mut most = default_most_setup();
+
             set_caller::<DefEnv>(accounts.bob);
             assert_eq!(most.ensure_owner(), Err(MostError::NotOwner(accounts.bob)));
             set_caller::<DefEnv>(accounts.alice);
@@ -829,17 +828,7 @@ pub mod most {
         fn add_guardian_works() {
             let accounts = default_accounts::<DefEnv>();
             set_caller::<DefEnv>(accounts.alice);
-            let mut most = Most::new(
-                guardian_accounts(),
-                THRESHOLD,
-                POCKET_MONEY,
-                RELAY_GAS_USAGE,
-                MIN_FEE,
-                MAX_FEE,
-                DEFAULT_FEE,
-                None,
-            )
-            .expect("Threshold is valid.");
+            let mut most = default_most_setup();
 
             assert!(!most.is_in_committee(most.get_current_committee_id().unwrap(), accounts.alice));
             assert_eq!(most.set_committee(vec![accounts.alice], 1), Ok(()));
@@ -850,17 +839,7 @@ pub mod most {
         fn remove_guardian_works() {
             let accounts = default_accounts::<DefEnv>();
             set_caller::<DefEnv>(accounts.alice);
-            let mut most = Most::new(
-                guardian_accounts(),
-                THRESHOLD,
-                POCKET_MONEY,
-                RELAY_GAS_USAGE,
-                MIN_FEE,
-                MAX_FEE,
-                DEFAULT_FEE,
-                None,
-            )
-            .expect("Threshold is valid.");
+            let mut most = default_most_setup();
 
             assert!(most.is_in_committee(most.get_current_committee_id().unwrap(), accounts.bob));
             assert_eq!(most.set_committee(vec![accounts.alice], 1), Ok(()));

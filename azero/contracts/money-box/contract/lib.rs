@@ -1,5 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
 
+pub use self::money_box_contract::MoneyBoxContractRef;
+
 #[ink::contract]
 pub mod money_box_contract {
     use ink::{
