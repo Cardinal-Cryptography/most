@@ -111,7 +111,7 @@ pub mod money_box_contract {
 
         fn ensure_admin(&self) -> Result<(), MoneyBoxError> {
             if self.env().caller() != self.admin {
-                return Err(MoneyBoxError::CallerNotAdmin);
+                Err(MoneyBoxError::CallerNotAdmin)
             } else {
                 Ok(())
             }
@@ -125,10 +125,10 @@ pub mod money_box_contract {
                 self.env().emit_event(InsufficientFunds {
                     current_balance: self.env().balance(),
                 });
-            } else if Some(self.env().caller()) == self.owner {
-                if self.env().transfer(to, self.amount_to_pay).is_ok() {
-                    self.env().emit_event(PocketMoneyPaidOut { to });
-                }
+            } else if Some(self.env().caller()) == self.owner
+                && self.env().transfer(to, self.amount_to_pay).is_ok()
+            {
+                self.env().emit_event(PocketMoneyPaidOut { to });
             }
         }
     }

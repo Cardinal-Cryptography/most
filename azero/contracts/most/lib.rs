@@ -26,6 +26,7 @@ pub mod most {
 
     const GAS_ORACLE_MAX_AGE: u64 = 24 * 60 * 60 * 1000; // 1 day
     const ORACLE_CALL_GAS_LIMIT: u64 = 2_000_000_000;
+    const MONEYBOX_CALL_GAS_LIMIT: u64 = 2_000_000_000;
     const BASE_FEE_BUFFER_PERCENTAGE: u128 = 20;
 
     #[ink(event)]
@@ -657,13 +658,17 @@ pub mod most {
         }
 
         // ---  helper functions
-        fn pay_pocket_money(&self, account: AccountId) -> Result<(), MostError> {
+        fn pay_pocket_money(&self, dest_account: AccountId) -> Result<(), MostError> {
             // call subsidy contract
             if let Some(subsidy_address) = self.data()?.subsidy_contract {
                 let subsidy_contract: contract_ref!(MoneyBox) = subsidy_address.into();
 
                 // ignore error from the contract call
-                _ = subsidy_contract.pay_out(account);
+                let _ = subsidy_contract
+                    .call()
+                    .pay_out(dest_account)
+                    .gas_limit(MONEYBOX_CALL_GAS_LIMIT)
+                    .try_invoke();
             }
             Ok(())
         }
@@ -801,7 +806,7 @@ pub mod most {
         fn new_sets_correct_guardians() {
             let accounts = default_accounts::<DefEnv>();
             set_caller::<DefEnv>(accounts.alice);
-            let mut most = default_most_setup();
+            let most = default_most_setup();
 
             for account in guardian_accounts() {
                 assert!(most.is_in_committee(most.get_current_committee_id().unwrap(), account));
