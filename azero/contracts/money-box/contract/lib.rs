@@ -1,9 +1,13 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
 
 #[ink::contract]
-pub mod token {
+pub mod money_box_contract {
+    use ink::{
+        env::{set_code_hash, Error as InkEnvError},
+        prelude::{format, string::String},
+    };
+    use money_box_trait::MoneyBox;
     use scale::{Decode, Encode};
-    use ink::prelude::string::String;
 
     #[ink(event)]
     #[derive(Debug)]
@@ -13,29 +17,43 @@ pub mod token {
         pub to: AccountId,
     }
 
+    #[ink(event)]
+    #[derive(Debug)]
+    #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
+    pub struct InsufficientFunds {
+        pub current_balance: Balance,
+    }
+
+    #[ink(event)]
+    #[derive(Debug)]
+    #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
+    pub struct ContractUpgraded {
+        pub new_code_hash: [u8; 32],
+    }
+
     #[derive(Debug, PartialEq, Eq, Encode, Decode)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub enum MoneyBoxError {
         CallerNotAdmin,
-        CallerNotOwner,
-        NotEnoughBalance,
         InkEnvError(String),
     }
 
+    impl From<InkEnvError> for MoneyBoxError {
+        fn from(why: InkEnvError) -> Self {
+            Self::InkEnvError(format!("{:?}", why))
+        }
+    }
+
     #[ink(storage)]
-    pub struct MoneyBox {
+    pub struct MoneyBoxContract {
         amount_to_pay: Balance,
-        owner: AccountId,
+        owner: Option<AccountId>,
         admin: AccountId,
     }
 
-    impl MoneyBox {
+    impl MoneyBoxContract {
         #[ink(constructor)]
-        pub fn new(
-            amount_to_pay: Balance,
-            owner: AccountId,
-            admin: AccountId,
-        ) -> Self {
+        pub fn new(amount_to_pay: Balance, owner: Option<AccountId>, admin: AccountId) -> Self {
             Self {
                 amount_to_pay,
                 owner,
@@ -44,28 +62,14 @@ pub mod token {
         }
 
         #[ink(message)]
-        pub fn pay_out(&mut self, to: AccountId) -> Result<(), MoneyBoxError> {
-            self.ensure_owner()?;
-            if self.env().balance() < self.amount_to_pay {
-                return Err(MoneyBoxError::NotEnoughBalance);
-            }
-
-            self.env().transfer(to, self.amount_to_pay).map_err(|e| {
-                MoneyBoxError::InkEnvError(format!("Failed to transfer: {:?}", e))
-            })?;
-            self.env().emit_event(PocketMoneyPaidOut { to });
-            Ok(())
-        }
-
-        #[ink(message)]
-        pub fn owner(&self) -> AccountId {
+        pub fn owner(&self) -> Option<AccountId> {
             self.owner
         }
 
         #[ink(message)]
         pub fn set_owner(&mut self, new_owner: AccountId) -> Result<(), MoneyBoxError> {
             self.ensure_admin()?;
-            self.owner = new_owner;
+            self.owner = Some(new_owner);
             Ok(())
         }
 
@@ -93,12 +97,14 @@ pub mod token {
             Ok(())
         }
 
-        fn ensure_owner(&self) -> Result<(), MoneyBoxError> {
-            if self.env().caller() != self.admin {
-                return Err(MoneyBoxError::CallerNotOwner);
-            } else {
-                Ok(())
-            }
+        #[ink(message)]
+        pub fn upgrade_contract(&mut self, code_hash: [u8; 32]) -> Result<(), MoneyBoxError> {
+            self.ensure_admin()?;
+            set_code_hash(&code_hash)?;
+            self.env().emit_event(ContractUpgraded {
+                new_code_hash: code_hash,
+            });
+            Ok(())
         }
 
         fn ensure_admin(&self) -> Result<(), MoneyBoxError> {
@@ -106,6 +112,21 @@ pub mod token {
                 return Err(MoneyBoxError::CallerNotAdmin);
             } else {
                 Ok(())
+            }
+        }
+    }
+
+    impl MoneyBox for MoneyBoxContract {
+        #[ink(message)]
+        fn pay_out(&self, to: AccountId) {
+            if self.env().balance() < self.amount_to_pay {
+                self.env().emit_event(InsufficientFunds {
+                    current_balance: self.env().balance(),
+                });
+            } else if Some(self.env().caller()) == self.owner {
+                if self.env().transfer(to, self.amount_to_pay).is_ok() {
+                    self.env().emit_event(PocketMoneyPaidOut { to });
+                }
             }
         }
     }
@@ -124,14 +145,17 @@ pub mod token {
             let alice = default_accounts::<E>().alice;
             let bob = default_accounts::<E>().bob;
 
-            let mut token = MoneyBox::new(DEFAULT_AZERO_AMOUNT, alice, bob);
+            let mut contract = MoneyBoxContract::new(DEFAULT_AZERO_AMOUNT, Some(alice), bob);
 
             set_caller::<E>(alice);
-            assert_eq!(token.set_admin(alice), Err(MoneyBoxError::CallerNotAdmin));
+            assert_eq!(
+                contract.set_admin(alice),
+                Err(MoneyBoxError::CallerNotAdmin)
+            );
 
             set_caller::<E>(bob);
-            assert_eq!(token.set_admin(alice), Ok(()));
-            assert_eq!(token.admin(), alice);
+            assert_eq!(contract.set_admin(alice), Ok(()));
+            assert_eq!(contract.admin(), alice);
         }
 
         #[ink::test]
@@ -139,14 +163,17 @@ pub mod token {
             let alice = default_accounts::<E>().alice;
             let bob = default_accounts::<E>().bob;
 
-            let mut token = MoneyBox::new(DEFAULT_AZERO_AMOUNT, alice, bob);
+            let mut contract = MoneyBoxContract::new(DEFAULT_AZERO_AMOUNT, Some(alice), bob);
 
             set_caller::<E>(alice);
-            assert_eq!(token.set_owner(alice), Err(MoneyBoxError::CallerNotAdmin));
+            assert_eq!(
+                contract.set_owner(alice),
+                Err(MoneyBoxError::CallerNotAdmin)
+            );
 
             set_caller::<E>(bob);
-            assert_eq!(token.set_owner(alice), Ok(()));
-            assert_eq!(token.owner(), alice);
+            assert_eq!(contract.set_owner(alice), Ok(()));
+            assert_eq!(contract.owner(), Some(alice));
         }
 
         #[ink::test]
@@ -154,31 +181,34 @@ pub mod token {
             let alice = default_accounts::<E>().alice;
             let bob = default_accounts::<E>().bob;
 
-            let mut token = MoneyBox::new(DEFAULT_AZERO_AMOUNT, alice, bob);
+            let mut contract = MoneyBoxContract::new(DEFAULT_AZERO_AMOUNT, Some(alice), bob);
 
             set_caller::<E>(alice);
-            assert_eq!(token.set_amount_to_pay(NEW_AZERO_AMOUNT), Err(MoneyBoxError::CallerNotAdmin));
+            assert_eq!(
+                contract.set_amount_to_pay(NEW_AZERO_AMOUNT),
+                Err(MoneyBoxError::CallerNotAdmin)
+            );
 
             set_caller::<E>(bob);
-            assert_eq!(token.set_amount_to_pay(NEW_AZERO_AMOUNT), Ok(()));
-            assert_eq!(token.amount_to_pay(), NEW_AZERO_AMOUNT);
+            assert_eq!(contract.set_amount_to_pay(NEW_AZERO_AMOUNT), Ok(()));
+            assert_eq!(contract.amount_to_pay(), NEW_AZERO_AMOUNT);
         }
 
         #[ink::test]
-        fn pay_out_fails_when_not_enough_funds() {
+        fn pay_out_fails_when_caller_not_owner() {
             let alice = default_accounts::<E>().alice;
             let bob = default_accounts::<E>().bob;
 
-            let mut token = MoneyBox::new(DEFAULT_AZERO_AMOUNT, alice, bob);
+            let contract = MoneyBoxContract::new(DEFAULT_AZERO_AMOUNT, Some(alice), bob);
 
+            // transfer some funds to the contract
+            set_account_balance::<E>(alice, 2 * DEFAULT_AZERO_AMOUNT);
             set_caller::<E>(alice);
-            assert_eq!(token.pay_out(bob), Err(MoneyBoxError::CallerNotOwner));
+            transfer_in::<E>(DEFAULT_AZERO_AMOUNT);
 
             set_caller::<E>(bob);
-            assert_eq!(token.pay_out(bob), Err(MoneyBoxError::NotEnoughBalance));
-
-            //let bob_balance_after = get_account_balance::<E>(bob).expect("Cannot get balance");
-            //assert_eq!(bob_balance_after, bob_balance_before + DEFAULT_AZERO_AMOUNT);
+            contract.pay_out(alice);
+            assert_eq!(recorded_events().count(), 0);
         }
 
         #[ink::test]
@@ -186,7 +216,7 @@ pub mod token {
             let alice = default_accounts::<E>().alice;
             let bob = default_accounts::<E>().bob;
 
-            let mut token = MoneyBox::new(DEFAULT_AZERO_AMOUNT, alice, bob);
+            let contract = MoneyBoxContract::new(DEFAULT_AZERO_AMOUNT, Some(alice), bob);
 
             // transfer some funds to the contract
             set_account_balance::<E>(alice, 2 * DEFAULT_AZERO_AMOUNT);
@@ -195,11 +225,7 @@ pub mod token {
 
             let bob_balance_before = get_account_balance::<E>(bob).expect("Cannot get balance");
 
-            set_caller::<E>(alice);
-            assert_eq!(token.pay_out(bob), Err(MoneyBoxError::CallerNotOwner));
-
-            set_caller::<E>(bob);
-            assert_eq!(token.pay_out(bob), Ok(()));
+            contract.pay_out(bob);
 
             let bob_balance_after = get_account_balance::<E>(bob).expect("Cannot get balance");
             assert_eq!(bob_balance_after, bob_balance_before + DEFAULT_AZERO_AMOUNT);

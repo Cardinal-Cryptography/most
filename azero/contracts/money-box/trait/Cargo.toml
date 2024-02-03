@@ -1,5 +1,5 @@
 [package]
-name = "money_box"
+name = "money-box-trait"
 version = "1.0.0"
 authors = ["Cardinal Cryptography"]
 edition = "2021"
@@ -8,10 +8,10 @@ edition = "2021"
 ink = { version = "=4.3.0", default-features = false }
 
 scale = { package = "parity-scale-codec", version = "3", default-features = false, features = [
-      "derive",
+    "derive",
 ] }
 scale-info = { version = "2.5", default-features = false, features = [
-      "derive",
+    "derive",
 ], optional = true }
 
 [lib]
@@ -19,9 +19,5 @@ path = "lib.rs"
 
 [features]
 default = ["std"]
-std = [
-    "ink/std",
-    "scale/std",
-    "scale-info/std",
-]
+std = ["ink/std", "scale/std", "scale-info/std"]
 ink-as-dependency = []

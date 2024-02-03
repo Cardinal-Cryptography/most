@@ -9,6 +9,7 @@ ink = { version = "=4.3.0", default-features = false }
 psp22 = { version = "0.2.0", default-features = false }
 psp22-traits = { path = "../psp22-traits" , default-features = false }
 gas-oracle-trait = { path = "../gas-price-oracle/trait", default-features = false }
+money-box-trait = { path = "../money-box/trait", default-features = false }
 shared = { path = "../shared" }
 
 scale = { package = "parity-scale-codec", version = "3", default-features = false, features = [

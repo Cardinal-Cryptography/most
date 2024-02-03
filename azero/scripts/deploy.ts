@@ -6,6 +6,9 @@ import Governance from "../types/contracts/governance";
 import Most from "../types/contracts/most";
 import Token from "../types/contracts/token";
 import TestOracleConstructors from "../types/constructors/test_oracle";
+import MoneyBox from "../types/contracts/money_box";
+import MoneyBoxConstructors from "../types/constructors/money_box";
+
 import {
   uploadCode,
   Addresses,
@@ -64,6 +67,7 @@ async function main(): Promise<void> {
   const mostConstructors = new MostConstructors(api, deployer);
   const tokenConstructors = new TokenConstructors(api, deployer);
   const testOracleConstructors = new TestOracleConstructors(api, deployer);
+  const moneyBoxConstructors = new MoneyBoxConstructors(api, deployer);
 
   let estimatedGasOracle = await estimateContractInit(
     api,
@@ -76,6 +80,22 @@ async function main(): Promise<void> {
     100000, // default value
     true, // randomize
     { gasLimit: estimatedGasOracle },
+  );
+
+  console.log("oracle address:", oracleAddress);
+
+  const estimatedGasMoneyBox = await estimateContractInit(
+    api,
+    deployer,
+    "money_box.contract",
+    [pocket_money!, null, deployer.address],
+  );
+
+  const { address: moneyBoxAddress } = await moneyBoxConstructors.new(
+    pocket_money!,
+    null,
+    deployer.address,
+    { gasLimit: estimatedGasMoneyBox },
   );
 
   const estimatedGasMost = await estimateContractInit(

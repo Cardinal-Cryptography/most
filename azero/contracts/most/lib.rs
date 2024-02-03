@@ -16,6 +16,7 @@ pub mod most {
         prelude::{format, string::String, vec, vec::Vec},
         storage::{traits::ManualKey, Lazy, Mapping},
     };
+    use money_box_trait::MoneyBox;
     use psp22::PSP22Error;
     use psp22_traits::{Burnable, Mintable};
     use scale::{Decode, Encode};
@@ -86,8 +87,6 @@ pub mod most {
         request_nonce: u128,
         /// accounting helper
         committee_id: CommitteeId,
-        /// a fixed subsidy transferred along with the bridged tokens to the destination account on aleph zero to bootstrap
-        pocket_money: u128,
         /// How much gas does a single confirmation of a cross-chain transfer request use on the destination chain on average.
         /// This value is calculated by summing the total gas usage of *all* the transactions it takes to relay a single request and dividing it by the current committee size and multiplying by 1.2
         relay_gas_usage: u128,
@@ -99,6 +98,8 @@ pub mod most {
         default_fee: u128,
         /// gas price oracle that is used to calculate the fee for a cross-chain transfer request
         gas_price_oracle: Option<AccountId>,
+        /// a contract called to pay out a subsidy for use on the destination chain
+        subsidy_contract: Option<AccountId>,
     }
 
     #[ink(storage)]
@@ -163,12 +164,12 @@ pub mod most {
         pub fn new(
             committee: Vec<AccountId>,
             signature_threshold: u128,
-            pocket_money: Balance,
             relay_gas_usage: u128,
             min_fee: Balance,
             max_fee: Balance,
             default_fee: Balance,
             gas_price_oracle: Option<AccountId>,
+            subsidy_contract: Option<AccountId>,
         ) -> Result<Self, MostError> {
             if signature_threshold == 0 || committee.len().lt(&(signature_threshold as usize)) {
                 return Err(MostError::InvalidThreshold);
@@ -192,12 +193,12 @@ pub mod most {
                 owner: Self::env().caller(),
                 request_nonce: 0,
                 committee_id,
-                pocket_money,
                 relay_gas_usage,
                 min_fee,
                 max_fee,
                 default_fee,
                 gas_price_oracle,
+                subsidy_contract,
             });
 
             Ok(Self {
@@ -351,10 +352,7 @@ pub mod most {
                 )?;
 
                 // bootstrap account with pocket money
-                // NOTE: we don't revert on a failure!
-                _ = self
-                    .env()
-                    .transfer(dest_receiver_address.into(), data.pocket_money);
+                self.pay_pocket_money(dest_receiver_address.into())?;
 
                 // mark it as processed
                 self.processed_requests.insert(request_hash, &());
@@ -436,12 +434,12 @@ pub mod most {
             Ok(self.data()?.request_nonce)
         }
 
-        /// Query pocket money
+        /// Query subsidy contract
         ///
-        /// An amount of the native token that is tranferred with every request
+        /// An address of the contract that may be used to subsidize bridging users
         #[ink(message)]
-        pub fn get_pocket_money(&self) -> Result<Balance, MostError> {
-            Ok(self.data()?.pocket_money)
+        pub fn get_subsidy_contract(&self) -> Result<Option<AccountId>, MostError> {
+            Ok(self.data()?.subsidy_contract)
         }
 
         /// Returns current active committee id
@@ -644,6 +642,17 @@ pub mod most {
         }
 
         // ---  helper functions
+        fn pay_pocket_money(&self, account: AccountId) -> Result<(), MostError> {
+            // call subsidy contract
+            if let Some(subsidy_address) = self.data()?.subsidy_contract {
+                let subsidy_contract: contract_ref!(MoneyBox) = subsidy_address.into();
+
+                // ignore error from the contract call
+                _ = subsidy_contract.pay_out(account);
+            }
+            Ok(())
+        }
+
         fn ensure_owner(&mut self) -> Result<(), MostError> {
             let caller = self.env().caller();
             let data = self.data()?;

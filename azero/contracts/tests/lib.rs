@@ -65,7 +65,6 @@ mod e2e {
             &alice(),
             guardian_ids(),
             DEFAULT_THRESHOLD,
-            DEFAULT_POCKET_MONEY,
             DEFAULT_RELAY_GAS_USAGE,
             MIN_FEE,
             MAX_FEE,
@@ -908,7 +907,6 @@ mod e2e {
         caller: &Keypair,
         guardians: Vec<AccountId>,
         threshold: u128,
-        pocket_money: u128,
         relay_gas_usage: u128,
         min_fee: u128,
         max_fee: u128,
@@ -917,11 +915,11 @@ mod e2e {
         let most_constructor = MostRef::new(
             guardians,
             threshold,
-            pocket_money,
             relay_gas_usage,
             min_fee,
             max_fee,
             default_fee,
+            None,
             None,
         );
         client
@@ -968,7 +966,6 @@ mod e2e {
             &alice(),
             guardian_ids(),
             DEFAULT_THRESHOLD,
-            DEFAULT_POCKET_MONEY,
             DEFAULT_RELAY_GAS_USAGE,
             MIN_FEE,
             MAX_FEE,

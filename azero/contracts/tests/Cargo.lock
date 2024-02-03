@@ -2676,11 +2676,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "money-box-trait"
+version = "1.0.0"
+dependencies = [
+ "ink",
+ "parity-scale-codec",
+]
+
+[[package]]
 name = "most"
 version = "1.0.0"
 dependencies = [
  "gas-oracle-trait",
  "ink",
+ "money-box-trait",
  "parity-scale-codec",
  "psp22",
  "psp22-traits",
