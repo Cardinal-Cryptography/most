@@ -63,6 +63,13 @@ async function main(): Promise<void> {
   );
   console.log("oracle code hash:", testOracleCodeHash);
 
+  const moneyBoxCodeHash = await uploadCode(
+    api,
+    deployer,
+    "money_box.contract",
+  );
+  console.log("money box code hash:", moneyBoxCodeHash);
+
   const governanceConstructors = new GovernanceConstructors(api, deployer);
   const mostConstructors = new MostConstructors(api, deployer);
   const tokenConstructors = new TokenConstructors(api, deployer);
@@ -88,13 +95,11 @@ async function main(): Promise<void> {
     api,
     deployer,
     "money_box.contract",
-    [pocket_money!, null, deployer.address],
+    [pocket_money!],
   );
 
   const { address: moneyBoxAddress } = await moneyBoxConstructors.new(
     pocket_money!,
-    null,
-    deployer.address,
     { gasLimit: estimatedGasMoneyBox },
   );
 
@@ -105,24 +110,24 @@ async function main(): Promise<void> {
     [
       relayers_keys,
       signature_threshold!,
-      pocket_money!,
       relay_gas_usage!,
       min_fee!,
       max_fee!,
       default_fee!,
       oracleAddress,
+      moneyBoxAddress,
     ],
   );
 
   const { address: mostAddress } = await mostConstructors.new(
     relayers_keys,
     signature_threshold!,
-    pocket_money!,
     relay_gas_usage!,
     min_fee!,
     max_fee!,
     default_fee!,
     oracleAddress,
+    moneyBoxAddress,
     { gasLimit: estimatedGasMost },
   );
 
@@ -165,6 +170,9 @@ async function main(): Promise<void> {
   const governance = new Governance(governanceAddress, deployer, api);
   console.log("governance address:", governanceAddress);
 
+  console.log("Changing money box owner to most...");
+  await new MoneyBox(moneyBoxAddress, deployer, api).tx.setOwner(mostAddress);
+
   for (const address of governance_keys) {
     console.log("Adding", address, "as governance member...");
     await governance.tx.addMember(address);
@@ -184,6 +192,7 @@ async function main(): Promise<void> {
     most: mostAddress,
     weth: wethAddress,
     test_oracle: oracleAddress,
+    money_box: moneyBoxAddress,
   };
   console.log("addresses:", addresses);
 

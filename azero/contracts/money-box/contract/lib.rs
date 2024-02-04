@@ -49,29 +49,29 @@ pub mod money_box_contract {
     #[ink(storage)]
     pub struct MoneyBoxContract {
         amount_to_pay: Balance,
-        owner: Option<AccountId>,
+        owner: AccountId,
         admin: AccountId,
     }
 
     impl MoneyBoxContract {
         #[ink(constructor)]
-        pub fn new(amount_to_pay: Balance, owner: Option<AccountId>, admin: AccountId) -> Self {
+        pub fn new(amount_to_pay: Balance) -> Self {
             Self {
                 amount_to_pay,
-                owner,
-                admin,
+                owner: Self::env().caller(),
+                admin: Self::env().caller(),
             }
         }
 
         #[ink(message)]
-        pub fn owner(&self) -> Option<AccountId> {
+        pub fn owner(&self) -> AccountId {
             self.owner
         }
 
         #[ink(message)]
         pub fn set_owner(&mut self, new_owner: AccountId) -> Result<(), MoneyBoxError> {
             self.ensure_admin()?;
-            self.owner = Some(new_owner);
+            self.owner = new_owner;
             Ok(())
         }
 
@@ -125,7 +125,7 @@ pub mod money_box_contract {
                 self.env().emit_event(InsufficientFunds {
                     current_balance: self.env().balance(),
                 });
-            } else if Some(self.env().caller()) == self.owner
+            } else if self.env().caller() == self.owner
                 && self.env().transfer(to, self.amount_to_pay).is_ok()
             {
                 self.env().emit_event(PocketMoneyPaidOut { to });
@@ -147,17 +147,15 @@ pub mod money_box_contract {
             let alice = default_accounts::<E>().alice;
             let bob = default_accounts::<E>().bob;
 
-            let mut contract = MoneyBoxContract::new(DEFAULT_AZERO_AMOUNT, Some(alice), bob);
-
             set_caller::<E>(alice);
-            assert_eq!(
-                contract.set_admin(alice),
-                Err(MoneyBoxError::CallerNotAdmin)
-            );
+            let mut contract = MoneyBoxContract::new(DEFAULT_AZERO_AMOUNT);
 
             set_caller::<E>(bob);
-            assert_eq!(contract.set_admin(alice), Ok(()));
-            assert_eq!(contract.admin(), alice);
+            assert_eq!(contract.set_admin(bob), Err(MoneyBoxError::CallerNotAdmin));
+
+            set_caller::<E>(alice);
+            assert_eq!(contract.set_admin(bob), Ok(()));
+            assert_eq!(contract.admin(), bob);
         }
 
         #[ink::test]
@@ -165,17 +163,15 @@ pub mod money_box_contract {
             let alice = default_accounts::<E>().alice;
             let bob = default_accounts::<E>().bob;
 
-            let mut contract = MoneyBoxContract::new(DEFAULT_AZERO_AMOUNT, Some(alice), bob);
-
             set_caller::<E>(alice);
-            assert_eq!(
-                contract.set_owner(alice),
-                Err(MoneyBoxError::CallerNotAdmin)
-            );
+            let mut contract = MoneyBoxContract::new(DEFAULT_AZERO_AMOUNT);
 
             set_caller::<E>(bob);
-            assert_eq!(contract.set_owner(alice), Ok(()));
-            assert_eq!(contract.owner(), Some(alice));
+            assert_eq!(contract.set_owner(bob), Err(MoneyBoxError::CallerNotAdmin));
+
+            set_caller::<E>(alice);
+            assert_eq!(contract.set_owner(bob), Ok(()));
+            assert_eq!(contract.owner(), bob);
         }
 
         #[ink::test]
@@ -183,15 +179,16 @@ pub mod money_box_contract {
             let alice = default_accounts::<E>().alice;
             let bob = default_accounts::<E>().bob;
 
-            let mut contract = MoneyBoxContract::new(DEFAULT_AZERO_AMOUNT, Some(alice), bob);
-
             set_caller::<E>(alice);
+            let mut contract = MoneyBoxContract::new(DEFAULT_AZERO_AMOUNT);
+
+            set_caller::<E>(bob);
             assert_eq!(
                 contract.set_amount_to_pay(NEW_AZERO_AMOUNT),
                 Err(MoneyBoxError::CallerNotAdmin)
             );
 
-            set_caller::<E>(bob);
+            set_caller::<E>(alice);
             assert_eq!(contract.set_amount_to_pay(NEW_AZERO_AMOUNT), Ok(()));
             assert_eq!(contract.amount_to_pay(), NEW_AZERO_AMOUNT);
         }
@@ -201,11 +198,11 @@ pub mod money_box_contract {
             let alice = default_accounts::<E>().alice;
             let bob = default_accounts::<E>().bob;
 
-            let contract = MoneyBoxContract::new(DEFAULT_AZERO_AMOUNT, Some(alice), bob);
+            set_caller::<E>(alice);
+            let contract = MoneyBoxContract::new(DEFAULT_AZERO_AMOUNT);
 
             // transfer some funds to the contract
             set_account_balance::<E>(alice, 2 * DEFAULT_AZERO_AMOUNT);
-            set_caller::<E>(alice);
             transfer_in::<E>(DEFAULT_AZERO_AMOUNT);
 
             set_caller::<E>(bob);
@@ -218,11 +215,11 @@ pub mod money_box_contract {
             let alice = default_accounts::<E>().alice;
             let bob = default_accounts::<E>().bob;
 
-            let contract = MoneyBoxContract::new(DEFAULT_AZERO_AMOUNT, Some(alice), bob);
+            set_caller::<E>(alice);
+            let contract = MoneyBoxContract::new(DEFAULT_AZERO_AMOUNT);
 
             // transfer some funds to the contract
             set_account_balance::<E>(alice, 2 * DEFAULT_AZERO_AMOUNT);
-            set_caller::<E>(alice);
             transfer_in::<E>(DEFAULT_AZERO_AMOUNT);
 
             let bob_balance_before = get_account_balance::<E>(bob).expect("Cannot get balance");

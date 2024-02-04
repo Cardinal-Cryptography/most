@@ -14,6 +14,7 @@ export type Addresses = {
   most: string;
   weth: string;
   test_oracle: string;
+  money_box: string;
 };
 
 /**
@@ -32,7 +33,7 @@ export async function uploadCode(
     fs.readFileSync(__dirname + `/../artifacts/` + contractName, "utf8"),
   );
   const tokenAbi = new Abi(tokenContractRaw);
-  const _txHash = await new Promise(async (resolve, reject) => {
+  await new Promise(async (resolve, reject) => {
     const unsub = await api.tx.contracts
       .uploadCode(tokenAbi.info.source.wasm, null, 0)
       .signAndSend(deployer, (result) => {
