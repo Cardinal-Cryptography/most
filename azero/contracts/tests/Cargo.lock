@@ -2824,6 +2824,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ff011a302c396a5197692431fc1948019154afc178baf7d8e37367442a4601cf"
 
 [[package]]
+name = "oracle"
+version = "1.0.0"
+dependencies = [
+ "gas-oracle-trait",
+ "ink",
+ "parity-scale-codec",
+ "scale-info",
+]
+
+[[package]]
 name = "os_pipe"
 version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4671,27 +4681,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "test_oracle"
-version = "1.0.0"
-dependencies = [
- "gas-oracle-trait",
- "ink",
- "parity-scale-codec",
- "scale-info",
-]
-
-[[package]]
 name = "tests"
 version = "1.0.0"
 dependencies = [
  "ink",
  "ink_e2e",
  "most",
+ "oracle",
  "parity-scale-codec",
  "psp22",
  "shared",
  "subxt",
- "test_oracle",
  "token",
 ]
 
