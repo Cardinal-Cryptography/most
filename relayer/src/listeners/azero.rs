@@ -107,6 +107,7 @@ impl AlephZeroListener {
             default_sync_from_block_azero,
             name,
             sync_step,
+            override_azero_cache,
             ..
         } = &*config;
 
@@ -120,13 +121,17 @@ impl AlephZeroListener {
             config.azero_ref_time_limit,
             config.azero_proof_size_limit,
         )?;
-        let mut first_unprocessed_block_number = read_first_unprocessed_block_number(
-            name.clone(),
-            ALEPH_LAST_BLOCK_KEY.to_string(),
-            redis_connection.clone(),
-            *default_sync_from_block_azero,
-        )
-        .await;
+        let mut first_unprocessed_block_number = if *override_azero_cache {
+            *default_sync_from_block_azero
+        } else {
+            read_first_unprocessed_block_number(
+                name.clone(),
+                ALEPH_LAST_BLOCK_KEY.to_string(),
+                redis_connection.clone(),
+                *default_sync_from_block_azero,
+            )
+            .await
+        };
 
         // Add the first block number to the set of pending blocks.
         add_to_pending(first_unprocessed_block_number, pending_blocks.clone()).await;

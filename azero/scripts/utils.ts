@@ -13,7 +13,7 @@ export type Addresses = {
   governance: string;
   most: string;
   weth: string;
-  test_oracle: string;
+  oracle: string;
 };
 
 /**
