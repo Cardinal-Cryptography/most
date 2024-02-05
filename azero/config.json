@@ -4,6 +4,7 @@
     "contracts/token/*",
     "contracts/governance/*",
     "contracts/gas-price-oracle/contract/*"
+    "contracts/advisory/contract/*"
   ],
   "typechainGeneratedPath": "types",
   "workspacePath": "./contracts"

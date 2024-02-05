@@ -14,6 +14,7 @@ export type Addresses = {
   most: string;
   weth: string;
   oracle: string;
+  advisory: string;
 };
 
 /**
