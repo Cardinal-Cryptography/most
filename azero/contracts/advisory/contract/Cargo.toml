@@ -6,7 +6,6 @@ edition = "2021"
 
 [dependencies]
 ink = { version = "=4.3.0", default-features = false }
-# shared = { path = "../../shared" }
 advisory-trait = { path = "../trait", default-features = false }
 scale = { package = "parity-scale-codec", version = "3", default-features = false, features = [
     "derive",
