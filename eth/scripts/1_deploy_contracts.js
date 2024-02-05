@@ -8,6 +8,13 @@ async function main() {
 
   console.log("Using ", accounts[0], "as signer");
 
+  const Advisory = await ethers.getContractFactory("Advisory");
+  console.log("Deploying Advisory...");
+  const advisory = await Advisory.deploy(
+      accounts[0]
+  );
+  console.log("Advisory deployed to:", advisory.target);
+
   const WETH9 = await ethers.getContractFactory("WETH9");
   console.log("Deploying WETH9...");
   const weth9 = await WETH9.deploy();
@@ -63,6 +70,7 @@ async function main() {
     most: most.target,
     weth9: weth9.target,
     usdt: usdt.target,
+    advisory: advisory.target,      
   };
 
   console.log(addresses);

@@ -5,6 +5,21 @@ pub mod advisory {
 
     use advisory_trait::{AdvisoryError, IsAdvisory};
 
+    #[ink(event)]
+    #[derive(Debug)]
+    #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
+    pub struct EmergencyChanged {
+        pub emergency: bool,
+    }
+
+    #[ink(event)]
+    #[derive(Debug)]
+    #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
+    pub struct OwnershipTransferred {
+        pub previous_owner: AccountId,
+        pub new_owner: AccountId,
+    }
+
     #[ink(storage)]
     pub struct Advisory {
         pub owner: AccountId,
@@ -13,9 +28,12 @@ pub mod advisory {
 
     impl IsAdvisory for Advisory {
         #[ink(message)]
-        fn set_emergency(&mut self) -> Result<(), AdvisoryError> {
+        fn flip_emergency(&mut self) -> Result<(), AdvisoryError> {
             self.ensure_owner()?;
             self.emergency = !self.emergency;
+            self.env().emit_event(EmergencyChanged {
+                emergency: self.emergency,
+            });
             Ok(())
         }
 
@@ -25,8 +43,12 @@ pub mod advisory {
         }
 
         #[ink(message)]
-        fn set_owner(&mut self, new_owner: AccountId) -> Result<(), AdvisoryError> {
+        fn transfer_ownership(&mut self, new_owner: AccountId) -> Result<(), AdvisoryError> {
             self.ensure_owner()?;
+            self.env().emit_event(OwnershipTransferred {
+                previous_owner: self.owner,
+                new_owner,
+            });
             self.owner = new_owner;
             Ok(())
         }

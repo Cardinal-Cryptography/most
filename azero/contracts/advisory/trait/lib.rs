@@ -26,11 +26,11 @@ impl From<InkEnvError> for AdvisoryError {
 #[ink::trait_definition]
 pub trait IsAdvisory {
     #[ink(message)]
-    fn set_emergency(&mut self) -> Result<(), AdvisoryError>;
+    fn flip_emergency(&mut self) -> Result<(), AdvisoryError>;
     #[ink(message)]
     fn is_emergency(&self) -> bool;
     #[ink(message)]
-    fn set_owner(&mut self, new_owner: AccountId) -> Result<(), AdvisoryError>;
+    fn transfer_ownership(&mut self, new_owner: AccountId) -> Result<(), AdvisoryError>;
     #[ink(message)]
     fn owner(&self) -> AccountId;
 }
