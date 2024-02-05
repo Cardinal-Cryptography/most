@@ -3,7 +3,26 @@
 #[ink::contract]
 pub mod advisory {
 
-    use advisory_trait::{AdvisoryError, IsAdvisory};
+    use ink::{
+        env::Error as InkEnvError,
+        prelude::{format, string::String},
+    };
+    use scale::{Decode, Encode};
+
+    #[derive(Debug, PartialEq, Eq, Encode, Decode)]
+    #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
+    pub enum AdvisoryError {
+        /// Error when calling a function from contracts environment
+        InkEnvError(String),
+        /// Caller is not an owner
+        NotOwner(AccountId),
+    }
+
+    impl From<InkEnvError> for AdvisoryError {
+        fn from(why: InkEnvError) -> Self {
+            Self::InkEnvError(format!("{:?}", why))
+        }
+    }
 
     #[ink(event)]
     #[derive(Debug)]
@@ -26,9 +45,9 @@ pub mod advisory {
         pub emergency: bool,
     }
 
-    impl IsAdvisory for Advisory {
+    impl Advisory {
         #[ink(message)]
-        fn flip_emergency(&mut self) -> Result<(), AdvisoryError> {
+        pub fn flip_emergency(&mut self) -> Result<(), AdvisoryError> {
             self.ensure_owner()?;
             self.emergency = !self.emergency;
             self.env().emit_event(EmergencyChanged {
@@ -38,12 +57,12 @@ pub mod advisory {
         }
 
         #[ink(message)]
-        fn is_emergency(&self) -> bool {
+        pub fn is_emergency(&self) -> bool {
             self.emergency
         }
 
         #[ink(message)]
-        fn transfer_ownership(&mut self, new_owner: AccountId) -> Result<(), AdvisoryError> {
+        pub fn transfer_ownership(&mut self, new_owner: AccountId) -> Result<(), AdvisoryError> {
             self.ensure_owner()?;
             self.env().emit_event(OwnershipTransferred {
                 previous_owner: self.owner,
@@ -54,7 +73,7 @@ pub mod advisory {
         }
 
         #[ink(message)]
-        fn owner(&self) -> AccountId {
+        pub fn owner(&self) -> AccountId {
             self.owner
         }
     }

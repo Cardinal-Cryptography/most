@@ -6,16 +6,6 @@ version = 3
 name = "advisory"
 version = "1.0.0"
 dependencies = [
- "advisory-trait",
- "ink",
- "parity-scale-codec",
- "scale-info",
-]
-
-[[package]]
-name = "advisory-trait"
-version = "1.0.0"
-dependencies = [
  "ink",
  "parity-scale-codec",
  "scale-info",
