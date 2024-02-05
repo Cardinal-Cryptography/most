@@ -178,7 +178,7 @@ async function main(): Promise<void> {
     most: mostAddress,
     weth: wethAddress,
     oracle: oracleAddress,
-    advisory: advisoryAddress
+    advisory: advisoryAddress,
   };
   console.log("addresses:", addresses);
 
