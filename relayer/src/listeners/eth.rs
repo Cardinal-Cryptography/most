@@ -70,19 +70,24 @@ impl EthListener {
             name,
             default_sync_from_block_eth,
             sync_step,
+            override_eth_cache,
             ..
         } = &*config;
 
         let address = eth_contract_address.parse::<Address>()?;
         let contract = Most::new(address, Arc::clone(&eth_connection));
 
-        let mut first_unprocessed_block_number = read_first_unprocessed_block_number(
-            name.clone(),
-            ETH_LAST_BLOCK_KEY.to_string(),
-            redis_connection.clone(),
-            *default_sync_from_block_eth,
-        )
-        .await;
+        let mut first_unprocessed_block_number = if *override_eth_cache {
+            *default_sync_from_block_eth
+        } else {
+            read_first_unprocessed_block_number(
+                name.clone(),
+                ETH_LAST_BLOCK_KEY.to_string(),
+                redis_connection.clone(),
+                *default_sync_from_block_eth,
+            )
+            .await
+        };
 
         // Main Ethereum event loop.
         loop {
