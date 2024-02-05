@@ -9,7 +9,7 @@ pub struct AzeroContractAddresses {
     pub governance: String,
     pub most: String,
     pub weth: String,
-    pub test_oracle: String,
+    pub oracle: String,
 }
 
 pub fn contract_addresses(

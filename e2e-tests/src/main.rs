@@ -1,7 +1,9 @@
 use std::{env, str::FromStr};
 
 use aleph_client::{
+    ConnectionApi,
     keypair_from_string,
+    pallets::contract::ContractRpc,
     sp_core::{blake2_256, ByteArray},
     sp_runtime::AccountId32,
 };
@@ -122,7 +124,7 @@ async fn main() -> anyhow::Result<()> {
     info!("'sendRequest' tx receipt: {:?}", send_request_receipt);
 
     let azero_connection = azero::connection(&config.azero_node_ws).await;
-    let azero_client = azero_connection.as_client().rpc();
+    //let azero_client = azero_connection.as_client().rpc();
 
     let mut call_data = vec![];
     call_data.append(&mut (&blake2_256("balance_of".as_bytes())[0..4]).to_vec());
@@ -131,13 +133,14 @@ async fn main() -> anyhow::Result<()> {
     let rpc_params = rpc_params![
         (*azero_account_keypair.account_id()).clone(),
         weth_azero_account_id,
-        0 as u128,
-        50_000_000_000 as u128,
+        0_u128,
+        50_000_000_000_u128,
         None::<u128>,
         call_data
     ];
 
-    let res = azero_client.request("contracts_call", rpc_params).await?;
+    //let res = azero_client.request("contracts_call", rpc_params).await?;
+    let res = azero_connection.rpc_call("contracts_call".to_string(), rpc_params).await?;
     info!("res: {:?}", res);
 
     Ok(())
