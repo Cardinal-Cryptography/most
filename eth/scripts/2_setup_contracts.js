@@ -1,6 +1,9 @@
-const fs = require("node:fs");
 const { ethers, artifacts } = require("hardhat");
+const { Keyring } = require('@polkadot/keyring');
+const { u8aToHex } = require('@polkadot/util');
+
 const contracts = require("../addresses.json");
+const azeroContracts = require("../../azero/addresses.json");
 
 async function main() {
   const signers = await ethers.getSigners();
@@ -10,29 +13,36 @@ async function main() {
 
   // --- setup
 
+  const Most = artifacts.require("Most");
+  const most = await Most.at(contracts.most);
+
+  // Add a pair
+  const wethAddressBytes = ethers.zeroPadValue(ethers.getBytes(contracts.weth9), 32);
+  const wethAddressBytesAzero = u8aToHex(new Keyring({ type: 'sr25519' }).decodeAddress(azeroContracts.weth));
+
+  console.log("Adding wETH token pair to Most:", contracts.weth9, "=>", azeroContracts.weth);
+
+  await most.addPair(
+    wethAddressBytes,
+    wethAddressBytesAzero,
+  );
+
   const Governance = artifacts.require("Governance");
   const governance = await Governance.at(contracts.governance);
 
   let initialGovernanceOwner = await governance.owner();
   console.log(
-    "Transferring Governance ownership from ",
+    "Transferring Governance ownership from",
     initialGovernanceOwner,
-    "to ",
+    "to",
     governance.address,
   );
   await governance.transferOwnership(contracts.governance);
   console.log("Governance ownership transferred successfully");
 
-  const Most = artifacts.require("Most");
-  const most = await Most.at(contracts.most);
-
-  const payload = ethers.zeroPadValue(ethers.getBytes(contracts.usdt), 32);
-  console.log("Setting USDT address in Most to:", payload);
-  await most.setUSDT(payload);
-
   let initialMostOwner = await most.owner();
   console.log(
-    "Transferring Most ownership from ",
+    "Transferring Most ownership from",
     initialMostOwner,
     "to",
     contracts.governance,
@@ -44,7 +54,7 @@ async function main() {
   const migrations = await Migrations.at(contracts.migrations);
 
   let lastCompletedMigration = await migrations.last_completed_migration();
-  console.log("Updating migrations from ", lastCompletedMigration, " to ", 2);
+  console.log("Updating migrations from", lastCompletedMigration, "to", 2);
   await migrations.setCompleted(2);
 
   console.log("Done");
