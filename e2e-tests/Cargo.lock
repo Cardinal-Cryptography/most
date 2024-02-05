@@ -1045,7 +1045,6 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
- "subxt",
  "tokio",
 ]
 

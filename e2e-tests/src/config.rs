@@ -23,7 +23,7 @@ pub struct Config {
     pub eth_contract_metadata_paths: EthContractMetadataPaths,
 
     #[arg(long, default_value = "200000")]
-    pub eth_gas_limit: u32,
+    pub eth_gas_limit: u128,
 
     #[command(flatten)]
     pub test_args: TestArgs,

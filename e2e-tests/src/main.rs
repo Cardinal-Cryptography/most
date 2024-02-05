@@ -1,10 +1,6 @@
 use std::{env, str::FromStr};
 
-use aleph_client::{
-    keypair_from_string,
-    sp_core::{blake2_256, ByteArray},
-    sp_runtime::AccountId32,
-};
+use aleph_client::{keypair_from_string, sp_runtime::AccountId32};
 use anyhow;
 use clap::Parser;
 use ethers::{
@@ -15,7 +11,6 @@ use ethers::{
     utils,
 };
 use log::info;
-use subxt::rpc_params;
 
 mod azero;
 mod config;
@@ -46,10 +41,6 @@ async fn main() -> anyhow::Result<()> {
     let weth =
         eth::contract_from_deployed(weth_eth_address, weth_abi, eth_signed_connection.clone())?;
 
-    //let initial_balance = eth_signed_connection
-    //    .get_balance(eth_account_address, None)
-    //    .await?;
-
     let send_tx = TransactionRequest::new()
         .to(weth_eth_address)
         .value(U256::from(utils::parse_ether(
@@ -62,10 +53,6 @@ async fn main() -> anyhow::Result<()> {
         .await?
         .ok_or(anyhow::anyhow!("Send tx receipt not available."))?;
     info!("Send tx receipt: {:?}", send_receipt);
-
-    //let post_transfer_eth_balance = eth_signed_connection
-    //    .get_balance(eth_account_address, None)
-    //    .await?;
 
     let most_address = eth_contract_addresses.most.parse::<Address>()?;
 
@@ -120,25 +107,6 @@ async fn main() -> anyhow::Result<()> {
         .await?
         .ok_or(anyhow::anyhow!("'sendRequest' tx receipt not available."))?;
     info!("'sendRequest' tx receipt: {:?}", send_request_receipt);
-
-    let azero_connection = azero::connection(&config.azero_node_ws).await;
-    let azero_client = azero_connection.as_client().rpc();
-
-    let mut call_data = vec![];
-    call_data.append(&mut (&blake2_256("balance_of".as_bytes())[0..4]).to_vec());
-    call_data.append(&mut azero_account_keypair.account_id().to_raw_vec());
-
-    let rpc_params = rpc_params![
-        (*azero_account_keypair.account_id()).clone(),
-        weth_azero_account_id,
-        0 as u128,
-        50_000_000_000 as u128,
-        None::<u128>,
-        call_data
-    ];
-
-    let res = azero_client.request("contracts_call", rpc_params).await?;
-    info!("res: {:?}", res);
 
     Ok(())
 }
