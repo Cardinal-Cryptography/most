@@ -48,7 +48,7 @@ pub struct Config {
     #[arg(long, default_value = "0")]
     pub default_sync_from_block_azero: u32,
 
-    #[arg(long, default_value = "1000")]
+    #[arg(long, default_value = "100")]
     pub sync_step: u32,
 
     #[arg(long, default_value = "redis://127.0.0.1:6379")]
