@@ -185,7 +185,6 @@ test-ink: test-ink-e2e
 	cd azero/contracts/governance && cargo test
 	cd azero/contracts/token && cargo test
 	cd azero/contracts/gas-price-oracle/contract && cargo test
-	cd azero/contracts/gas-price-oracle/test-contract && cargo test
 	cd azero/contracts/money-box/contract && cargo test
 
 .PHONY: check-js-format
@@ -212,7 +211,6 @@ ink-lint:
 	cd azero/contracts/psp22-traits && cargo clippy -- --no-deps -D warnings
 	cd azero/contracts/tests && cargo clippy -- --no-deps -D warnings
 	cd azero/contracts/gas-price-oracle/contract && cargo clippy -- --no-deps -D warnings
-	cd azero/contracts/gas-price-oracle/test-contract && cargo clippy -- --no-deps -D warnings
 	cd azero/contracts/gas-price-oracle/trait && cargo clippy -- --no-deps -D warnings
 	cd azero/contracts/money-box/contract && cargo clippy -- --no-deps -D warnings
 	cd azero/contracts/money-box/trait && cargo clippy -- --no-deps -D warnings
@@ -231,7 +229,6 @@ rust-format-check:
 	cd azero/contracts/psp22-traits && cargo fmt -- --check
 	cd azero/contracts/tests && cargo fmt -- --check
 	cd azero/contracts/gas-price-oracle/contract && cargo fmt -- --check
-	cd azero/contracts/gas-price-oracle/test-contract && cargo fmt -- --check
 	cd azero/contracts/gas-price-oracle/trait && cargo fmt -- --check
 	cd azero/contracts/money-box/contract && cargo fmt -- --check
 	cd azero/contracts/money-box/trait && cargo fmt -- --check
@@ -246,7 +243,6 @@ rust-format:
 	cd azero/contracts/psp22-traits && cargo fmt
 	cd azero/contracts/tests && cargo fmt
 	cd azero/contracts/gas-price-oracle/contract && cargo fmt
-	cd azero/contracts/gas-price-oracle/test-contract && cargo fmt
 	cd azero/contracts/gas-price-oracle/trait && cargo fmt
 	cd azero/contracts/money-box/contract && cargo fmt
 	cd azero/contracts/money-box/trait && cargo fmt

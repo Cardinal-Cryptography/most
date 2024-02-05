@@ -4,7 +4,6 @@
     "contracts/token/*",
     "contracts/governance/*",
     "contracts/gas-price-oracle/contract/*",
-    "contracts/gas-price-oracle/test-contract/*",
     "contracts/money-box/contract/*"
   ],
   "typechainGeneratedPath": "types",
