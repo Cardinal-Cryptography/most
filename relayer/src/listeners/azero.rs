@@ -6,7 +6,7 @@ use aleph_client::{
     AlephConfig, AsConnection,
 };
 use ethers::{
-    abi::{self, EncodePackedError, Token},
+    abi::{self, Token},
     core::types::Address,
     prelude::{ContractCall, ContractError},
     providers::{Middleware, ProviderError},
@@ -17,7 +17,7 @@ use redis::{aio::Connection as RedisConnection, RedisError};
 use subxt::{events::Events, utils::H256};
 use thiserror::Error;
 use tokio::{
-    sync::{Mutex, OwnedSemaphorePermit, Semaphore},
+    sync::{Mutex, OwnedSemaphorePermit, Semaphore, AcquireError},
     task::JoinSet,
     time::{sleep, Duration},
 };
@@ -73,17 +73,14 @@ pub enum AzeroListenerError {
     #[error("missing data from event")]
     MissingEventData(String),
 
-    #[error("error when creating an ABI data encoding")]
-    AbiEncode(#[from] EncodePackedError),
-
     #[error("redis connection error")]
     Redis(#[from] RedisError),
 
     #[error("join error")]
     Join(#[from] tokio::task::JoinError),
 
-    #[error("unexpected error")]
-    Unexpected,
+    #[error("semaphore error")]
+    Semaphore(#[from] AcquireError),
 }
 
 const ALEPH_LAST_BLOCK_KEY: &str = "alephzero_last_known_block_number";
@@ -248,8 +245,7 @@ async fn handle_events(
         let permit = event_handler_tasks_semaphore
             .clone()
             .acquire_owned()
-            .await
-            .expect("Failed to acquire semaphore permit");
+            .await?;
 
         // Spawn a new task for handling each event.
         event_tasks.spawn(handle_event(config, eth_connection, event, permit));
@@ -267,9 +263,6 @@ async fn handle_events(
             redis_connection.clone(),
         )
         .await
-        .expect(
-            "Failed to wait for event handler tasks or to update the last processed block number.",
-        );
     });
     Ok(())
 }
