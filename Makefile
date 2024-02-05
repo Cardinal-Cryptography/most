@@ -74,7 +74,7 @@ eth-deps:
 
 .PHONY: watch-eth
 watch-eth: # watcher on the eth contracts
-watch-eth:
+watch-eth: eth-deps
 	cd eth && npm run watch
 
 .PHONY: compile-eth
@@ -121,7 +121,7 @@ azero-deps:
 
 .PHONY: watch-azero
 watch-azero: # watch azero contracts and generate artifacts
-watch-azero:
+watch-azero: azero-deps
 	cd azero && npm run watch
 
 .PHONY: compile-azero
