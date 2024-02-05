@@ -41,6 +41,11 @@ devnet-azero: # Run azero devnet
 devnet-azero: bootstrap-azero
 	docker compose -f ./devnet-azero/devnet-azero-compose.yml up -d
 
+.PHONY: devnet-azero-logs
+devnet-azero-logs: # show azero devnet node logs
+devnet-azero-logs:
+	docker container logs aleph_bridgenode --follow
+
 .PHONY: devnet-eth
 devnet-eth: # Run eth devnet
 devnet-eth:

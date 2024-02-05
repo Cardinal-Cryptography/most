@@ -76,7 +76,7 @@ async function main(): Promise<void> {
 
   const { address: advisoryAddress } = await advisoryConstructors.new(
     authority, // owner
-    { gasLimit: estimatedGasOracle },
+    { gasLimit: estimatedGasAdvisory },
   );
 
   let estimatedGasOracle = await estimateContractInit(
