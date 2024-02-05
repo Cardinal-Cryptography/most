@@ -12,7 +12,7 @@ psp22 = "0.2.0"
 scale = { package = "parity-scale-codec", version = "3", default-features = false, features = ["derive"] }
 shared = { path = "../shared" }
 subxt = "0.31.0"
-test_oracle = { path = "../gas-price-oracle/test-contract", features = ["ink-as-dependency"] }
+oracle = { path = "../gas-price-oracle/contract", features = ["ink-as-dependency"] }
 wrapped_token = { path = "../token", package = "token", features = ["ink-as-dependency"] }
 
 [lib]
@@ -20,6 +20,6 @@ path = "lib.rs"
 
 [features]
 default = ["std", "e2e-tests"]
-std = ["ink/std", "most/std", "wrapped_token/std", "test_oracle/std"]
+std = ["ink/std", "most/std", "wrapped_token/std", "oracle/std"]
 ink-as-dependency = []
 e2e-tests = []
