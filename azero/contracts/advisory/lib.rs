@@ -28,7 +28,8 @@ pub mod advisory {
     #[derive(Debug)]
     #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
     pub struct EmergencyChanged {
-        pub emergency: bool,
+        pub previous_state: bool,
+        pub new_state: bool,
     }
 
     #[ink(event)]
@@ -47,12 +48,17 @@ pub mod advisory {
 
     impl Advisory {
         #[ink(message)]
-        pub fn flip_emergency(&mut self) -> Result<(), AdvisoryError> {
+        pub fn set_emergency(&mut self, new_state: bool) -> Result<(), AdvisoryError> {
             self.ensure_owner()?;
-            self.emergency = !self.emergency;
-            self.env().emit_event(EmergencyChanged {
-                emergency: self.emergency,
-            });
+
+            if new_state != self.emergency {
+                self.env().emit_event(EmergencyChanged {
+                    previous_state: self.emergency,
+                    new_state,
+                });
+                self.emergency = new_state;
+            }
+
             Ok(())
         }
 
