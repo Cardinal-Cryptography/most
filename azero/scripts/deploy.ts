@@ -14,10 +14,15 @@ import {
 } from "./utils";
 import "dotenv/config";
 import "@polkadot/api-augment";
+import { ethers } from "ethers";
 
 const envFile = process.env.AZERO_ENV || "dev";
 async function import_env() {
   return await import(`../env/${envFile}.json`);
+}
+
+async function import_eth_addresses() {
+  return await import(`../../eth/addresses.json`);
 }
 
 async function main(): Promise<void> {
@@ -34,6 +39,13 @@ async function main(): Promise<void> {
     default_fee,
     authority,
   } = await import_env();
+
+  const {
+    weth9
+  } = await import_eth_addresses();
+  const wethEthAddress = ethers.zeroPadValue(ethers.getBytes(weth9), 32);
+  console.log("weth eth address:", wethEthAddress);
+
 
   const wsProvider = new WsProvider(ws_node);
   const keyring = new Keyring({ type: "sr25519" });
@@ -127,6 +139,9 @@ async function main(): Promise<void> {
   );
   console.log("token address:", wethAddress);
 
+  const most = new Most(mostAddress, deployer, api);
+  await most.tx.addPair(wethAddress, wethEthAddress);
+
   const quorum = 2;
   const estimatedGasGovernance = await estimateContractInit(
     api,
@@ -148,7 +163,7 @@ async function main(): Promise<void> {
   }
 
   console.log("Transferring ownership of most to governance...");
-  await new Most(mostAddress, deployer, api).tx.setOwner(governanceAddress);
+  await most.tx.setOwner(governanceAddress);
 
   console.log("Transferring ownership of weth to governance...");
   await new Token(wethAddress, deployer, api).tx.setAdmin(governanceAddress);
