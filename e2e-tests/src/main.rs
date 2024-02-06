@@ -1,11 +1,6 @@
 use std::{env, str::FromStr};
 
-use aleph_client::{
-    keypair_from_string,
-    sp_core::{blake2_256, ByteArray},
-    sp_runtime::AccountId32,
-    ConnectionApi,
-};
+use aleph_client::{contract::ContractInstance, keypair_from_string, sp_runtime::AccountId32};
 use anyhow;
 use clap::Parser;
 use ethers::{
@@ -16,7 +11,6 @@ use ethers::{
     utils,
 };
 use log::info;
-use subxt::rpc_params;
 
 mod azero;
 mod config;
@@ -43,7 +37,7 @@ async fn main() -> anyhow::Result<()> {
     let eth_contract_addresses = eth::contract_addresses(&config.eth_contract_addresses_path)?;
     let weth_eth_address = eth_contract_addresses.weth9.parse::<Address>()?;
 
-    let weth_abi = eth::contract_abi(&config.eth_contract_metadata_paths.weth9)?;
+    let weth_abi = eth::contract_abi(&config.contract_metadata_paths.eth_weth9)?;
     let weth =
         eth::contract_from_deployed(weth_eth_address, weth_abi, eth_signed_connection.clone())?;
 
@@ -84,7 +78,7 @@ async fn main() -> anyhow::Result<()> {
         .ok_or(anyhow::anyhow!("'approve' tx receipt not available."))?;
     info!("'Approve' tx receipt: {:?}", approve_receipt);
 
-    let most_abi = eth::contract_abi(&config.eth_contract_metadata_paths.most)?;
+    let most_abi = eth::contract_abi(&config.contract_metadata_paths.eth_most)?;
     let most = eth::contract_from_deployed(most_address, most_abi, eth_signed_connection.clone())?;
 
     let mut weth_eth_address_bytes = [0_u8; 32];
@@ -114,23 +108,19 @@ async fn main() -> anyhow::Result<()> {
 
     let azero_connection = azero::connection(&config.azero_node_ws).await;
 
-    let mut call_data = vec![];
-    call_data.append(&mut (&blake2_256("balance_of".as_bytes())[0..4]).to_vec());
-    call_data.append(&mut azero_account_keypair.account_id().to_raw_vec());
-
-    let rpc_params = rpc_params![
-        (*azero_account_keypair.account_id()).clone(),
+    let weth_azero_contract = ContractInstance::new(
         weth_azero_account_id,
-        0_u128,
-        50_000_000_000_u128,
-        None::<u128>,
-        call_data
-    ];
+        &config.contract_metadata_paths.azero_token,
+    )?;
 
-    let res = azero_connection
-        .rpc_call("contracts_call".to_string(), rpc_params)
+    let balance: u128 = weth_azero_contract
+        .contract_read(
+            &azero_connection,
+            "PSP22::balance_of",
+            &[(*azero_account_keypair.account_id()).clone().to_string()],
+        )
         .await?;
-    info!("res: {:?}", res);
+    info!("balance: {:?}", balance);
 
     Ok(())
 }

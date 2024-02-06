@@ -19,11 +19,11 @@ pub struct Config {
     #[arg(long, default_value = "../eth/addresses.json")]
     pub eth_contract_addresses_path: String,
 
-    #[command(flatten)]
-    pub eth_contract_metadata_paths: EthContractMetadataPaths,
-
     #[arg(long, default_value = "200000")]
     pub eth_gas_limit: u128,
+
+    #[command(flatten)]
+    pub contract_metadata_paths: ContractMetadataPaths,
 
     #[command(flatten)]
     pub test_args: TestArgs,
@@ -33,27 +33,42 @@ pub struct Config {
 }
 
 #[derive(Args, Debug)]
-pub struct EthContractMetadataPaths {
+pub struct ContractMetadataPaths {
+    #[arg(long, default_value = "../azero/artifacts/governance.json")]
+    pub azero_governance: String,
+
+    #[arg(long, default_value = "../azero/artifacts/migrations.json")]
+    pub azero_migrations: String,
+
+    #[arg(long, default_value = "../azero/artifacts/most.json")]
+    pub azero_most: String,
+
+    #[arg(long, default_value = "../azero/artifacts/oracle.json")]
+    pub azero_oracle: String,
+
+    #[arg(long, default_value = "../azero/artifacts/token.json")]
+    pub azero_token: String,
+
     #[arg(
         long,
         default_value = "../eth/artifacts/contracts/Governance.sol/Governance.json"
     )]
-    pub governance: String,
+    pub eth_governance: String,
 
     #[arg(
         long,
         default_value = "../eth/artifacts/contracts/Migrations.sol/Migrations.json"
     )]
-    pub migrations: String,
+    pub eth_migrations: String,
 
     #[arg(long, default_value = "../eth/artifacts/contracts/Most.sol/Most.json")]
-    pub most: String,
+    pub eth_most: String,
 
     #[arg(
         long,
         default_value = "../eth/artifacts/contracts/WETH9.sol/WETH9.json"
     )]
-    pub weth9: String,
+    pub eth_weth9: String,
 }
 
 #[derive(Args, Debug)]
