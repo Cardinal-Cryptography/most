@@ -25,6 +25,12 @@ pub struct Config {
     #[command(flatten)]
     pub contract_metadata_paths: ContractMetadataPaths,
 
+    #[arg(
+        long,
+        default_value = "harsh master island dirt equip search awesome double turn crush wool grant"
+    )]
+    pub mnemonic: String,
+
     #[command(flatten)]
     pub test_args: TestArgs,
 

@@ -4,10 +4,8 @@ use aleph_client::{contract::ContractInstance, keypair_from_string, sp_runtime::
 use anyhow;
 use clap::Parser;
 use ethers::{
-    core::types::{Address, TransactionRequest, U256},
-    middleware::Middleware,
+    core::types::Address,
     signers::{coins_bip39::English, MnemonicBuilder, Signer},
-    types::H256,
     utils,
 };
 use log::info;
@@ -18,16 +16,13 @@ mod eth;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    const DEV_MNEMONIC: &str =
-        "harsh master island dirt equip search awesome double turn crush wool grant";
-
     let config = config::Config::parse();
 
     env::set_var("RUST_LOG", config.rust_log.as_str());
     env_logger::init();
 
     let wallet = MnemonicBuilder::<English>::default()
-        .phrase(DEV_MNEMONIC)
+        .phrase(&*config.mnemonic)
         .index(config.eth_dev_account_index)?
         .build()?;
     let eth_account_address = wallet.address();
@@ -38,29 +33,17 @@ async fn main() -> anyhow::Result<()> {
     let weth_eth_address = eth_contract_addresses.weth9.parse::<Address>()?;
 
     let weth_abi = eth::contract_abi(&config.contract_metadata_paths.eth_weth9)?;
-    let weth =
-        eth::contract_from_deployed(weth_eth_address, weth_abi, eth_signed_connection.clone())?;
+    let weth = eth::contract_from_deployed(weth_eth_address, weth_abi, &eth_signed_connection)?;
 
-    //let initial_balance = eth_signed_connection
-    //    .get_balance(eth_account_address, None)
-    //    .await?;
-
-    let send_tx = TransactionRequest::new()
-        .to(weth_eth_address)
-        .value(U256::from(utils::parse_ether(
-            config.test_args.transfer_amount + 100,
-        )?))
-        .from(eth_account_address);
-    let send_receipt = eth_signed_connection
-        .send_transaction(send_tx, None)
-        .await?
-        .await?
-        .ok_or(anyhow::anyhow!("Send tx receipt not available."))?;
+    let transfer_amount = utils::parse_ether(config.test_args.transfer_amount)?;
+    let send_receipt = eth::send_tx(
+        eth_account_address,
+        weth_eth_address,
+        transfer_amount + 100,
+        &eth_signed_connection,
+    )
+    .await?;
     info!("Send tx receipt: {:?}", send_receipt);
-
-    //let post_transfer_eth_balance = eth_signed_connection
-    //    .get_balance(eth_account_address, None)
-    //    .await?;
 
     let most_address = eth_contract_addresses.most.parse::<Address>()?;
 
@@ -69,17 +52,12 @@ async fn main() -> anyhow::Result<()> {
         utils::parse_ether(config.test_args.transfer_amount)?,
     );
 
-    let approve_call = weth.method::<_, H256>("approve", approve_args)?;
-    let approve_call = approve_call.gas(config.eth_gas_limit);
-    let approve_pending_tx = approve_call.send().await?;
-    let approve_receipt = approve_pending_tx
-        .confirmations(1)
-        .await?
-        .ok_or(anyhow::anyhow!("'approve' tx receipt not available."))?;
+    let approve_receipt =
+        eth::call_contract_method(weth, "approve", config.eth_gas_limit, approve_args).await?;
     info!("'Approve' tx receipt: {:?}", approve_receipt);
 
     let most_abi = eth::contract_abi(&config.contract_metadata_paths.eth_most)?;
-    let most = eth::contract_from_deployed(most_address, most_abi, eth_signed_connection.clone())?;
+    let most = eth::contract_from_deployed(most_address, most_abi, &eth_signed_connection)?;
 
     let mut weth_eth_address_bytes = [0_u8; 32];
     weth_eth_address_bytes[12..].copy_from_slice(weth_eth_address.as_fixed_bytes());
@@ -98,13 +76,13 @@ async fn main() -> anyhow::Result<()> {
         utils::parse_ether(config.test_args.transfer_amount)?,
         azero_account_address_bytes,
     );
-    let send_request_call = most.method::<_, H256>("sendRequest", send_request_args)?;
-    let pending_send_request_tx = send_request_call.send().await?;
-    let send_request_receipt = pending_send_request_tx
-        .confirmations(1)
-        .await?
-        .ok_or(anyhow::anyhow!("'sendRequest' tx receipt not available."))?;
+    let send_request_receipt =
+        eth::call_contract_method(most, "sendRequest", config.eth_gas_limit, send_request_args)
+            .await?;
     info!("'sendRequest' tx receipt: {:?}", send_request_receipt);
+
+    info!("Waiting 12 minutes for finalization");
+    tokio::time::sleep(tokio::time::Duration::from_secs(12 * 60)).await;
 
     let azero_connection = azero::connection(&config.azero_node_ws).await;
 
@@ -113,14 +91,15 @@ async fn main() -> anyhow::Result<()> {
         &config.contract_metadata_paths.azero_token,
     )?;
 
-    let balance: u128 = weth_azero_contract
+    let balance_post_transfer: u128 = weth_azero_contract
         .contract_read(
             &azero_connection,
             "PSP22::balance_of",
             &[(*azero_account_keypair.account_id()).clone().to_string()],
         )
         .await?;
-    info!("balance: {:?}", balance);
+    info!("balance post transfer: {:?}", balance_post_transfer);
+    assert_eq!(transfer_amount, balance_post_transfer.into());
 
     Ok(())
 }
