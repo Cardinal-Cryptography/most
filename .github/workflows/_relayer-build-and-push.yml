@@ -66,21 +66,30 @@ jobs:
         # yamllint disable-line rule:line-length
         uses: Cardinal-Cryptography/github-actions/get-ref-properties@v6
 
-      - name: Download files from S3 AWS bucket
+      - name: Download addresses from S3 AWS bucket
         shell: bash
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_DEVNET_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_DEVNET_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: eu-central-1
+          AWS_ACCESS_KEY_ID: ${{ secrets.CONTRACTS_MOST_ADDRESSES_BRIDGENET_DEV_RO_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CONTRACTS_MOST_ADDRESSES_BRIDGENET_DEV_RO_AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
+        # yamllint disable rule:line-length
+        run: |
+          s3_addr_path="most/addresses/${{ inputs.environment }}/${{ inputs.frontend-environment }}/${{ github.sha }}"
+          aws s3 cp s3://${{ secrets.CONTRACTS_S3BUCKET_NAME }}/${s3_addr_path}/azero_addresses.json azero/addresses.json
+          aws s3 cp s3://${{ secrets.CONTRACTS_S3BUCKET_NAME }}/${s3_addr_path}/eth_addresses.json eth/addresses.json
+        # yamllint enable rule:line-length
+
+      - name: Download artifact from S3 AWS bucket
+        shell: bash
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
         # yamllint disable rule:line-length
         run: |
           mkdir -p azero/artifacts
-
-          s3_addr_path="most/addresses/${{ inputs.environment }}/${{ inputs.frontend-environment }}/${{ github.sha }}"
           s3_art_path="most/artifacts/${{ github.sha }}"
-          aws s3 cp s3://alephzero-devnet-contracts-test/${s3_addr_path}/azero_addresses.json azero/addresses.json
-          aws s3 cp s3://alephzero-devnet-contracts-test/${s3_addr_path}/eth_addresses.json eth/addresses.json
-          aws s3 cp s3://alephzero-devnet-contracts-test/${s3_art_path}/azero_most/most.json azero/artifacts/most.json
+          aws s3 cp s3://${{ secrets.CONTRACTS_S3BUCKET_NAME }}/${s3_art_path}/azero_most/most.json azero/artifacts/most.json
         # yamllint enable rule:line-length
 
       - name: Install Rust toolchain
