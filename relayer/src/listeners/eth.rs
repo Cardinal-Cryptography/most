@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 
 use ethers::{
     abi::EncodePackedError,
@@ -64,6 +67,7 @@ impl EthListener {
         azero_connection: Arc<SignedAzeroWsConnection>,
         eth_connection: Arc<SignedEthConnection>,
         redis_connection: Arc<Mutex<RedisConnection>>,
+        emergency: Arc<AtomicBool>,
     ) -> Result<(), EthListenerError> {
         let Config {
             eth_contract_address,
@@ -91,49 +95,54 @@ impl EthListener {
 
         // Main Ethereum event loop.
         loop {
-            // Query for the next unknowns finalized block number, if not present we wait for it.
-            let next_finalized_block_number = get_next_finalized_block_number_eth(
-                eth_connection.clone(),
-                first_unprocessed_block_number,
-            )
-            .await;
+            match emergency.load(Ordering::Relaxed) {
+                true => continue,
+                false => {
+                    // Query for the next unknowns finalized block number, if not present we wait for it.
+                    let next_finalized_block_number = get_next_finalized_block_number_eth(
+                        eth_connection.clone(),
+                        first_unprocessed_block_number,
+                    )
+                    .await;
 
-            // Don't query for more than `sync_step` blocks at one time.
-            let to_block = std::cmp::min(
-                next_finalized_block_number,
-                first_unprocessed_block_number + sync_step - 1,
-            );
+                    // Don't query for more than `sync_step` blocks at one time.
+                    let to_block = std::cmp::min(
+                        next_finalized_block_number,
+                        first_unprocessed_block_number + sync_step - 1,
+                    );
 
-            log::info!(
-                "Processing events from blocks {} - {}",
-                first_unprocessed_block_number,
-                to_block
-            );
+                    log::info!(
+                        "Processing events from blocks {} - {}",
+                        first_unprocessed_block_number,
+                        to_block
+                    );
 
-            // Query for events.
-            let events = contract
-                .events()
-                .from_block(first_unprocessed_block_number)
-                .to_block(to_block)
-                .query()
-                .await?;
+                    // Query for events.
+                    let events = contract
+                        .events()
+                        .from_block(first_unprocessed_block_number)
+                        .to_block(to_block)
+                        .query()
+                        .await?;
 
-            // Handle events.
-            for event in events {
-                handle_event(&event, &config, Arc::clone(&azero_connection)).await?
+                    // Handle events.
+                    for event in events {
+                        handle_event(&event, &config, Arc::clone(&azero_connection)).await?
+                    }
+
+                    // Update the last block number.
+                    first_unprocessed_block_number = to_block + 1;
+
+                    // Cache the last processed block number.
+                    write_last_processed_block(
+                        name.clone(),
+                        ETH_LAST_BLOCK_KEY.to_string(),
+                        redis_connection.clone(),
+                        to_block,
+                    )
+                    .await?;
+                }
             }
-
-            // Update the last block number.
-            first_unprocessed_block_number = to_block + 1;
-
-            // Cache the last processed block number.
-            write_last_processed_block(
-                name.clone(),
-                ETH_LAST_BLOCK_KEY.to_string(),
-                redis_connection.clone(),
-                to_block,
-            )
-            .await?;
         }
     }
 }

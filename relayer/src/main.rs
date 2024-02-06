@@ -1,9 +1,14 @@
-use std::{env, process, sync::Arc};
+use std::{
+    env, process,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 
 use clap::Parser;
 use config::Config;
 use connections::EthConnectionError;
-use crossbeam_channel::bounded;
 use ethers::signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, Signer, WalletError};
 use eyre::Result;
 use log::{debug, error, info};
@@ -55,7 +60,8 @@ fn main() -> Result<()> {
     let rt = Runtime::new()?;
 
     rt.block_on(async {
-        let (sender, receiver) = bounded::<bool>(1);
+        // let (sender, emergency) = bounded::<bool>(1);
+        let emergency = Arc::new(AtomicBool::new(false));
 
         let mut tasks = Vec::with_capacity(4);
 
@@ -76,9 +82,10 @@ fn main() -> Result<()> {
         debug!("Established connection to Aleph Zero node");
 
         let config_rc1 = Arc::clone(&config);
+        let emergency_rc1 = Arc::clone(&emergency);
 
         tasks.push(tokio::spawn(async {
-            AdvisoryListener::run(config_rc1, azero_connection, sender)
+            AdvisoryListener::run(config_rc1, azero_connection, emergency_rc1)
                 .await
                 .expect("Advisory listener task has failed")
         }));
@@ -115,6 +122,7 @@ fn main() -> Result<()> {
         let azero_connection_rc1 = Arc::clone(&azero_signed_connection);
         let eth_connection_rc1 = Arc::clone(&eth_connection);
         let redis_connection_rc1 = Arc::clone(&redis_connection);
+        let emergency_rc2 = Arc::clone(&emergency);
 
         info!("Starting Ethereum listener");
 
@@ -124,6 +132,7 @@ fn main() -> Result<()> {
                 azero_connection_rc1,
                 eth_connection_rc1,
                 redis_connection_rc1,
+                emergency_rc2,
             )
             .await
             .expect("Ethereum listener task has failed")
@@ -133,6 +142,7 @@ fn main() -> Result<()> {
         let azero_connection_rc2 = Arc::clone(&azero_signed_connection);
         let eth_connection_rc2 = Arc::clone(&eth_connection);
         let redis_connection_rc2 = Arc::clone(&redis_connection);
+        let emergency_rc3 = Arc::clone(&emergency);
 
         info!("Starting AlephZero listener");
 
@@ -142,6 +152,7 @@ fn main() -> Result<()> {
                 azero_connection_rc2,
                 eth_connection_rc2,
                 redis_connection_rc2,
+                emergency_rc3,
             )
             .await
             .expect("AlephZero listener task has failed")

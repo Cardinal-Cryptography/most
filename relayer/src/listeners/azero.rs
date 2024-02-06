@@ -1,4 +1,11 @@
-use std::{cmp::min, collections::BTreeSet, sync::Arc};
+use std::{
+    cmp::min,
+    collections::BTreeSet,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 
 use aleph_client::{
     contract::event::{BlockDetails, ContractEvent},
@@ -99,6 +106,7 @@ impl AlephZeroListener {
         azero_connection: Arc<SignedAzeroWsConnection>,
         eth_connection: Arc<SignedEthConnection>,
         redis_connection: Arc<Mutex<RedisConnection>>,
+        emergency: Arc<AtomicBool>,
     ) -> Result<(), AzeroListenerError> {
         let Config {
             most_contract_metadata: azero_contract_metadata,
@@ -138,50 +146,56 @@ impl AlephZeroListener {
 
         // Main AlephZero event loop
         loop {
-            // Query for the next unknown finalized block number, if not present we wait for it.
-            let mut to_block = get_next_finalized_block_number_azero(
-                azero_connection.clone(),
-                first_unprocessed_block_number,
-            )
-            .await;
+            match emergency.load(Ordering::Relaxed) {
+                true => continue,
+                false => {
+                    // Query for the next unknown finalized block number, if not present we wait for it.
+                    let mut to_block = get_next_finalized_block_number_azero(
+                        azero_connection.clone(),
+                        first_unprocessed_block_number,
+                    )
+                    .await;
 
-            to_block = min(to_block, first_unprocessed_block_number + (*sync_step) - 1);
+                    to_block = min(to_block, first_unprocessed_block_number + (*sync_step) - 1);
 
-            info!(
-                "Processing events from blocks {} - {}",
-                first_unprocessed_block_number, to_block
-            );
+                    info!(
+                        "Processing events from blocks {} - {}",
+                        first_unprocessed_block_number, to_block
+                    );
 
-            // Add the next block numbers now, so that there is always some block number in the set.
-            for block_number in first_unprocessed_block_number..=to_block {
-                add_to_pending(block_number + 1, pending_blocks.clone()).await;
+                    // Add the next block numbers now, so that there is always some block number in the set.
+                    for block_number in first_unprocessed_block_number..=to_block {
+                        add_to_pending(block_number + 1, pending_blocks.clone()).await;
+                    }
+
+                    // Fetch the events in parallel.
+                    let block_events = fetch_events_in_block_range(
+                        azero_connection.clone(),
+                        first_unprocessed_block_number,
+                        to_block,
+                    )
+                    .await?;
+
+                    for (block_details, events) in block_events {
+                        let filtered_events =
+                            most_instance.filter_events(events, block_details.clone());
+
+                        handle_events(
+                            config.clone(),
+                            eth_connection.clone(),
+                            filtered_events,
+                            block_details.block_number,
+                            pending_blocks.clone(),
+                            redis_connection.clone(),
+                            event_handler_tasks_semaphore.clone(),
+                        )
+                        .await?;
+                    }
+
+                    // Update the last block number.
+                    first_unprocessed_block_number = to_block + 1;
+                }
             }
-
-            // Fetch the events in parallel.
-            let block_events = fetch_events_in_block_range(
-                azero_connection.clone(),
-                first_unprocessed_block_number,
-                to_block,
-            )
-            .await?;
-
-            for (block_details, events) in block_events {
-                let filtered_events = most_instance.filter_events(events, block_details.clone());
-
-                handle_events(
-                    config.clone(),
-                    eth_connection.clone(),
-                    filtered_events,
-                    block_details.block_number,
-                    pending_blocks.clone(),
-                    redis_connection.clone(),
-                    event_handler_tasks_semaphore.clone(),
-                )
-                .await?;
-            }
-
-            // Update the last block number.
-            first_unprocessed_block_number = to_block + 1;
         }
     }
 }

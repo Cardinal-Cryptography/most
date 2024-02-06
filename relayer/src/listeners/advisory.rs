@@ -1,11 +1,14 @@
-use std::{cmp::min, collections::BTreeSet, sync::Arc};
+use std::{
+    cmp::min,
+    collections::BTreeSet,
+    sync::{atomic::AtomicBool, Arc},
+};
 
 use aleph_client::{
     contract::event::{BlockDetails, ContractEvent},
     utility::BlocksApi,
     AlephConfig, AsConnection,
 };
-use crossbeam_channel::Sender;
 use ethers::{
     abi::{self, EncodePackedError, Token},
     core::types::Address,
@@ -44,7 +47,7 @@ impl AdvisoryListener {
     pub async fn run(
         config: Arc<Config>,
         azero_connection: Arc<AzeroWsConnection>,
-        sender: Sender<bool>,
+        emergency: Arc<AtomicBool>,
     ) -> Result<(), AzeroListenerError> {
         let Config {
             advisory_contract_metadata,
