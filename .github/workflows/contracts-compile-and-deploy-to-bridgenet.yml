@@ -122,7 +122,7 @@ jobs:
   upload-contract-addresses:
     name: Upload contract addresses to S3
     runs-on: self-hosted
-    needs: [deploy-azero, deploy-eth]
+    needs: [deploy-contracts]
     strategy:
       matrix:
         include:
