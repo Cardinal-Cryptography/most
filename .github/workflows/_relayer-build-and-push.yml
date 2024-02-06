@@ -80,7 +80,7 @@ jobs:
           s3_art_path="most/artifacts/${{ github.sha }}"
           aws s3 cp s3://alephzero-devnet-contracts-test/${s3_addr_path}/azero_addresses.json azero/addresses.json
           aws s3 cp s3://alephzero-devnet-contracts-test/${s3_addr_path}/eth_addresses.json eth/addresses.json
-          aws s3 cp s3://alephzero-devnet-contracts-test/${s3_art_path}/most.json azero/artifacts/most.json
+          aws s3 cp s3://alephzero-devnet-contracts-test/${s3_art_path}/azero_most/most.json azero/artifacts/most.json
         # yamllint enable rule:line-length
 
       - name: Build relayer
