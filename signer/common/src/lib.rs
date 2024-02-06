@@ -1,6 +1,7 @@
 use schnorrkel::SIGNATURE_LENGTH;
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
+use serde_json::Deserializer;
 use vsock::VsockStream;
 
 pub type SerializedSignature = [u8; SIGNATURE_LENGTH];
@@ -41,21 +42,47 @@ pub enum Response {
     },
 }
 
-pub fn client(cid: u32, port: u32) -> Result<(), Error> {
-    let connection = VsockStream::connect_with_cid_port(cid, port)?;
-    let mut de = serde_json::Deserializer::from_reader(&connection);
+pub struct Client {
+    connection: VsockStream,
+}
 
-    serde_json::to_writer(&connection, &Command::Ping)?;
-    let res = Response::deserialize(&mut de)?;
+impl From<VsockStream> for Client {
+    fn from(connection: VsockStream) -> Self {
+        Self { connection }
+    }
+}
+
+impl Client {
+    pub fn new(cid: u32, port: u32) -> Result<Self, Error> {
+        let connection = VsockStream::connect_with_cid_port(cid, port)?;
+
+        Ok(Self { connection })
+    }
+
+    pub fn send<T: Serialize>(&self, msg: &T) -> Result<(), Error> {
+        serde_json::to_writer(&self.connection, msg)?;
+        Ok(())
+    }
+
+    pub fn recv<'de, T: Deserialize<'de>>(&self) -> Result<T, Error> {
+        let mut de = Deserializer::from_reader(&self.connection);
+        let res = T::deserialize(&mut de)?;
+
+        Ok(res)
+    }
+}
+
+pub fn client(cid: u32, port: u32) -> Result<(), Error> {
+    let client = Client::new(cid, port)?;
+
+    client.send(&Command::Ping)?;
+    let res: Response = client.recv()?;
     println!("Received response: {:?}", res);
 
-    serde_json::to_writer(
-        &connection,
-        &Command::Sign {
-            payload: vec![1, 2, 3, 4],
-        },
-    )?;
-    let res = Response::deserialize(&mut de)?;
+    client.send(&Command::Sign {
+        payload: vec![1, 2, 3, 4],
+    })?;
+    let res: Response = client.recv()?;
     println!("Received response: {:?}", res);
 
     Ok(())

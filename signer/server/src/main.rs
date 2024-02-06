@@ -1,9 +1,8 @@
 use clap::Parser;
-use common::{client, Command, Response};
+use common::{client, Client, Command, Response};
 use hex::FromHexError;
 use schnorrkel::{signing_context, Keypair, SignatureError};
-use serde::Deserialize;
-use vsock::{VsockListener, VsockStream, VMADDR_CID_ANY, VMADDR_CID_HOST};
+use vsock::{VsockListener, VMADDR_CID_ANY, VMADDR_CID_HOST};
 
 #[derive(Parser)]
 struct ServerArguments {
@@ -36,7 +35,7 @@ impl From<common::Error> for Error {
 }
 
 impl From<FromHexError> for Error {
-    fn from(err: FromHexError) -> Self {
+    fn from(_: FromHexError) -> Self {
         Error::Key("The key should be hex-encoded".to_string())
     }
 }
@@ -78,9 +77,7 @@ fn server(azero_key: String) -> Result<(), Error> {
     let listener = VsockListener::bind_with_cid_port(VMADDR_CID_ANY, 1234)?;
 
     for client in listener.incoming() {
-        let client = client?;
-        println!("Receive connection from: {:?}", client.peer_addr());
-
+        let client: Client = client?.into();
         let result = handle_client(client, &azero_key);
         println!("Client disconnected: {:?}", result);
     }
@@ -88,23 +85,21 @@ fn server(azero_key: String) -> Result<(), Error> {
     Ok(())
 }
 
-fn handle_client(client: VsockStream, azero_key: &Keypair) -> Result<(), Error> {
-    let mut de = serde_json::Deserializer::from_reader(&client);
-
+fn handle_client(client: Client, azero_key: &Keypair) -> Result<(), Error> {
     loop {
-        let command = Command::deserialize(&mut de)?;
+        let command = client.recv()?;
         println!("Received command: {:?}", command);
 
         match command {
             Command::Ping => {
-                serde_json::to_writer(&client, &Response::Pong)?;
+                client.send(&Response::Pong)?;
             }
             Command::Sign { payload } => {
                 let context = signing_context("MOST signer".as_bytes());
                 let signature = azero_key.sign(context.bytes(&payload));
                 let signature = signature.to_bytes();
 
-                serde_json::to_writer(&client, &Response::Signed { payload, signature })?;
+                client.send(&Response::Signed { payload, signature })?;
             }
         }
     }
