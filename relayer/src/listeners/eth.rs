@@ -204,7 +204,7 @@ pub async fn get_next_finalized_block_number_eth(
                 Some(block) => {
                     let best_finalized_block_number = block
                         .number
-                        .expect("Finalized block should have a number.")
+                        .expect("Finalized block has a number.")
                         .as_u32();
                     if best_finalized_block_number >= not_older_than {
                         return best_finalized_block_number;

@@ -17,7 +17,7 @@ use redis::{aio::Connection as RedisConnection, RedisError};
 use subxt::{events::Events, utils::H256};
 use thiserror::Error;
 use tokio::{
-    sync::{Mutex, OwnedSemaphorePermit, Semaphore, AcquireError},
+    sync::{AcquireError, Mutex, OwnedSemaphorePermit, Semaphore},
     task::JoinSet,
     time::{sleep, Duration},
 };
@@ -377,7 +377,7 @@ async fn handle_processed_block(
     // We can update the last processed block number in Redis.
     let earliest_still_pending = pending_blocks
         .first()
-        .expect("There should always be a pending block in the set");
+        .expect("There always is a pending block in the set");
 
     // Note: `earliest_still_pending` will never be 0
     write_last_processed_block(
@@ -428,7 +428,7 @@ async fn get_next_finalized_block_number_azero(
             Ok(hash) => match azero_connection.get_block_number(hash).await {
                 Ok(number_opt) => {
                     let best_finalized_block_number =
-                        number_opt.expect("Finalized block should have a number.");
+                        number_opt.expect("Finalized block has a number.");
                     if best_finalized_block_number >= not_older_than {
                         return best_finalized_block_number;
                     }
