@@ -1,11 +1,10 @@
 use std::{env, str::FromStr};
 
 use aleph_client::{
-    ConnectionApi,
     keypair_from_string,
-    pallets::contract::ContractRpc,
     sp_core::{blake2_256, ByteArray},
     sp_runtime::AccountId32,
+    ConnectionApi,
 };
 use anyhow;
 use clap::Parser;
@@ -95,7 +94,6 @@ async fn main() -> anyhow::Result<()> {
         azero::contract_addresses(&config.azero_contract_addresses_path)?;
     let weth_azero_account_id = AccountId32::from_str(&azero_contract_addresses.weth)
         .map_err(|e| anyhow::anyhow!("Cannot parse account id from string: {:?}", e))?;
-    let weth_azero_address_bytes: [u8; 32] = weth_azero_account_id.clone().into();
 
     let azero_account_keypair = keypair_from_string("//Alice");
     let azero_account_address_bytes: [u8; 32] =
@@ -115,7 +113,6 @@ async fn main() -> anyhow::Result<()> {
     info!("'sendRequest' tx receipt: {:?}", send_request_receipt);
 
     let azero_connection = azero::connection(&config.azero_node_ws).await;
-    //let azero_client = azero_connection.as_client().rpc();
 
     let mut call_data = vec![];
     call_data.append(&mut (&blake2_256("balance_of".as_bytes())[0..4]).to_vec());
@@ -130,8 +127,9 @@ async fn main() -> anyhow::Result<()> {
         call_data
     ];
 
-    //let res = azero_client.request("contracts_call", rpc_params).await?;
-    let res = azero_connection.rpc_call("contracts_call".to_string(), rpc_params).await?;
+    let res = azero_connection
+        .rpc_call("contracts_call".to_string(), rpc_params)
+        .await?;
     info!("res: {:?}", res);
 
     Ok(())

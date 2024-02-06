@@ -1,6 +1,6 @@
 use std::fs;
 
-use aleph_client::{Connection, KeyPair, SignedConnection};
+use aleph_client::Connection;
 use anyhow;
 use serde::{Deserialize, Serialize};
 
@@ -22,9 +22,4 @@ pub fn contract_addresses(
 
 pub async fn connection(url: &str) -> Connection {
     Connection::new(url).await
-}
-
-pub fn sign_connection(connection: &Connection, keypair: &KeyPair) -> SignedConnection {
-    let signer = KeyPair::new(keypair.signer().clone());
-    SignedConnection::from_connection(connection.clone(), signer)
 }
