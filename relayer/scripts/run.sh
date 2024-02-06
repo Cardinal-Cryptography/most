@@ -26,7 +26,7 @@ RELAYER_ID=${RELAYER_ID:-0}
 
 # --- RUN
 
-cargo run -- --rust-log=info \
+cargo run --bin relayer -- --rust-log=info \
   --name "guardian_${RELAYER_ID}" \
   --azero-contract-address=$(get_address $AZERO_ADDRESSES_FILE most) \
   --eth-contract-address=$(get_address $ETH_ADDRESSES_FILE most) \

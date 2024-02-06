@@ -1,10 +1,8 @@
-use schnorrkel::SIGNATURE_LENGTH;
+use aleph_client::AlephConfig;
 use serde::{Deserialize, Serialize};
-use serde_big_array::BigArray;
 use serde_json::Deserializer;
+use subxt::{ext::sp_runtime::MultiSignature, tx::Signer};
 use vsock::VsockStream;
-
-pub type SerializedSignature = [u8; SIGNATURE_LENGTH];
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -12,6 +10,8 @@ pub enum Error {
     IO(std::io::Error),
     #[error("Serde error: {0}")]
     Serde(serde_json::Error),
+    #[error("Invalid response from server")]
+    InvalidResponse,
 }
 
 impl From<std::io::Error> for Error {
@@ -37,9 +37,13 @@ pub enum Response {
     Pong,
     Signed {
         payload: Vec<u8>,
-        #[serde(with = "BigArray")]
-        signature: SerializedSignature,
+        signature: MultiSignature,
     },
+}
+
+pub struct OnceOffSigner {
+    payload: Vec<u8>,
+    signature: MultiSignature,
 }
 
 pub struct Client {
@@ -69,6 +73,39 @@ impl Client {
         let res = T::deserialize(&mut de)?;
 
         Ok(res)
+    }
+
+    pub fn prepare_signer(&self, payload: &[u8]) -> Result<OnceOffSigner, Error> {
+        self.send(&Command::Sign {
+            payload: payload.to_vec(),
+        })?;
+        let signed = self.recv::<Response>()?;
+
+        match signed {
+            Response::Signed {
+                payload: return_payload,
+                signature,
+            } if return_payload == payload => Ok(OnceOffSigner {
+                payload: return_payload,
+                signature,
+            }),
+            _ => Err(Error::InvalidResponse),
+        }
+    }
+}
+
+impl Signer<AlephConfig> for OnceOffSigner {
+    fn account_id(&self) -> <AlephConfig as subxt::Config>::AccountId {
+        todo!()
+    }
+
+    fn address(&self) -> <AlephConfig as subxt::Config>::Address {
+        todo!()
+    }
+
+    fn sign(&self, signer_payload: &[u8]) -> <AlephConfig as subxt::Config>::Signature {
+        assert!(signer_payload == self.payload);
+        self.signature.clone()
     }
 }
 
