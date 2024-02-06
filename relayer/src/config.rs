@@ -13,7 +13,7 @@ pub struct Config {
     pub override_eth_cache: bool,
 
     #[arg(long, default_value = "0")]
-    pub committee_id: u32,
+    pub relayers_committee_id: u128,
 
     #[arg(long)]
     pub azero_contract_address: String,

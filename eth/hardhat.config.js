@@ -56,7 +56,6 @@ module.exports = {
           "0xd7a898720ab24ae154d67f51F2F75341D2A3719f",
         ],
         governanceThreshold: 2,
-        deployer: "0xEe88da44b4901d7F86970c52dC5139Af80C83edD",
       },
     },
   },

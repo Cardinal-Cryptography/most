@@ -136,7 +136,7 @@ deploy-azero: compile-azero
 
 .PHONY: deploy
 deploy: # Deploy all contracts
-deploy: deploy-azero deploy-eth
+deploy: deploy-eth deploy-azero setup-eth
 
 .PHONY: watch-relayer
 watch-relayer:
