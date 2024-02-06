@@ -41,6 +41,11 @@ devnet-azero: # Run azero devnet
 devnet-azero: bootstrap-azero
 	docker compose -f ./devnet-azero/devnet-azero-compose.yml up -d
 
+.PHONY: devnet-azero-logs
+devnet-azero-logs: # show azero devnet node logs
+devnet-azero-logs:
+	docker container logs aleph_bridgenode --follow
+
 .PHONY: devnet-eth
 devnet-eth: # Run eth devnet
 devnet-eth:
@@ -69,7 +74,7 @@ eth-deps:
 
 .PHONY: watch-eth
 watch-eth: # watcher on the eth contracts
-watch-eth:
+watch-eth: eth-deps
 	cd eth && npm run watch
 
 .PHONY: compile-eth
@@ -116,7 +121,7 @@ azero-deps:
 
 .PHONY: watch-azero
 watch-azero: # watch azero contracts and generate artifacts
-watch-azero:
+watch-azero: azero-deps
 	cd azero && npm run watch
 
 .PHONY: compile-azero

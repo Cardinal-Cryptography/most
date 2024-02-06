@@ -7,6 +7,7 @@ import Governance from "../types/contracts/governance";
 import Most from "../types/contracts/most";
 import Token from "../types/contracts/token";
 import OracleConstructors from "../types/constructors/oracle";
+import AdvisoryConstructors from "../types/constructors/advisory";
 import {
   uploadCode,
   Addresses,
@@ -76,10 +77,26 @@ async function main(): Promise<void> {
   const oracleCodeHash = await uploadCode(api, deployer, "oracle.contract");
   console.log("oracle code hash:", oracleCodeHash);
 
+  const advisoryCodeHash = await uploadCode(api, deployer, "advisory.contract");
+  console.log("advisory code hash:", advisoryCodeHash);
+
   const governanceConstructors = new GovernanceConstructors(api, deployer);
   const mostConstructors = new MostConstructors(api, deployer);
   const tokenConstructors = new TokenConstructors(api, deployer);
   const oracleConstructors = new OracleConstructors(api, deployer);
+  const advisoryConstructors = new AdvisoryConstructors(api, deployer);
+
+  let estimatedGasAdvisory = await estimateContractInit(
+    api,
+    deployer,
+    "advisory.contract",
+    [authority],
+  );
+
+  const { address: advisoryAddress } = await advisoryConstructors.new(
+    authority, // owner
+    { gasLimit: estimatedGasAdvisory },
+  );
 
   let estimatedGasOracle = await estimateContractInit(
     api,
@@ -186,6 +203,7 @@ async function main(): Promise<void> {
     most: mostAddress,
     weth: wethAddress,
     oracle: oracleAddress,
+    advisory: advisoryAddress,
   };
   console.log("addresses:", addresses);
 
