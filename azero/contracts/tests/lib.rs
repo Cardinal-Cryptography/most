@@ -32,10 +32,10 @@ mod e2e {
         most::{CrosschainTransferRequest, RequestProcessed, RequestSigned},
         MostError, MostRef,
     };
+    use oracle::oracle::OracleRef;
     use psp22::{PSP22Error, PSP22};
     use scale::{Decode, Encode};
     use shared::{keccak256, Keccak256HashOutput};
-    use test_oracle::TestOracleRef;
     use wrapped_token::TokenRef;
 
     use crate::events::{
@@ -951,9 +951,9 @@ mod e2e {
         caller: &Keypair,
         price: u128,
     ) -> AccountId {
-        let oracle_constructor = TestOracleRef::new(price, false);
+        let oracle_constructor = OracleRef::new(account_id(AccountKeyring::Alice), price);
         client
-            .instantiate("test_oracle", caller, oracle_constructor, 0, None)
+            .instantiate("oracle", caller, oracle_constructor, 0, None)
             .await
             .expect("Oracle instantiation failed")
             .account_id

@@ -56,6 +56,14 @@ if [[ -n "${DEV_MODE}" ]]; then
   ARGS+=(--dev)
 fi
 
+if [[ -n "${OVERRIDE_AZERO_CACHE}" ]]; then
+  ARGS+=(--override-azero-cache)
+fi
+
+if [[ -n "${OVERRIDE_ETH_CACHE}" ]]; then
+  ARGS+=(--override-eth-cache)
+fi
+
 if [[ -n "${AZERO_START_BLOCK}" ]]; then
   ARGS+=(--default-sync-from-block-azero=${AZERO_START_BLOCK})
 fi

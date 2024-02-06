@@ -107,6 +107,7 @@ impl AlephZeroListener {
             default_sync_from_block_azero,
             name,
             sync_step,
+            override_azero_cache,
             ..
         } = &*config;
 
@@ -120,13 +121,17 @@ impl AlephZeroListener {
             config.azero_ref_time_limit,
             config.azero_proof_size_limit,
         )?;
-        let mut first_unprocessed_block_number = read_first_unprocessed_block_number(
-            name.clone(),
-            ALEPH_LAST_BLOCK_KEY.to_string(),
-            redis_connection.clone(),
-            *default_sync_from_block_azero,
-        )
-        .await;
+        let mut first_unprocessed_block_number = if *override_azero_cache {
+            *default_sync_from_block_azero
+        } else {
+            read_first_unprocessed_block_number(
+                name.clone(),
+                ALEPH_LAST_BLOCK_KEY.to_string(),
+                redis_connection.clone(),
+                *default_sync_from_block_azero,
+            )
+            .await
+        };
 
         // Add the first block number to the set of pending blocks.
         add_to_pending(first_unprocessed_block_number, pending_blocks.clone()).await;
@@ -281,7 +286,7 @@ async fn handle_event(
     _permit: OwnedSemaphorePermit,
 ) -> Result<(), AzeroListenerError> {
     let Config {
-        committee_id,
+        relayers_committee_id,
         eth_contract_address,
         eth_tx_min_confirmations,
         eth_tx_submission_retries,
@@ -293,11 +298,20 @@ async fn handle_event(
 
             // decode event data
             let CrosschainTransferRequestData {
+                committee_id,
                 dest_token_address,
                 amount,
                 dest_receiver_address,
                 request_nonce,
             } = get_request_event_data(&data)?;
+
+            if committee_id != *relayers_committee_id {
+                warn!(
+                    "Ignoring event from committee {}, expected {}",
+                    committee_id, relayers_committee_id
+                );
+                return Ok(());
+            }
 
             info!(
                 "Decoded event data: [dest_token_address: 0x{}, amount: {amount}, dest_receiver_address: 0x{}, request_nonce: {request_nonce}]", 
@@ -309,7 +323,7 @@ async fn handle_event(
             // (it does not pad uint to 32 bytes, but uses the actual number of bytes required to store the value)
             // so we use `abi::encode` instead (it only differs for signed and dynamic size types, which we don't use here)
             let bytes = abi::encode(&[
-                Token::Uint((*committee_id).into()),
+                Token::Uint(committee_id.into()),
                 Token::FixedBytes(dest_token_address.to_vec()),
                 Token::Uint(amount.into()),
                 Token::FixedBytes(dest_receiver_address.to_vec()),
@@ -328,7 +342,7 @@ async fn handle_event(
             // forward transfer & vote
             let call: ContractCall<SignedEthConnection, ()> = contract.receive_request(
                 request_hash,
-                (*committee_id).into(),
+                committee_id.into(),
                 dest_token_address,
                 amount.into(),
                 dest_receiver_address,
