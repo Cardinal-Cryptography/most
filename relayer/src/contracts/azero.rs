@@ -10,7 +10,7 @@ use aleph_client::{
         ContractInstance,
     },
     contract_transcode::{ContractMessageTranscoder, Value, Value::Seq},
-    pallets::contract::{ContractRpc, ContractsUserApi},
+    pallets::contract::ContractsUserApi,
     sp_weights::weight_v2::Weight,
     AccountId, AlephConfig, Connection, SignedConnection, TxInfo, TxStatus,
 };
@@ -207,6 +207,20 @@ fn decode_uint_field(
     field: &str,
 ) -> Result<u128, AzeroContractError> {
     if let Some(Value::UInt(x)) = data.get(field) {
+        Ok(*x)
+    } else {
+        Err(AzeroContractError::MissingOrInvalidField(format!(
+            "Data field {:?} couldn't be found or has incorrect format",
+            field
+        )))
+    }
+}
+
+pub fn decode_bool_field(
+    data: &HashMap<String, Value>,
+    field: &str,
+) -> Result<bool, AzeroContractError> {
+    if let Some(Value::Bool(x)) = data.get(field) {
         Ok(*x)
     } else {
         Err(AzeroContractError::MissingOrInvalidField(format!(

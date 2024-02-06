@@ -1,9 +1,6 @@
 use std::{
     env, process,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+    sync::{atomic::AtomicBool, Arc},
 };
 
 use clap::Parser;
