@@ -57,14 +57,18 @@ fn main() -> Result<()> {
     let rt = Runtime::new()?;
 
     rt.block_on(async {
-        // let (sender, emergency) = bounded::<bool>(1);
         let emergency = Arc::new(AtomicBool::new(false));
 
         let mut tasks = Vec::with_capacity(4);
 
         let client = RedisClient::open(config.redis_node.clone())
             .expect("Cannot connect to the redis cluster instance");
-        let redis_connection = Arc::new(Mutex::new(client.get_async_connection().await.unwrap()));
+        let redis_connection = Arc::new(Mutex::new(
+            client
+                .get_async_connection()
+                .await
+                .expect("Cannot make redis connection"),
+        ));
 
         let azero_keypair = if config.dev {
             let azero_seed = "//".to_owned() + &config.dev_account_index.to_string();
@@ -81,11 +85,14 @@ fn main() -> Result<()> {
         let config_rc1 = Arc::clone(&config);
         let emergency_rc1 = Arc::clone(&emergency);
 
-        tasks.push(tokio::spawn(async {
-            AdvisoryListener::run(config_rc1, azero_connection, emergency_rc1)
-                .await
-                .expect("Advisory listener task has failed")
-        }));
+        // run task only if address passed on CLI
+        if config.advisory_contract_address.is_some() {
+            tasks.push(tokio::spawn(async {
+                AdvisoryListener::run(config_rc1, azero_connection, emergency_rc1)
+                    .await
+                    .expect("Advisory listener task has failed")
+            }));
+        }
 
         let wallet = if config.dev {
             // If no keystore path is provided, we use the default development mnemonic

@@ -109,8 +109,8 @@ impl AlephZeroListener {
         emergency: Arc<AtomicBool>,
     ) -> Result<(), AzeroListenerError> {
         let Config {
-            most_contract_metadata: azero_contract_metadata,
-            most_contract_address: azero_contract_address,
+            azero_contract_metadata,
+            azero_contract_address,
             azero_max_event_handler_tasks,
             default_sync_from_block_azero,
             name,

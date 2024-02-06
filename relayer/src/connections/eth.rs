@@ -1,5 +1,5 @@
 use ethers::{
-    prelude::SignerMiddleware,
+    prelude::{signer::SignerMiddlewareError, SignerMiddleware},
     providers::{Http, Provider, ProviderError, ProviderExt},
     signers::{LocalWallet, WalletError},
 };
@@ -17,6 +17,9 @@ pub enum EthConnectionError {
 
     #[error("wallet error")]
     Wallet(#[from] WalletError),
+
+    #[error("signer error")]
+    Signer(#[from] SignerMiddlewareError<EthConnection, LocalWallet>),
 }
 
 pub async fn connect(url: &str) -> EthConnection {
@@ -27,9 +30,5 @@ pub async fn sign(
     connection: EthConnection,
     wallet: LocalWallet,
 ) -> Result<SignedEthConnection, EthConnectionError> {
-    Ok(
-        SignerMiddleware::new_with_provider_chain(connection, wallet)
-            .await
-            .unwrap(),
-    )
+    Ok(SignerMiddleware::new_with_provider_chain(connection, wallet).await?)
 }

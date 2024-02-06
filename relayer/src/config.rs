@@ -22,10 +22,10 @@ pub struct Config {
     pub advisory_contract_metadata: String,
 
     #[arg(long)]
-    pub most_contract_address: String,
+    pub azero_contract_address: String,
 
     #[arg(long, default_value = "../azero/artifacts/most.json")]
-    pub most_contract_metadata: String,
+    pub azero_contract_metadata: String,
 
     #[arg(long, default_value = "ws://127.0.0.1:9944")]
     pub azero_node_wss_url: String,

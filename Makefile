@@ -51,6 +51,11 @@ devnet-eth: # Run eth devnet
 devnet-eth:
 	docker compose -f ./devnet-eth/devnet-eth-compose.yml up -d
 
+.PHONY: devnet-eth-logs
+devnet-eth-logs: # show ethereum devnet node logs
+devnet-eth-logs:
+	docker container logs geth --follow
+
 .PHONY: redis-instance
 redis-instance: # Run a redis instance
 redis-instance:
@@ -142,7 +147,7 @@ deploy: deploy-eth deploy-azero setup-eth
 watch-relayer:
 	cd relayer && cargo watch -s 'cargo clippy' -c
 
-run-relayers: # Run the relayer
+run-relayers: # Run three relayers
 run-relayers: build-docker-relayer
 	docker compose -f ./relayer/scripts/devnet-relayers-compose.yml up -d
 
