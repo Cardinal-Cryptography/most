@@ -97,15 +97,6 @@ async fn main() -> anyhow::Result<()> {
         .map_err(|e| anyhow::anyhow!("Cannot parse account id from string: {:?}", e))?;
     let weth_azero_address_bytes: [u8; 32] = weth_azero_account_id.clone().into();
 
-    let add_pair_args = (weth_eth_address_bytes, weth_azero_address_bytes);
-    let add_pair_call = most.method::<_, H256>("addPair", add_pair_args)?;
-    let add_pair_pending_tx = add_pair_call.send().await?;
-    let add_pair_receipt = add_pair_pending_tx
-        .confirmations(1)
-        .await?
-        .ok_or(anyhow::anyhow!("'addPair' tx receipt not available."))?;
-    info!("'addPair' receipt: {:?}", add_pair_receipt);
-
     let azero_account_keypair = keypair_from_string("//Alice");
     let azero_account_address_bytes: [u8; 32] =
         (*azero_account_keypair.account_id()).clone().into();

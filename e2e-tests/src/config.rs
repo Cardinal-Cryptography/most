@@ -23,7 +23,7 @@ pub struct Config {
     pub eth_contract_metadata_paths: EthContractMetadataPaths,
 
     #[arg(long, default_value = "200000")]
-    pub eth_gas_limit: u32,
+    pub eth_gas_limit: u128,
 
     #[command(flatten)]
     pub test_args: TestArgs,
@@ -39,15 +39,16 @@ pub struct EthContractMetadataPaths {
         default_value = "../eth/artifacts/contracts/Governance.sol/Governance.json"
     )]
     pub governance: String,
+
     #[arg(
         long,
         default_value = "../eth/artifacts/contracts/Migrations.sol/Migrations.json"
     )]
     pub migrations: String,
+
     #[arg(long, default_value = "../eth/artifacts/contracts/Most.sol/Most.json")]
     pub most: String,
-    //#[arg(long, default_value = "../eth/artifacts/contracts/USDT.sol/USDT.json")]
-    //pub usdt: String,
+
     #[arg(
         long,
         default_value = "../eth/artifacts/contracts/WETH9.sol/WETH9.json"
