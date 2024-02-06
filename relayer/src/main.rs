@@ -103,7 +103,7 @@ async fn main() -> Result<()> {
     tasks.spawn(async move {
         EthListener::run(config, azero_connection, eth_connection, redis_connection)
             .await
-            .map_err(|err| ListenerError::from(err))
+            .map_err(ListenerError::from)
     });
 
     info!("Starting AlephZero listener");
@@ -116,7 +116,7 @@ async fn main() -> Result<()> {
             redis_connection_rc2,
         )
         .await
-        .map_err(|err| ListenerError::from(err))
+        .map_err(ListenerError::from)
     });
 
     while let Some(result) = tasks.join_next().await {
