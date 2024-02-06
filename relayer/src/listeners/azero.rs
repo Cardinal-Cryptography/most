@@ -19,7 +19,7 @@ use ethers::{
     providers::{Middleware, ProviderError},
     utils::keccak256,
 };
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 use redis::{aio::Connection as RedisConnection, RedisError};
 use subxt::{events::Events, utils::H256};
 use thiserror::Error;
@@ -147,7 +147,11 @@ impl AlephZeroListener {
         // Main AlephZero event loop
         loop {
             match emergency.load(Ordering::Relaxed) {
-                true => continue,
+                true => {
+                    trace!("Advisory is in an emergency state");
+                    sleep(Duration::from_millis(999)).await;
+                    continue;
+                }
                 false => {
                     // Query for the next unknown finalized block number, if not present we wait for it.
                     let mut to_block = get_next_finalized_block_number_azero(

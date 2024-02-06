@@ -7,7 +7,7 @@ services:
       - DEV_MODE=true
     image: most-relayer
     network_mode: host
-    restart: on-failure
+    restart: on-failure:3
   Relayer2:
     container_name: most-relayer-2
     environment:
@@ -15,7 +15,7 @@ services:
       - DEV_MODE=true
     image: most-relayer
     network_mode: host
-    restart: on-failure
+    restart: on-failure:3
   Relayer3:
     container_name: most-relayer-3
     environment:
@@ -23,5 +23,5 @@ services:
       - DEV_MODE=true
     image: most-relayer
     network_mode: host
-    restart: on-failure
+    restart: on-failure:3
 version: '3.9'

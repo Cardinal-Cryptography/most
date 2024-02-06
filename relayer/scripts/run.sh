@@ -18,7 +18,7 @@ function get_address {
 
 # --- ARGS
 
-ETH_NETWORK=${ETH_NETWORK:-"http://127.0.0.1:8546"}
+ETH_NETWORK=${ETH_NETWORK:-"http://127.0.0.1:8545"}
 AZERO_NETWORK=${AZERO_NETWORK:-"ws://127.0.0.1:9944"}
 
 KEYSTORE_PATH=${KEYSTORE_PATH:-""}
@@ -34,4 +34,6 @@ cargo run -- --rust-log=info \
   --eth-node-http-url=${ETH_NETWORK} \
   --azero-node-wss-url=${AZERO_NETWORK} \
   --dev-account-index=${RELAYER_ID} \
+  --default-sync-from-block-eth=0 \
+  --default-sync-from-block-azero=0 \
   --dev

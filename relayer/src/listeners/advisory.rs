@@ -45,10 +45,9 @@ impl AdvisoryListener {
         )?;
 
         let is_emergency = advisory_instance.is_emergency(&azero_connection).await?;
-        debug!("Advisory emergency state: {is_emergency}");
+        info!("Advisory emergency state: {is_emergency}");
         emergency.store(is_emergency, Ordering::Relaxed);
 
-        // let connection = azero_connection.as_connection();
         let mut subscription = azero_connection
             .as_client()
             .blocks()
@@ -127,7 +126,7 @@ async fn handle_event(
         let decoded_event @ EmergencyChangedEvent { new_state, .. } =
             read_emergency_changed_event_data(&event.data)?;
 
-        debug!("Decoded Advisory contract event: {decoded_event:?}");
+        info!("Decoded Advisory contract event: {decoded_event:?}");
 
         emergency.store(new_state, Ordering::Relaxed);
     }

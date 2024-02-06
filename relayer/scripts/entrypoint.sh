@@ -26,9 +26,12 @@ KEYSTORE_PATH=${KEYSTORE_PATH:-""}
 RELAYER_ID=${RELAYER_ID:-0}
 
 AZERO_MOST_METADATA=${AZERO_MOST_METADATA:-"/usr/local/most.json"}
+ADVISORY_METADATA=${ADVISORY_METADATA:-"/usr/local/advisory.json"}
 
 ARGS=(
   --name "guardian_${RELAYER_ID}"
+  --advisory-contract-address=$(get_address $AZERO_ADDRESSES_FILE advisory)
+  --advisory-contract-metadata=${ADVISORY_METADATA}
   --azero-contract-address=$(get_address $AZERO_ADDRESSES_FILE most)
   --eth-contract-address=$(get_address $ETH_ADDRESSES_FILE most)
   --eth-node-http-url=${ETH_NETWORK}

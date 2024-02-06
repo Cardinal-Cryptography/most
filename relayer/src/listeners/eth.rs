@@ -96,7 +96,11 @@ impl EthListener {
         // Main Ethereum event loop.
         loop {
             match emergency.load(Ordering::Relaxed) {
-                true => continue,
+                true => {
+                    trace!("Advisory is in an emergency state");
+                    sleep(Duration::from_millis(999)).await;
+                    continue;
+                }
                 false => {
                     // Query for the next unknowns finalized block number, if not present we wait for it.
                     let next_finalized_block_number = get_next_finalized_block_number_eth(
