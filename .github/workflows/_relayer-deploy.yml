@@ -37,7 +37,7 @@ jobs:
           fi
 
           # TODO: Remove in further steps
-          if [[ '${{ inputs.environments }}' != 'devnet' ]]; then
+          if [[ '${{ inputs.environment }}' != 'devnet' ]]; then
             echo 'Only devnet is now deployable'
             exit 1
           fi
