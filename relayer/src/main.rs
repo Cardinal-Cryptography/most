@@ -3,6 +3,7 @@ use std::{env, process, sync::Arc};
 use clap::Parser;
 use config::Config;
 use connections::EthConnectionError;
+use crossbeam_channel::bounded;
 use ethers::signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, Signer, WalletError};
 use eyre::Result;
 use log::{debug, error, info};
@@ -12,7 +13,9 @@ use tokio::{runtime::Runtime, sync::Mutex};
 
 use crate::{
     connections::{azero, eth},
-    listeners::{AlephZeroListener, AzeroListenerError, EthListener, EthListenerError},
+    listeners::{
+        AdvisoryListener, AlephZeroListener, AzeroListenerError, EthListener, EthListenerError,
+    },
 };
 
 mod config;
@@ -52,6 +55,8 @@ fn main() -> Result<()> {
     let rt = Runtime::new()?;
 
     rt.block_on(async {
+        let (sender, receiver) = bounded::<bool>(1);
+
         let mut tasks = Vec::with_capacity(4);
 
         let client = RedisClient::open(config.redis_node.clone())
@@ -65,12 +70,18 @@ fn main() -> Result<()> {
             unimplemented!("Only dev mode is supported for now");
         };
 
-        let azero_connection = Arc::new(azero::sign(
-            &azero::init(&config.azero_node_wss_url).await,
-            &azero_keypair,
-        ));
+        let azero_connection = Arc::new(azero::init(&config.azero_node_wss_url).await);
+        let azero_signed_connection = Arc::new(azero::sign(&azero_connection, &azero_keypair));
 
         debug!("Established connection to Aleph Zero node");
+
+        let config_rc1 = Arc::clone(&config);
+
+        tasks.push(tokio::spawn(async {
+            AdvisoryListener::run(config_rc1, azero_connection, sender)
+                .await
+                .expect("Advisory listener task has failed")
+        }));
 
         let wallet = if config.dev {
             // If no keystore path is provided, we use the default development mnemonic
@@ -100,8 +111,8 @@ fn main() -> Result<()> {
 
         debug!("Established connection to Ethereum node");
 
-        let config_rc1 = Arc::clone(&config);
-        let azero_connection_rc1 = Arc::clone(&azero_connection);
+        let config_rc2 = Arc::clone(&config);
+        let azero_connection_rc1 = Arc::clone(&azero_signed_connection);
         let eth_connection_rc1 = Arc::clone(&eth_connection);
         let redis_connection_rc1 = Arc::clone(&redis_connection);
 
@@ -109,7 +120,7 @@ fn main() -> Result<()> {
 
         tasks.push(tokio::spawn(async {
             EthListener::run(
-                config_rc1,
+                config_rc2,
                 azero_connection_rc1,
                 eth_connection_rc1,
                 redis_connection_rc1,
@@ -118,8 +129,8 @@ fn main() -> Result<()> {
             .expect("Ethereum listener task has failed")
         }));
 
-        let config_rc2 = Arc::clone(&config);
-        let azero_connection_rc2 = Arc::clone(&azero_connection);
+        let config_rc3 = Arc::clone(&config);
+        let azero_connection_rc2 = Arc::clone(&azero_signed_connection);
         let eth_connection_rc2 = Arc::clone(&eth_connection);
         let redis_connection_rc2 = Arc::clone(&redis_connection);
 
@@ -127,7 +138,7 @@ fn main() -> Result<()> {
 
         tasks.push(tokio::spawn(async {
             AlephZeroListener::run(
-                config_rc2,
+                config_rc3,
                 azero_connection_rc2,
                 eth_connection_rc2,
                 redis_connection_rc2,

@@ -9,6 +9,7 @@ aleph_client = { git = "https://github.com/Cardinal-Cryptography/aleph-node", re
 anyhow = "1.0.75"
 clap = { version = "4.3.4", features = ["derive"] }
 codec = { package = 'parity-scale-codec', version = "3.0.0", features = ['derive'] }
+crossbeam-channel = "0.5"
 env_logger = "0.10.0"
 ethers = { version = "2.0.9", features = ["abigen", "rustls", "ws", "ethers-solc"] }
 eyre = "0.6.8"

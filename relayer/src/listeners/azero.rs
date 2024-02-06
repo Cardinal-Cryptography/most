@@ -101,8 +101,8 @@ impl AlephZeroListener {
         redis_connection: Arc<Mutex<RedisConnection>>,
     ) -> Result<(), AzeroListenerError> {
         let Config {
-            azero_contract_metadata,
-            azero_contract_address,
+            most_contract_metadata: azero_contract_metadata,
+            most_contract_address: azero_contract_address,
             azero_max_event_handler_tasks,
             default_sync_from_block_azero,
             name,

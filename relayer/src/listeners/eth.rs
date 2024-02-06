@@ -156,8 +156,8 @@ async fn handle_event(
     {
         let Config {
             relayers_committee_id,
-            azero_contract_address,
-            azero_contract_metadata,
+            most_contract_address: azero_contract_address,
+            most_contract_metadata: azero_contract_metadata,
             ..
         } = config;
 

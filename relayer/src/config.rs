@@ -16,10 +16,16 @@ pub struct Config {
     pub relayers_committee_id: u128,
 
     #[arg(long)]
-    pub azero_contract_address: String,
+    pub advisory_contract_address: Option<String>,
+
+    #[arg(long, default_value = "../azero/artifacts/advisory.json")]
+    pub advisory_contract_metadata: String,
+
+    #[arg(long)]
+    pub most_contract_address: String,
 
     #[arg(long, default_value = "../azero/artifacts/most.json")]
-    pub azero_contract_metadata: String,
+    pub most_contract_metadata: String,
 
     #[arg(long, default_value = "ws://127.0.0.1:9944")]
     pub azero_node_wss_url: String,
