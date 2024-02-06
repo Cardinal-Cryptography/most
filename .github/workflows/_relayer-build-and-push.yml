@@ -83,6 +83,9 @@ jobs:
           aws s3 cp s3://alephzero-devnet-contracts-test/${s3_art_path}/azero_most/most.json azero/artifacts/most.json
         # yamllint enable rule:line-length
 
+      - name: Install Rust toolchain
+        uses: Cardinal-Cryptography/github-actions/install-rust-toolchain@v6
+
       - name: Build relayer
         id: build
         run: |
