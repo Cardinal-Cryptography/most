@@ -39,15 +39,16 @@ pub struct EthContractMetadataPaths {
         default_value = "../eth/artifacts/contracts/Governance.sol/Governance.json"
     )]
     pub governance: String,
+    
     #[arg(
         long,
         default_value = "../eth/artifacts/contracts/Migrations.sol/Migrations.json"
     )]
     pub migrations: String,
+
     #[arg(long, default_value = "../eth/artifacts/contracts/Most.sol/Most.json")]
     pub most: String,
-    //#[arg(long, default_value = "../eth/artifacts/contracts/USDT.sol/USDT.json")]
-    //pub usdt: String,
+
     #[arg(
         long,
         default_value = "../eth/artifacts/contracts/WETH9.sol/WETH9.json"

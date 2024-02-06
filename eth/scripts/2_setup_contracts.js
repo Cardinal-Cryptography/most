@@ -1,6 +1,6 @@
 const { ethers, artifacts } = require("hardhat");
-const { Keyring } = require('@polkadot/keyring');
-const { u8aToHex } = require('@polkadot/util');
+const { Keyring } = require("@polkadot/keyring");
+const { u8aToHex } = require("@polkadot/util");
 
 const contracts = require("../addresses.json");
 const azeroContracts = require("../../azero/addresses.json");
@@ -17,15 +17,22 @@ async function main() {
   const most = await Most.at(contracts.most);
 
   // Add a pair
-  const wethAddressBytes = ethers.zeroPadValue(ethers.getBytes(contracts.weth9), 32);
-  const wethAddressBytesAzero = u8aToHex(new Keyring({ type: 'sr25519' }).decodeAddress(azeroContracts.weth));
-
-  console.log("Adding wETH token pair to Most:", contracts.weth9, "=>", azeroContracts.weth);
-
-  await most.addPair(
-    wethAddressBytes,
-    wethAddressBytesAzero,
+  const wethAddressBytes = ethers.zeroPadValue(
+    ethers.getBytes(contracts.weth9),
+    32,
   );
+  const wethAddressBytesAzero = u8aToHex(
+    new Keyring({ type: "sr25519" }).decodeAddress(azeroContracts.weth),
+  );
+
+  console.log(
+    "Adding wETH token pair to Most:",
+    contracts.weth9,
+    "=>",
+    azeroContracts.weth,
+  );
+
+  await most.addPair(wethAddressBytes, wethAddressBytesAzero);
 
   const Governance = artifacts.require("Governance");
   const governance = await Governance.at(contracts.governance);
