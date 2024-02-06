@@ -49,7 +49,7 @@ jobs:
           repository: Cardinal-Cryptography/${{ secrets.REPO_OPS_MOST_NAME }}
           token: ${{ secrets.CI_GH_TOKEN }}
           path: ${{ secrets.REPO_OPS_MOST_NAME }}
-          ref: A0-3238-add-relayer
+          ref: main
 
       - name: Init kustomize
         uses: imranismail/setup-kustomize@v2
