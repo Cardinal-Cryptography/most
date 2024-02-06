@@ -31,7 +31,7 @@ jobs:
             exit 1
           fi
 
-          if [[ ! '${{ inputs.image-tag }}' =~ ^[a-z0-9\-]+$ ]]; then
+          if [[ ! '${{ inputs.docker-tag }}' =~ ^[a-z0-9\-]+$ ]]; then
             echo 'Invalid image tag'
             exit 1
           fi
