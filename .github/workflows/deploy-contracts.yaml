@@ -59,7 +59,7 @@ jobs:
   upload-contract-artifacts:
     name: Upload contract artifacts to S3
     runs-on: self-hosted
-    needs: [deploy-azero, deploy-eth]
+    needs: [deploy-contracts]
     strategy:
       matrix:
         include:
