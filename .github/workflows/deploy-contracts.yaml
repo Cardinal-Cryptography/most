@@ -13,10 +13,10 @@ jobs:
   test-eth-contracts:
     uses: ./.github/workflows/test-eth-contracts.yml
 
-  deploy-eth:
-    name: Compile and deploy eth contracts
+  deploy-contracts:
+    name: Deploy and setup contracts
     runs-on: self-hosted
-    needs: [test-eth-contracts]
+    needs: [test-eth-contracts, test-azero-contracts]
 
     steps:
       - name: Checkout code
@@ -25,9 +25,17 @@ jobs:
       - name: Setup node
         uses: asdf-vm/actions/install@v2
 
-      - name: Deploy contracts
+      - name: Deploy eth contracts
         shell: bash
         run: make deploy-eth NETWORK=bridgenet
+
+      - name: Deploy and setup azero contracts
+        shell: bash
+        run: AZERO_ENV=bridgenet make deploy-azero-docker
+
+      - name: Setup eth contracts
+        shell: bash
+        run: make setup-eth NETWORK=bridgenet
 
       - uses: actions/upload-artifact@v4
         with:
@@ -37,22 +45,6 @@ jobs:
           path: |
             eth/artifacts
             eth/addresses.json
-
-  deploy-azero:
-    name: Compile and deploy azero contracts
-    runs-on: self-hosted
-    needs: [test-azero-contracts]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Setup node
-        uses: asdf-vm/actions/install@v2
-
-      - name: Compile and deploy contracts
-        shell: bash
-        run: AZERO_ENV=bridgenet make deploy-azero-docker
 
       - uses: actions/upload-artifact@v4
         with:
@@ -66,7 +58,7 @@ jobs:
   upload-contract-artifacts:
     name: Upload contract artifacts to S3
     runs-on: self-hosted
-    needs: [deploy-azero, deploy-eth]
+    needs: [deploy-contracts]
     strategy:
       matrix:
         include:
