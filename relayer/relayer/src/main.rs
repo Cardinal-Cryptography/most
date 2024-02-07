@@ -77,7 +77,7 @@ fn main() -> Result<()> {
                 keypair,
             )
         } else {
-            unimplemented!("Only dev mode is supported for now");
+            panic!("Use dev mode or connect to a signer");
         };
 
         let azero_ro_connection = Arc::new(azero::init(&config.azero_node_wss_url).await);

@@ -1,3 +1,5 @@
+use std::thread;
+
 use clap::Parser;
 use signer_client::{client, Client, Command, Response};
 use subxt::ext::sp_core::{crypto::SecretStringError, sr25519::Pair as KeyPair, Pair};
@@ -68,14 +70,20 @@ fn server(azero_key: String) -> Result<(), Error> {
 
     for client in listener.incoming() {
         let client: Client = client?.into();
-        let result = handle_client(client, &azero_key);
-        println!("Client disconnected: {:?}", result);
+        handle_client(client, azero_key.clone());
     }
 
     Ok(())
 }
 
-fn handle_client(client: Client, azero_key: &KeyPair) -> Result<(), Error> {
+fn handle_client(client: Client, azero_key: KeyPair) {
+    thread::spawn(move || {
+        let result = do_handle_client(client, &azero_key);
+        println!("Client disconnected: {:?}", result);
+    });
+}
+
+fn do_handle_client(client: Client, azero_key: &KeyPair) -> Result<(), Error> {
     loop {
         let command = client.recv()?;
         println!("Received command: {:?}", command);
