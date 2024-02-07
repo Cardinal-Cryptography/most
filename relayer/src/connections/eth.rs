@@ -12,7 +12,7 @@ pub type SignedEthConnection = SignerMiddleware<EthConnection, LocalWallet>;
 #[error(transparent)]
 #[non_exhaustive]
 pub enum EthConnectionError {
-    #[error("middleware error")]
+    #[error("signer error")]
     SignerMiddleware(#[from] SignerMiddlewareError<EthConnection, Wallet<SigningKey>>),
 }
 
