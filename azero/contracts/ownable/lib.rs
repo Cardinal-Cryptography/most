@@ -70,7 +70,6 @@ impl Data {
 
 }
 
-
 /// Implement this trait to enable two-step ownership trasfer process in your contract.
 /// 
 /// The process looks like this:
@@ -82,21 +81,28 @@ impl Data {
 #[ink::trait_definition]
 pub trait Ownable2Step {
 
+    /// Returns the address of the current owner.
     #[ink(message)]
     fn get_owner(&self) -> OwnableResult<AccountId>;
 
+    /// Returns the address of the pending owner.
     #[ink(message)]
     fn get_pending_owner(&self) -> OwnableResult<AccountId>;
 
+    /// Checks if the the `account` is the current owner.
     #[ink(message)]
     fn is_owner(&self, account: AccountId) -> OwnableResult<bool>;
 
+    /// Starts the ownership transfer of the contract to a new account. Replaces the pending transfer if there is one.
+    /// Can only be called by the current owner.
     #[ink(message)]
     fn transfer_ownership(&mut self, new_owner: AccountId) -> OwnableResult<()>;
 
+    /// The new owner accepts the ownership transfer.
     #[ink(message)]
     fn accept_ownership(&mut self) -> OwnableResult<()>;
 
+    /// Return error if called by any account other than the owner.
     #[ink(message)]
     fn ensure_owner(&self) -> OwnableResult<()>;
 }
