@@ -69,6 +69,7 @@ async fn main() -> Result<()> {
             cid,
             config.signer_port,
         )
+        .await
         .expect("Cannot connect to signer")
     } else if config.dev {
         let azero_seed = "//".to_owned() + &config.dev_account_index.to_string();

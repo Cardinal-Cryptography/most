@@ -57,7 +57,6 @@ impl From<VsockStream> for Client {
 impl Client {
     pub fn new(cid: u32, port: u32) -> Result<Self, Error> {
         let connection = VsockStream::connect_with_cid_port(cid, port)?;
-
         Ok(Self { connection })
     }
 

@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 use aleph_client::{
     sp_runtime::{MultiAddress, MultiSignature},
     AccountId, AlephConfig, AsConnection, Connection, KeyPair, Pair, RootConnection,
@@ -7,6 +9,7 @@ use anyhow::anyhow;
 use log::info;
 use signer_client::Client;
 use subxt::tx::TxPayload;
+use tokio::task::spawn_blocking;
 
 pub type AzeroWsConnection = Connection;
 type ParamsBuilder = subxt::config::polkadot::PolkadotExtrinsicParamsBuilder<AlephConfig>;
@@ -16,15 +19,31 @@ pub async fn init(url: &str) -> AzeroWsConnection {
 }
 
 struct AzeroSignerClient {
-    client: Client,
+    client: Arc<Mutex<Client>>,
     account_id: AccountId,
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("Join error: {0}")]
+    JoinError(#[from] tokio::task::JoinError),
+
+    #[error("Signer error: {0}")]
+    SignerError(#[from] signer_client::Error),
+}
+
 impl AzeroSignerClient {
-    fn new(cid: u32, port: u32) -> Result<Self, signer_client::Error> {
-        let client = Client::new(cid, port)?;
-        let account_id = client.account_id()?;
-        Ok(Self { client, account_id })
+    async fn new(cid: u32, port: u32) -> Result<Self, Error> {
+        let res = spawn_blocking(move || {
+            let client = Client::new(cid, port)?;
+            let account_id = client.account_id()?;
+            let client = Arc::new(Mutex::new(client));
+
+            Ok::<_, signer_client::Error>(Self { client, account_id })
+        })
+        .await??;
+
+        Ok(res)
     }
 }
 
@@ -41,12 +60,21 @@ impl AzeroSigner {
         }
     }
 
-    fn sign(&self, payload: &[u8]) -> Result<MultiSignature, anyhow::Error> {
+    async fn sign(&self, payload: &[u8]) -> Result<MultiSignature, anyhow::Error> {
         match self {
             AzeroSigner::Dev(keypair) => Ok(keypair.signer().sign(payload).into()),
             AzeroSigner::Signer(signer) => {
-                let signature = signer.client.sign(payload)?;
-                Ok(signature)
+                let client = signer.client.clone();
+                let payload = payload.to_vec();
+
+                let res = spawn_blocking(move || {
+                    let client = client.lock().unwrap();
+                    let signature = client.sign(&payload)?;
+                    Ok::<_, signer_client::Error>(signature)
+                })
+                .await??;
+
+                Ok(res)
             }
         }
     }
@@ -58,12 +86,12 @@ pub struct AzeroConnectionWithSigner {
 }
 
 impl AzeroConnectionWithSigner {
-    pub fn with_signer(
+    pub async fn with_signer(
         connection: AzeroWsConnection,
         cid: u32,
         port: u32,
-    ) -> Result<Self, signer_client::Error> {
-        let client = AzeroSignerClient::new(cid, port)?;
+    ) -> Result<Self, Error> {
+        let client = AzeroSignerClient::new(cid, port).await?;
         let signer = AzeroSigner::Signer(client);
         Ok(Self { connection, signer })
     }
@@ -107,7 +135,7 @@ impl SignedConnectionApi for AzeroConnectionWithSigner {
             .tx()
             .create_partial_signed(&tx, self.account_id(), params)
             .await?;
-        let signature = self.signer.sign(&tx.signer_payload())?;
+        let signature = self.signer.sign(&tx.signer_payload()).await?;
         let address = MultiAddress::Id(self.account_id().clone());
         let tx = tx.sign_with_address_and_signature(&address, &signature);
 
