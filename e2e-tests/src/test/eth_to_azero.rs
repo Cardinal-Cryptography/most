@@ -1,8 +1,6 @@
-use std::{env, str::FromStr};
+use std::str::FromStr;
 
 use aleph_client::{contract::ContractInstance, keypair_from_string, sp_runtime::AccountId32};
-use anyhow;
-use clap::Parser;
 use ethers::{
     core::types::Address,
     signers::{coins_bip39::English, MnemonicBuilder, Signer},
@@ -10,19 +8,21 @@ use ethers::{
 };
 use log::info;
 
-mod azero;
-mod config;
-mod eth;
+use crate::{azero, config::setup_test, eth};
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    let config = config::Config::parse();
-
-    env::set_var("RUST_LOG", config.rust_log.as_str());
-    env_logger::init();
+/// One-way `Ethereum` -> `Aleph Zero` transfer trough `most`.
+/// Wraps the required funds into wETH for an Ethereum account.
+/// Approves the `most` contract to use the wETH funds.
+/// Transfers `transfer_amount` of wETH to a specified Aleph Zero account over the bridge.
+/// Waits for the transfer to complete - bottlenecked by Ethereum finalization.
+/// Verifies that the correct amount of wETH is present on the Aleph Zero chain.
+/// It relies on all the relevant contracts being deployed on both ends and the (wETH_ETH:wETH_AZERO) pair having been added to `most`.
+#[tokio::test]
+pub async fn eth_to_azero() -> anyhow::Result<()> {
+    let config = setup_test();
 
     let wallet = MnemonicBuilder::<English>::default()
-        .phrase(&*config.mnemonic)
+        .phrase(&*config.eth_mnemonic)
         .index(config.eth_dev_account_index)?
         .build()?;
     let eth_account_address = wallet.address();
@@ -81,8 +81,14 @@ async fn main() -> anyhow::Result<()> {
             .await?;
     info!("'sendRequest' tx receipt: {:?}", send_request_receipt);
 
-    info!("Waiting 12 minutes for finalization");
-    tokio::time::sleep(tokio::time::Duration::from_secs(12 * 60)).await;
+    info!(
+        "Waiting {:?} minutes for finalization",
+        config.test_args.wait_minutes
+    );
+    tokio::time::sleep(tokio::time::Duration::from_secs(
+        60_u64 * config.test_args.wait_minutes,
+    ))
+    .await;
 
     let azero_connection = azero::connection(&config.azero_node_ws).await;
 
