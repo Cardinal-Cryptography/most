@@ -16,6 +16,7 @@ pub mod most {
         prelude::{format, string::String, vec, vec::Vec},
         storage::{traits::ManualKey, Lazy, Mapping},
     };
+    use ownable::{OwnableResult, Ownable2Step};
     use psp22::PSP22Error;
     use psp22_traits::{Burnable, Mintable};
     use scale::{Decode, Encode};
@@ -80,8 +81,6 @@ pub mod most {
     #[derive(Debug)]
     #[ink::storage_item]
     pub struct Data {
-        /// an account that can perform a subset of actions
-        owner: AccountId,
         /// nonce for outgoing cross-chain transfer requests
         request_nonce: u128,
         /// accounting helper
@@ -104,6 +103,8 @@ pub mod most {
     #[ink(storage)]
     pub struct Most {
         data: Lazy<Data, ManualKey<0x44415441>>,
+        /// stores the data used by the Ownable2Step trait
+        ownable_data: Lazy<ownable::Data, ManualKey<0xDEADBEEF>>,
         /// requests that are still collecting signatures
         pending_requests: Mapping<HashedRequest, Request, ManualKey<0x50454E44>>,
         /// signatures per cross chain transfer request
@@ -132,6 +133,7 @@ pub mod most {
         NotInCommittee,
         HashDoesNotMatchData,
         PSP22(PSP22Error),
+        Ownable(ownable::Error),
         RequestNotProcessed,
         RequestAlreadyProcessed,
         UnsupportedPair,
@@ -154,6 +156,12 @@ pub mod most {
     impl From<PSP22Error> for MostError {
         fn from(inner: PSP22Error) -> Self {
             MostError::PSP22(inner)
+        }
+    }
+
+    impl From<ownable::Error> for MostError {
+        fn from(inner: ownable::Error) -> Self {
+            MostError::Ownable(inner)
         }
     }
 
@@ -189,7 +197,6 @@ pub mod most {
 
             let mut data = Lazy::new();
             data.set(&Data {
-                owner: Self::env().caller(),
                 request_nonce: 0,
                 committee_id,
                 pocket_money,
@@ -200,8 +207,12 @@ pub mod most {
                 gas_price_oracle,
             });
 
+            let mut ownable_data = Lazy::new();
+            ownable_data.set(&ownable::Data::new(Self::env().caller()));
+
             Ok(Self {
                 data,
+                ownable_data,
                 signature_thresholds,
                 committees,
                 committee_sizes,
@@ -631,28 +642,6 @@ pub mod most {
             Ok(())
         }
 
-        /// Sets a new owner account
-        ///
-        /// Can only be called by contracts owner
-        #[ink(message)]
-        pub fn set_owner(&mut self, new_owner: AccountId) -> Result<(), MostError> {
-            self.ensure_owner()?;
-            let mut data = self.data()?;
-            data.owner = new_owner;
-            self.data.set(&data);
-            Ok(())
-        }
-
-        // ---  helper functions
-        fn ensure_owner(&mut self) -> Result<(), MostError> {
-            let caller = self.env().caller();
-            let data = self.data()?;
-            match caller.eq(&data.owner) {
-                true => Ok(()),
-                false => Err(MostError::NotOwner(caller)),
-            }
-        }
-
         /// Mints the specified amount of token to the designated account
         ///
         /// Most contract needs to have a Minter role on the token contract
@@ -676,6 +665,49 @@ pub mod most {
 
         fn data(&self) -> Result<Data, MostError> {
             self.data.get().ok_or(MostError::CorruptedStorage)
+        }
+
+        fn ownable_data(&self) -> Result<ownable::Data, ownable::Error> {
+            self.ownable_data.get().ok_or(ownable::Error::CorruptedStorage)
+        }
+    }
+
+    impl ownable::Ownable2Step for Most {
+
+        #[ink(message)]
+        fn get_owner(&self) -> OwnableResult<AccountId> {
+            Ok(self.ownable_data()?.get_owner())
+        }
+
+        #[ink(message)]
+        fn get_pending_owner(&self) -> OwnableResult<AccountId> {
+            self.ownable_data()?.get_pending_owner().ok_or(ownable::Error::NoPendingOwner)
+        }
+
+        #[ink(message)]
+        fn is_owner(&self, account: AccountId) -> OwnableResult<bool> {
+            Ok(self.ownable_data()?.is_owner(account))
+        }
+
+        #[ink(message)]
+        fn transfer_ownership(&mut self, new_owner: AccountId) -> OwnableResult<()> {
+            let mut ownable_data = self.ownable_data()?;
+            ownable_data.transfer_ownership(self.env().caller(), new_owner)?;
+            self.ownable_data.set(&ownable_data);
+            Ok(())
+        }
+
+        #[ink(message)]
+        fn accept_ownership(&mut self) -> OwnableResult<()> {
+            let mut ownable_data = self.ownable_data()?;
+            ownable_data.accept_ownership(self.env().caller())?;
+            self.ownable_data.set(&ownable_data);
+            Ok(())
+        }
+
+        #[ink(message)]
+        fn ensure_owner(&self) -> OwnableResult<()> {
+            self.ownable_data()?.ensure_owner(self.env().caller())
         }
     }
 
@@ -750,7 +782,7 @@ pub mod most {
         #[ink::test]
         fn new_sets_caller_as_owner() {
             set_caller::<DefEnv>(default_accounts::<DefEnv>().alice);
-            let mut most = Most::new(
+            let most = Most::new(
                 guardian_accounts(),
                 THRESHOLD,
                 POCKET_MONEY,
@@ -766,7 +798,7 @@ pub mod most {
             set_caller::<DefEnv>(guardian_accounts()[0]);
             assert_eq!(
                 most.ensure_owner(),
-                Err(MostError::NotOwner(guardian_accounts()[0]))
+                Err(ownable::Error::UnauthorizedAccount(guardian_accounts()[0]))
             );
         }
 
@@ -808,11 +840,12 @@ pub mod most {
             )
             .expect("Threshold is valid.");
             set_caller::<DefEnv>(accounts.bob);
-            assert_eq!(most.ensure_owner(), Err(MostError::NotOwner(accounts.bob)));
+            assert_eq!(most.ensure_owner(), Err(ownable::Error::UnauthorizedAccount(accounts.bob)));
             set_caller::<DefEnv>(accounts.alice);
             assert_eq!(most.ensure_owner(), Ok(()));
-            assert_eq!(most.set_owner(accounts.bob), Ok(()));
+            assert_eq!(most.transfer_ownership(accounts.bob), Ok(()));
             set_caller::<DefEnv>(accounts.bob);
+            assert_eq!(most.accept_ownership(), Ok(()));
             assert_eq!(most.ensure_owner(), Ok(()));
         }
 
