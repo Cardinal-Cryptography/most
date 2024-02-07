@@ -147,6 +147,10 @@ deploy: deploy-eth deploy-azero setup-eth
 watch-relayer:
 	cd relayer && cargo watch -s 'cargo clippy' -c
 
+run-relayer: # Run a single relayer
+run-relayer:
+	cd relayer ./scripts/run.sh
+
 run-relayers: # Run three relayers
 run-relayers: build-docker-relayer
 	docker compose -f ./relayer/scripts/devnet-relayers-compose.yml up -d
