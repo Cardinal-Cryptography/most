@@ -20,6 +20,8 @@
         "@polkadot/api": "^10.11.2",
         "child_process": "^1.0.2",
         "dotenv": "^16.3.1",
+        "gulp": "^4.0.2",
+        "gulp-shell": "^0.8.0",
         "hardhat": "^2.19.0",
         "prettier": "^3.0.3",
         "prettier-plugin-solidity": "^1.1.3",
