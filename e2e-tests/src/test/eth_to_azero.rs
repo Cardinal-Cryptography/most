@@ -10,7 +10,7 @@ use log::info;
 
 use crate::{azero, config::setup_test, eth};
 
-/// One-way `Ethereum` -> `Aleph Zero` transfer trough `most`.
+/// One-way `Ethereum` -> `Aleph Zero` transfer through `most`.
 /// Wraps the required funds into wETH for an Ethereum account.
 /// Approves the `most` contract to use the wETH funds.
 /// Transfers `transfer_amount` of wETH to a specified Aleph Zero account over the bridge.
