@@ -7,7 +7,16 @@ pub struct Config {
     pub dev: bool,
 
     #[arg(long, default_value = "0")]
+    pub dev_account_index: u32,
+
+    #[arg(long, default_value = "0")]
     pub committee_id: u32,
+
+    #[arg(long)]
+    pub signer_cid: Option<u32>,
+
+    #[arg(long, default_value = "1234")]
+    pub signer_port: u32,
 
     #[arg(long)]
     pub azero_contract_address: String,
@@ -26,9 +35,6 @@ pub struct Config {
 
     #[arg(long, default_value = "")]
     pub eth_keystore_password: String,
-
-    #[arg(long, default_value = "0")]
-    pub dev_account_index: u32,
 
     #[arg(long, default_value = "")]
     pub eth_keystore_path: String,

@@ -93,13 +93,8 @@ fn handle_client(client: Client, azero_key: &KeyPair) -> Result<(), Error> {
             Command::Sign { payload } => {
                 let signature = azero_key.sign(&payload);
                 let signature = subxt::ext::sp_runtime::MultiSignature::Sr25519(signature);
-                let account_id = azero_key.public().into();
 
-                client.send(&Response::Signed {
-                    payload,
-                    signature,
-                    account_id,
-                })?;
+                client.send(&Response::Signed { payload, signature })?;
             }
         }
     }

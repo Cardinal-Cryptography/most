@@ -1,5 +1,6 @@
 use std::{env, process, sync::Arc};
 
+use aleph_client::pallets::balances::BalanceUserApi;
 use clap::Parser;
 use config::Config;
 use connections::EthConnectionError;
@@ -61,21 +62,25 @@ fn main() -> Result<()> {
             .expect("Cannot connect to the redis cluster instance");
         let redis_connection = Arc::new(Mutex::new(client.get_async_connection().await.unwrap()));
 
-        let azero_keypair = if config.dev {
+        let azero_rw_connection = if let Some(cid) = config.signer_cid {
+            AzeroConnectionWithSigner::with_signer(
+                azero::init(&config.azero_node_wss_url).await,
+                cid,
+                config.signer_port,
+            )
+            .expect("Cannot connect to signer")
+        } else if config.dev {
             let azero_seed = "//".to_owned() + &config.dev_account_index.to_string();
-            aleph_client::keypair_from_string(&azero_seed)
+            let keypair = aleph_client::keypair_from_string(&azero_seed);
+            AzeroConnectionWithSigner::with_keypair(
+                azero::init(&config.azero_node_wss_url).await,
+                keypair,
+            )
         } else {
             unimplemented!("Only dev mode is supported for now");
         };
 
-        let azero_ro_connection = Arc::new(azero::sign(
-            &azero::init(&config.azero_node_wss_url).await,
-            &azero_keypair,
-        ));
-
-        let azero_rw_connection =
-            AzeroConnectionWithSigner::new(azero::init(&config.azero_node_wss_url).await, 2, 1234)
-                .expect("Cannot connect to signer");
+        let azero_ro_connection = Arc::new(azero::init(&config.azero_node_wss_url).await);
 
         let wallet = if config.dev {
             // If no keystore path is provided, we use the default development mnemonic

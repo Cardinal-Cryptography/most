@@ -1,10 +1,6 @@
-use aleph_client::AlephConfig;
 use serde::{Deserialize, Serialize};
 use serde_json::Deserializer;
-use subxt::{
-    ext::{sp_core::crypto::AccountId32, sp_runtime::MultiSignature},
-    tx::Signer,
-};
+use subxt::ext::{sp_core::crypto::AccountId32, sp_runtime::MultiSignature};
 use vsock::VsockStream;
 
 #[derive(thiserror::Error, Debug)]
@@ -44,15 +40,8 @@ pub enum Response {
     },
     Signed {
         payload: Vec<u8>,
-        account_id: AccountId32,
         signature: MultiSignature,
     },
-}
-
-pub struct OnceOffSigner {
-    payload: Vec<u8>,
-    signature: MultiSignature,
-    account_id: AccountId32,
 }
 
 pub struct Client {
@@ -93,7 +82,7 @@ impl Client {
         }
     }
 
-    pub fn prepare_signer(&self, payload: &[u8]) -> Result<OnceOffSigner, Error> {
+    pub fn sign(&self, payload: &[u8]) -> Result<MultiSignature, Error> {
         self.send(&Command::Sign {
             payload: payload.to_vec(),
         })?;
@@ -102,30 +91,10 @@ impl Client {
         match signed {
             Response::Signed {
                 payload: return_payload,
-                account_id,
                 signature,
-            } if return_payload == payload => Ok(OnceOffSigner {
-                payload: return_payload,
-                account_id,
-                signature,
-            }),
+            } if return_payload == payload => Ok(signature),
             _ => Err(Error::InvalidResponse),
         }
-    }
-}
-
-impl Signer<AlephConfig> for OnceOffSigner {
-    fn account_id(&self) -> <AlephConfig as subxt::Config>::AccountId {
-        self.account_id.clone()
-    }
-
-    fn address(&self) -> <AlephConfig as subxt::Config>::Address {
-        self.account_id.clone().into()
-    }
-
-    fn sign(&self, signer_payload: &[u8]) -> <AlephConfig as subxt::Config>::Signature {
-        assert!(signer_payload == self.payload);
-        self.signature.clone()
     }
 }
 
