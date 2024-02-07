@@ -6,7 +6,7 @@ use aleph_client::{
     AlephConfig, AsConnection,
 };
 use ethers::{
-    abi::{self, EncodePackedError, Token},
+    abi::{self, Token},
     core::types::Address,
     prelude::{ContractCall, ContractError},
     providers::{Middleware, ProviderError},
@@ -17,7 +17,7 @@ use redis::{aio::Connection as RedisConnection, RedisError};
 use subxt::{events::Events, utils::H256};
 use thiserror::Error;
 use tokio::{
-    sync::{Mutex, OwnedSemaphorePermit, Semaphore},
+    sync::{AcquireError, Mutex, OwnedSemaphorePermit, Semaphore},
     task::JoinSet,
     time::{sleep, Duration},
 };
@@ -73,17 +73,14 @@ pub enum AzeroListenerError {
     #[error("missing data from event")]
     MissingEventData(String),
 
-    #[error("error when creating an ABI data encoding")]
-    AbiEncode(#[from] EncodePackedError),
-
     #[error("redis connection error")]
     Redis(#[from] RedisError),
 
     #[error("join error")]
     Join(#[from] tokio::task::JoinError),
 
-    #[error("unexpected error")]
-    Unexpected,
+    #[error("semaphore error")]
+    Semaphore(#[from] AcquireError),
 }
 
 const ALEPH_LAST_BLOCK_KEY: &str = "alephzero_last_known_block_number";
@@ -253,8 +250,7 @@ async fn handle_events(
         let permit = event_handler_tasks_semaphore
             .clone()
             .acquire_owned()
-            .await
-            .expect("Failed to acquire semaphore permit");
+            .await?;
 
         // Spawn a new task for handling each event.
         event_tasks.spawn(handle_event(config, eth_connection, event, permit));
@@ -272,9 +268,6 @@ async fn handle_events(
             redis_connection.clone(),
         )
         .await
-        .expect(
-            "Failed to wait for event handler tasks or to update the last processed block number.",
-        );
     });
     Ok(())
 }
@@ -398,7 +391,7 @@ async fn handle_processed_block(
     // We can update the last processed block number in Redis.
     let earliest_still_pending = pending_blocks
         .first()
-        .expect("There should always be a pending block in the set");
+        .expect("There always is a pending block in the set");
 
     // Note: `earliest_still_pending` will never be 0
     write_last_processed_block(
@@ -449,7 +442,7 @@ async fn get_next_finalized_block_number_azero(
             Ok(hash) => match azero_connection.get_block_number(hash).await {
                 Ok(number_opt) => {
                     let best_finalized_block_number =
-                        number_opt.expect("Finalized block should have a number.");
+                        number_opt.expect("Finalized block has a number.");
                     if best_finalized_block_number >= not_older_than {
                         return best_finalized_block_number;
                     }
