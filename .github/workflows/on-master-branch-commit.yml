@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - master
+      - A0-3158-dockerize-relayer
 
 jobs:
   check-vars-and-secrets:

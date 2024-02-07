@@ -45,7 +45,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: eth-artifacts
+          name: eth-deployed-contracts
           if-no-files-found: error
           retention-days: 1
           path: |
@@ -54,7 +54,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: azero-artifacts
+          name: azero-deployed-contracts
           if-no-files-found: error
           retention-days: 1
           path: |
@@ -94,17 +94,13 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: azero-artifacts
+          name: azero-deployed-contracts
           path: azero
 
       - uses: actions/download-artifact@v4
         with:
-          name: eth-artifacts
+          name: eth-deployed-contracts
           path: eth
-
-      - name: Prepare contract_spec.json
-        shell: bash
-        run: make contract_spec.json
 
       - name: Copy files to S3 AWS bucket
         uses: Cardinal-Cryptography/github-actions/copy-file-to-s3@v1
@@ -123,28 +119,18 @@ jobs:
     name: Upload contract addresses to S3
     runs-on: self-hosted
     needs: [deploy-contracts]
-    strategy:
-      matrix:
-        include:
-          - from: eth/addresses.json
-            filename: eth_addresses.json
-          - from: azero/addresses.json
-            filename: azero_addresses.json
-
-          - from: contract_spec.json
-            filename: bridgenet.json
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
       - uses: actions/download-artifact@v4
         with:
-          name: azero-artifacts
+          name: azero-deployed-contracts
           path: azero
 
       - uses: actions/download-artifact@v4
         with:
-          name: eth-artifacts
+          name: eth-deployed-contracts
           path: eth
 
       - name: Prepare contract_spec.json
@@ -159,7 +145,7 @@ jobs:
           AWS_DEFAULT_REGION: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
         with:
           compression: false
-          source-path: ${{ matrix.from }}
-          s3-bucket-filename: ${{ matrix.filename }}
-          s3-bucket-path: most/addresses/bridgenet/dev
+          source-path: contract_spec.json
+          s3-bucket-filename: dev.json
+          s3-bucket-path: most/addresses/bridgenet
           s3-bucket-name: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
