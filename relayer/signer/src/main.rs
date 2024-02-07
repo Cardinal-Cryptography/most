@@ -2,7 +2,10 @@ use std::thread;
 
 use clap::Parser;
 use signer_client::{client, Client, Command, Response};
-use subxt::ext::sp_core::{crypto::SecretStringError, sr25519::Pair as KeyPair, Pair};
+use subxt::ext::{
+    sp_core::{crypto::SecretStringError, sr25519::Pair as KeyPair, Pair},
+    sp_runtime::AccountId32,
+};
 use vsock::{VsockListener, VMADDR_CID_ANY, VMADDR_CID_HOST};
 
 #[derive(Parser)]
@@ -20,34 +23,16 @@ struct ServerArguments {
 #[derive(thiserror::Error, Debug)]
 enum Error {
     #[error("Stream error: {0}")]
-    Stream(signer_client::Error),
+    Stream(#[from] signer_client::Error),
 
     #[error("Key error: {0}")]
-    Key(SecretStringError),
-}
+    Key(#[from] SecretStringError),
 
-impl From<signer_client::Error> for Error {
-    fn from(err: signer_client::Error) -> Self {
-        Error::Stream(err)
-    }
-}
+    #[error("Serialization error: {0}")]
+    Serialization(#[from] serde_json::Error),
 
-impl From<serde_json::Error> for Error {
-    fn from(err: serde_json::Error) -> Self {
-        Error::Stream(err.into())
-    }
-}
-
-impl From<std::io::Error> for Error {
-    fn from(err: std::io::Error) -> Self {
-        Error::Stream(err.into())
-    }
-}
-
-impl From<SecretStringError> for Error {
-    fn from(value: SecretStringError) -> Self {
-        Error::Key(value)
-    }
+    #[error("IO error: {0}")]
+    IO(#[from] std::io::Error),
 }
 
 fn main() -> Result<(), Error> {
@@ -64,9 +49,11 @@ fn main() -> Result<(), Error> {
 
 fn server(azero_key: String) -> Result<(), Error> {
     let azero_key = KeyPair::from_string(&azero_key, None)?;
+    let account_id: AccountId32 = azero_key.public().into();
+    println!("Account ID: {:?}", account_id);
 
     let listener = VsockListener::bind_with_cid_port(VMADDR_CID_ANY, 1234)?;
-    println!("My address: {:?}", listener.local_addr());
+    println!("Vsock address: {:?}", listener.local_addr());
 
     for client in listener.incoming() {
         let client: Client = client?.into();
