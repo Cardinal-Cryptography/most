@@ -44,7 +44,11 @@ jobs:
             exit 1
           fi
 
-          if [[ ! '${{ inputs.frontend-environment }}' =~ [a-z0-9]+ ]]; then
+          if [[ \
+            '${{ inputs.frontend-environment }}' != 'dev' && \
+            '${{ inputs.frontend-environment }}' != 'stg' && \
+            '${{ inputs.frontend-environment }}' != 'prd'
+          ]]; then
             echo 'Invalid frontend environment'
             exit 1
           fi

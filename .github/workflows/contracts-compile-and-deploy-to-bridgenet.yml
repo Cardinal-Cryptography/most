@@ -161,5 +161,5 @@ jobs:
           compression: false
           source-path: ${{ matrix.from }}
           s3-bucket-filename: ${{ matrix.filename }}
-          s3-bucket-path: most/addresses/bridgenet/dev/${{ github.sha }}
+          s3-bucket-path: most/addresses/bridgenet/dev
           s3-bucket-name: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
