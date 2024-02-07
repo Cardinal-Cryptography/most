@@ -5,9 +5,9 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 
-contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
+contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
     uint256 public requestNonce;
     uint256 public committeeId;
 
@@ -75,6 +75,9 @@ contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
 
     // required by the OZ UUPS module
     function _authorizeUpgrade(address) internal override onlyOwner {}
+
+    // Disable possibility to renounce ownership
+    function renounceOwnership() public virtual override onlyOwner {}
 
     // Invoke this tx to transfer funds to the destination chain.
     // Account needs to approve the Most contract to spend the `srcTokenAmount`
