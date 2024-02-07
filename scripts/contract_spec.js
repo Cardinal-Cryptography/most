@@ -30,7 +30,7 @@ let result = {
 
         eth_migrations: {
             contract: "azero_migrations",
-            address: azero.migrations
+            address: eth.migrations
         },
 
         eth_governance: {
