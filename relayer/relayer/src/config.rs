@@ -6,11 +6,17 @@ pub struct Config {
     #[arg(long)]
     pub dev: bool,
 
+    #[arg(long)]
+    pub override_azero_cache: bool,
+
+    #[arg(long)]
+    pub override_eth_cache: bool,
+
     #[arg(long, default_value = "0")]
     pub dev_account_index: u32,
 
     #[arg(long, default_value = "0")]
-    pub committee_id: u32,
+    pub relayers_committee_id: u128,
 
     #[arg(long)]
     pub signer_cid: Option<u32>,

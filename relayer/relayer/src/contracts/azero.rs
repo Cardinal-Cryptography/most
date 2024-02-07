@@ -75,8 +75,8 @@ impl MostInstance {
         request_nonce: u128,
     ) -> Result<TxInfo, AzeroContractError> {
         let args = [
-            committee_id.to_string(),
             bytes32_to_str(&request_hash),
+            committee_id.to_string(),
             bytes32_to_str(&dest_token_address),
             amount.to_string(),
             bytes32_to_str(&dest_receiver_address),
@@ -120,6 +120,7 @@ impl MostInstance {
 }
 
 pub struct CrosschainTransferRequestData {
+    pub committee_id: u128,
     pub dest_token_address: [u8; 32],
     pub amount: u128,
     pub dest_receiver_address: [u8; 32],
@@ -129,12 +130,14 @@ pub struct CrosschainTransferRequestData {
 pub fn get_request_event_data(
     data: &HashMap<String, Value>,
 ) -> Result<CrosschainTransferRequestData, AzeroContractError> {
+    let committee_id: u128 = decode_uint_field(data, "committee_id")?;
     let dest_token_address: [u8; 32] = decode_seq_field(data, "dest_token_address")?;
     let amount: u128 = decode_uint_field(data, "amount")?;
     let dest_receiver_address: [u8; 32] = decode_seq_field(data, "dest_receiver_address")?;
     let request_nonce: u128 = decode_uint_field(data, "request_nonce")?;
 
     Ok(CrosschainTransferRequestData {
+        committee_id,
         dest_token_address,
         amount,
         dest_receiver_address,

@@ -41,6 +41,11 @@ devnet-azero: # Run azero devnet
 devnet-azero: bootstrap-azero
 	docker compose -f ./devnet-azero/devnet-azero-compose.yml up -d
 
+.PHONY: devnet-azero-logs
+devnet-azero-logs: # show azero devnet node logs
+devnet-azero-logs:
+	docker container logs aleph_bridgenode --follow
+
 .PHONY: devnet-eth
 devnet-eth: # Run eth devnet
 devnet-eth:
@@ -69,7 +74,7 @@ eth-deps:
 
 .PHONY: watch-eth
 watch-eth: # watcher on the eth contracts
-watch-eth:
+watch-eth: eth-deps
 	cd eth && npm run watch
 
 .PHONY: compile-eth
@@ -116,7 +121,7 @@ azero-deps:
 
 .PHONY: watch-azero
 watch-azero: # watch azero contracts and generate artifacts
-watch-azero:
+watch-azero: azero-deps
 	cd azero && npm run watch
 
 .PHONY: compile-azero
@@ -131,7 +136,7 @@ deploy-azero: compile-azero
 
 .PHONY: deploy
 deploy: # Deploy all contracts
-deploy: deploy-azero deploy-eth
+deploy: deploy-eth deploy-azero setup-eth
 
 .PHONY: watch-relayer
 watch-relayer:
@@ -185,7 +190,6 @@ test-ink: test-ink-e2e
 	cd azero/contracts/governance && cargo test
 	cd azero/contracts/token && cargo test
 	cd azero/contracts/gas-price-oracle/contract && cargo test
-	cd azero/contracts/gas-price-oracle/test-contract && cargo test
 
 .PHONY: check-js-format
 check-js-format: # Check js formatting
@@ -211,7 +215,6 @@ ink-lint:
 	cd azero/contracts/psp22-traits && cargo clippy -- --no-deps -D warnings
 	cd azero/contracts/tests && cargo clippy -- --no-deps -D warnings
 	cd azero/contracts/gas-price-oracle/contract && cargo clippy -- --no-deps -D warnings
-	cd azero/contracts/gas-price-oracle/test-contract && cargo clippy -- --no-deps -D warnings
 	cd azero/contracts/gas-price-oracle/trait && cargo clippy -- --no-deps -D warnings
 
 .PHONY: contracts-lint
@@ -228,7 +231,6 @@ rust-format-check:
 	cd azero/contracts/psp22-traits && cargo fmt -- --check
 	cd azero/contracts/tests && cargo fmt -- --check
 	cd azero/contracts/gas-price-oracle/contract && cargo fmt -- --check
-	cd azero/contracts/gas-price-oracle/test-contract && cargo fmt -- --check
 	cd azero/contracts/gas-price-oracle/trait && cargo fmt -- --check
 
 .PHONY: rust-format
@@ -241,7 +243,6 @@ rust-format:
 	cd azero/contracts/psp22-traits && cargo fmt
 	cd azero/contracts/tests && cargo fmt
 	cd azero/contracts/gas-price-oracle/contract && cargo fmt
-	cd azero/contracts/gas-price-oracle/test-contract && cargo fmt
 	cd azero/contracts/gas-price-oracle/trait && cargo fmt
 
 .PHONY: js-format-check

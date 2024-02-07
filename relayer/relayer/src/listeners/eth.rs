@@ -70,19 +70,24 @@ impl EthListener {
             name,
             default_sync_from_block_eth,
             sync_step,
+            override_eth_cache,
             ..
         } = &*config;
 
         let address = eth_contract_address.parse::<Address>()?;
         let contract = Most::new(address, Arc::clone(&eth_connection));
 
-        let mut first_unprocessed_block_number = read_first_unprocessed_block_number(
-            name.clone(),
-            ETH_LAST_BLOCK_KEY.to_string(),
-            redis_connection.clone(),
-            *default_sync_from_block_eth,
-        )
-        .await;
+        let mut first_unprocessed_block_number = if *override_eth_cache {
+            *default_sync_from_block_eth
+        } else {
+            read_first_unprocessed_block_number(
+                name.clone(),
+                ETH_LAST_BLOCK_KEY.to_string(),
+                redis_connection.clone(),
+                *default_sync_from_block_eth,
+            )
+            .await
+        };
 
         // Main Ethereum event loop.
         loop {
@@ -140,6 +145,7 @@ async fn handle_event(
 ) -> Result<(), EthListenerError> {
     if let MostEvents::CrosschainTransferRequestFilter(
         crosschain_transfer_event @ CrosschainTransferRequestFilter {
+            committee_id,
             dest_token_address,
             amount,
             dest_receiver_address,
@@ -149,16 +155,25 @@ async fn handle_event(
     ) = event
     {
         let Config {
-            committee_id,
+            relayers_committee_id,
             azero_contract_address,
             azero_contract_metadata,
             ..
         } = config;
 
+        if *relayers_committee_id != committee_id.as_u128() {
+            warn!(
+                "Ignoring event from committee {}, expected {}",
+                committee_id, relayers_committee_id
+            );
+            return Ok(());
+        }
+
         info!("handling eth contract event: {crosschain_transfer_event:?}");
 
         // concat bytes
         let bytes = concat_u8_arrays(vec![
+            &committee_id.as_u128().to_le_bytes(),
             dest_token_address,
             &amount.as_u128().to_le_bytes(),
             dest_receiver_address,
@@ -182,7 +197,7 @@ async fn handle_event(
             .receive_request(
                 azero_connection,
                 request_hash,
-                *committee_id as u128,
+                committee_id.as_u128(),
                 *dest_token_address,
                 amount.as_u128(),
                 *dest_receiver_address,
@@ -204,7 +219,7 @@ pub async fn get_next_finalized_block_number_eth(
                 Some(block) => {
                     let best_finalized_block_number = block
                         .number
-                        .expect("Finalized block should have a number.")
+                        .expect("Finalized block has a number.")
                         .as_u32();
                     if best_finalized_block_number >= not_older_than {
                         return best_finalized_block_number;

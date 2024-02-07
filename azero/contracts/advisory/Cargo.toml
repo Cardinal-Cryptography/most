@@ -1,13 +1,11 @@
 [package]
-name = "test_oracle"
+name = "advisory"
 version = "1.0.0"
 authors = ["Cardinal Cryptography"]
 edition = "2021"
 
 [dependencies]
 ink = { version = "=4.3.0", default-features = false }
-gas-oracle-trait = { path = "../trait" , default-features = false }
-
 scale = { package = "parity-scale-codec", version = "3", default-features = false, features = [
     "derive",
 ] }
@@ -20,7 +18,7 @@ path = "lib.rs"
 
 [features]
 default = ["std"]
-std = ["ink/std", "scale/std", "scale-info/std", "gas-oracle-trait/std"]
+std = ["ink/std", "scale/std", "scale-info/std" ]
 ink-as-dependency = []
 
 [profile.release]
