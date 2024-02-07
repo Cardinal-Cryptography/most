@@ -80,7 +80,7 @@ async fn main() -> Result<()> {
     let emergency_rc1 = Arc::clone(&emergency);
 
     // run task only if address passed on CLI
-    if config.advisory_contract_address.is_some() {
+    if config.advisory_contract_addresses.is_some() {
         tasks.spawn(async move {
             AdvisoryListener::run(config_rc1, azero_connection, emergency_rc1)
                 .await

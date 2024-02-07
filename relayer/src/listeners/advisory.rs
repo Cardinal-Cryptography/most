@@ -35,16 +35,32 @@ impl AdvisoryListener {
     ) -> Result<(), AzeroListenerError> {
         let Config {
             advisory_contract_metadata,
-            advisory_contract_address,
+            advisory_contract_addresses,
             ..
         } = &*config;
 
-        let advisory_instance = AdvisoryInstance::new(
-            &advisory_contract_address.clone().expect("Advisory address"),
-            advisory_contract_metadata,
-        )?;
+        let contracts: Vec<AdvisoryInstance> = advisory_contract_addresses
+            .clone()
+            .expect("Advisory addresses")
+            .into_iter()
+            .try_fold(
+                Vec::new(),
+                |mut acc, address| -> Result<Vec<AdvisoryInstance>, AzeroListenerError> {
+                    acc.push(AdvisoryInstance::new(&address, advisory_contract_metadata)?);
+                    Ok(acc)
+                },
+            )?;
 
-        let is_emergency = advisory_instance.is_emergency(&azero_connection).await?;
+        let instances: Vec<&ContractInstance> = contracts.iter().map(|c| &c.contract).collect();
+
+        let mut is_emergency: bool = false;
+        for advisory in &contracts {
+            if advisory.is_emergency(&azero_connection).await? {
+                is_emergency = true;
+                break;
+            }
+        }
+
         info!("Advisory emergency state: {is_emergency}");
         emergency.store(is_emergency, Ordering::Relaxed);
 
@@ -62,7 +78,7 @@ impl AdvisoryListener {
                 &config,
                 emergency.clone(),
                 events,
-                &[&advisory_instance.contract],
+                &instances,
                 block.number(),
                 block.hash(),
             )
@@ -112,13 +128,14 @@ async fn handle_event(
     emergency: Arc<AtomicBool>,
 ) -> Result<(), AzeroListenerError> {
     let Config {
-        advisory_contract_address,
+        advisory_contract_addresses,
         ..
     } = config;
 
-    if event.contract.to_string().eq(&advisory_contract_address
-        .clone()
-        .expect("Advisory contract address"))
+    if advisory_contract_addresses
+        .as_ref()
+        .expect("Advisory contract addresses")
+        .contains(&event.contract.to_string())
         && ["EmergencyChanged"].contains(&event.name.clone().unwrap().as_str())
     {
         debug!("Raw Advisory contract event: {event:?}");
