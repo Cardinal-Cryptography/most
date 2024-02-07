@@ -1,7 +1,10 @@
 use aleph_client::AlephConfig;
 use serde::{Deserialize, Serialize};
 use serde_json::Deserializer;
-use subxt::{ext::sp_runtime::MultiSignature, tx::Signer};
+use subxt::{
+    ext::{sp_core::crypto::AccountId32, sp_runtime::MultiSignature},
+    tx::Signer,
+};
 use vsock::VsockStream;
 
 #[derive(thiserror::Error, Debug)]
@@ -29,14 +32,19 @@ impl From<serde_json::Error> for Error {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Command {
     Ping,
+    AccountId,
     Sign { payload: Vec<u8> },
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Response {
     Pong,
+    AccountId {
+        account_id: AccountId32,
+    },
     Signed {
         payload: Vec<u8>,
+        account_id: AccountId32,
         signature: MultiSignature,
     },
 }
@@ -44,6 +52,7 @@ pub enum Response {
 pub struct OnceOffSigner {
     payload: Vec<u8>,
     signature: MultiSignature,
+    account_id: AccountId32,
 }
 
 pub struct Client {
@@ -75,6 +84,15 @@ impl Client {
         Ok(res)
     }
 
+    pub fn account_id(&self) -> Result<AccountId32, Error> {
+        self.send(&Command::AccountId)?;
+        if let Response::AccountId { account_id } = self.recv()? {
+            Ok(account_id)
+        } else {
+            Err(Error::InvalidResponse)
+        }
+    }
+
     pub fn prepare_signer(&self, payload: &[u8]) -> Result<OnceOffSigner, Error> {
         self.send(&Command::Sign {
             payload: payload.to_vec(),
@@ -84,9 +102,11 @@ impl Client {
         match signed {
             Response::Signed {
                 payload: return_payload,
+                account_id,
                 signature,
             } if return_payload == payload => Ok(OnceOffSigner {
                 payload: return_payload,
+                account_id,
                 signature,
             }),
             _ => Err(Error::InvalidResponse),
@@ -96,11 +116,11 @@ impl Client {
 
 impl Signer<AlephConfig> for OnceOffSigner {
     fn account_id(&self) -> <AlephConfig as subxt::Config>::AccountId {
-        todo!()
+        self.account_id.clone()
     }
 
     fn address(&self) -> <AlephConfig as subxt::Config>::Address {
-        todo!()
+        self.account_id.clone().into()
     }
 
     fn sign(&self, signer_payload: &[u8]) -> <AlephConfig as subxt::Config>::Signature {

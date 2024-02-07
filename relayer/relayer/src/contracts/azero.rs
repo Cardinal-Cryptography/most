@@ -12,11 +12,13 @@ use aleph_client::{
     contract_transcode::{ContractMessageTranscoder, Value, Value::Seq},
     pallets::contract::ContractsUserApi,
     sp_weights::weight_v2::Weight,
-    AccountId, AlephConfig, SignedConnection, TxInfo, TxStatus,
+    AccountId, AlephConfig, TxInfo, TxStatus,
 };
 use log::trace;
 use subxt::events::Events;
 use thiserror::Error;
+
+use crate::connections::azero::AzeroConnectionWithSigner;
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -64,7 +66,7 @@ impl MostInstance {
     #[allow(clippy::too_many_arguments)]
     pub async fn receive_request(
         &self,
-        signed_connection: &SignedConnection,
+        signed_connection: &AzeroConnectionWithSigner,
         request_hash: [u8; 32],
         committee_id: u128,
         dest_token_address: [u8; 32],

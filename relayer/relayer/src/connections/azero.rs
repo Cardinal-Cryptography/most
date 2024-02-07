@@ -21,8 +21,9 @@ pub fn sign(connection: &AzeroWsConnection, keypair: &KeyPair) -> SignedAzeroWsC
 }
 
 pub struct AzeroConnectionWithSigner {
-    pub connection: AzeroWsConnection,
-    pub signer: Client,
+    connection: AzeroWsConnection,
+    signer: Client,
+    account_id: AccountId,
 }
 
 impl AzeroConnectionWithSigner {
@@ -32,7 +33,12 @@ impl AzeroConnectionWithSigner {
         port: u32,
     ) -> Result<Self, signer_client::Error> {
         let signer = Client::new(cid, port)?;
-        Ok(Self { connection, signer })
+        let account_id = signer.account_id()?;
+        Ok(Self {
+            connection,
+            signer,
+            account_id,
+        })
     }
 }
 
@@ -63,14 +69,17 @@ impl SignedConnectionApi for AzeroConnectionWithSigner {
             info!(target:"aleph-client", "Sending extrinsic {}.{} with params: {:?}", details.pallet_name, details.call_name, params);
         }
 
-        let trial = self.as_connection().as_client().tx().create_unsigned(&tx)?;
-        let signer = self.signer.prepare_signer(trial.encoded())?;
-
-        let progress = self
+        let tx = self
             .as_connection()
             .as_client()
             .tx()
-            .sign_and_submit_then_watch(&tx, &signer, params)
+            .create_partial_signed(&tx, &self.account_id, params)
+            .await?;
+        let signer = self.signer.prepare_signer(&tx.signer_payload())?;
+        let tx = tx.sign(&signer);
+
+        let progress = tx
+            .submit_and_watch()
             .await
             .map_err(|e| anyhow!("Failed to submit transaction: {:?}", e))?;
 
@@ -96,7 +105,7 @@ impl SignedConnectionApi for AzeroConnectionWithSigner {
     }
 
     fn account_id(&self) -> &AccountId {
-        unimplemented!("AzeroConnectionWithSigner::account_id")
+        &self.account_id
     }
 
     fn signer(&self) -> &KeyPair {

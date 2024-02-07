@@ -64,6 +64,7 @@ fn server(azero_key: String) -> Result<(), Error> {
     let azero_key = KeyPair::from_string(&azero_key, None)?;
 
     let listener = VsockListener::bind_with_cid_port(VMADDR_CID_ANY, 1234)?;
+    println!("My address: {:?}", listener.local_addr());
 
     for client in listener.incoming() {
         let client: Client = client?.into();
@@ -83,10 +84,22 @@ fn handle_client(client: Client, azero_key: &KeyPair) -> Result<(), Error> {
             Command::Ping => {
                 client.send(&Response::Pong)?;
             }
+
+            Command::AccountId => {
+                let account_id = azero_key.public().into();
+                client.send(&Response::AccountId { account_id })?;
+            }
+
             Command::Sign { payload } => {
                 let signature = azero_key.sign(&payload);
                 let signature = subxt::ext::sp_runtime::MultiSignature::Sr25519(signature);
-                client.send(&Response::Signed { payload, signature })?;
+                let account_id = azero_key.public().into();
+
+                client.send(&Response::Signed {
+                    payload,
+                    signature,
+                    account_id,
+                })?;
             }
         }
     }

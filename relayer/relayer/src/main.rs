@@ -11,7 +11,10 @@ use thiserror::Error;
 use tokio::{runtime::Runtime, sync::Mutex};
 
 use crate::{
-    connections::{azero, eth},
+    connections::{
+        azero::{self, AzeroConnectionWithSigner},
+        eth,
+    },
     listeners::{AlephZeroListener, AzeroListenerError, EthListener, EthListenerError},
 };
 
@@ -65,12 +68,14 @@ fn main() -> Result<()> {
             unimplemented!("Only dev mode is supported for now");
         };
 
-        let azero_connection = Arc::new(azero::sign(
+        let azero_ro_connection = Arc::new(azero::sign(
             &azero::init(&config.azero_node_wss_url).await,
             &azero_keypair,
         ));
 
-        debug!("Established connection to Aleph Zero node");
+        let azero_rw_connection =
+            AzeroConnectionWithSigner::new(azero::init(&config.azero_node_wss_url).await, 2, 1234)
+                .expect("Cannot connect to signer");
 
         let wallet = if config.dev {
             // If no keystore path is provided, we use the default development mnemonic
@@ -101,7 +106,6 @@ fn main() -> Result<()> {
         debug!("Established connection to Ethereum node");
 
         let config_rc1 = Arc::clone(&config);
-        let azero_connection_rc1 = Arc::clone(&azero_connection);
         let eth_connection_rc1 = Arc::clone(&eth_connection);
         let redis_connection_rc1 = Arc::clone(&redis_connection);
 
@@ -110,7 +114,7 @@ fn main() -> Result<()> {
         tasks.push(tokio::spawn(async {
             EthListener::run(
                 config_rc1,
-                azero_connection_rc1,
+                azero_rw_connection,
                 eth_connection_rc1,
                 redis_connection_rc1,
             )
@@ -119,7 +123,7 @@ fn main() -> Result<()> {
         }));
 
         let config_rc2 = Arc::clone(&config);
-        let azero_connection_rc2 = Arc::clone(&azero_connection);
+        let azero_connection_rc2 = Arc::clone(&azero_ro_connection);
         let eth_connection_rc2 = Arc::clone(&eth_connection);
         let redis_connection_rc2 = Arc::clone(&redis_connection);
 
