@@ -1,6 +1,7 @@
 use std::thread;
 
 use clap::Parser;
+use log::info;
 use signer_client::{client, Client, Command, Response};
 use subxt::ext::{
     sp_core::{crypto::SecretStringError, sr25519::Pair as KeyPair, Pair},
@@ -36,6 +37,8 @@ enum Error {
 }
 
 fn main() -> Result<(), Error> {
+    env_logger::init();
+
     let args = ServerArguments::parse();
 
     if args.server {
@@ -50,10 +53,10 @@ fn main() -> Result<(), Error> {
 fn server(azero_key: String) -> Result<(), Error> {
     let azero_key = KeyPair::from_string(&azero_key, None)?;
     let account_id: AccountId32 = azero_key.public().into();
-    println!("Account ID: {:?}", account_id);
+    info!("Account ID: {:?}", account_id);
 
     let listener = VsockListener::bind_with_cid_port(VMADDR_CID_ANY, 1234)?;
-    println!("Vsock address: {:?}", listener.local_addr());
+    info!("Vsock address: {:?}", listener.local_addr());
 
     for client in listener.incoming() {
         let client: Client = client?.into();
@@ -66,14 +69,14 @@ fn server(azero_key: String) -> Result<(), Error> {
 fn handle_client(client: Client, azero_key: KeyPair) {
     thread::spawn(move || {
         let result = do_handle_client(client, &azero_key);
-        println!("Client disconnected: {:?}", result);
+        info!("Client disconnected: {:?}", result);
     });
 }
 
 fn do_handle_client(client: Client, azero_key: &KeyPair) -> Result<(), Error> {
     loop {
         let command = client.recv()?;
-        println!("Received command: {:?}", command);
+        info!("Received command: {:?}", command);
 
         match command {
             Command::Ping => {
