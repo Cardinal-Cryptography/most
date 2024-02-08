@@ -30,7 +30,7 @@ mod e2e {
     };
     use most::{
         most::{CrosschainTransferRequest, RequestProcessed, RequestSigned},
-        MostError, MostRef,
+        MostError, MostRef, OwnableError
     };
     use oracle::oracle::OracleRef;
     use psp22::{PSP22Error, PSP22};
@@ -105,7 +105,7 @@ mod e2e {
 
         assert_eq!(
             add_pair_res.expect_err("Bob should not be able to add a pair as he is not the owner"),
-            MostError::NotOwner(account_id(AccountKeyring::Bob))
+            MostError::Ownable(OwnableError::UnauthorizedAccount(account_id(AccountKeyring::Bob)))
         );
     }
 

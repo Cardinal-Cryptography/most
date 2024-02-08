@@ -1,7 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
 
-pub use self::most::{MostError, MostRef};
-
+pub use self::most::{MostError, MostRef, };
+pub use ownable::{Error as OwnableError};
 #[ink::contract]
 pub mod most {
 
@@ -138,7 +138,6 @@ pub mod most {
         RequestAlreadyProcessed,
         UnsupportedPair,
         InkEnvError(String),
-        NotOwner(AccountId),
         RequestAlreadySigned,
         BaseFeeTooLow,
         Arithmetic,
@@ -844,6 +843,12 @@ pub mod most {
             set_caller::<DefEnv>(accounts.alice);
             assert_eq!(most.ensure_owner(), Ok(()));
             assert_eq!(most.transfer_ownership(accounts.bob), Ok(()));
+            // check that bob has to accept before being granted ownership
+            set_caller::<DefEnv>(accounts.bob);
+            assert_eq!(most.ensure_owner(), Err(ownable::Error::UnauthorizedAccount(accounts.bob)));
+            // check that only bob can accept the pending new ownership
+            set_caller::<DefEnv>(accounts.charlie);
+            assert_eq!(most.accept_ownership(), Err(ownable::Error::UnauthorizedAccount(accounts.charlie)));
             set_caller::<DefEnv>(accounts.bob);
             assert_eq!(most.accept_ownership(), Ok(()));
             assert_eq!(most.ensure_owner(), Ok(()));
