@@ -46,5 +46,7 @@ pub async fn azero_to_eth() -> anyhow::Result<()> {
         .get_balance(eth_account_address, None)
         .await?;
 
+    assert_eq!(balance_post_unwrap - balance_pre_unwrap, config.test_args.transfer_amount);
+
     Ok(())
 }
