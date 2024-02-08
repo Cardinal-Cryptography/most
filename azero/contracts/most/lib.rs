@@ -1,7 +1,8 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
 
-pub use self::most::{MostError, MostRef};
 pub use ownable::Error as OwnableError;
+
+pub use self::most::{MostError, MostRef};
 
 #[ink::contract]
 pub mod most {
