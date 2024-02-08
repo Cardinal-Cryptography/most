@@ -121,7 +121,10 @@ pub async fn eth_to_azero() -> anyhow::Result<()> {
         "wETH (Aleph Zero) balance post transfer: {:?}",
         balance_post_transfer
     );
-    assert_eq!(transfer_amount, balance_post_transfer.into());
+    assert_eq!(
+        transfer_amount,
+        (balance_post_transfer - balance_pre_transfer).into()
+    );
 
     Ok(())
 }
