@@ -37,7 +37,7 @@ static GLOBAL_CONFIG: Lazy<Config> = Lazy::new(|| Config {
         "harsh master island dirt equip search awesome double turn crush wool grant".to_string(),
     ),
     test_args: TestArgs {
-        wait_minutes: get_env("WAIT_MINUTES").unwrap_or(8),
+        wait_max_minutes: get_env("WAIT_MAX_MINUTES").unwrap_or(15),
         transfer_amount: get_env("TRANSFER_AMOUNT").unwrap_or(1),
     },
 });
@@ -85,6 +85,6 @@ pub struct ContractMetadataPaths {
 }
 
 pub struct TestArgs {
-    pub wait_minutes: u64,
+    pub wait_max_minutes: u64,
     pub transfer_amount: u128,
 }

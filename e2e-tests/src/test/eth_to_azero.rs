@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{ops::AddAssign, str::FromStr};
 
 use aleph_client::{contract::ContractInstance, keypair_from_string, sp_runtime::AccountId32};
 use ethers::{
@@ -101,27 +101,40 @@ pub async fn eth_to_azero() -> anyhow::Result<()> {
             .await?;
     info!("`sendRequest` tx receipt: {:?}", send_request_receipt);
 
+    let tick = tokio::time::Duration::from_secs(5_u64);
+    let wait_max = tokio::time::Duration::from_secs(60_u64 * config.test_args.wait_max_minutes);
+
     info!(
-        "Waiting {:?} minutes for finalization",
-        config.test_args.wait_minutes
+        "Waiting a max. of {:?} minutes for finalization",
+        config.test_args.wait_max_minutes
     );
-    tokio::time::sleep(tokio::time::Duration::from_secs(
-        60_u64 * config.test_args.wait_minutes,
+
+    let mut wait = tokio::time::Duration::from_secs(0_u64);
+
+    while wait <= wait_max {
+        tokio::time::sleep(tick).await;
+        wait.add_assign(tick);
+        let balance_current: u128 = weth_azero_contract
+            .contract_read(
+                &azero_connection,
+                "PSP22::balance_of",
+                &[azero_account.to_string()],
+            )
+            .await?;
+        if balance_current == transfer_amount.as_u128() {
+            info!(
+                "wETH (Aleph Zero) required balance detected: {:?}",
+                balance_current
+            );
+            return Ok(());
+        }
+        if wait.as_secs() % 60 == 0 {
+            info!("minutes elapsed: {:?}", wait.as_secs() / 60)
+        }
+    }
+
+    Err(anyhow::anyhow!(
+        "Failed to detect required wETH (Aleph Zero) balance change of: {:?}",
+        transfer_amount
     ))
-    .await;
-
-    let balance_post_transfer: u128 = weth_azero_contract
-        .contract_read(
-            &azero_connection,
-            "PSP22::balance_of",
-            &[azero_account.to_string()],
-        )
-        .await?;
-    info!(
-        "wETH (Aleph Zero) balance post transfer: {:?}",
-        balance_post_transfer
-    );
-    assert_eq!(transfer_amount, balance_post_transfer.into());
-
-    Ok(())
 }
