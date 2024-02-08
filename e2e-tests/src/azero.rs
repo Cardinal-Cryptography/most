@@ -1,5 +1,6 @@
 use std::fs;
 
+use aleph_client::Connection;
 use anyhow;
 use serde::{Deserialize, Serialize};
 
@@ -17,4 +18,8 @@ pub fn contract_addresses(
     Ok(serde_json::from_str(&fs::read_to_string(
         azero_contract_addresses_path,
     )?)?)
+}
+
+pub async fn connection(url: &str) -> Connection {
+    Connection::new(url).await
 }
