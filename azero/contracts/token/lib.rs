@@ -82,9 +82,8 @@ pub mod token {
         }
 
         fn ensure_owner(&self) -> Result<(), PSP22Error> {
-            <Self as Ownable2Step>::ensure_owner(self).map_err(
-                |_| PSP22Error::Custom(String::from("Caller has to be the admin."))
-            )
+            <Self as Ownable2Step>::ensure_owner(self)
+                .map_err(|_| PSP22Error::Custom(String::from("Caller has to be the admin.")))
         }
 
         fn ensure_minter_burner(&self) -> Result<(), PSP22Error> {
@@ -251,7 +250,9 @@ pub mod token {
 
         #[ink(message)]
         fn get_pending_owner(&self) -> OwnableResult<AccountId> {
-            self.ownable_data.get_pending_owner().ok_or(ownable::Error::NoPendingOwner)
+            self.ownable_data
+                .get_pending_owner()
+                .ok_or(ownable::Error::NoPendingOwner)
         }
 
         #[ink(message)]
@@ -261,7 +262,8 @@ pub mod token {
 
         #[ink(message)]
         fn transfer_ownership(&mut self, new_owner: AccountId) -> OwnableResult<()> {
-            self.ownable_data.transfer_ownership(self.env().caller(), new_owner)
+            self.ownable_data
+                .transfer_ownership(self.env().caller(), new_owner)
         }
 
         #[ink(message)]

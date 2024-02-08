@@ -1,7 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
 
-pub use self::most::{MostError, MostRef, };
-pub use ownable::{Error as OwnableError};
+pub use self::most::{MostError, MostRef};
+
 #[ink::contract]
 pub mod most {
 
@@ -16,7 +16,7 @@ pub mod most {
         prelude::{format, string::String, vec, vec::Vec},
         storage::{traits::ManualKey, Lazy, Mapping},
     };
-    use ownable::{OwnableResult, Ownable2Step};
+    use ownable::{Ownable2Step, OwnableResult};
     use psp22::PSP22Error;
     use psp22_traits::{Burnable, Mintable};
     use scale::{Decode, Encode};
@@ -667,12 +667,13 @@ pub mod most {
         }
 
         fn ownable_data(&self) -> Result<ownable::Data, ownable::Error> {
-            self.ownable_data.get().ok_or(ownable::Error::CorruptedStorage)
+            self.ownable_data
+                .get()
+                .ok_or(ownable::Error::CorruptedStorage)
         }
     }
 
     impl ownable::Ownable2Step for Most {
-
         #[ink(message)]
         fn get_owner(&self) -> OwnableResult<AccountId> {
             Ok(self.ownable_data()?.get_owner())
@@ -680,7 +681,9 @@ pub mod most {
 
         #[ink(message)]
         fn get_pending_owner(&self) -> OwnableResult<AccountId> {
-            self.ownable_data()?.get_pending_owner().ok_or(ownable::Error::NoPendingOwner)
+            self.ownable_data()?
+                .get_pending_owner()
+                .ok_or(ownable::Error::NoPendingOwner)
         }
 
         #[ink(message)]
@@ -839,16 +842,25 @@ pub mod most {
             )
             .expect("Threshold is valid.");
             set_caller::<DefEnv>(accounts.bob);
-            assert_eq!(most.ensure_owner(), Err(ownable::Error::UnauthorizedAccount(accounts.bob)));
+            assert_eq!(
+                most.ensure_owner(),
+                Err(ownable::Error::UnauthorizedAccount(accounts.bob))
+            );
             set_caller::<DefEnv>(accounts.alice);
             assert_eq!(most.ensure_owner(), Ok(()));
             assert_eq!(most.transfer_ownership(accounts.bob), Ok(()));
             // check that bob has to accept before being granted ownership
             set_caller::<DefEnv>(accounts.bob);
-            assert_eq!(most.ensure_owner(), Err(ownable::Error::UnauthorizedAccount(accounts.bob)));
+            assert_eq!(
+                most.ensure_owner(),
+                Err(ownable::Error::UnauthorizedAccount(accounts.bob))
+            );
             // check that only bob can accept the pending new ownership
             set_caller::<DefEnv>(accounts.charlie);
-            assert_eq!(most.accept_ownership(), Err(ownable::Error::UnauthorizedAccount(accounts.charlie)));
+            assert_eq!(
+                most.accept_ownership(),
+                Err(ownable::Error::UnauthorizedAccount(accounts.charlie))
+            );
             set_caller::<DefEnv>(accounts.bob);
             assert_eq!(most.accept_ownership(), Ok(()));
             assert_eq!(most.ensure_owner(), Ok(()));

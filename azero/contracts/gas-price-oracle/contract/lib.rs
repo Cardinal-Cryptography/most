@@ -8,8 +8,8 @@ pub mod oracle {
         prelude::{format, string::String},
         storage::{traits::ManualKey, Lazy},
     };
-    use scale::{Decode, Encode};
     use ownable::*;
+    use scale::{Decode, Encode};
 
     #[ink(storage)]
     pub struct Oracle {
@@ -100,7 +100,9 @@ pub mod oracle {
         }
 
         fn ownable_data(&self) -> Result<ownable::Data, ownable::Error> {
-            self.ownable_data.get().ok_or(ownable::Error::CorruptedStorage)
+            self.ownable_data
+                .get()
+                .ok_or(ownable::Error::CorruptedStorage)
         }
     }
 
@@ -122,7 +124,9 @@ pub mod oracle {
 
         #[ink(message)]
         fn get_pending_owner(&self) -> OwnableResult<AccountId> {
-            self.ownable_data()?.get_pending_owner().ok_or(ownable::Error::NoPendingOwner)
+            self.ownable_data()?
+                .get_pending_owner()
+                .ok_or(ownable::Error::NoPendingOwner)
         }
 
         #[ink(message)]
