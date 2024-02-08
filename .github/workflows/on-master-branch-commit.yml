@@ -1,0 +1,25 @@
+---
+name: Master branch commit
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  check-vars-and-secrets:
+    name: Check vars and secrets
+    uses: ./.github/workflows/_check-vars-and-secrets.yml
+    secrets: inherit
+
+  compile-contracts-and-deploy-to-bridgenet:
+    needs: [check-vars-and-secrets]
+    name: Compile contracts and deploy to bridgenet
+    uses: ./.github/workflows/contracts-compile-and-deploy-to-bridgenet.yml
+    secrets: inherit
+
+  build-and-deploy-relayer-to-devnet:
+    needs: [compile-contracts-and-deploy-to-bridgenet]
+    name: Build and deploy relayer to devnet
+    uses: ./.github/workflows/relayer-build-and-deploy-to-devnet.yml
+    secrets: inherit
