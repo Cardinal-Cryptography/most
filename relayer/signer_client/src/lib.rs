@@ -84,19 +84,3 @@ impl Client {
         }
     }
 }
-
-pub fn client(cid: u32, port: u32) -> Result<(), Error> {
-    let client = Client::new(cid, port)?;
-
-    client.send(&Command::Ping)?;
-    let res: Response = client.recv()?;
-    println!("Received response: {:?}", res);
-
-    client.send(&Command::Sign {
-        payload: vec![1, 2, 3, 4],
-    })?;
-    let res: Response = client.recv()?;
-    println!("Received response: {:?}", res);
-
-    Ok(())
-}

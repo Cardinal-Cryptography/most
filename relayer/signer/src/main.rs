@@ -2,23 +2,20 @@ use std::thread;
 
 use clap::Parser;
 use log::info;
-use signer_client::{client, Client, Command, Response};
+use signer_client::{Client, Command, Response};
 use subxt::ext::{
     sp_core::{crypto::SecretStringError, sr25519::Pair as KeyPair, Pair},
     sp_runtime::AccountId32,
 };
-use vsock::{VsockListener, VMADDR_CID_ANY, VMADDR_CID_HOST};
+use vsock::{VsockAddr, VsockListener, VMADDR_CID_ANY};
 
 #[derive(Parser)]
 struct ServerArguments {
     #[clap(short, long, default_value = "1234")]
-    port: u16,
+    port: u32,
 
     #[clap(short, long)]
     azero_key: Option<String>,
-
-    #[clap(short, long)]
-    server: bool,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -40,30 +37,56 @@ fn main() -> Result<(), Error> {
     env_logger::init();
 
     let args = ServerArguments::parse();
+    let server = Server::new(
+        args.azero_key.expect("Aleph Zero key not provided"),
+        args.port,
+    )?;
 
-    if args.server {
-        server(args.azero_key.expect("Aleph Zero key not provided"))?
-    } else {
-        client(VMADDR_CID_HOST, 1234)?
-    }
+    info!("Server listening on: {:?}", server.local_addr()?);
+    info!("Azero account ID: {:?}", server.account_id());
+
+    server.accept_loop()?;
 
     Ok(())
 }
 
-fn server(azero_key: String) -> Result<(), Error> {
-    let azero_key = KeyPair::from_string(&azero_key, None)?;
-    let account_id: AccountId32 = azero_key.public().into();
-    info!("Account ID: {:?}", account_id);
+struct Server {
+    listener: VsockListener,
+    azero_key: KeyPair,
+}
 
-    let listener = VsockListener::bind_with_cid_port(VMADDR_CID_ANY, 1234)?;
-    info!("Vsock address: {:?}", listener.local_addr());
+impl Server {
+    fn new(azero_key: String, port: u32) -> Result<Self, Error> {
+        let azero_key = KeyPair::from_string(&azero_key, None)?;
+        let listener = VsockListener::bind_with_cid_port(VMADDR_CID_ANY, port)?;
 
-    for client in listener.incoming() {
-        let client: Client = client?.into();
-        handle_client(client, azero_key.clone());
+        Ok(Self {
+            listener,
+            azero_key,
+        })
     }
 
-    Ok(())
+    fn account_id(&self) -> AccountId32 {
+        self.azero_key.public().into()
+    }
+
+    fn local_addr(&self) -> Result<VsockAddr, Error> {
+        Ok(self.listener.local_addr()?)
+    }
+
+    fn accept_one(&self) -> Result<(), Error> {
+        let (client, _) = self.listener.accept()?;
+        let client = Client::from(client);
+        handle_client(client, self.azero_key.clone());
+
+        Ok(())
+    }
+
+    fn accept_loop(&self) -> Result<(), Error> {
+        loop {
+            self.accept_one()?;
+        }
+    }
 }
 
 fn handle_client(client: Client, azero_key: KeyPair) {
@@ -95,5 +118,79 @@ fn do_handle_client(client: Client, azero_key: &KeyPair) -> Result<(), Error> {
                 client.send(&Response::Signed { payload, signature })?;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::env;
+
+    use assert2::{assert, let_assert};
+    use serial_test::serial;
+    use subxt::ext::sp_runtime::traits::Verify;
+    use vsock::VMADDR_CID_HOST;
+
+    use super::*;
+
+    #[test]
+    #[serial]
+    fn test_ping() {
+        let client = connect();
+
+        client.send(&Command::Ping).unwrap();
+        let response: Response = client.recv().unwrap();
+
+        assert!(matches!(response, Response::Pong));
+    }
+
+    #[test]
+    #[serial]
+    fn test_account_id() {
+        let client = connect();
+
+        client.send(&Command::AccountId).unwrap();
+        let response: Response = client.recv().unwrap();
+
+        let_assert!(Response::AccountId { account_id } = response);
+        assert!(account_id.to_string() == "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY");
+    }
+
+    #[test]
+    #[serial]
+    fn test_sign() {
+        let client = connect();
+        let payload = b"Hello, world!".to_vec();
+
+        client
+            .send(&Command::Sign {
+                payload: payload.clone(),
+            })
+            .unwrap();
+        let response: Response = client.recv().unwrap();
+
+        let_assert!(
+            Response::Signed {
+                payload: signed_payload,
+                signature
+            } = response
+        );
+
+        assert!(signed_payload == payload);
+        assert!(signature.verify(&payload[..], &client.account_id().unwrap()));
+    }
+
+    fn connect() -> Client {
+        let server = Server::new("//Alice".to_string(), port()).unwrap();
+        let client = Client::new(VMADDR_CID_HOST, port()).unwrap();
+        server.accept_one().unwrap();
+
+        client
+    }
+
+    fn port() -> u32 {
+        env::var("PORT")
+            .unwrap_or_else(|_| "9876".to_string())
+            .parse()
+            .unwrap()
     }
 }
