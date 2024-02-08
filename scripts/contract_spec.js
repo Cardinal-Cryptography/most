@@ -23,6 +23,16 @@ let result = {
             address: azero.weth
         },
 
+        azero_oracle: {
+            contract: "azero_oracle",
+            address: azero.oracle
+        },
+
+        eth_migrations: {
+            contract: "azero_migrations",
+            address: eth.migrations
+        },
+
         eth_governance: {
             contract: "eth_governance",
             address: eth.governance

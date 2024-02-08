@@ -1,5 +1,6 @@
 NETWORK ?= development
 AZERO_ENV ?= dev
+DOCKER_RELAYER_NAME ?= most-relayer
 
 export BRIDGENET_AZERO_START_BLOCK=`ENDPOINT=https://rpc-fe-bridgenet.dev.azero.dev ./relayer/scripts/azero_best_finalized.sh`
 export BRIDGENET_ETH_START_BLOCK=`ENDPOINT=https://rpc-eth-bridgenet.dev.azero.dev ./relayer/scripts/eth_best_finalized.sh`
@@ -41,6 +42,11 @@ devnet-azero: # Run azero devnet
 devnet-azero: bootstrap-azero
 	docker compose -f ./devnet-azero/devnet-azero-compose.yml up -d
 
+.PHONY: devnet-azero-logs
+devnet-azero-logs: # show azero devnet node logs
+devnet-azero-logs:
+	docker container logs aleph_bridgenode --follow
+
 .PHONY: devnet-eth
 devnet-eth: # Run eth devnet
 devnet-eth:
@@ -69,7 +75,7 @@ eth-deps:
 
 .PHONY: watch-eth
 watch-eth: # watcher on the eth contracts
-watch-eth:
+watch-eth: eth-deps
 	cd eth && npm run watch
 
 .PHONY: compile-eth
@@ -116,7 +122,7 @@ azero-deps:
 
 .PHONY: watch-azero
 watch-azero: # watch azero contracts and generate artifacts
-watch-azero:
+watch-azero: azero-deps
 	cd azero && npm run watch
 
 .PHONY: compile-azero
@@ -171,13 +177,6 @@ test-solidity: # Run solidity tests
 test-solidity: eth-deps
 	cd eth && npx hardhat test ./test/Most.js ./test/WrappedEther.js
 
-.PHONY: test-ink-e2e
-test-ink-e2e: # Run ink e2e tests
-test-ink-e2e: bootstrap-azero
-	export CONTRACTS_NODE="../../scripts/azero_contracts_node.sh" && \
-	cd azero/contracts/tests && \
-	cargo test e2e -- --test-threads=1 --nocapture
-
 .PHONY: test-ink
 test-ink: # Run ink tests
 test-ink: test-ink-e2e
@@ -185,6 +184,19 @@ test-ink: test-ink-e2e
 	cd azero/contracts/governance && cargo test
 	cd azero/contracts/token && cargo test
 	cd azero/contracts/gas-price-oracle/contract && cargo test
+
+.PHONY: test-ink-e2e
+test-ink-e2e: # Run ink e2e tests
+test-ink-e2e: bootstrap-azero
+	export CONTRACTS_NODE="../../scripts/azero_contracts_node.sh" && \
+	cd azero/contracts/tests && \
+	cargo test e2e -- --test-threads=1 --nocapture
+
+.PHONY: e2e-tests
+e2e-tests: # Run specific e2e test. Requires: `test_module::test_name`.
+e2e-tests:
+	cd e2e-tests && \
+		RUST_LOG=info cargo test test::$(TEST_CASE) -- --color always --exact --nocapture --test-threads=1
 
 .PHONY: check-js-format
 check-js-format: # Check js formatting
@@ -229,6 +241,7 @@ rust-format-check:
 	cd azero/contracts/gas-price-oracle/contract && cargo fmt -- --check
 	cd azero/contracts/gas-price-oracle/trait && cargo fmt -- --check
 	cd azero/contracts/ownable && cargo fmt -- --check
+	cd e2e-tests && cargo fmt -- --check
 
 .PHONY: rust-format
 rust-format: # Format rust code
@@ -242,6 +255,7 @@ rust-format:
 	cd azero/contracts/gas-price-oracle/contract && cargo fmt
 	cd azero/contracts/gas-price-oracle/trait && cargo fmt
 	cd azero/contracts/ownable && cargo fmt
+	cd e2e-tests && cargo fmt
 
 .PHONY: js-format-check
 js-format-check: # Check js formatting
@@ -274,7 +288,7 @@ build-docker-relayer: compile-azero compile-eth
 	cp azero/addresses.json relayer/azero_addresses.json
 	cp eth/addresses.json relayer/eth_addresses.json
 	cp azero/artifacts/most.json relayer/most.json
-	cd relayer && docker build -t most-relayer .
+	cd relayer && docker build -t $(DOCKER_RELAYER_NAME) .
 	rm relayer/azero_addresses.json relayer/eth_addresses.json relayer/most.json
 
 contract_spec.json: # Generate a a file describing deployed contracts based on addresses.json files
