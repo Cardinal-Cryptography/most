@@ -31,6 +31,20 @@ pub mod token {
         pub value: u128,
     }
 
+    #[ink(event)]
+    #[derive(Debug)]
+    #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
+    pub struct TransferOwnershipInitiated {
+        pub new_owner: AccountId,
+    }
+
+    #[ink(event)]
+    #[derive(Debug)]
+    #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
+    pub struct TransferOwnershipAccepted {
+        pub new_owner: AccountId,
+    }
+
     #[ink(storage)]
     pub struct Token {
         data: PSP22Data,
@@ -263,12 +277,19 @@ pub mod token {
         #[ink(message)]
         fn transfer_ownership(&mut self, new_owner: AccountId) -> OwnableResult<()> {
             self.ownable_data
-                .transfer_ownership(self.env().caller(), new_owner)
+                .transfer_ownership(self.env().caller(), new_owner)?;
+            self.env()
+                .emit_event(TransferOwnershipInitiated { new_owner });
+            Ok(())
         }
 
         #[ink(message)]
         fn accept_ownership(&mut self) -> OwnableResult<()> {
-            self.ownable_data.accept_ownership(self.env().caller())
+            let new_owner = self.env().caller();
+            self.ownable_data.accept_ownership(new_owner)?;
+            self.env()
+                .emit_event(TransferOwnershipInitiated { new_owner });
+            Ok(())
         }
 
         #[ink(message)]

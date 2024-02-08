@@ -71,6 +71,20 @@ pub mod most {
         pub signer: AccountId,
     }
 
+    #[ink(event)]
+    #[derive(Debug)]
+    #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
+    pub struct TransferOwnershipInitiated {
+        pub new_owner: AccountId,
+    }
+
+    #[ink(event)]
+    #[derive(Debug)]
+    #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
+    pub struct TransferOwnershipAccepted {
+        pub new_owner: AccountId,
+    }
+
     #[derive(Default, Debug, Encode, Decode, Clone, Copy, PartialEq, Eq)]
     #[cfg_attr(
         feature = "std",
@@ -698,14 +712,19 @@ pub mod most {
             let mut ownable_data = self.ownable_data()?;
             ownable_data.transfer_ownership(self.env().caller(), new_owner)?;
             self.ownable_data.set(&ownable_data);
+            self.env()
+                .emit_event(TransferOwnershipInitiated { new_owner });
             Ok(())
         }
 
         #[ink(message)]
         fn accept_ownership(&mut self) -> OwnableResult<()> {
+            let new_owner = self.env().caller();
             let mut ownable_data = self.ownable_data()?;
-            ownable_data.accept_ownership(self.env().caller())?;
+            ownable_data.accept_ownership(new_owner)?;
             self.ownable_data.set(&ownable_data);
+            self.env()
+                .emit_event(TransferOwnershipAccepted { new_owner });
             Ok(())
         }
 
