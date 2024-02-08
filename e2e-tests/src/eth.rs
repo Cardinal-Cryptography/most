@@ -24,6 +24,10 @@ pub struct EthContractAddresses {
     pub weth9: String,
 }
 
+pub async fn connection(node_http: &str) -> anyhow::Result<Provider<Http>> {
+    Provider::<Http>::try_connect(node_http).await.map_err(anyhow::anyhow!("Cannot establish ETH connection!"))
+}
+
 pub async fn signed_connection(
     node_http: &str,
     wallet: Wallet<SigningKey>,

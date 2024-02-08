@@ -1,9 +1,11 @@
 use std::str::FromStr;
 
-use aleph_client::{contract::ContractInstance, sp_runtime::AccountId32, keypair_from_string};
 use ethers::signers::{coins_bip39::English, MnemonicBuilder, Signer};
+use log::info;
 
-use crate::{azero, config::setup_test};
+use aleph_client::{contract::ContractInstance, sp_runtime::AccountId32, keypair_from_string};
+
+use crate::{azero, config::setup_test, eth};
 
 #[tokio::test]
 pub async fn azero_to_eth() -> anyhow::Result<()> {
@@ -29,9 +31,20 @@ pub async fn azero_to_eth() -> anyhow::Result<()> {
     let mut eth_account_address_bytes = [0_u8; 32];
     eth_account_address_bytes[12..].copy_from_slice(eth_account_address.as_fixed_bytes());
 
+    let eth_connection = eth::connection(&config.eth_node_http).await?;
+
+    let balance_pre_unwrap = eth_connection
+        .get_balance(eth_account_address, None)
+        .await?;
+
     let send_request_args = [weth_azero_address.to_string(), config.test_args.transfer_amount.to_string(), azero::bytes32_to_string(&eth_account_address_bytes)];
 
-    let res = most.contract_exec(&azero_signed_connection, "send_request", &send_request_args).await?;
+    let send_request_info = most.contract_exec(&azero_signed_connection, "send_request", &send_request_args).await?;
+    info!("`send_request` tx info: {:?}", send_request_info);
+
+    let balance_post_unwrap = eth_connection
+        .get_balance(eth_account_address, None)
+        .await?;
 
     Ok(())
 }
