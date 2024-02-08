@@ -101,7 +101,7 @@ pub async fn eth_to_azero() -> anyhow::Result<()> {
             .await?;
     info!("'sendRequest' tx receipt: {:?}", send_request_receipt);
 
-    let tick = tokio::time::Duration::from_secs(5_u64);
+    let tick = tokio::time::Duration::from_secs(30_u64);
     let wait_max = tokio::time::Duration::from_secs(60_u64 * config.test_args.wait_max_minutes);
 
     info!(
@@ -121,10 +121,11 @@ pub async fn eth_to_azero() -> anyhow::Result<()> {
                 &[azero_account.to_string()],
             )
             .await?;
-        if balance_current == transfer_amount.as_u128() {
+        let balance_change = balance_current - balance_pre_transfer;
+        if balance_change == transfer_amount.as_u128() {
             info!(
-                "wETH (Aleph Zero) required balance detected: {:?}",
-                balance_current
+                "wETH (Aleph Zero) required balance change detected: {:?}",
+                balance_change
             );
             return Ok(());
         }
