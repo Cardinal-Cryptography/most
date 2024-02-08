@@ -37,10 +37,9 @@ static GLOBAL_CONFIG: Lazy<Config> = Lazy::new(|| Config {
         "harsh master island dirt equip search awesome double turn crush wool grant".to_string(),
     ),
     test_args: TestArgs {
-        wait_minutes: get_env("WAIT").unwrap_or(12),
+        wait_minutes: get_env("WAIT_MINUTES").unwrap_or(10),
         transfer_amount: get_env("TRANSFER_AMOUNT").unwrap_or(1),
     },
-    rust_log: get_env("RUST_LOG").unwrap_or(log::Level::Info),
 });
 
 fn get_env<T>(name: &str) -> Option<T>
@@ -71,7 +70,6 @@ pub struct Config {
     pub contract_metadata_paths: ContractMetadataPaths,
     pub eth_mnemonic: String,
     pub test_args: TestArgs,
-    pub rust_log: log::Level,
 }
 
 pub struct ContractMetadataPaths {

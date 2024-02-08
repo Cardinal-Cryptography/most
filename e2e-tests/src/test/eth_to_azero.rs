@@ -10,7 +10,7 @@ use log::info;
 
 use crate::{azero, config::setup_test, eth};
 
-/// One-way `Ethereum` -> `Aleph Zero` transfer trough `most`.
+/// One-way `Ethereum` -> `Aleph Zero` transfer through `most`.
 /// Wraps the required funds into wETH for an Ethereum account.
 /// Approves the `most` contract to use the wETH funds.
 /// Transfers `transfer_amount` of wETH to a specified Aleph Zero account over the bridge.
@@ -56,20 +56,40 @@ pub async fn eth_to_azero() -> anyhow::Result<()> {
         eth::call_contract_method(weth, "approve", config.eth_gas_limit, approve_args).await?;
     info!("'Approve' tx receipt: {:?}", approve_receipt);
 
+    let azero_contract_addresses =
+        azero::contract_addresses(&config.azero_contract_addresses_path)?;
+    let weth_azero_address = AccountId32::from_str(&azero_contract_addresses.weth)
+        .map_err(|e| anyhow::anyhow!("Cannot parse account id from string: {:?}", e))?;
+
+    let weth_azero_contract = ContractInstance::new(
+        weth_azero_address,
+        &config.contract_metadata_paths.azero_token,
+    )?;
+
+    let azero_connection = azero::connection(&config.azero_node_ws).await;
+
+    let azero_account_keypair = keypair_from_string("//Alice");
+    let azero_account = azero_account_keypair.account_id();
+
+    let balance_pre_transfer: u128 = weth_azero_contract
+        .contract_read(
+            &azero_connection,
+            "PSP22::balance_of",
+            &[azero_account.to_string()],
+        )
+        .await?;
+    info!(
+        "wETH (Aleph Zero) balance pre transfer: {:?}",
+        balance_pre_transfer
+    );
+
     let most_abi = eth::contract_abi(&config.contract_metadata_paths.eth_most)?;
     let most = eth::contract_from_deployed(most_address, most_abi, &eth_signed_connection)?;
 
     let mut weth_eth_address_bytes = [0_u8; 32];
     weth_eth_address_bytes[12..].copy_from_slice(weth_eth_address.as_fixed_bytes());
 
-    let azero_contract_addresses =
-        azero::contract_addresses(&config.azero_contract_addresses_path)?;
-    let weth_azero_address = AccountId32::from_str(&azero_contract_addresses.weth)
-        .map_err(|e| anyhow::anyhow!("Cannot parse account id from string: {:?}", e))?;
-
-    let azero_account_keypair = keypair_from_string(&config.azero_account_seed);
-    let azero_account_address_bytes: [u8; 32] =
-        (*azero_account_keypair.account_id()).clone().into();
+    let azero_account_address_bytes: [u8; 32] = (*azero_account).clone().into();
 
     let send_request_args = (
         weth_eth_address_bytes,
@@ -90,21 +110,17 @@ pub async fn eth_to_azero() -> anyhow::Result<()> {
     ))
     .await;
 
-    let azero_connection = azero::connection(&config.azero_node_ws).await;
-
-    let weth_azero_contract = ContractInstance::new(
-        weth_azero_address,
-        &config.contract_metadata_paths.azero_token,
-    )?;
-
     let balance_post_transfer: u128 = weth_azero_contract
         .contract_read(
             &azero_connection,
             "PSP22::balance_of",
-            &[(*azero_account_keypair.account_id()).clone().to_string()],
+            &[azero_account.to_string()],
         )
         .await?;
-    info!("balance post transfer: {:?}", balance_post_transfer);
+    info!(
+        "wETH (Aleph Zero) balance post transfer: {:?}",
+        balance_post_transfer
+    );
     assert_eq!(transfer_amount, balance_post_transfer.into());
 
     Ok(())
