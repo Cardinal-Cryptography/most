@@ -14,5 +14,5 @@ In order to use the e2e test suite, we need to have *most* running in the backgr
 
 Running a one specific test using default config values:
 ```bash
-$ cargo test test::test_module::test_name -- --color always --exact --nocapture
+$ cargo test test::test_module::test_name -- --color always --exact --nocapture --test-threads=1
 ```

@@ -64,10 +64,10 @@ pub async fn eth_to_azero() -> anyhow::Result<()> {
 
     let azero_contract_addresses =
         azero::contract_addresses(&config.azero_contract_addresses_path)?;
-    let weth_azero_account_id = AccountId32::from_str(&azero_contract_addresses.weth)
+    let weth_azero_address = AccountId32::from_str(&azero_contract_addresses.weth)
         .map_err(|e| anyhow::anyhow!("Cannot parse account id from string: {:?}", e))?;
 
-    let azero_account_keypair = keypair_from_string("//Alice");
+    let azero_account_keypair = keypair_from_string(&config.azero_account_seed);
     let azero_account_address_bytes: [u8; 32] =
         (*azero_account_keypair.account_id()).clone().into();
 
@@ -93,7 +93,7 @@ pub async fn eth_to_azero() -> anyhow::Result<()> {
     let azero_connection = azero::connection(&config.azero_node_ws).await;
 
     let weth_azero_contract = ContractInstance::new(
-        weth_azero_account_id,
+        weth_azero_address,
         &config.contract_metadata_paths.azero_token,
     )?;
 
