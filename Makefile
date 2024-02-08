@@ -176,6 +176,11 @@ test-solidity: # Run solidity tests
 test-solidity: eth-deps
 	cd eth && npx hardhat test ./test/Most.js ./test/WrappedEther.js
 
+
+.PHONY: test-ink
+test-ink: # Run ink tests
+test-ink: test-ink-unit test-ink-e2e
+
 .PHONY: test-ink-e2e
 test-ink-e2e: # Run ink e2e tests
 test-ink-e2e: bootstrap-azero
@@ -184,12 +189,17 @@ test-ink-e2e: bootstrap-azero
 	cargo test e2e -- --test-threads=1 --nocapture
 
 .PHONY: test-ink
-test-ink: # Run ink tests
-test-ink: test-ink-e2e
+test-ink-unit: # Run ink unit tests
+test-ink-unit:
 	cd azero/contracts/most && cargo test
 	cd azero/contracts/governance && cargo test
 	cd azero/contracts/token && cargo test
 	cd azero/contracts/gas-price-oracle/contract && cargo test
+
+.PHONY: test-relayer
+test-relayer: # Run relayer tests
+test-relayer: compile-azero-docker compile-eth
+	cd relayer && cargo test
 
 .PHONY: check-js-format
 check-js-format: # Check js formatting
