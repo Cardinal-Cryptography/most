@@ -2639,7 +2639,6 @@ dependencies = [
  "anyhow",
  "env_logger",
  "ethers",
- "hex",
  "log",
  "once_cell",
  "serde",

@@ -54,7 +54,7 @@ pub async fn eth_to_azero() -> anyhow::Result<()> {
 
     let approve_receipt =
         eth::call_contract_method(weth, "approve", config.eth_gas_limit, approve_args).await?;
-    info!("`Approve` tx receipt: {:?}", approve_receipt);
+    info!("'Approve' tx receipt: {:?}", approve_receipt);
 
     let azero_contract_addresses =
         azero::contract_addresses(&config.azero_contract_addresses_path)?;
@@ -99,9 +99,9 @@ pub async fn eth_to_azero() -> anyhow::Result<()> {
     let send_request_receipt =
         eth::call_contract_method(most, "sendRequest", config.eth_gas_limit, send_request_args)
             .await?;
-    info!("`sendRequest` tx receipt: {:?}", send_request_receipt);
+    info!("'sendRequest' tx receipt: {:?}", send_request_receipt);
 
-    let tick = tokio::time::Duration::from_secs(5_u64);
+    let tick = tokio::time::Duration::from_secs(30_u64);
     let wait_max = tokio::time::Duration::from_secs(60_u64 * config.test_args.wait_max_minutes);
 
     info!(
@@ -121,10 +121,11 @@ pub async fn eth_to_azero() -> anyhow::Result<()> {
                 &[azero_account.to_string()],
             )
             .await?;
-        if balance_current == transfer_amount.as_u128() {
+        let balance_change = balance_current - balance_pre_transfer;
+        if balance_change == transfer_amount.as_u128() {
             info!(
-                "wETH (Aleph Zero) required balance detected: {:?}",
-                balance_current
+                "wETH (Aleph Zero) required balance change detected: {:?}",
+                balance_change
             );
             return Ok(());
         }
