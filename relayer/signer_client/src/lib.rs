@@ -6,23 +6,11 @@ use vsock::VsockStream;
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("IO error: {0}")]
-    IO(std::io::Error),
+    IO(#[from] std::io::Error),
     #[error("Serde error: {0}")]
-    Serde(serde_json::Error),
+    Serde(#[from] serde_json::Error),
     #[error("Invalid response from server")]
     InvalidResponse,
-}
-
-impl From<std::io::Error> for Error {
-    fn from(err: std::io::Error) -> Self {
-        Error::IO(err)
-    }
-}
-
-impl From<serde_json::Error> for Error {
-    fn from(err: serde_json::Error) -> Self {
-        Error::Serde(err)
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
