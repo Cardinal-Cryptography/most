@@ -14,13 +14,15 @@ scale = { package = "parity-scale-codec", version = "3", default-features = fals
 scale-info = { version = "2.5", default-features = false, features = [
     "derive",
 ], optional = true }
+ownable = { path = "../../ownable", default-features = false }
+
 
 [lib]
 path = "lib.rs"
 
 [features]
 default = ["std"]
-std = ["ink/std", "scale/std", "scale-info/std", "gas-oracle-trait/std"]
+std = ["ink/std", "scale/std", "scale-info/std", "gas-oracle-trait/std", "ownable/std"]
 ink-as-dependency = []
 
 [profile.release]

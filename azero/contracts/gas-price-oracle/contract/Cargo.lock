@@ -576,6 +576,16 @@ version = "1.0.0"
 dependencies = [
  "gas-oracle-trait",
  "ink",
+ "ownable",
+ "parity-scale-codec",
+ "scale-info",
+]
+
+[[package]]
+name = "ownable"
+version = "0.1.0"
+dependencies = [
+ "ink",
  "parity-scale-codec",
  "scale-info",
 ]
