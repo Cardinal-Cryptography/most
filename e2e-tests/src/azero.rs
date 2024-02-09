@@ -25,7 +25,10 @@ pub async fn connection(url: &str) -> Connection {
 }
 
 pub async fn signed_connection(url: &str, keypair: &KeyPair) -> SignedConnection {
-    SignedConnection::from_connection(Connection::new(url).await, KeyPair::new(keypair.signer().clone()))
+    SignedConnection::from_connection(
+        Connection::new(url).await,
+        KeyPair::new(keypair.signer().clone()),
+    )
 }
 
 pub fn bytes32_to_string(data: &[u8; 32]) -> String {

@@ -25,7 +25,9 @@ pub struct EthContractAddresses {
 }
 
 pub async fn connection(node_http: &str) -> anyhow::Result<Provider<Http>> {
-    Provider::<Http>::try_connect(node_http).await.map_err(anyhow::anyhow!("Cannot establish ETH connection!"))
+    Provider::<Http>::try_connect(node_http)
+        .await
+        .map_err(|e| anyhow::anyhow!("Cannot establish ETH connection: {:?}", e))
 }
 
 pub async fn signed_connection(
