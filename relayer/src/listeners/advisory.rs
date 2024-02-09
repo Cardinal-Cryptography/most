@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use log::{trace, warn};
+use log::{info, trace, warn};
 
 use super::AzeroListenerError;
 use crate::{config::Config, connections::azero::AzeroWsConnection, contracts::AdvisoryInstance};
@@ -39,19 +39,27 @@ impl AdvisoryListener {
             )?;
 
         loop {
-            let mut is_emergency: bool = false;
+            let previous_emergency_state = emergency.load(Ordering::Relaxed);
+            let mut current_emergency_state: bool = false;
             for advisory in &contracts {
                 if advisory.is_emergency(&azero_connection).await? {
-                    is_emergency = true;
-                    warn!(
+                    current_emergency_state = true;
+                    if current_emergency_state != previous_emergency_state {
+                        warn!(
                         "Detected an emergency state in the Advisory contract with an address {}",
                         advisory.address
                     );
+                    }
                     break;
                 }
             }
 
-            emergency.store(is_emergency, Ordering::Relaxed);
+            if previous_emergency_state && !current_emergency_state {
+                info!("Previously set emergency state has been lifted");
+            }
+
+            emergency.store(current_emergency_state, Ordering::Relaxed);
+
             // we sleep for about half a block production time before making another round of queries
             thread::sleep(Duration::from_millis(500))
         }
