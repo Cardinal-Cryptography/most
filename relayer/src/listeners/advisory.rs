@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use log::{info, warn};
+use log::{trace, warn};
 
 use super::AzeroListenerError;
 use crate::{config::Config, connections::azero::AzeroWsConnection, contracts::AdvisoryInstance};
@@ -47,13 +47,19 @@ impl AdvisoryListener {
                 }
             }
 
-            match is_emergency {
-                true => warn!("Advisory emergency state: {is_emergency}"),
-                false => info!("Advisory emergency state: {is_emergency}"),
+            if is_emergency {
+                warn!("Detected an emergency state in one of the advisory contracts");
             }
 
             emergency.store(is_emergency, Ordering::Relaxed);
             thread::sleep(Duration::from_millis(500))
         }
+    }
+}
+
+pub async fn emergency_release(emergency: Arc<AtomicBool>) {
+    while emergency.load(Ordering::Relaxed) {
+        trace!("Event handling paused due to an emergency state in one of the advisory contracts")
+        // TODO : sleep?
     }
 }

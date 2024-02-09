@@ -19,7 +19,7 @@ use ethers::{
     providers::{Middleware, ProviderError},
     utils::keccak256,
 };
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 use redis::{aio::Connection as RedisConnection, RedisError};
 use subxt::{events::Events, utils::H256};
 use thiserror::Error;
@@ -29,6 +29,7 @@ use tokio::{
     time::{sleep, Duration},
 };
 
+use super::emergency_release;
 use crate::{
     config::Config,
     connections::{
@@ -144,6 +145,8 @@ impl AlephZeroListener {
 
         // Main AlephZero event loop
         loop {
+            emergency_release(emergency.clone()).await;
+
             let mut to_block = get_next_finalized_block_number_azero(
                 azero_connection.clone(),
                 first_unprocessed_block_number,
@@ -296,19 +299,22 @@ async fn handle_event(
     _permit: OwnedSemaphorePermit,
     emergency: Arc<AtomicBool>,
 ) -> Result<(), AzeroListenerError> {
-    let mut emergency_logged = false;
-    while emergency.load(Ordering::Relaxed) {
-        match emergency_logged {
-            true => debug!(
-                "Event handling paused due to an emergency state in one of the advisory contracts"
-            ),
-            false => {
-                warn!("Emergency state detected while handling: {event:?}");
-                emergency_logged = true;
-            }
-        }
-        // TODO : sleep?
-    }
+    // let mut emergency_logged = false;
+    // while emergency.load(Ordering::Relaxed) {
+    //     match emergency_logged {
+    //         // TODO : debug
+    //         true => trace!(
+    //             "Event handling paused due to an emergency state in one of the advisory contracts"
+    //         ),
+    //         false => {
+    //             warn!("Emergency state detected while handling: {event:?}");
+    //             emergency_logged = true;
+    //         }
+    //     }
+    //     // TODO : sleep?
+    // }
+
+    emergency_release(emergency).await;
 
     let Config {
         relayers_committee_id,
@@ -425,6 +431,8 @@ async fn handle_processed_block(
     let earliest_still_pending = pending_blocks
         .first()
         .expect("There always is a pending block in the set");
+
+    // println!("@handle processed_block");
 
     // Note: `earliest_still_pending` will never be 0
     write_last_processed_block(
