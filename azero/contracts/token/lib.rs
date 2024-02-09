@@ -294,9 +294,9 @@ pub mod token {
     #[cfg(test)]
     mod tests {
         use ink::env::{test::*, DefaultEnvironment as E};
+        use ownable::OwnableError;
 
         use super::*;
-        use ownable::OwnableError;
 
         const INIT_SUPPLY_TEST: u128 = 1_000_000;
 
