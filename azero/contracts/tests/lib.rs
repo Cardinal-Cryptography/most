@@ -105,7 +105,7 @@ mod e2e {
 
         assert_eq!(
             add_pair_res.expect_err("Bob should not be able to add a pair as he is not the owner"),
-            MostError::Ownable(OwnableError::UnauthorizedAccount(account_id(
+            MostError::Ownable(OwnableError::CallerNotOwner(account_id(
                 AccountKeyring::Bob
             )))
         );

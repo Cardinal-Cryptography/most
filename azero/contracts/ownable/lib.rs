@@ -4,7 +4,6 @@
 ///
 /// The basic functionality is similar to the `Ownable` concept and exposes the following messages/methods:
 /// * `get_owner`
-/// * `is_owner`
 /// * `ensure_owner`: a helper to use with the `?` syntax that will check whether the caller is the owner of the contract
 ///
 /// Additionally, it introduces the following method for transferring ownership:
@@ -13,30 +12,30 @@
 /// * `get_pending_owner`: returns the pending owner, if the ownership change process is currently underway.  
 ///
 /// In order to use it in your contract, implement the methods of the `Ownable2Step` trait: in most cases, you can simply call the corresponding methods on the `Data` object.
-use ink::primitives::AccountId;
+use ink::{prelude::string::String, primitives::AccountId};
 use scale::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Eq, Encode, Decode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
-pub enum Error {
+pub enum OwnableError {
     /// The caller didn't have the permissions to call a given method
-    UnauthorizedAccount(AccountId),
+    CallerNotOwner(AccountId),
     /// The caller tried to accept ownership but the process hasn't been started
     NoPendingOwner,
     /// Useful in cases, when the `Data` struct is not accessed directly but inside of `Lazy` or a `Mapping`, means that we failed to access the `Data` struct itself.
-    CorruptedStorage,
+    Custom(String),
 }
 
-pub type OwnableResult<T> = Result<T, Error>;
+pub type OwnableResult<T> = Result<T, OwnableError>;
 
 #[derive(Debug)]
 #[ink::storage_item]
-pub struct Data {
+pub struct Ownable2StepData {
     owner: AccountId,
     pending_owner: Option<AccountId>,
 }
 
-impl Data {
+impl Ownable2StepData {
     pub fn new(owner: AccountId) -> Self {
         Self {
             owner,
@@ -50,7 +49,7 @@ impl Data {
         new_owner: AccountId,
     ) -> OwnableResult<()> {
         if caller != self.owner {
-            return Err(Error::UnauthorizedAccount(caller));
+            return Err(OwnableError::CallerNotOwner(caller));
         }
 
         self.pending_owner = Some(new_owner);
@@ -59,10 +58,10 @@ impl Data {
     }
 
     pub fn accept_ownership(&mut self, caller: AccountId) -> OwnableResult<()> {
-        let pending_owner = self.pending_owner.ok_or(Error::NoPendingOwner)?;
+        let pending_owner = self.pending_owner.ok_or(OwnableError::NoPendingOwner)?;
 
         if caller != pending_owner {
-            return Err(Error::UnauthorizedAccount(caller));
+            return Err(OwnableError::CallerNotOwner(caller));
         }
 
         self.owner = pending_owner;
@@ -71,21 +70,17 @@ impl Data {
         Ok(())
     }
 
-    pub fn get_owner(&self) -> AccountId {
-        self.owner
+    pub fn get_owner(&self) -> OwnableResult<AccountId> {
+        Ok(self.owner)
     }
 
-    pub fn get_pending_owner(&self) -> Option<AccountId> {
-        self.pending_owner
-    }
-
-    pub fn is_owner(&self, caller: AccountId) -> bool {
-        caller == self.owner
+    pub fn get_pending_owner(&self) -> OwnableResult<AccountId> {
+        self.pending_owner.ok_or(OwnableError::NoPendingOwner)
     }
 
     pub fn ensure_owner(&self, caller: AccountId) -> OwnableResult<()> {
         if caller != self.owner {
-            Err(Error::UnauthorizedAccount(caller))
+            Err(OwnableError::CallerNotOwner(caller))
         } else {
             Ok(())
         }
@@ -109,10 +104,6 @@ pub trait Ownable2Step {
     /// Returns the address of the pending owner.
     #[ink(message)]
     fn get_pending_owner(&self) -> OwnableResult<AccountId>;
-
-    /// Checks if the the `account` is the current owner.
-    #[ink(message)]
-    fn is_owner(&self, account: AccountId) -> OwnableResult<bool>;
 
     /// Starts the ownership transfer of the contract to a new account. Replaces the pending transfer if there is one.
     /// Can only be called by the current owner.

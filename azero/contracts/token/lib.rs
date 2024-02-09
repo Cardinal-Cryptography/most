@@ -5,7 +5,7 @@ pub use self::token::TokenRef;
 #[ink::contract]
 pub mod token {
     use ink::prelude::{string::String, vec::Vec};
-    use ownable::{Ownable2Step, OwnableResult};
+    use ownable::{Ownable2Step, Ownable2StepData, OwnableResult};
     use psp22::{PSP22Data, PSP22Error, PSP22Event, PSP22Metadata, PSP22};
     use psp22_traits::{Burnable, Mintable};
 
@@ -48,7 +48,7 @@ pub mod token {
     #[ink(storage)]
     pub struct Token {
         data: PSP22Data,
-        ownable_data: ownable::Data,
+        ownable_data: Ownable2StepData,
         name: Option<String>,
         symbol: Option<String>,
         decimals: u8,
@@ -67,7 +67,7 @@ pub mod token {
         ) -> Self {
             let caller = Self::env().caller();
             let data = PSP22Data::new(total_supply, caller);
-            let ownable_data = ownable::Data::new(caller);
+            let ownable_data = Ownable2StepData::new(caller);
 
             Self {
                 data,
@@ -259,19 +259,12 @@ pub mod token {
     impl Ownable2Step for Token {
         #[ink(message)]
         fn get_owner(&self) -> OwnableResult<AccountId> {
-            Ok(self.ownable_data.get_owner())
+            self.ownable_data.get_owner()
         }
 
         #[ink(message)]
         fn get_pending_owner(&self) -> OwnableResult<AccountId> {
-            self.ownable_data
-                .get_pending_owner()
-                .ok_or(ownable::Error::NoPendingOwner)
-        }
-
-        #[ink(message)]
-        fn is_owner(&self, account: AccountId) -> OwnableResult<bool> {
-            Ok(self.ownable_data.is_owner(account))
+            self.ownable_data.get_pending_owner()
         }
 
         #[ink(message)]
@@ -331,7 +324,7 @@ pub mod token {
             set_caller::<E>(bob);
             assert_eq!(
                 token.transfer_ownership(alice),
-                Err(ownable::Error::UnauthorizedAccount(bob)),
+                Err(ownable::Error::CallerNotOwner(bob)),
             );
         }
 

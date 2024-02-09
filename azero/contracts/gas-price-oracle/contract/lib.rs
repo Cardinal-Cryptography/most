@@ -6,15 +6,14 @@ pub mod oracle {
     use ink::{
         env::{set_code_hash, Error as InkEnvError},
         prelude::{format, string::String},
-        storage::{traits::ManualKey, Lazy},
     };
-    use ownable::*;
+    use ownable::{Ownable2Step, Ownable2StepData, OwnableError, OwnableResult};
     use scale::{Decode, Encode};
 
     #[ink(storage)]
     pub struct Oracle {
         /// data for Ownable2Step - oracle owner
-        ownable_data: Lazy<ownable::Data, ManualKey<0xDEADBEEF>>,
+        ownable_data: Ownable2StepData,
         /// timestamp of the last update in ms since UNIX epoch
         last_update: u64,
         /// price of one unit of ETH gas in picoAZERO (i.e. 10^-12 AZERO)
@@ -26,13 +25,19 @@ pub mod oracle {
     #[derive(Debug, PartialEq, Eq, Encode, Decode)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub enum OracleError {
-        Ownable(ownable::Error),
+        Ownable(OwnableError),
         InkEnvError(String),
     }
 
     impl From<InkEnvError> for OracleError {
         fn from(why: InkEnvError) -> Self {
             Self::InkEnvError(format!("{:?}", why))
+        }
+    }
+
+    impl From<OwnableError> for OracleError {
+        fn from(inner: OwnableError) -> Self {
+            OracleError::Ownable(inner)
         }
     }
 
@@ -65,19 +70,11 @@ pub mod oracle {
         pub new_code_hash: [u8; 32],
     }
 
-    impl From<ownable::Error> for OracleError {
-        fn from(inner: ownable::Error) -> Self {
-            OracleError::Ownable(inner)
-        }
-    }
-
     impl Oracle {
         #[ink(constructor)]
         pub fn new(owner: AccountId, init_price: u128) -> Self {
-            let mut ownable_data = Lazy::new();
-            ownable_data.set(&ownable::Data::new(owner));
             Self {
-                ownable_data,
+                ownable_data: Ownable2StepData::new(owner),
                 last_update: Self::env().block_timestamp(),
                 last_price: init_price,
                 reserved: None,
@@ -105,12 +102,6 @@ pub mod oracle {
             });
             Ok(())
         }
-
-        fn ownable_data(&self) -> Result<ownable::Data, ownable::Error> {
-            self.ownable_data
-                .get()
-                .ok_or(ownable::Error::CorruptedStorage)
-        }
     }
 
     impl EthGasPriceOracle for Oracle {
@@ -123,29 +114,21 @@ pub mod oracle {
         }
     }
 
-    impl ownable::Ownable2Step for Oracle {
+    impl Ownable2Step for Oracle {
         #[ink(message)]
         fn get_owner(&self) -> OwnableResult<AccountId> {
-            Ok(self.ownable_data()?.get_owner())
+            self.ownable_data.get_owner()
         }
 
         #[ink(message)]
         fn get_pending_owner(&self) -> OwnableResult<AccountId> {
-            self.ownable_data()?
-                .get_pending_owner()
-                .ok_or(ownable::Error::NoPendingOwner)
-        }
-
-        #[ink(message)]
-        fn is_owner(&self, account: AccountId) -> OwnableResult<bool> {
-            Ok(self.ownable_data()?.is_owner(account))
+            self.ownable_data.get_pending_owner()
         }
 
         #[ink(message)]
         fn transfer_ownership(&mut self, new_owner: AccountId) -> OwnableResult<()> {
-            let mut ownable_data = self.ownable_data()?;
-            ownable_data.transfer_ownership(self.env().caller(), new_owner)?;
-            self.ownable_data.set(&ownable_data);
+            self.ownable_data
+                .transfer_ownership(self.env().caller(), new_owner)?;
             self.env()
                 .emit_event(TransferOwnershipInitiated { new_owner });
             Ok(())
@@ -154,9 +137,7 @@ pub mod oracle {
         #[ink(message)]
         fn accept_ownership(&mut self) -> OwnableResult<()> {
             let new_owner = self.env().caller();
-            let mut ownable_data = self.ownable_data()?;
-            ownable_data.accept_ownership(new_owner)?;
-            self.ownable_data.set(&ownable_data);
+            self.ownable_data.accept_ownership(new_owner)?;
             self.env()
                 .emit_event(TransferOwnershipAccepted { new_owner });
             Ok(())
@@ -164,7 +145,7 @@ pub mod oracle {
 
         #[ink(message)]
         fn ensure_owner(&self) -> OwnableResult<()> {
-            self.ownable_data()?.ensure_owner(self.env().caller())
+            self.ownable_data.ensure_owner(self.env().caller())
         }
     }
 
