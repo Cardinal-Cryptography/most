@@ -38,7 +38,6 @@ pub enum AzeroContractError {
 pub struct AdvisoryInstance {
     pub contract: ContractInstance,
     pub address: AccountId,
-    pub transcoder: ContractMessageTranscoder,
 }
 
 impl AdvisoryInstance {
@@ -47,7 +46,6 @@ impl AdvisoryInstance {
             .map_err(|why| AzeroContractError::NotAccountId(why.to_string()))?;
         Ok(Self {
             address: address.clone(),
-            transcoder: ContractMessageTranscoder::load(metadata_path)?,
             contract: ContractInstance::new(address, metadata_path)?,
         })
     }

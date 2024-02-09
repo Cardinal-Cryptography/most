@@ -145,7 +145,7 @@ async function main(): Promise<void> {
   const symbol = "wETH";
   const name = symbol;
   const decimals = 12;
-  const minterBurner = (process.env.AZERO_ENV == "dev") ? authority : mostAddress;
+  const minterBurner = process.env.AZERO_ENV == "dev" ? authority : mostAddress;
   const estimatedGasToken = await estimateContractInit(
     api,
     deployer,
@@ -164,9 +164,9 @@ async function main(): Promise<void> {
   console.log("token address:", wethAddress);
 
   // premint some token for DEV
-  if process.env.AZERO_ENV == "dev" {
+  if (process.env.AZERO_ENV == "dev") {
     const weth = new Token(wethAddress, deployer, api);
-    await weth.tx.mint(authority, 1000000000000000)
+    await weth.tx.mint(authority, 1000000000000000);
     await weth.tx.setMinterBurner(mostAddress);
   }
 
