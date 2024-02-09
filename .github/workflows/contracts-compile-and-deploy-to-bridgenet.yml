@@ -2,15 +2,21 @@
 name: Bridgenet - deploy contracts
 
 on:
-  push:
-    branches:
-      - master
+  workflow_call:
+  workflow_dispatch:
 
 jobs:
+  check-vars-and-secrets:
+    name: Check vars and secrets
+    uses: ./.github/workflows/_check-vars-and-secrets.yml
+    secrets: inherit
+
   test-azero-contracts:
+    needs: [check-vars-and-secrets]
     uses: ./.github/workflows/test-azero-contracts.yml
 
   test-eth-contracts:
+    needs: [check-vars-and-secrets]
     uses: ./.github/workflows/test-eth-contracts.yml
 
   deploy-contracts:
@@ -39,7 +45,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: eth-artifacts
+          name: eth-deployed-contracts
           if-no-files-found: error
           retention-days: 1
           path: |
@@ -48,7 +54,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: azero-artifacts
+          name: azero-deployed-contracts
           if-no-files-found: error
           retention-days: 1
           path: |
@@ -62,42 +68,69 @@ jobs:
     strategy:
       matrix:
         include:
-          - from: contract_spec.json
-            to: addresses/fe_bridgenet
-            filname: bridgenet.json
           - from: eth/artifacts/contracts/Governance.sol/Governance.json
-            to: contracts/${{ github.sha }}/eth_governace
+            to: eth_governance
           - from: eth/artifacts/contracts/Most.sol/Most.json
-            to: contracts/${{ github.sha }}/eth_most
+            to: eth_most
           - from: eth/artifacts/contracts/Token.sol/Token.json
-            to: contracts/${{ github.sha }}/eth_token
+            to: eth_token
           - from: eth/artifacts/contracts/WETH9.sol/WETH9.json
-            to: contracts/${{ github.sha }}/eth_weth9
+            to: eth_weth9
           - from: azero/artifacts/most.json
-            to: contracts/${{ github.sha }}/azero_most
+            to: azero_most
           - from: azero/artifacts/most.contract
-            to: contracts/${{ github.sha }}/azero_most
+            to: azero_most
           - from: azero/artifacts/governance.json
-            to: contracts/${{ github.sha }}/azero_governance
+            to: azero_governance
           - from: azero/artifacts/governance.contract
-            to: contracts/${{ github.sha }}/azero_governance
+            to: azero_governance
           - from: azero/artifacts/token.json
-            to: contracts/${{ github.sha }}/azero_token
+            to: azero_token
           - from: azero/artifacts/token.contract
-            to: contracts/${{ github.sha }}/azero_token
-
+            to: azero_token
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
       - uses: actions/download-artifact@v4
         with:
-          name: azero-artifacts
+          name: azero-deployed-contracts
           path: azero
 
       - uses: actions/download-artifact@v4
         with:
-          name: eth-artifacts
+          name: eth-deployed-contracts
+          path: eth
+
+      - name: Copy files to S3 AWS bucket
+        uses: Cardinal-Cryptography/github-actions/copy-file-to-s3@v1
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RW_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RW_AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
+        with:
+          compression: false
+          source-path: ${{ matrix.from }}
+          s3-bucket-filename: ${{ matrix.filename }}
+          s3-bucket-path: most/artifacts/${{ github.sha }}/${{ matrix.to }}
+          s3-bucket-name: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
+
+  upload-contract-addresses:
+    name: Upload contract addresses to S3
+    runs-on: self-hosted
+    needs: [deploy-contracts]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: azero-deployed-contracts
+          path: azero
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: eth-deployed-contracts
           path: eth
 
       - name: Prepare contract_spec.json
@@ -107,12 +140,12 @@ jobs:
       - name: Copy files to S3 AWS bucket
         uses: Cardinal-Cryptography/github-actions/copy-file-to-s3@v1
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_DEVNET_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_DEVNET_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: eu-central-1
+          AWS_ACCESS_KEY_ID: ${{ secrets.CONTRACTS_MOST_ADDRESSES_BRIDGENET_DEV_RW_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CONTRACTS_MOST_ADDRESSES_BRIDGENET_DEV_RW_AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
         with:
           compression: false
-          source-path: ${{ matrix.from }}
-          s3-bucket-filename: ${{ matrix.filename }}
-          s3-bucket-path: most/${{ matrix.to }}
-          s3-bucket-name: alephzero-devnet-contracts-test
+          source-path: contract_spec.json
+          s3-bucket-filename: dev.json
+          s3-bucket-path: most/addresses/bridgenet
+          s3-bucket-name: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}

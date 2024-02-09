@@ -1,0 +1,33 @@
+name: Relayer - build and deploy to devnet
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  check-vars-and-secrets:
+    name: Check vars and secrets
+    uses: ./.github/workflows/_check-vars-and-secrets.yml
+    secrets: inherit
+
+  build-and-push:
+    needs: [check-vars-and-secrets]
+    name: Build and push
+    uses: ./.github/workflows/_relayer-build-and-push.yml
+    secrets: inherit
+    with:
+      environment: bridgenet
+      frontend-environment: dev
+
+  deploy-to-devnet:
+    needs: [build-and-push]
+    name: Deploy to devnet
+    uses: ./.github/workflows/_relayer-deploy.yml
+    secrets: inherit
+    with:
+      environment: devnet
+      docker-tag: ${{ needs.build-and-push.outputs.docker-tag }}

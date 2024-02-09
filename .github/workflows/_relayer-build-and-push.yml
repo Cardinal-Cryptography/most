@@ -1,0 +1,144 @@
+name: Build and push relayer
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: One of 'bridgenet', 'testnet', 'mainnet'
+        type: string
+        required: true
+      frontend-environment:
+        description: Environment name for frontend
+        type: string
+        required: true
+    outputs:
+      docker-tag:
+        description: Docker image tag
+        value: ${{ jobs.build-and-push.outputs.docker-tag }}
+
+jobs:
+  check-vars-and-secrets:
+    name: Check vars and secrets
+    uses: ./.github/workflows/_check-vars-and-secrets.yml
+    secrets: inherit
+
+  build-and-push:
+    needs: [check-vars-and-secrets]
+    name: Build and push
+    runs-on: [self-hosted, Linux, X64, large]
+    outputs:
+      docker-tag: ${{ steps.build.outputs.docker-tag }}
+    env:
+      RUST_BACKTRACE: full
+      RUSTC_WRAPPER: sccache
+    steps:
+      - name: Check inputs
+        shell: bash
+        run: |
+          if [[ \
+            '${{ inputs.environment }}' != 'bridgenet' && \
+            '${{ inputs.environment }}' != 'testnet' && \
+            '${{ inputs.environment }}' != 'mainnet' \
+          ]]; then
+            echo 'Invalid environment'
+            exit 1
+          fi
+
+          # TODO: Replace below envs names when agreed with frontend devs
+          if [[ \
+            '${{ inputs.frontend-environment }}' != 'dev' && \
+            '${{ inputs.frontend-environment }}' != 'stg' && \
+            '${{ inputs.frontend-environment }}' != 'prd'
+          ]]; then
+            echo 'Invalid frontend environment'
+            exit 1
+          fi
+
+          # TODO: Remove when implemented
+          if [[ \
+            '${{ inputs.frontend-environment }}' != 'dev'
+          ]]; then
+            echo 'Only dev frontend environment is implemented at this moment'
+            exit 1          
+          fi
+
+          # TODO: Remove when implemented
+          if [[ \
+            '${{ inputs.environment }}' == 'testnet' || \
+            '${{ inputs.environment }}' == 'mainnet' \
+          ]]; then
+            echo 'testnet and mainnet are not implemented yet'
+            exit 1
+          fi
+
+      - name: Checkout Source code
+        uses: actions/checkout@v2
+
+      - name: Call action get-ref-properties
+        id: get-ref-properties
+        # yamllint disable-line rule:line-length
+        uses: Cardinal-Cryptography/github-actions/get-ref-properties@v6
+
+      - name: Download addresses from S3 AWS bucket
+        shell: bash
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CONTRACTS_MOST_ADDRESSES_BRIDGENET_DEV_RO_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CONTRACTS_MOST_ADDRESSES_BRIDGENET_DEV_RO_AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
+          TMP_ADDRESSES_FILE: addresses-${{ inputs.frontend-environment }}.json
+        # yamllint disable rule:line-length
+        run: |
+          s3_addr_path="most/addresses/${{ inputs.environment }}/${{ inputs.frontend-environment }}.json"
+          aws s3 cp s3://${{ secrets.CONTRACTS_S3BUCKET_NAME }}/${s3_addr_path} '${{ env.TMP_ADDRESSES_FILE }}'
+        # yamllint enable rule:line-length
+
+      - name: Download artifact from S3 AWS bucket
+        shell: bash
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
+        # yamllint disable rule:line-length
+        run: |
+          mkdir -p azero/artifacts
+          s3_art_path="most/artifacts/${{ github.sha }}"
+          aws s3 cp s3://${{ secrets.CONTRACTS_S3BUCKET_NAME }}/${s3_art_path}/azero_most/most.json azero/artifacts/most.json
+        # yamllint enable rule:line-length
+
+      - name: Install Rust toolchain
+        uses: Cardinal-Cryptography/github-actions/install-rust-toolchain@v6
+
+      - name: Build relayer
+        id: build
+        env:
+          TMP_ADDRESSES_FILE: addresses-${{ inputs.frontend-environment }}.json
+        run: |
+          # Extract eth and azero addresses into separate JSON files, as required for building relayer
+          # TODO: It's a hack for now, get that sorted with developers!
+          cat '${{ env.TMP_ADDRESSES_FILE }}' | jq '.addresses | to_entries | map(select(.key | contains("eth_"))) | map({(.key | sub("eth_";"")): .value.address}) | add' > eth/addresses.json
+          cat '${{ env.TMP_ADDRESSES_FILE }}' | jq '.addresses | to_entries | map(select(.key | contains("azero_"))) | map({(.key | sub("azero_";"")): .value.address}) | add' > azero/addresses.json
+
+          docker_tag=${{ steps.get-ref-properties.outputs.sha }}-${{ inputs.environment }}-${{ inputs.frontend-environment }}
+          docker_name=most-relayer-${docker_tag}
+
+          make build-docker-relayer DOCKER_RELAYER_NAME=${docker_name}
+
+          echo "docker-name=${docker_name}" >> $GITHUB_OUTPUT
+          echo "docker-tag=${docker_tag}" >> $GITHUB_OUTPUT
+
+      - name: Login to Amazon ECR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.ECR_PRIVATE_HOST }}
+          username: ${{ secrets.AWS_MAINNET_ACCESS_KEY_ID }}
+          password: ${{ secrets.AWS_MAINNET_SECRET_ACCESS_KEY }}
+        env:
+          AWS_REGION: us-east-1
+
+      - name: Push docker image to ECR
+        shell: bash
+        run: |
+          docker_image='${{ secrets.ECR_PRIVATE_HOST }}/most-relayer:${{ steps.build.outputs.docker-tag }}'
+
+          docker tag '${{ steps.build.outputs.docker-name }}' "${docker_image}"
+          docker push "${docker_image}"
