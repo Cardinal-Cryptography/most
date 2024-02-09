@@ -1,10 +1,7 @@
 use std::{
     cmp::min,
     collections::BTreeSet,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+    sync::{atomic::AtomicBool, Arc},
 };
 
 use aleph_client::{
@@ -19,7 +16,7 @@ use ethers::{
     providers::{Middleware, ProviderError},
     utils::keccak256,
 };
-use log::{debug, error, info, trace, warn};
+use log::{debug, error, info, warn};
 use redis::{aio::Connection as RedisConnection, RedisError};
 use subxt::{events::Events, utils::H256};
 use thiserror::Error;
