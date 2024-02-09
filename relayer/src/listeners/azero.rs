@@ -19,7 +19,7 @@ use ethers::{
     providers::{Middleware, ProviderError},
     utils::keccak256,
 };
-use log::{debug, error, info, trace, warn};
+use log::{debug, error, info, warn};
 use redis::{aio::Connection as RedisConnection, RedisError};
 use subxt::{events::Events, utils::H256};
 use thiserror::Error;
@@ -95,6 +95,7 @@ const ALEPH_BLOCK_PROD_TIME_SEC: u64 = 1;
 // This is more than the maximum number of send_request calls than will fit into the block (execution time)
 const ALEPH_MAX_REQUESTS_PER_BLOCK: usize = 50;
 
+#[derive(Copy, Clone)]
 pub struct AlephZeroListener;
 
 impl AlephZeroListener {
@@ -143,60 +144,50 @@ impl AlephZeroListener {
 
         // Main AlephZero event loop
         loop {
-            match emergency.load(Ordering::Relaxed) {
-                true => {
-                    trace!("Advisory is in an emergency state");
-                    sleep(Duration::from_millis(999)).await;
-                    continue;
-                }
-                false => {
-                    // Query for the next unknown finalized block number, if not present we wait for it.
-                    let mut to_block = get_next_finalized_block_number_azero(
-                        azero_connection.clone(),
-                        first_unprocessed_block_number,
-                    )
-                    .await;
+            let mut to_block = get_next_finalized_block_number_azero(
+                azero_connection.clone(),
+                first_unprocessed_block_number,
+            )
+            .await;
 
-                    to_block = min(to_block, first_unprocessed_block_number + (*sync_step) - 1);
+            to_block = min(to_block, first_unprocessed_block_number + (*sync_step) - 1);
 
-                    info!(
-                        "Processing events from blocks {} - {}",
-                        first_unprocessed_block_number, to_block
-                    );
+            info!(
+                "Processing events from blocks {} - {}",
+                first_unprocessed_block_number, to_block
+            );
 
-                    // Add the next block numbers now, so that there is always some block number in the set.
-                    for block_number in first_unprocessed_block_number..=to_block {
-                        add_to_pending(block_number + 1, pending_blocks.clone()).await;
-                    }
-
-                    // Fetch the events in parallel.
-                    let block_events = fetch_events_in_block_range(
-                        azero_connection.clone(),
-                        first_unprocessed_block_number,
-                        to_block,
-                    )
-                    .await?;
-
-                    for (block_details, events) in block_events {
-                        let filtered_events =
-                            most_instance.filter_events(events, block_details.clone());
-
-                        handle_events(
-                            config.clone(),
-                            eth_connection.clone(),
-                            filtered_events,
-                            block_details.block_number,
-                            pending_blocks.clone(),
-                            redis_connection.clone(),
-                            event_handler_tasks_semaphore.clone(),
-                        )
-                        .await?;
-                    }
-
-                    // Update the last block number.
-                    first_unprocessed_block_number = to_block + 1;
-                }
+            // Add the next block numbers now, so that there is always some block number in the set.
+            for block_number in first_unprocessed_block_number..=to_block {
+                add_to_pending(block_number + 1, pending_blocks.clone()).await;
             }
+
+            // Fetch the events in parallel.
+            let block_events = fetch_events_in_block_range(
+                azero_connection.clone(),
+                first_unprocessed_block_number,
+                to_block,
+            )
+            .await?;
+
+            for (block_details, events) in block_events {
+                let filtered_events = most_instance.filter_events(events, block_details.clone());
+
+                handle_events(
+                    config.clone(),
+                    eth_connection.clone(),
+                    filtered_events,
+                    block_details.block_number,
+                    pending_blocks.clone(),
+                    redis_connection.clone(),
+                    event_handler_tasks_semaphore.clone(),
+                    emergency.clone(),
+                )
+                .await?;
+            }
+
+            // Update the last block number.
+            first_unprocessed_block_number = to_block + 1;
         }
     }
 }
@@ -252,6 +243,7 @@ async fn add_to_pending(block_number: u32, pending_blocks: Arc<Mutex<BTreeSet<u3
 }
 
 // handle all events present in one block
+#[allow(clippy::too_many_arguments)]
 async fn handle_events(
     config: Arc<Config>,
     eth_connection: Arc<SignedEthConnection>,
@@ -260,6 +252,7 @@ async fn handle_events(
     pending_blocks: Arc<Mutex<BTreeSet<u32>>>,
     redis_connection: Arc<Mutex<RedisConnection>>,
     event_handler_tasks_semaphore: Arc<Semaphore>,
+    emergency: Arc<AtomicBool>,
 ) -> Result<(), AzeroListenerError> {
     let mut event_tasks = JoinSet::new();
     for event in events {
@@ -271,7 +264,13 @@ async fn handle_events(
             .await?;
 
         // Spawn a new task for handling each event.
-        event_tasks.spawn(handle_event(config, eth_connection, event, permit));
+        event_tasks.spawn(handle_event(
+            config,
+            eth_connection,
+            event,
+            permit,
+            emergency.clone(),
+        ));
         if event_tasks.len() >= ALEPH_MAX_REQUESTS_PER_BLOCK {
             panic!("Too many send_request calls in one block: our benchmark is outdated.");
         }
@@ -295,7 +294,22 @@ async fn handle_event(
     eth_connection: Arc<SignedEthConnection>,
     event: ContractEvent,
     _permit: OwnedSemaphorePermit,
+    emergency: Arc<AtomicBool>,
 ) -> Result<(), AzeroListenerError> {
+    let mut emergency_logged = false;
+    while emergency.load(Ordering::Relaxed) {
+        match emergency_logged {
+            true => debug!(
+                "Event handling paused due to an emergency state in one of the advisory contracts"
+            ),
+            false => {
+                warn!("Emergency state detected while handling: {event:?}");
+                emergency_logged = true;
+            }
+        }
+        // TODO : sleep?
+    }
+
     let Config {
         relayers_committee_id,
         eth_contract_address,
@@ -303,6 +317,7 @@ async fn handle_event(
         eth_tx_submission_retries,
         ..
     } = &*config;
+
     if let Some(name) = &event.name {
         if name.eq("CrosschainTransferRequest") {
             let data = event.data;

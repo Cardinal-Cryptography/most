@@ -131,7 +131,13 @@ impl EthListener {
 
                     // Handle events.
                     for event in events {
-                        handle_event(&event, &config, Arc::clone(&azero_connection)).await?
+                        handle_event(
+                            &event,
+                            &config,
+                            Arc::clone(&azero_connection),
+                            Arc::clone(&emergency),
+                        )
+                        .await?
                     }
 
                     // Update the last block number.
@@ -155,7 +161,22 @@ async fn handle_event(
     event: &MostEvents,
     config: &Config,
     azero_connection: Arc<SignedAzeroWsConnection>,
+    emergency: Arc<AtomicBool>,
 ) -> Result<(), EthListenerError> {
+    let mut emergency_logged = false;
+    while emergency.load(Ordering::Relaxed) {
+        match emergency_logged {
+            true => debug!(
+                "Event handling paused due to an emergency state in one of the advisory contracts"
+            ),
+            false => {
+                warn!("Emergency state detected while handling: {event:?}");
+                emergency_logged = true;
+            }
+        }
+        // TODO : sleep?
+    }
+
     if let MostEvents::CrosschainTransferRequestFilter(
         crosschain_transfer_event @ CrosschainTransferRequestFilter {
             committee_id,

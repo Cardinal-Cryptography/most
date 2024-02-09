@@ -216,20 +216,6 @@ fn decode_uint_field(
     }
 }
 
-pub fn decode_bool_field(
-    data: &HashMap<String, Value>,
-    field: &str,
-) -> Result<bool, AzeroContractError> {
-    if let Some(Value::Bool(x)) = data.get(field) {
-        Ok(*x)
-    } else {
-        Err(AzeroContractError::MissingOrInvalidField(format!(
-            "Data field {:?} couldn't be found or has incorrect format",
-            field
-        )))
-    }
-}
-
 fn bytes32_to_str(data: &[u8; 32]) -> String {
     "0x".to_owned() + &hex::encode(data)
 }
