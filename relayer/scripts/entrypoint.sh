@@ -38,7 +38,6 @@ ARGS=(
   --azero-node-wss-url=${AZERO_NETWORK}
   --dev-account-index=${RELAYER_ID}
   --redis-node=${REDIS}
-  --rust-log=info
   --azero-contract-metadata=${AZERO_MOST_METADATA}
 )
 

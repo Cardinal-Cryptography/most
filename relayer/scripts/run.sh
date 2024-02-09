@@ -28,8 +28,7 @@ RELAYER_ID=${RELAYER_ID:-0}
 
 export RUST_LOG=info,aleph-client=warn
 
-cargo run -- --rust-log=info \
-  --name "guardian_${RELAYER_ID}" \
+cargo run -- --name="guardian_${RELAYER_ID}" \
   --advisory-contract-addresses=$(get_address $AZERO_ADDRESSES_FILE advisory) \
   --azero-contract-address=$(get_address $AZERO_ADDRESSES_FILE most) \
   --eth-contract-address=$(get_address $ETH_ADDRESSES_FILE most) \
