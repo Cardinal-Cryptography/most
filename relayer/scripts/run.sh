@@ -28,7 +28,7 @@ RELAYER_ID=${RELAYER_ID:-0}
 
 cargo run -- --rust-log=info \
   --name "guardian_${RELAYER_ID}" \
-  --advisory-contract-address=$(get_address $AZERO_ADDRESSES_FILE advisory) \
+  --advisory-contract-addresses=$(get_address $AZERO_ADDRESSES_FILE advisory) \
   --azero-contract-address=$(get_address $AZERO_ADDRESSES_FILE most) \
   --eth-contract-address=$(get_address $ETH_ADDRESSES_FILE most) \
   --eth-node-http-url=${ETH_NETWORK} \
