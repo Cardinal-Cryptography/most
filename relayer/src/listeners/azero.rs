@@ -299,21 +299,6 @@ async fn handle_event(
     _permit: OwnedSemaphorePermit,
     emergency: Arc<AtomicBool>,
 ) -> Result<(), AzeroListenerError> {
-    // let mut emergency_logged = false;
-    // while emergency.load(Ordering::Relaxed) {
-    //     match emergency_logged {
-    //         // TODO : debug
-    //         true => trace!(
-    //             "Event handling paused due to an emergency state in one of the advisory contracts"
-    //         ),
-    //         false => {
-    //             warn!("Emergency state detected while handling: {event:?}");
-    //             emergency_logged = true;
-    //         }
-    //     }
-    //     // TODO : sleep?
-    // }
-
     emergency_release(emergency).await;
 
     let Config {
@@ -431,8 +416,6 @@ async fn handle_processed_block(
     let earliest_still_pending = pending_blocks
         .first()
         .expect("There always is a pending block in the set");
-
-    // println!("@handle processed_block");
 
     // Note: `earliest_still_pending` will never be 0
     write_last_processed_block(

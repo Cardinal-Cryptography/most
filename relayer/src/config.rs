@@ -66,9 +66,6 @@ pub struct Config {
     #[arg(long, default_value = "redis://127.0.0.1:6379")]
     pub redis_node: String,
 
-    #[arg(long, default_value = "info")]
-    pub rust_log: log::Level,
-
     #[arg(long, default_value = "200000")]
     pub eth_gas_limit: u32,
 

@@ -5,6 +5,7 @@ services:
     environment:
       - RELAYER_ID=1
       - DEV_MODE=true
+      - RUST_LOG=info,aleph-client=warn
     image: most-relayer
     network_mode: host
     restart: on-failure:3
@@ -13,6 +14,7 @@ services:
     environment:
       - RELAYER_ID=2
       - DEV_MODE=true
+      - RUST_LOG=info,aleph-client=warn
     image: most-relayer
     network_mode: host
     restart: on-failure:3
@@ -21,6 +23,7 @@ services:
     environment:
       - RELAYER_ID=3
       - DEV_MODE=true
+      - RUST_LOG=info,aleph-client=warn
     image: most-relayer
     network_mode: host
     restart: on-failure:3

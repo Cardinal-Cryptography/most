@@ -1,5 +1,5 @@
 use std::{
-    env, process,
+    process,
     sync::{atomic::AtomicBool, Arc},
 };
 
@@ -52,8 +52,6 @@ pub enum ListenerError {
 #[tokio::main]
 async fn main() -> Result<()> {
     let config = Arc::new(Config::parse());
-
-    // env::set_var("RUST_LOG", config.rust_log.as_str());
     env_logger::init();
 
     info!("{:#?}", &config);

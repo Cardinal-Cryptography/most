@@ -43,15 +43,16 @@ impl AdvisoryListener {
             for advisory in &contracts {
                 if advisory.is_emergency(&azero_connection).await? {
                     is_emergency = true;
+                    warn!(
+                        "Detected an emergency state in the Advisory contract with an address {}",
+                        advisory.address
+                    );
                     break;
                 }
             }
 
-            if is_emergency {
-                warn!("Detected an emergency state in one of the advisory contracts");
-            }
-
             emergency.store(is_emergency, Ordering::Relaxed);
+            // we sleep for about half a block production time before making another round of queries
             thread::sleep(Duration::from_millis(500))
         }
     }
@@ -60,6 +61,5 @@ impl AdvisoryListener {
 pub async fn emergency_release(emergency: Arc<AtomicBool>) {
     while emergency.load(Ordering::Relaxed) {
         trace!("Event handling paused due to an emergency state in one of the advisory contracts")
-        // TODO : sleep?
     }
 }
