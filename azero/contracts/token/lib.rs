@@ -296,6 +296,7 @@ pub mod token {
         use ink::env::{test::*, DefaultEnvironment as E};
 
         use super::*;
+        use ownable::OwnableError;
 
         const INIT_SUPPLY_TEST: u128 = 1_000_000;
 
@@ -324,7 +325,7 @@ pub mod token {
             set_caller::<E>(bob);
             assert_eq!(
                 token.transfer_ownership(alice),
-                Err(ownable::Error::CallerNotOwner(bob)),
+                Err(OwnableError::CallerNotOwner(bob)),
             );
         }
 
