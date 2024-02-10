@@ -88,6 +88,10 @@ pub mod most {
         committee_id: CommitteeId,
         /// a fixed subsidy transferred along with the bridged tokens to the destination account on aleph zero to bootstrap
         pocket_money: u128,
+        /// total rewards collected by all commitees
+        rewards_all: u128,
+        /// total rewards paid out to any committee member
+        paid_out_rewards_all: u128,
         /// How much gas does a single confirmation of a cross-chain transfer request use on the destination chain on average.
         /// This value is calculated by summing the total gas usage of *all* the transactions it takes to relay a single request and dividing it by the current committee size and multiplying by 1.2
         relay_gas_usage: u128,
@@ -193,6 +197,8 @@ pub mod most {
                 request_nonce: 0,
                 committee_id,
                 pocket_money,
+                rewards_all: 0,
+                paid_out_rewards_all: 0,
                 relay_gas_usage,
                 min_fee,
                 max_fee,
@@ -273,6 +279,10 @@ pub mod most {
                 .checked_add(1)
                 .ok_or(MostError::Arithmetic)?;
 
+            data.rewards_all
+                .checked_add(base_fee)
+                .ok_or(MostError::Arithmetic)?;
+
             self.data.set(&data);
 
             // return surplus if any
@@ -327,7 +337,7 @@ pub mod most {
                 return Err(MostError::RequestAlreadySigned);
             }
 
-            let mut request = self.pending_requests.get(request_hash).unwrap_or_default(); //  {
+            let mut request = self.pending_requests.get(request_hash).unwrap_or_default();
 
             // record vote
             request.signature_count += 1;
@@ -350,11 +360,16 @@ pub mod most {
                     amount,
                 )?;
 
+                let unclaimed_rewards_all =
+                    data.rewards_all.saturating_sub(data.paid_out_rewards_all);
+
                 // bootstrap account with pocket money
-                // NOTE: we don't revert on a failure!
-                _ = self
-                    .env()
-                    .transfer(dest_receiver_address.into(), data.pocket_money);
+                if self.env().balance() >= unclaimed_rewards_all.saturating_add(data.pocket_money) {
+                    // don't revert if the transfer fails
+                    _ = self
+                        .env()
+                        .transfer(dest_receiver_address.into(), data.pocket_money);
+                }
 
                 // mark it as processed
                 self.processed_requests.insert(request_hash, &());
@@ -387,6 +402,12 @@ pub mod most {
 
             if outstanding_rewards.gt(&0) {
                 self.env().transfer(member_id, outstanding_rewards)?;
+
+                let mut data = self.data()?;
+                data.paid_out_rewards_all = data
+                    .paid_out_rewards_all
+                    .saturating_add(outstanding_rewards);
+                self.data.set(&data);
 
                 self.paid_out_member_rewards.insert(
                     (member_id, committee_id),
