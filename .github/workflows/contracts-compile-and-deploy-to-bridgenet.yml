@@ -103,7 +103,7 @@ jobs:
           path: eth
 
       - name: Copy files to S3 AWS bucket
-        uses: Cardinal-Cryptography/github-actions/copy-file-to-s3@v1
+        uses: Cardinal-Cryptography/github-actions/copy-file-to-s3@v6
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RW_AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RW_AWS_SECRET_ACCESS_KEY }}
@@ -114,6 +114,7 @@ jobs:
           s3-bucket-filename: ${{ matrix.filename }}
           s3-bucket-path: most/artifacts/${{ github.sha }}/${{ matrix.to }}
           s3-bucket-name: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
+          if-exist: 'overwrite'
 
   upload-contract-addresses:
     name: Upload contract addresses to S3
@@ -138,7 +139,7 @@ jobs:
         run: make contract_spec.json
 
       - name: Copy files to S3 AWS bucket
-        uses: Cardinal-Cryptography/github-actions/copy-file-to-s3@v1
+        uses: Cardinal-Cryptography/github-actions/copy-file-to-s3@v6
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.CONTRACTS_MOST_ADDRESSES_BRIDGENET_DEV_RW_AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.CONTRACTS_MOST_ADDRESSES_BRIDGENET_DEV_RW_AWS_SECRET_ACCESS_KEY }}
@@ -149,3 +150,4 @@ jobs:
           s3-bucket-filename: dev.json
           s3-bucket-path: most/addresses/bridgenet
           s3-bucket-name: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
+          if-exist: 'overwrite'
