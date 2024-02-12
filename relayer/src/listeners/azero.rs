@@ -343,22 +343,24 @@ async fn handle_event(
             );
 
             info!(
-                "Sending tx with request nonce {} to the Ethereum network and waiting for {} confirmations",
+                "Sending tx with request nonce {} to the Ethereum network and waiting for {} confirmations.",
                 request_nonce,
                 eth_tx_min_confirmations
             );
 
             // This shouldn't fail unless there is something wrong with our config.
             // NOTE: this does not check whether the actual tx reverted on-chain. Reverts are only checked on dry-run.
-            let tx_hash = call
+            let receipt = call
                 .gas(config.eth_gas_limit)
+                .nonce(eth_connection.inner().next())
                 .send()
                 .await?
                 .confirmations(*eth_tx_min_confirmations)
                 .retries(*eth_tx_submission_retries)
                 .await?
-                .ok_or(AzeroListenerError::TxNotPresentInBlockOrMempool)?
-                .transaction_hash;
+                .ok_or(AzeroListenerError::TxNotPresentInBlockOrMempool)?;
+
+            let tx_hash = receipt.transaction_hash;
 
             info!("Tx with nonce {request_nonce} has been sent to the Ethereum network: {tx_hash:?} and received {eth_tx_min_confirmations} confirmations.");
 

@@ -6,6 +6,9 @@ pub struct Config {
     #[arg(long)]
     pub dev: bool,
 
+    #[arg(long, default_value = "0")]
+    pub dev_account_index: u32,
+
     #[arg(long)]
     pub override_azero_cache: bool,
 
@@ -27,14 +30,20 @@ pub struct Config {
     #[arg(long, default_value = "1000")]
     pub azero_max_event_handler_tasks: usize,
 
+    #[arg(long, default_value = "0")]
+    pub default_sync_from_block_azero: u32,
+
+    #[arg(long, default_value = "100000000000")]
+    pub azero_ref_time_limit: u64,
+
+    #[arg(long, default_value = "10000000")]
+    pub azero_proof_size_limit: u64,
+
     #[arg(long)]
     pub eth_contract_address: String,
 
     #[arg(long, default_value = "")]
     pub eth_keystore_password: String,
-
-    #[arg(long, default_value = "0")]
-    pub dev_account_index: u32,
 
     #[arg(long, default_value = "")]
     pub eth_keystore_path: String,
@@ -51,8 +60,8 @@ pub struct Config {
     #[arg(long, default_value = "0")]
     pub default_sync_from_block_eth: u32,
 
-    #[arg(long, default_value = "0")]
-    pub default_sync_from_block_azero: u32,
+    #[arg(long, default_value = "200000")]
+    pub eth_gas_limit: u32,
 
     #[arg(long, default_value = "100")]
     pub sync_step: u32,
@@ -62,13 +71,4 @@ pub struct Config {
 
     #[arg(long, default_value = "info")]
     pub rust_log: log::Level,
-
-    #[arg(long, default_value = "200000")]
-    pub eth_gas_limit: u32,
-
-    #[arg(long, default_value = "100000000000")]
-    pub azero_ref_time_limit: u64,
-
-    #[arg(long, default_value = "10000000")]
-    pub azero_proof_size_limit: u64,
 }
