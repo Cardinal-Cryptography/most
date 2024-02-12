@@ -530,7 +530,13 @@ mod e2e {
 
     #[ink_e2e::test]
     fn pocket_money_wont_pay_from_rewards(mut client: ink_e2e::Client<C, E>) {
-        let (most_address, token_address) = setup_default_most_and_token(&mut client, false).await;
+        let (most_address, token_address) = setup_default_most_and_token(&mut client, true).await;
+
+        // assert that most account is empty
+        assert_eq!(
+            client.balance(most_address).await.expect("native balance"),
+            0
+        );
 
         let amount_to_send = 1000;
 
