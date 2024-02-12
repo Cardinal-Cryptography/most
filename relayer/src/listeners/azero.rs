@@ -10,6 +10,7 @@ use ethers::{
     core::types::Address,
     prelude::{ContractCall, ContractError},
     providers::{Middleware, ProviderError},
+    types::U64,
     utils::keccak256,
 };
 use log::{debug, error, info, warn};
@@ -26,7 +27,7 @@ use crate::{
     config::Config,
     connections::{
         azero::SignedAzeroWsConnection,
-        eth::{EthConnection, EthConnectionError, SignedEthConnection},
+        eth::SignedEthConnection,
         redis_helpers::{read_first_unprocessed_block_number, write_last_processed_block},
     },
     contracts::{
@@ -40,47 +41,44 @@ use crate::{
 #[error(transparent)]
 #[non_exhaustive]
 pub enum AzeroListenerError {
-    #[error("aleph-client error")]
+    #[error("Aleph-client error")]
     AlephClient(#[from] anyhow::Error),
 
-    #[error("error when parsing ethereum address")]
+    #[error("Error when parsing ethereum address")]
     FromHex(#[from] rustc_hex::FromHexError),
 
-    #[error("subxt error")]
+    #[error("Subxt error")]
     Subxt(#[from] subxt::Error),
 
-    #[error("azero provider error")]
+    #[error("Ethers provider error")]
     Provider(#[from] ProviderError),
 
-    #[error("azero contract error")]
+    #[error("Azero contract error")]
     AzeroContract(#[from] AzeroContractError),
 
-    #[error("eth connection error")]
-    EthConnection(#[from] EthConnectionError),
-
-    #[error("eth contract error")]
-    EthContractListen(#[from] ContractError<EthConnection>),
-
-    #[error("eth contract error")]
+    #[error("Eth contract error")]
     EthContractTx(#[from] ContractError<SignedEthConnection>),
 
-    #[error("no block found")]
+    #[error("No block found")]
     BlockNotFound,
 
-    #[error("tx was not present in any block or mempool after the maximum number of retries")]
+    #[error("Tx was not present in any block or mempool after the maximum number of retries")]
     TxNotPresentInBlockOrMempool,
 
-    #[error("missing data from event")]
+    #[error("Missing data from event")]
     MissingEventData(String),
 
-    #[error("redis connection error")]
+    #[error("Redis connection error")]
     Redis(#[from] RedisError),
 
-    #[error("join error")]
+    #[error("Join error")]
     Join(#[from] tokio::task::JoinError),
 
-    #[error("semaphore error")]
+    #[error("Semaphore error")]
     Semaphore(#[from] AcquireError),
+
+    #[error("Contract reverted")]
+    EthContractReverted,
 }
 
 const ALEPH_LAST_BLOCK_KEY: &str = "alephzero_last_known_block_number";
@@ -111,6 +109,7 @@ impl AlephZeroListener {
         let pending_blocks: Arc<Mutex<BTreeSet<u32>>> = Arc::new(Mutex::new(BTreeSet::new()));
         let event_handler_tasks_semaphore =
             Arc::new(Semaphore::new(*azero_max_event_handler_tasks));
+        let mut block_sealing_tasks = JoinSet::new();
 
         let most_instance = MostInstance::new(
             azero_contract_address,
@@ -173,8 +172,14 @@ impl AlephZeroListener {
                     pending_blocks.clone(),
                     redis_connection.clone(),
                     event_handler_tasks_semaphore.clone(),
+                    &mut block_sealing_tasks,
                 )
                 .await?;
+            }
+
+            // Check for errors in the event handler tasks.
+            while let Some(result) = block_sealing_tasks.try_join_next() {
+                result??;
             }
 
             // Update the last block number.
@@ -242,6 +247,7 @@ async fn handle_events(
     pending_blocks: Arc<Mutex<BTreeSet<u32>>>,
     redis_connection: Arc<Mutex<RedisConnection>>,
     event_handler_tasks_semaphore: Arc<Semaphore>,
+    block_sealing_tasks: &mut JoinSet<Result<(), AzeroListenerError>>,
 ) -> Result<(), AzeroListenerError> {
     let mut event_tasks = JoinSet::new();
     for event in events {
@@ -259,8 +265,8 @@ async fn handle_events(
         }
     }
 
-    tokio::spawn(async move {
-        handle_processed_block(
+    block_sealing_tasks.spawn(async move {
+        seal_processed_block(
             config.clone(),
             block_number,
             event_tasks,
@@ -361,6 +367,14 @@ async fn handle_event(
                 .ok_or(AzeroListenerError::TxNotPresentInBlockOrMempool)?;
 
             let tx_hash = receipt.transaction_hash;
+            let tx_status = receipt.status;
+
+            if tx_status == Some(U64::from(0)) {
+                warn!(
+                    "Tx with nonce {request_nonce} has been sent to the Ethereum network: {tx_hash:?} but it reverted."
+                );
+                return Err(AzeroListenerError::EthContractReverted);
+            }
 
             info!("Tx with nonce {request_nonce} has been sent to the Ethereum network: {tx_hash:?} and received {eth_tx_min_confirmations} confirmations.");
 
@@ -371,7 +385,7 @@ async fn handle_event(
 }
 
 // Awaits for all requests from the block to be processed, then updates the last processed block number in Redis.
-async fn handle_processed_block(
+async fn seal_processed_block(
     config: Arc<Config>,
     block_number: u32,
     mut event_tasks: JoinSet<Result<(), AzeroListenerError>>,
