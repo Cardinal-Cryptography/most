@@ -41,6 +41,7 @@ async function main(): Promise<void> {
     ws_node,
     relayers_keys,
     governance_keys,
+    governance_seeds,
     authority_seed,
     signature_threshold,
     pocket_money,
@@ -60,6 +61,10 @@ async function main(): Promise<void> {
 
   const api = await ApiPromise.create({ provider: wsProvider });
   const deployer = keyring.addFromUri(authority_seed);
+  const governance_members = [];
+  governance_seeds.forEach((governance_seed) => {
+    governance_members.push(keyring.addFromUri(governance_seed));
+  });
 
   const tokenCodeHash = await uploadCode(api, deployer, "token.contract");
   console.log("token code hash:", tokenCodeHash);
@@ -70,7 +75,7 @@ async function main(): Promise<void> {
   const governanceCodeHash = await uploadCode(
     api,
     deployer,
-    "governance.contract",
+    "governance.contract"
   );
   console.log("governance code hash:", governanceCodeHash);
 
@@ -90,25 +95,25 @@ async function main(): Promise<void> {
     api,
     deployer,
     "advisory.contract",
-    [authority],
+    [authority]
   );
 
   const { address: advisoryAddress } = await advisoryConstructors.new(
     authority, // owner
-    { gasLimit: estimatedGasAdvisory },
+    { gasLimit: estimatedGasAdvisory }
   );
 
   let estimatedGasOracle = await estimateContractInit(
     api,
     deployer,
     "oracle.contract",
-    [authority, 10000000000],
+    [authority, 10000000000]
   );
 
   const { address: oracleAddress } = await oracleConstructors.new(
     authority, // owner
     10000000000, // initial value
-    { gasLimit: estimatedGasOracle },
+    { gasLimit: estimatedGasOracle }
   );
 
   const estimatedGasMost = await estimateContractInit(
@@ -124,7 +129,7 @@ async function main(): Promise<void> {
       max_fee!,
       default_fee!,
       oracleAddress,
-    ],
+    ]
   );
 
   const { address: mostAddress } = await mostConstructors.new(
@@ -136,7 +141,7 @@ async function main(): Promise<void> {
     max_fee!,
     default_fee!,
     oracleAddress,
-    { gasLimit: estimatedGasMost },
+    { gasLimit: estimatedGasMost }
   );
 
   console.log("most address:", mostAddress);
@@ -150,7 +155,7 @@ async function main(): Promise<void> {
     api,
     deployer,
     "token.contract",
-    [initialSupply, name, symbol, decimals, minterBurner],
+    [initialSupply, name, symbol, decimals, minterBurner]
   );
 
   const { address: wethAddress } = await tokenConstructors.new(
@@ -159,7 +164,7 @@ async function main(): Promise<void> {
     symbol,
     decimals,
     minterBurner,
-    { gasLimit: estimatedGasToken },
+    { gasLimit: estimatedGasToken }
   );
   console.log("token address:", wethAddress);
 
@@ -170,12 +175,12 @@ async function main(): Promise<void> {
     api,
     deployer,
     "governance.contract",
-    [quorum],
+    [quorum]
   );
 
   const { address: governanceAddress } = await governanceConstructors.new(
     quorum,
-    { gasLimit: estimatedGasGovernance },
+    { gasLimit: estimatedGasGovernance }
   );
   const governance = new Governance(governanceAddress, deployer, api);
   console.log("governance address:", governanceAddress);
@@ -190,13 +195,73 @@ async function main(): Promise<void> {
   }
 
   console.log("Transferring ownership of most to governance...");
-  await most.tx.setOwner(governanceAddress);
+  await most.tx.transferOwnership(governanceAddress);
+  console.log("Accepting ownership of most by governance...");
+  //create proposal with transaction acceptOwnership()
+  console.log("Creating proposal...");
+  await governance
+    .withSigner(governance_members[0])
+    .tx.submitProposal(
+      mostAddress,
+      most.contractAbi.findMessage("Ownable2Step::accept_ownership").selector as any,
+      [],
+      true
+    );
+  //Members signing proposal...
+  console.log("Members signing proposal...");
+  governance_members.forEach(async (governance_member) => {
+    await governance.withSigner(governance_member).tx.vote(0);
+  });
+  //execute proposal
+  console.log("Executing proposal...");
+  await governance.tx.executeProposal(0);
 
+  const token = new Token(wethAddress, deployer, api);
   console.log("Transferring ownership of weth to governance...");
-  await new Token(wethAddress, deployer, api).tx.setAdmin(governanceAddress);
+  await token.tx.transferOwnership(governanceAddress);
+  console.log("Accepting ownership of weth by governance...");
+  //create proposal with transaction acceptOwnership()
+  console.log("Creating proposal...");
+  await governance
+    .withSigner(governance_members[0])
+    .tx.submitProposal(
+      wethAddress,
+      token.contractAbi.findMessage("Ownable2Step::accept_ownership")
+        .selector as any,
+      [],
+      true
+    );
+  console.log("Members signing proposal...");
+  //vote on proposal
+  governance_members.forEach(async (governance_member) => {
+    await governance.withSigner(governance_member).tx.vote(1);
+  });
+  //execute proposal
+  console.log("Executing...");
+  await governance.tx.executeProposal(1);
 
   console.log("Transferring ownership of governance to governance...");
-  await governance.tx.setOwner(governanceAddress);
+  await governance.tx.transferOwnership(governanceAddress);
+  console.log("Accepting ownership of weth by governance...");
+  //create proposal with transaction acceptOwnership()
+  console.log("Creating proposal...");
+  await governance
+    .withSigner(governance_members[0])
+    .tx.submitProposal(
+      governanceAddress,
+      governance.contractAbi.findMessage("Ownable2Step::accept_ownership")
+        .selector as any,
+      [],
+      true
+    );
+  //vote on proposal
+  console.log("Members signing proposal...");
+  governance_members.forEach(async (governance_member) => {
+    await governance.withSigner(governance_member).tx.vote(2);
+  });
+  //execute proposal
+  console.log("Executing...");
+  await governance.tx.executeProposal(2);
 
   const addresses: Addresses = {
     governance: governanceAddress,
