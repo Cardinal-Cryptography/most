@@ -89,7 +89,7 @@ jobs:
           project: most
           chain-environment: bridgenet
           frontend-environment: dev
-          dst-addresses: downloaded-addresses-${{ inputs.frontend-environment }}.json
+          dst-addresses: downloaded-addresses-bridgenet-dev
           if-not-exist: fallback
 
       - name: Download artifact from S3 bucket
@@ -113,7 +113,7 @@ jobs:
       - name: Build relayer
         id: build
         env:
-          TMP_ADDRESSES_FILE: downloaded-addresses-${{ inputs.frontend-environment }}.json
+          TMP_ADDRESSES_FILE: downloaded-addresses-bridgenet-dev/${{ inputs.frontend-environment }}.json
           TMP_ADDRESSES_DIR: downloaded-artifact-azero-most
         run: |
           mkdir -p azero/artifacts
