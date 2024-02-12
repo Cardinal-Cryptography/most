@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - master
+      - A0-4026-change-workflows-to-use-new-actions-for-contracts
 
 jobs:
   check-vars-and-secrets:
