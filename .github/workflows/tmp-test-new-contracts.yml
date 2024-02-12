@@ -29,7 +29,7 @@ jobs:
           project: most
           chain-environment: bridgenet
           frontend-environment: mikotest
-          if-exist: fallback
+          if-exist: skip
 
       - name: store contract artifacts on s3 bucket
         uses: Cardinal-Cryptography/github-actions/store-contract-artifact@A0-4026-add-code-for-dealing-with-contracts
