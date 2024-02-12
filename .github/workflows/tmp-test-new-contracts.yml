@@ -72,3 +72,4 @@ jobs:
         shell: bash
         run: |
           ls -al
+          find downloaded_azero_most
