@@ -24,7 +24,7 @@ jobs:
           aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ADDRESSES_BRIDGENET_DEV_RW_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ADDRESSES_BRIDGENET_DEV_RW_AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
-          aws-s3-bucket-name: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
+          s3-bucket-name: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
           src-addresses: contract_spec.json
           project: most
           chain-environment: bridgenet
@@ -37,7 +37,7 @@ jobs:
           aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ADDRESSES_BRIDGENET_DEV_RW_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ADDRESSES_BRIDGENET_DEV_RW_AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
-          aws-s3-bucket-name: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
+          s3-bucket-name: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
           src-artifact: some/artifact/Artifact.json
           project: most
           version: mikotest
