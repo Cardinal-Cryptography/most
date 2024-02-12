@@ -137,6 +137,11 @@ fn do_handle_client(
                 let address = eth_wallet.address();
                 client.send(&Response::EthAddress { address })?;
             }
+
+            Command::SignEthHash { hash } => {
+                let signature = eth_wallet.sign_hash(hash)?;
+                client.send(&Response::SignedEthHash { hash, signature })?;
+            }
         }
     }
 }
@@ -152,6 +157,10 @@ mod test {
     use vsock::VMADDR_CID_HOST;
 
     use super::*;
+
+    const ETH_PUBLIC_ADDRESS: &str = "0xEe88da44b4901d7F86970c52dC5139Af80C83edD";
+    const ETH_PRIVATE_KEY: &str =
+        "58039a48427a62f77e5562d7f565d10595d92abdd4813233607ec2ac5ac4b9de";
 
     #[test]
     #[serial]
@@ -207,18 +216,26 @@ mod test {
 
         let address = client.eth_address().unwrap();
 
-        assert!(
-            address == Address::from_str("0xEe88da44b4901d7F86970c52dC5139Af80C83edD").unwrap()
-        );
+        assert!(address == Address::from_str(ETH_PUBLIC_ADDRESS).unwrap());
+    }
+
+    #[test]
+    #[serial]
+    fn test_sign_eth_hash() {
+        let client = connect();
+
+        let payload = b"Hello, world!".to_vec();
+        let hash = ethers::utils::keccak256(payload).into();
+
+        let signature = client.sign_eth_hash(hash).unwrap();
+        let address = Address::from_str(ETH_PUBLIC_ADDRESS).unwrap();
+
+        assert!(signature.verify(hash, address).is_ok());
     }
 
     fn connect() -> Client {
-        let server = Server::new(
-            "//Alice".to_string(),
-            "58039a48427a62f77e5562d7f565d10595d92abdd4813233607ec2ac5ac4b9de".to_string(),
-            port(),
-        )
-        .unwrap();
+        let server =
+            Server::new("//Alice".to_string(), ETH_PRIVATE_KEY.to_string(), port()).unwrap();
         let client = Client::new(VMADDR_CID_HOST, port()).unwrap();
         server.accept_one().unwrap();
 

@@ -24,6 +24,7 @@ pub enum Command {
     AccountIdAzero,
     Sign { payload: Vec<u8> },
     EthAddress,
+    SignEthHash { hash: EthH256 },
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -38,6 +39,10 @@ pub enum Response {
     },
     EthAddress {
         address: EthAddress,
+    },
+    SignedEthHash {
+        hash: EthH256,
+        signature: EthSignature,
     },
 }
 
@@ -105,7 +110,19 @@ impl Client {
     }
 
     pub fn sign_eth_hash(&self, hash: EthH256) -> Result<EthSignature, Error> {
-        todo!("sign_eth_hash")
+        self.send(&Command::SignEthHash { hash })?;
+
+        if let Response::SignedEthHash {
+            hash: return_hash,
+            signature,
+        } = self.recv()?
+        {
+            if return_hash == hash {
+                return Ok(signature);
+            }
+        }
+
+        Err(Error::InvalidResponse)
     }
 
     pub fn sign_eth_tx(&self, tx: &EthTypedTransaction) -> Result<EthSignature, Error> {
