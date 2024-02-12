@@ -19,7 +19,7 @@ jobs:
           echo 'bofh2' > some/artifact/Artifact.json
 
       - name: store contract addresses on s3 bucket
-        uses: Cardinal-Cryptography/github-actions/store-contract-addresses@A0-4026-add-code-for-dealing-with-contracts
+        uses: Cardinal-Cryptography/github-actions/store-contract-addresses@v6
         with:
           aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ADDRESSES_BRIDGENET_DEV_RW_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ADDRESSES_BRIDGENET_DEV_RW_AWS_SECRET_ACCESS_KEY }}
@@ -32,7 +32,7 @@ jobs:
           if-exist: skip
 
       - name: store contract artifacts on s3 bucket
-        uses: Cardinal-Cryptography/github-actions/store-contract-artifact@A0-4026-add-code-for-dealing-with-contracts
+        uses: Cardinal-Cryptography/github-actions/store-contract-artifact@v6
         with:
           aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RW_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RW_AWS_SECRET_ACCESS_KEY }}
@@ -45,7 +45,7 @@ jobs:
           if-exist: skip
 
       - name: download contract addresses from s3 bucket
-        uses: Cardinal-Cryptography/github-actions/download-contract-addresses@A0-4026-add-code-for-dealing-with-contracts
+        uses: Cardinal-Cryptography/github-actions/download-contract-addresses@v6
         with:
           aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ADDRESSES_BRIDGENET_DEV_RW_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ADDRESSES_BRIDGENET_DEV_RW_AWS_SECRET_ACCESS_KEY }}
@@ -57,7 +57,7 @@ jobs:
           frontend-environment: mikotest
 
       - name: download contract artifact from s3 bucket
-        uses: Cardinal-Cryptography/github-actions/download-contract-artifact@A0-4026-add-code-for-dealing-with-contracts
+        uses: Cardinal-Cryptography/github-actions/download-contract-artifact@v6
         with:
           aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RW_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RW_AWS_SECRET_ACCESS_KEY }}
