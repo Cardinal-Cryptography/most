@@ -53,6 +53,24 @@ or
 make devnet-azero
 ```
 
+## Running a relayer with a signer locally
+
+First, run the signer:
+
+```bash
+cd relayer
+RELAYER_ID=1 scripts/run_signer.sh
+```
+
+The signer will output the CID on which it is running, but you should also be able to just use 2 (meaning host) as the CID.
+
+Next, run the relayer, passing the signer CID to connect to:
+
+```bash
+# in most/relayer
+SIGNER_CID=2 scripts/run.sh
+```
+
 ## Cleaning up
 
 To stop the networks (and redis) and clean up:

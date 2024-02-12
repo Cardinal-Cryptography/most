@@ -24,9 +24,8 @@ AZERO_NETWORK=${AZERO_NETWORK:-"ws://127.0.0.1:9944"}
 KEYSTORE_PATH=${KEYSTORE_PATH:-""}
 RELAYER_ID=${RELAYER_ID:-0}
 
-# --- RUN
-
-cargo run --bin relayer -- --rust-log=info \
+ARGS=(
+  run --bin relayer -- --rust-log=info \
   --name "guardian_${RELAYER_ID}" \
   --azero-contract-address=$(get_address $AZERO_ADDRESSES_FILE most) \
   --eth-contract-address=$(get_address $ETH_ADDRESSES_FILE most) \
@@ -34,3 +33,12 @@ cargo run --bin relayer -- --rust-log=info \
   --azero-node-wss-url=${AZERO_NETWORK} \
   --dev-account-index=${RELAYER_ID} \
   --dev
+)
+
+if [[ -n "${SIGNER_CID}" ]]; then
+  ARGS+=(--signer-cid=${SIGNER_CID})
+fi
+
+# --- RUN
+
+cargo "${ARGS[@]}"
