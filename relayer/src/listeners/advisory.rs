@@ -40,7 +40,7 @@ impl AdvisoryListener {
 
         loop {
             let previous_emergency_state = emergency.load(Ordering::Relaxed);
-            let mut current_emergency_state: bool = false;
+            let mut current_emergency_state = false;
             for advisory in &contracts {
                 if advisory.is_emergency(&azero_connection).await? {
                     current_emergency_state = true;
