@@ -93,14 +93,15 @@ impl EthListener {
 
         // Main Ethereum event loop.
         loop {
-            emergency_release(emergency.clone()).await;
-
             // Query for the next unknowns finalized block number, if not present we wait for it.
             let next_finalized_block_number = get_next_finalized_block_number_eth(
                 eth_connection.clone(),
                 first_unprocessed_block_number,
             )
             .await;
+
+            // stop and wait for the emergency to be released
+            emergency_release(emergency.clone()).await;
 
             // Don't query for more than `sync_step` blocks at one time.
             let to_block = std::cmp::min(

@@ -142,14 +142,15 @@ impl AlephZeroListener {
 
         // Main AlephZero event loop
         loop {
-            emergency_release(emergency.clone()).await;
-
             // Query for the next unknown finalized block number, if not present we wait for it
             let mut to_block = get_next_finalized_block_number_azero(
                 azero_connection.clone(),
                 first_unprocessed_block_number,
             )
             .await;
+
+            // stop and wait for the emergency to be released
+            emergency_release(emergency.clone()).await;
 
             to_block = min(to_block, first_unprocessed_block_number + (*sync_step) - 1);
 

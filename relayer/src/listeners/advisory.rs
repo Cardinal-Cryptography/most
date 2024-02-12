@@ -7,6 +7,7 @@ use std::{
     time::Duration,
 };
 
+use aleph_client::utility::BlocksApi;
 use log::{info, trace, warn};
 
 use super::AzeroListenerError;
@@ -45,8 +46,10 @@ impl AdvisoryListener {
                 if advisory.is_emergency(&azero_connection).await? {
                     current_emergency_state = true;
                     if current_emergency_state != previous_emergency_state {
+                        let current_block_number =
+                            azero_connection.get_block_number_opt(None).await?;
                         warn!(
-                        "Detected an emergency state in the Advisory contract with an address {}",
+                        "Detected an emergency state at block {current_block_number:?} in the Advisory contract with an address {}",
                         advisory.address
                     );
                     }
