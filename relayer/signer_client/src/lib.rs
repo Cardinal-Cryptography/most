@@ -3,6 +3,11 @@ use serde_json::Deserializer;
 use subxt::ext::{sp_core::crypto::AccountId32, sp_runtime::MultiSignature};
 use vsock::VsockStream;
 
+type EthAddress = ethers::types::Address;
+type EthSignature = ethers::types::Signature;
+type EthH256 = ethers::types::H256;
+type EthTypedTransaction = ethers::types::transaction::eip2718::TypedTransaction;
+
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("IO error: {0}")]
@@ -16,22 +21,27 @@ pub enum Error {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Command {
     Ping,
-    AccountId,
+    AccountIdAzero,
     Sign { payload: Vec<u8> },
+    EthAddress,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Response {
     Pong,
-    AccountId {
+    AccountIdAzero {
         account_id: AccountId32,
     },
     Signed {
         payload: Vec<u8>,
         signature: MultiSignature,
     },
+    EthAddress {
+        address: EthAddress,
+    },
 }
 
+#[derive(Debug)]
 pub struct Client {
     connection: VsockStream,
 }
@@ -61,8 +71,8 @@ impl Client {
     }
 
     pub fn account_id(&self) -> Result<AccountId32, Error> {
-        self.send(&Command::AccountId)?;
-        if let Response::AccountId { account_id } = self.recv()? {
+        self.send(&Command::AccountIdAzero)?;
+        if let Response::AccountIdAzero { account_id } = self.recv()? {
             Ok(account_id)
         } else {
             Err(Error::InvalidResponse)
@@ -82,5 +92,23 @@ impl Client {
             } if return_payload == payload => Ok(signature),
             _ => Err(Error::InvalidResponse),
         }
+    }
+
+    pub fn eth_address(&self) -> Result<EthAddress, Error> {
+        self.send(&Command::EthAddress)?;
+
+        if let Response::EthAddress { address } = self.recv()? {
+            Ok(address)
+        } else {
+            Err(Error::InvalidResponse)
+        }
+    }
+
+    pub fn sign_eth_hash(&self, hash: EthH256) -> Result<EthSignature, Error> {
+        todo!("sign_eth_hash")
+    }
+
+    pub fn sign_eth_tx(&self, tx: &EthTypedTransaction) -> Result<EthSignature, Error> {
+        todo!("sign_eth_tx")
     }
 }

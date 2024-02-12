@@ -1,6 +1,7 @@
 use std::thread;
 
 use clap::Parser;
+use ethers::signers::{LocalWallet, Signer};
 use log::info;
 use signer_client::{Client, Command, Response};
 use subxt::ext::{
@@ -16,6 +17,9 @@ struct ServerArguments {
 
     #[clap(short, long)]
     azero_key: String,
+
+    #[clap(short, long)]
+    eth_wallet_mnemonic: String,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -31,13 +35,19 @@ enum Error {
 
     #[error("IO error: {0}")]
     IO(#[from] std::io::Error),
+
+    #[error("Eth Wallet error: {0}")]
+    Wallet(#[from] ethers::signers::WalletError),
+
+    #[error("Hex decoding error: {0}")]
+    Hex(#[from] hex::FromHexError),
 }
 
 fn main() -> Result<(), Error> {
     env_logger::init();
 
     let args = ServerArguments::parse();
-    let server = Server::new(args.azero_key, args.port)?;
+    let server = Server::new(args.azero_key, args.eth_wallet_mnemonic, args.port)?;
 
     info!("Server listening on: {:?}", server.local_addr()?);
     info!("Azero account ID: {:?}", server.account_id());
@@ -50,16 +60,20 @@ fn main() -> Result<(), Error> {
 struct Server {
     listener: VsockListener,
     azero_key: KeyPair,
+    eth_wallet: LocalWallet,
 }
 
 impl Server {
-    fn new(azero_key: String, port: u32) -> Result<Self, Error> {
+    fn new(azero_key: String, eth_key: String, port: u32) -> Result<Self, Error> {
         let azero_key = KeyPair::from_string(&azero_key, None)?;
         let listener = VsockListener::bind_with_cid_port(VMADDR_CID_ANY, port)?;
+        let eth_key = hex::decode(eth_key)?;
+        let eth_wallet = LocalWallet::from_bytes(&eth_key)?;
 
         Ok(Self {
             listener,
             azero_key,
+            eth_wallet,
         })
     }
 
@@ -74,7 +88,7 @@ impl Server {
     fn accept_one(&self) -> Result<(), Error> {
         let (client, _) = self.listener.accept()?;
         let client = Client::from(client);
-        handle_client(client, self.azero_key.clone());
+        handle_client(client, self.azero_key.clone(), self.eth_wallet.clone());
 
         Ok(())
     }
@@ -86,14 +100,18 @@ impl Server {
     }
 }
 
-fn handle_client(client: Client, azero_key: KeyPair) {
+fn handle_client(client: Client, azero_key: KeyPair, eth_wallet: LocalWallet) {
     thread::spawn(move || {
-        let result = do_handle_client(client, &azero_key);
+        let result = do_handle_client(client, &azero_key, &eth_wallet);
         info!("Client disconnected: {:?}", result);
     });
 }
 
-fn do_handle_client(client: Client, azero_key: &KeyPair) -> Result<(), Error> {
+fn do_handle_client(
+    client: Client,
+    azero_key: &KeyPair,
+    eth_wallet: &LocalWallet,
+) -> Result<(), Error> {
     loop {
         let command = client.recv()?;
         info!("Received command: {:?}", command);
@@ -103,9 +121,9 @@ fn do_handle_client(client: Client, azero_key: &KeyPair) -> Result<(), Error> {
                 client.send(&Response::Pong)?;
             }
 
-            Command::AccountId => {
+            Command::AccountIdAzero => {
                 let account_id = azero_key.public().into();
-                client.send(&Response::AccountId { account_id })?;
+                client.send(&Response::AccountIdAzero { account_id })?;
             }
 
             Command::Sign { payload } => {
@@ -114,15 +132,21 @@ fn do_handle_client(client: Client, azero_key: &KeyPair) -> Result<(), Error> {
 
                 client.send(&Response::Signed { payload, signature })?;
             }
+
+            Command::EthAddress => {
+                let address = eth_wallet.address();
+                client.send(&Response::EthAddress { address })?;
+            }
         }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use std::env;
+    use std::{env, str::FromStr};
 
     use assert2::{assert, let_assert};
+    use ethers::addressbook::Address;
     use serial_test::serial;
     use subxt::ext::sp_runtime::traits::Verify;
     use vsock::VMADDR_CID_HOST;
@@ -142,13 +166,13 @@ mod test {
 
     #[test]
     #[serial]
-    fn test_account_id() {
+    fn test_account_id_azero() {
         let client = connect();
 
-        client.send(&Command::AccountId).unwrap();
+        client.send(&Command::AccountIdAzero).unwrap();
         let response: Response = client.recv().unwrap();
 
-        let_assert!(Response::AccountId { account_id } = response);
+        let_assert!(Response::AccountIdAzero { account_id } = response);
         assert!(account_id.to_string() == "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY");
     }
 
@@ -176,8 +200,25 @@ mod test {
         assert!(signature.verify(&payload[..], &client.account_id().unwrap()));
     }
 
+    #[test]
+    #[serial]
+    fn test_eth_address() {
+        let client = connect();
+
+        let address = client.eth_address().unwrap();
+
+        assert!(
+            address == Address::from_str("0xEe88da44b4901d7F86970c52dC5139Af80C83edD").unwrap()
+        );
+    }
+
     fn connect() -> Client {
-        let server = Server::new("//Alice".to_string(), port()).unwrap();
+        let server = Server::new(
+            "//Alice".to_string(),
+            "58039a48427a62f77e5562d7f565d10595d92abdd4813233607ec2ac5ac4b9de".to_string(),
+            port(),
+        )
+        .unwrap();
         let client = Client::new(VMADDR_CID_HOST, port()).unwrap();
         server.accept_one().unwrap();
 
