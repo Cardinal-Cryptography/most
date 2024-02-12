@@ -45,6 +45,23 @@ async function main() {
     governance.address,
   );
   await governance.transferOwnership(contracts.governance);
+  // accept ownership by governance
+  let governanceInstance = await new ethers.Contract(
+    contracts.governance,
+    Governance.abi,
+    signers[0],
+  );
+  let iface = await new ethers.Interface(["function acceptOwnership()"]);
+  let calldata = await iface.encodeFunctionData("acceptOwnership", []);
+  await governanceInstance
+    .connect(signers[1])
+    .submitProposal(contracts.governance, calldata);
+  console.log("Proposal submitted");
+  console.log("Signing proposal...");
+  await governanceInstance.connect(signers[2]).vote(0);
+  await governanceInstance.connect(signers[3]).vote(0);
+  // execute proposal
+  await governance.executeProposal(0);
   console.log("Governance ownership transferred successfully");
 
   let initialMostOwner = await most.owner();
@@ -55,6 +72,16 @@ async function main() {
     contracts.governance,
   );
   await most.transferOwnership(contracts.governance);
+  // accept ownership by governance
+  await governanceInstance
+    .connect(signers[1])
+    .submitProposal(contracts.most, calldata);
+  console.log("Proposal submitted");
+  console.log("Signing proposal...");
+  await governanceInstance.connect(signers[2]).vote(1);
+  await governanceInstance.connect(signers[3]).vote(1);
+  // execute proposal
+  await governance.executeProposal(1);
   console.log("Most ownership transferred successfully");
 
   const Migrations = artifacts.require("Migrations");
