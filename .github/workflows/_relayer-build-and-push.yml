@@ -90,7 +90,6 @@ jobs:
           chain-environment: bridgenet
           frontend-environment: dev
           dst-addresses: downloaded-addresses-bridgenet-dev
-          if-not-exist: fallback
 
       - name: Download artifact from S3 bucket
         uses: Cardinal-Cryptography/github-actions/download-contract-artifact@v6
@@ -103,9 +102,6 @@ jobs:
           version: ${{ github.sha }}
           contract: azero_most
           dst-artifact: downloaded-artifact-azero-most
-          # When downloading a 'directory' from S3 bucket, it will not show as existing
-          # Hence, 'try' needs to be used
-          if-not-exist: try
 
       - name: Install Rust toolchain
         uses: Cardinal-Cryptography/github-actions/install-rust-toolchain@v6
