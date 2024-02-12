@@ -69,8 +69,7 @@ async fn main() -> Result<()> {
             cid,
             config.signer_port,
         )
-        .await
-        .expect("Cannot connect to signer")
+        .await?
     } else if config.dev {
         let azero_seed = "//".to_owned() + &config.dev_account_index.to_string();
         let keypair = aleph_client::keypair_from_string(&azero_seed);

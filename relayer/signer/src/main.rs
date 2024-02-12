@@ -15,7 +15,7 @@ struct ServerArguments {
     port: u32,
 
     #[clap(short, long)]
-    azero_key: Option<String>,
+    azero_key: String,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -37,10 +37,7 @@ fn main() -> Result<(), Error> {
     env_logger::init();
 
     let args = ServerArguments::parse();
-    let server = Server::new(
-        args.azero_key.expect("Aleph Zero key not provided"),
-        args.port,
-    )?;
+    let server = Server::new(args.azero_key, args.port)?;
 
     info!("Server listening on: {:?}", server.local_addr()?);
     info!("Azero account ID: {:?}", server.account_id());
