@@ -71,7 +71,12 @@ pub async fn azero_to_eth() -> anyhow::Result<()> {
     ];
 
     let send_request_info = most
-        .contract_exec(&azero_signed_connection, "send_request", &send_request_args)
+        .contract_exec_value(
+            &azero_signed_connection,
+            "send_request",
+            &send_request_args,
+            10_000,
+        )
         .await?;
     info!("`send_request` tx info: {:?}", send_request_info);
 
