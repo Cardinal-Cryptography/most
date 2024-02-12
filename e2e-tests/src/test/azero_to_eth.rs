@@ -3,7 +3,11 @@ use std::str::FromStr;
 use aleph_client::{
     contract::ContractInstance, keypair_from_string, sp_runtime::AccountId32, utility::BlocksApi,
 };
-use ethers::{middleware::Middleware, signers::{coins_bip39::English, MnemonicBuilder, Signer}, utils};
+use ethers::{
+    middleware::Middleware,
+    signers::{coins_bip39::English, MnemonicBuilder, Signer},
+    utils,
+};
 use log::info;
 
 use crate::{azero, config::setup_test, eth};
@@ -14,7 +18,7 @@ pub async fn azero_to_eth() -> anyhow::Result<()> {
 
     let azero_contract_addresses =
         azero::contract_addresses(&config.azero_contract_addresses_path)?;
-    let most_address = AccountId32::from_str(&azero_contract_addresses.weth)
+    let most_address = AccountId32::from_str(&azero_contract_addresses.most)
         .map_err(|e| anyhow::anyhow!("Cannot parse account id from string: {:?}", e))?;
     let weth_azero_address = AccountId32::from_str(&azero_contract_addresses.weth)
         .map_err(|e| anyhow::anyhow!("Cannot parse account id from string: {:?}", e))?;
@@ -28,10 +32,9 @@ pub async fn azero_to_eth() -> anyhow::Result<()> {
     let azero_signed_connection =
         azero::signed_connection(&config.azero_node_ws, &azero_account_keypair).await;
 
-    let approve_args = [
-        most_address.to_string(),
-        config.test_args.transfer_amount.to_string(),
-    ];
+    let transfer_amount = utils::parse_ether(config.test_args.transfer_amount)?.as_u128();
+
+    let approve_args = [most_address.to_string(), transfer_amount.to_string()];
 
     let approve_info = weth_azero
         .contract_exec(&azero_signed_connection, "PSP22::approve", &approve_args)
@@ -60,14 +63,13 @@ pub async fn azero_to_eth() -> anyhow::Result<()> {
         .get_balance(eth_account_address, None)
         .await?;
 
-    let transfer_amount = utils::parse_ether(config.test_args.transfer_amount)?.as_u128();
+    let weth_azero_address_bytes: [u8; 32] = weth_azero_address.into();
     let send_request_args = [
-        "0x".to_string() + weth_azero_address.to_string().as_str(),
+        azero::bytes32_to_string(&weth_azero_address_bytes),
         transfer_amount.to_string(),
         azero::bytes32_to_string(&eth_account_address_bytes),
     ];
 
-    info!("HERE");
     let send_request_info = most
         .contract_exec(&azero_signed_connection, "send_request", &send_request_args)
         .await?;
@@ -81,8 +83,8 @@ pub async fn azero_to_eth() -> anyhow::Result<()> {
         .await?;
 
     assert_eq!(
-        balance_post_unwrap - balance_pre_unwrap,
-        config.test_args.transfer_amount.into()
+        (balance_post_unwrap - balance_pre_unwrap).as_u128(),
+        transfer_amount
     );
 
     Ok(())

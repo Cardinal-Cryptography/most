@@ -47,10 +47,7 @@ pub async fn eth_to_azero() -> anyhow::Result<()> {
 
     let most_address = eth_contract_addresses.most.parse::<Address>()?;
 
-    let approve_args = (
-        most_address,
-        transfer_amount,
-    );
+    let approve_args = (most_address, transfer_amount);
 
     let approve_receipt =
         eth::call_contract_method(weth_eth, "approve", config.eth_gas_limit, approve_args).await?;
