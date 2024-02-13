@@ -50,11 +50,18 @@ impl AdvisoryInstance {
         })
     }
 
-    pub async fn is_emergency(&self, connection: &Connection) -> Result<bool, AzeroContractError> {
-        self.contract
-            .contract_read0(connection, "is_emergency")
+    pub async fn is_emergency(
+        &self,
+        connection: &Connection,
+    ) -> Result<(bool, AccountId), AzeroContractError> {
+        match self
+            .contract
+            .contract_read0::<bool, _>(connection, "is_emergency")
             .await
-            .map_err(AzeroContractError::AlephClient)
+        {
+            Ok(is_emergency) => Ok((is_emergency, self.address.clone())),
+            Err(why) => Err(AzeroContractError::AlephClient(why)),
+        }
     }
 }
 

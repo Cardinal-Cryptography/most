@@ -28,7 +28,6 @@ use crate::{
         AzeroContractError, CrosschainTransferRequestFilter, Most, MostEvents, MostInstance,
     },
     helpers::concat_u8_arrays,
-    listeners::emergency_release,
 };
 
 #[derive(Debug, Error)]
@@ -100,8 +99,9 @@ impl EthListener {
             )
             .await;
 
-            // stop and wait for the emergency to be released
-            emergency_release(emergency.clone()).await;
+            match emergency.load(std::sync::atomic::Ordering::Relaxed) {
+                true => trace!("Event handling paused due to an emergency state in one of the Advisory contracts"),
+                false => {
 
             // Don't query for more than `sync_step` blocks at one time.
             let to_block = std::cmp::min(
@@ -129,7 +129,6 @@ impl EthListener {
                     &event,
                     &config,
                     Arc::clone(&azero_connection),
-                    Arc::clone(&emergency),
                 )
                 .await?
             }
@@ -145,6 +144,8 @@ impl EthListener {
                 to_block,
             )
             .await?;
+                },
+            }
         }
     }
 }
@@ -153,10 +154,7 @@ async fn handle_event(
     event: &MostEvents,
     config: &Config,
     azero_connection: Arc<SignedAzeroWsConnection>,
-    emergency: Arc<AtomicBool>,
 ) -> Result<(), EthListenerError> {
-    emergency_release(emergency).await;
-
     if let MostEvents::CrosschainTransferRequestFilter(
         crosschain_transfer_event @ CrosschainTransferRequestFilter {
             committee_id,
