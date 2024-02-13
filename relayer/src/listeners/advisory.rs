@@ -3,7 +3,6 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
-    thread,
     time::Duration,
 };
 
@@ -11,6 +10,7 @@ use aleph_client::utility::BlocksApi;
 use futures::future::join_all;
 use log::{info, warn};
 use thiserror::Error;
+use tokio::time::sleep;
 
 use crate::{
     config::Config,
@@ -88,7 +88,7 @@ impl AdvisoryListener {
             emergency.store(current_emergency_state, Ordering::Relaxed);
 
             // we sleep for about half a block production time before making another round of queries
-            thread::sleep(Duration::from_millis(500))
+            sleep(Duration::from_millis(500)).await;
         }
     }
 }
