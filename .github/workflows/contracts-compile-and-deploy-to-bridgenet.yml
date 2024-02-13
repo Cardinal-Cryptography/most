@@ -5,6 +5,10 @@ on:
   workflow_call:
   workflow_dispatch:
 
+concurrency:
+  group: "${{ github.ref }}-${{ github.workflow }}"
+  cancel-in-progress: false
+
 jobs:
   check-vars-and-secrets:
     name: Check vars and secrets
@@ -102,18 +106,18 @@ jobs:
           name: eth-deployed-contracts
           path: eth
 
-      - name: Copy files to S3 AWS bucket
-        uses: Cardinal-Cryptography/github-actions/copy-file-to-s3@v1
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RW_AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RW_AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
+      - name: Store artifact in S3 bucket
+        uses: Cardinal-Cryptography/github-actions/store-contract-artifact@v6
         with:
-          compression: false
-          source-path: ${{ matrix.from }}
-          s3-bucket-filename: ${{ matrix.filename }}
-          s3-bucket-path: most/artifacts/${{ github.sha }}/${{ matrix.to }}
-          s3-bucket-name: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
+          aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RW_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RW_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
+          s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
+          project: most
+          version: ${{ github.sha }}
+          contract: ${{ matrix.to }}
+          src-artifact: ${{ matrix.from }}
+          if-exist: overwrite
 
   upload-contract-addresses:
     name: Upload contract addresses to S3
@@ -137,15 +141,15 @@ jobs:
         shell: bash
         run: make contract_spec.json
 
-      - name: Copy files to S3 AWS bucket
-        uses: Cardinal-Cryptography/github-actions/copy-file-to-s3@v1
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.CONTRACTS_MOST_ADDRESSES_BRIDGENET_DEV_RW_AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.CONTRACTS_MOST_ADDRESSES_BRIDGENET_DEV_RW_AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
+      - name: Store addresses in S3 bucket
+        uses: Cardinal-Cryptography/github-actions/store-contract-addresses@v6
         with:
-          compression: false
-          source-path: contract_spec.json
-          s3-bucket-filename: dev.json
-          s3-bucket-path: most/addresses/bridgenet
-          s3-bucket-name: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
+          aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ADDRESSES_BRIDGENET_DEV_RW_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ADDRESSES_BRIDGENET_DEV_RW_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
+          s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
+          project: most
+          chain-environment: bridgenet
+          frontend-environment: dev
+          src-addresses: contract_spec.json
+          if-exist: overwrite
