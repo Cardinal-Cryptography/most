@@ -9,9 +9,24 @@ use std::{
 
 use aleph_client::utility::BlocksApi;
 use log::{info, trace, warn};
+use thiserror::Error;
 
-use super::AzeroListenerError;
-use crate::{config::Config, connections::azero::AzeroWsConnection, contracts::AdvisoryInstance};
+use crate::{
+    config::Config,
+    connections::azero::AzeroWsConnection,
+    contracts::{AdvisoryInstance, AzeroContractError},
+};
+
+#[derive(Debug, Error)]
+#[error(transparent)]
+#[non_exhaustive]
+pub enum AdvisoryListenerError {
+    #[error("aleph-client error")]
+    AlephClient(#[from] anyhow::Error),
+
+    #[error("azero contract error")]
+    AzeroContract(#[from] AzeroContractError),
+}
 
 pub struct AdvisoryListener;
 
@@ -20,7 +35,7 @@ impl AdvisoryListener {
         config: Arc<Config>,
         azero_connection: Arc<AzeroWsConnection>,
         emergency: Arc<AtomicBool>,
-    ) -> Result<(), AzeroListenerError> {
+    ) -> Result<(), AdvisoryListenerError> {
         let Config {
             advisory_contract_metadata,
             advisory_contract_addresses,
@@ -33,7 +48,7 @@ impl AdvisoryListener {
             .into_iter()
             .try_fold(
                 Vec::new(),
-                |mut acc, address| -> Result<Vec<AdvisoryInstance>, AzeroListenerError> {
+                |mut acc, address| -> Result<Vec<AdvisoryInstance>, AdvisoryListenerError> {
                     acc.push(AdvisoryInstance::new(&address, advisory_contract_metadata)?);
                     Ok(acc)
                 },

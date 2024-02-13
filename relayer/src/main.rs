@@ -8,6 +8,7 @@ use config::Config;
 use connections::EthConnectionError;
 use ethers::signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, Signer, WalletError};
 use eyre::Result;
+use listeners::AdvisoryListenerError;
 use log::{debug, error, info};
 use redis::{Client as RedisClient, RedisError};
 use thiserror::Error;
@@ -47,6 +48,9 @@ pub enum ListenerError {
 
     #[error("redis error")]
     Redis(#[from] RedisError),
+
+    #[error("advisory listener error")]
+    Advisory(#[from] AdvisoryListenerError),
 }
 
 #[tokio::main]
