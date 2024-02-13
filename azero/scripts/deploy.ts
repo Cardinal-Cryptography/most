@@ -201,16 +201,6 @@ async function main(): Promise<void> {
   console.log("Creating proposal...");
   await governance
     .withSigner(governance_members[0])
-    .query.submitProposal(
-      mostAddress,
-      most.contractAbi
-        .findMessage("Ownable2Step::accept_ownership")
-        .selector.toU8a() as any,
-      [],
-      true,
-    );
-  await governance
-    .withSigner(governance_members[0])
     .tx.submitProposal(
       mostAddress,
       most.contractAbi
@@ -252,7 +242,7 @@ async function main(): Promise<void> {
 
   console.log("Transferring ownership of governance to governance...");
   await governance.tx.transferOwnership(governanceAddress);
-  console.log("Accepting ownership of weth by governance...");
+  console.log("Accepting ownership of governance by governance...");
   //create proposal with transaction acceptOwnership()
   console.log("Creating proposal...");
   await governance
