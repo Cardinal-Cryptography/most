@@ -87,9 +87,9 @@ jobs:
           aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
           s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
           project: most
-          chain-environment: bridgenet
-          frontend-environment: dev
-          dst-addresses: downloaded-addresses-bridgenet-dev
+          chain-environment: ${{ inputs.environment }}
+          frontend-environment: ${{ inputs.frontend-environment }}
+          dst-addresses: downloaded-addresses-${{ inputs.environment }}-${{ inputs.frontend-environment }}.json
 
       - name: Download artifact from S3 bucket
         uses: Cardinal-Cryptography/github-actions/download-contract-artifact@v6
@@ -109,7 +109,7 @@ jobs:
       - name: Build relayer
         id: build
         env:
-          TMP_ADDRESSES_FILE: downloaded-addresses-bridgenet-dev/${{ inputs.frontend-environment }}.json
+          TMP_ADDRESSES_FILE: downloaded-addresses-${{ inputs.environment }}-${{ inputs.frontend-environment }}.json
           TMP_ADDRESSES_DIR: downloaded-artifact-azero-most
         run: |
           mkdir -p azero/artifacts
