@@ -239,6 +239,7 @@ async fn add_to_pending(block_number: u32, pending_blocks: Arc<Mutex<BTreeSet<u3
 }
 
 // handle all events present in one block
+#[allow(clippy::too_many_arguments)]
 async fn handle_events(
     config: Arc<Config>,
     eth_connection: Arc<SignedEthConnection>,
