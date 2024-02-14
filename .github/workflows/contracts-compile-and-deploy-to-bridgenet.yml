@@ -26,7 +26,8 @@ jobs:
   deploy-contracts:
     name: Deploy and setup contracts
     runs-on: self-hosted
-    needs: [test-eth-contracts, test-azero-contracts]
+    needs: [check-vars-and-secrets]
+    #needs: [test-eth-contracts, test-azero-contracts]
 
     steps:
       - name: Checkout code
