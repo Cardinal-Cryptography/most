@@ -30,6 +30,7 @@ pub mod advisory {
     pub struct EmergencyChanged {
         pub previous_state: bool,
         pub new_state: bool,
+        pub caller: AccountId,
     }
 
     #[ink(event)]
@@ -55,6 +56,7 @@ pub mod advisory {
                 self.env().emit_event(EmergencyChanged {
                     previous_state: self.emergency,
                     new_state,
+                    caller: self.env().caller(),
                 });
                 self.emergency = new_state;
             }
