@@ -1,4 +1,3 @@
-use aleph_client::sp_runtime::print;
 use serde::{Deserialize, Serialize};
 use serde_json::Deserializer;
 use subxt::ext::{sp_core::crypto::AccountId32, sp_runtime::MultiSignature};
