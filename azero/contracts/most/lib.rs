@@ -241,9 +241,9 @@ pub mod most {
                 .ok_or(MostError::UnsupportedPair)?;
 
             let current_base_fee = self.get_base_fee()?;
-            let base_fee = self.env().transferred_value();
+            let transferred_fee = self.env().transferred_value();
 
-            if base_fee.lt(&current_base_fee) {
+            if transferred_fee.lt(&current_base_fee) {
                 return Err(MostError::BaseFeeTooLow);
             }
 
@@ -260,35 +260,36 @@ pub mod most {
                 .collected_committee_rewards
                 .get(data.committee_id)
                 .unwrap_or(0)
-                .checked_add(base_fee)
+                .checked_add(current_base_fee)
                 .ok_or(MostError::Arithmetic)?;
 
             self.collected_committee_rewards
                 .insert(data.committee_id, &base_fee_total);
 
-            self.env().emit_event(CrosschainTransferRequest {
-                committee_id: data.committee_id,
-                dest_token_address,
-                amount,
-                dest_receiver_address,
-                request_nonce: data.request_nonce,
-            });
+            data.rewards_all = data
+                .rewards_all
+                .checked_add(current_base_fee)
+                .ok_or(MostError::Arithmetic)?;
 
             data.request_nonce = data
                 .request_nonce
                 .checked_add(1)
                 .ok_or(MostError::Arithmetic)?;
 
-            data.rewards_all
-                .checked_add(base_fee)
-                .ok_or(MostError::Arithmetic)?;
-
             self.data.set(&data);
 
             // return surplus if any
-            if let Some(surplus) = base_fee.checked_sub(current_base_fee) {
+            if let Some(surplus) = transferred_fee.checked_sub(current_base_fee) {
                 self.env().transfer(sender, surplus)?;
             };
+
+            self.env().emit_event(CrosschainTransferRequest {
+                committee_id: data.committee_id,
+                dest_token_address,
+                amount,
+                dest_receiver_address,
+                request_nonce: data.request_nonce.saturating_sub(1),
+            });
 
             Ok(())
         }
@@ -340,7 +341,10 @@ pub mod most {
             let mut request = self.pending_requests.get(request_hash).unwrap_or_default();
 
             // record vote
-            request.signature_count += 1;
+            request.signature_count = request
+                .signature_count
+                .checked_add(1)
+                .ok_or(MostError::Arithmetic)?;
             self.signatures.insert((request_hash, caller), &());
 
             self.env().emit_event(RequestSigned {
