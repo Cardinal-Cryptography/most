@@ -15,7 +15,10 @@ use thiserror::Error;
 use tokio::{sync::Mutex, task::JoinSet};
 
 use crate::{
-    connections::{azero, eth},
+    connections::{
+        azero::{self, AzeroConnectionWithSigner},
+        eth,
+    },
     listeners::{
         AdvisoryListener, AlephZeroListener, AzeroListenerError, EthListener, EthListenerError,
     },
@@ -66,27 +69,41 @@ async fn main() -> Result<()> {
     let client = RedisClient::open(config.redis_node.clone())?;
     let redis_connection = Arc::new(Mutex::new(client.get_async_connection().await?));
 
-    let azero_keypair = if config.dev {
-        let azero_seed = "//".to_owned() + &config.dev_account_index.to_string();
-        aleph_client::keypair_from_string(&azero_seed)
-    } else {
-        unimplemented!("Only dev mode is supported for now");
-    };
-
     let azero_connection = Arc::new(azero::init(&config.azero_node_wss_url).await);
-    let azero_signed_connection = Arc::new(azero::sign(&azero_connection, &azero_keypair));
+    let azero_signed_connection = if let Some(cid) = config.signer_cid {
+        AzeroConnectionWithSigner::with_signer(
+            azero::init(&config.azero_node_wss_url).await,
+            cid,
+            config.signer_port,
+        )
+        .await?
+    } else if config.dev {
+        let azero_seed = "//".to_owned() + &config.dev_account_index.to_string();
+        let keypair = aleph_client::keypair_from_string(&azero_seed);
+        AzeroConnectionWithSigner::with_keypair(
+            azero::init(&config.azero_node_wss_url).await,
+            keypair,
+        )
+    } else {
+        panic!("Use dev mode or connect to a signer");
+    };
 
     debug!("Established connection to Aleph Zero node");
 
     let advisory_config_rc = Arc::clone(&config);
     let advisory_emergency_rc = Arc::clone(&emergency);
+    let advisory_listener_azero_connection_rc = azero_connection.clone();
 
     // run task only if address passed on CLI
     if config.advisory_contract_addresses.is_some() {
         tasks.spawn(async move {
-            AdvisoryListener::run(advisory_config_rc, azero_connection, advisory_emergency_rc)
-                .await
-                .map_err(ListenerError::from)
+            AdvisoryListener::run(
+                advisory_config_rc,
+                advisory_listener_azero_connection_rc,
+                advisory_emergency_rc,
+            )
+            .await
+            .map_err(ListenerError::from)
         });
     }
 
@@ -112,7 +129,6 @@ async fn main() -> Result<()> {
     debug!("Established connection to Ethereum node");
 
     let eth_listener_config_rc = Arc::clone(&config);
-    let eth_listener_azero_signed_connection_rc = Arc::clone(&azero_signed_connection);
     let eth_listener_eth_connection_rc = Arc::clone(&eth_connection);
     let eth_listener_redis_connection_rc = Arc::clone(&redis_connection);
     let eth_listener_emergency_rc = Arc::clone(&emergency);
@@ -122,7 +138,7 @@ async fn main() -> Result<()> {
     tasks.spawn(async move {
         EthListener::run(
             eth_listener_config_rc,
-            eth_listener_azero_signed_connection_rc,
+            azero_signed_connection,
             eth_listener_eth_connection_rc,
             eth_listener_redis_connection_rc,
             eth_listener_emergency_rc,
@@ -134,7 +150,7 @@ async fn main() -> Result<()> {
     info!("Starting AlephZero listener");
 
     let aleph_zero_listener_config_rc = Arc::clone(&config);
-    let aleph_zero_listener_azero_signed_connection_rc = Arc::clone(&azero_signed_connection);
+    let aleph_zero_listener_azero_signed_connection_rc = azero_connection.clone();
     let aleph_zero_listener_eth_connection_rc = Arc::clone(&eth_connection);
     let aleph_zero_listener_redis_connection_rc = Arc::clone(&redis_connection);
     let aleph_zero_listener_emergency_rc = Arc::clone(&emergency);
