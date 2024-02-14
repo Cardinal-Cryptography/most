@@ -28,6 +28,11 @@ let result = {
             address: azero.oracle
         },
 
+        azero_advisory: {
+            contract: "azero_advisory",
+            address: azero.advisory
+        },
+
         eth_migrations: {
             contract: "azero_migrations",
             address: eth.migrations
