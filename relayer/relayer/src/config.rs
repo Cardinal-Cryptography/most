@@ -1,3 +1,25 @@
+use std::{cmp::max, ops::Deref, str::FromStr};
+
+#[derive(Debug, Clone)]
+pub struct SyncFromBlock(u32);
+
+impl FromStr for SyncFromBlock {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let inner: u32 = s.parse().map_err(|e| format!("{e}"))?;
+        Ok(Self(max(1, inner)))
+    }
+}
+
+impl Deref for SyncFromBlock {
+    type Target = u32;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 #[derive(Debug, clap::Parser)]
 pub struct Config {
     #[arg(long)]
@@ -60,11 +82,11 @@ pub struct Config {
     #[arg(long, default_value = "32")]
     pub eth_tx_min_confirmations: usize,
 
-    #[arg(long, default_value = "0")]
-    pub default_sync_from_block_eth: u32,
+    #[arg(long, default_value = "1")]
+    pub default_sync_from_block_eth: SyncFromBlock,
 
-    #[arg(long, default_value = "0")]
-    pub default_sync_from_block_azero: u32,
+    #[arg(long, default_value = "1")]
+    pub default_sync_from_block_azero: SyncFromBlock,
 
     #[arg(long, default_value = "100")]
     pub sync_step: u32,
