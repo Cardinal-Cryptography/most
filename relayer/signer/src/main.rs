@@ -126,11 +126,11 @@ fn do_handle_client(
                 client.send(&Response::AccountIdAzero { account_id })?;
             }
 
-            Command::Sign { payload } => {
+            Command::SignAzero { payload } => {
                 let signature = azero_key.sign(&payload);
                 let signature = subxt::ext::sp_runtime::MultiSignature::Sr25519(signature);
 
-                client.send(&Response::Signed { payload, signature })?;
+                client.send(&Response::SignedAzero { payload, signature })?;
             }
 
             Command::EthAddress => {
@@ -193,26 +193,26 @@ mod test {
 
     #[test]
     #[serial]
-    fn test_sign() {
+    fn test_sign_azero() {
         let client = connect();
         let payload = b"Hello, world!".to_vec();
 
         client
-            .send(&Command::Sign {
+            .send(&Command::SignAzero {
                 payload: payload.clone(),
             })
             .unwrap();
         let response: Response = client.recv().unwrap();
 
         let_assert!(
-            Response::Signed {
+            Response::SignedAzero {
                 payload: signed_payload,
                 signature
             } = response
         );
 
         assert!(signed_payload == payload);
-        assert!(signature.verify(&payload[..], &client.account_id().unwrap()));
+        assert!(signature.verify(&payload[..], &client.azero_account_id().unwrap()));
     }
 
     #[test]

@@ -36,7 +36,7 @@ impl AzeroSignerClient {
     async fn new(cid: u32, port: u32) -> Result<Self, Error> {
         let res = spawn_blocking(move || {
             let client = Client::new(cid, port)?;
-            let account_id = client.account_id()?;
+            let account_id = client.azero_account_id()?;
             let client = Arc::new(Mutex::new(client));
 
             Ok::<_, signer_client::Error>(Self { client, account_id })
@@ -69,7 +69,7 @@ impl AzeroSigner {
 
                 let res = spawn_blocking(move || {
                     let client = client.lock().unwrap();
-                    let signature = client.sign(&payload)?;
+                    let signature = client.sign_azero(&payload)?;
                     Ok::<_, signer_client::Error>(signature)
                 })
                 .await??;

@@ -22,7 +22,7 @@ pub enum Error {
 pub enum Command {
     Ping,
     AccountIdAzero,
-    Sign {
+    SignAzero {
         payload: Vec<u8>,
     },
     EthAddress,
@@ -40,7 +40,7 @@ pub enum Response {
     AccountIdAzero {
         account_id: AccountId32,
     },
-    Signed {
+    SignedAzero {
         payload: Vec<u8>,
         signature: MultiSignature,
     },
@@ -86,7 +86,7 @@ impl Client {
         Ok(res)
     }
 
-    pub fn account_id(&self) -> Result<AccountId32, Error> {
+    pub fn azero_account_id(&self) -> Result<AccountId32, Error> {
         self.send(&Command::AccountIdAzero)?;
         if let Response::AccountIdAzero { account_id } = self.recv()? {
             Ok(account_id)
@@ -95,14 +95,14 @@ impl Client {
         }
     }
 
-    pub fn sign(&self, payload: &[u8]) -> Result<MultiSignature, Error> {
-        self.send(&Command::Sign {
+    pub fn sign_azero(&self, payload: &[u8]) -> Result<MultiSignature, Error> {
+        self.send(&Command::SignAzero {
             payload: payload.to_vec(),
         })?;
         let signed = self.recv::<Response>()?;
 
         match signed {
-            Response::Signed {
+            Response::SignedAzero {
                 payload: return_payload,
                 signature,
             } if return_payload == payload => Ok(signature),
