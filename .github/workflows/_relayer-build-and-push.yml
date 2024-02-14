@@ -143,7 +143,7 @@ jobs:
           docker_tag=${{ steps.get-ref-properties.outputs.sha }}-${{ inputs.environment }}-${{ inputs.frontend-environment }}
           docker_name=most-relayer-${docker_tag}
 
-          make build-docker-relayer DOCKER_RELAYER_NAME=${docker_name}
+          make build-docker-relayer DOCKER_RELAYER_NAME=${docker_name} DOCKER_RELAYER_COPY_ADDRESSES=copy
 
           echo "docker-name=${docker_name}" >> $GITHUB_OUTPUT
           echo "docker-tag=${docker_tag}" >> $GITHUB_OUTPUT

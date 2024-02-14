@@ -1,6 +1,7 @@
 NETWORK ?= development
 AZERO_ENV ?= dev
 DOCKER_RELAYER_NAME ?= most-relayer
+DOCKER_RELAYER_COPY_ADDRESSES ?= copy
 
 export BRIDGENET_AZERO_START_BLOCK=`ENDPOINT=https://rpc-fe-bridgenet.dev.azero.dev ./relayer/scripts/azero_best_finalized.sh`
 export BRIDGENET_ETH_START_BLOCK=`ENDPOINT=https://rpc-eth-bridgenet.dev.azero.dev ./relayer/scripts/eth_best_finalized.sh`
@@ -293,12 +294,14 @@ format: rust-format js-format
 build-docker-relayer: # Build relayer docker image
 build-docker-relayer: compile-azero compile-eth
 	cd relayer && cargo build --release
-	cp azero/addresses.json relayer/azero_addresses.json
-	cp eth/addresses.json relayer/eth_addresses.json
+	ifeq ($(DOCKER_RELAYER_COPY_ADDRESSES),copy)
+	  cp azero/addresses.json relayer/azero_addresses.json
+	  cp eth/addresses.json relayer/eth_addresses.json
+	endif
 	cp azero/artifacts/most.json relayer/most.json
 	cp azero/artifacts/advisory.json relayer/advisory.json
-	cd relayer && docker build -t $(DOCKER_RELAYER_NAME) .
-	rm relayer/azero_addresses.json relayer/eth_addresses.json relayer/most.json relayer/advisory.json
+	cd relayer && docker build -t $(DOCKER_RELAYER_NAME) --build-arg COPY_ADDRESSES=$(DOCKER_RELAYER_COPY_ADDRESSES) .
+	rm -f relayer/azero_addresses.json relayer/eth_addresses.json relayer/most.json relayer/advisory.json
 
 contract_spec.json: # Generate a a file describing deployed contracts based on addresses.json files
 contract_spec.json: azero/addresses.json eth/addresses.json

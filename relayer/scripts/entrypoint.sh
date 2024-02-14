@@ -25,6 +25,10 @@ REDIS=${REDIS:-"redis://127.0.0.1:6379"}
 KEYSTORE_PATH=${KEYSTORE_PATH:-""}
 RELAYER_ID=${RELAYER_ID:-0}
 
+ADVISORY_ADDRESSES=${ADVISORY_ADDRESSES:-""}
+AZERO_MOST_ADDRESS=${AZERO_MOST_ADDDRESS:-""}
+ETH_MOST_ADDRESS=${ETH_MOST_ADDRESS:-""}
+
 # --- RELAYER ID from MY_POD_NAME coming from statefulset's pod, such as
 # --- relayer-0, relayer-1 etc.
 if [[ "${MY_POD_NAME}" =~ ^relayer-[0-9]+$ && "${RELAYER_ID}" == 0 ]]; then
@@ -39,16 +43,48 @@ ADVISORY_METADATA=${ADVISORY_METADATA:-"/usr/local/advisory.json"}
 
 ARGS=(
   --name "guardian_${RELAYER_ID}"
-  --advisory-contract-addresses=$(get_address $AZERO_ADDRESSES_FILE advisory)
   --advisory-contract-metadata=${ADVISORY_METADATA}
-  --azero-contract-address=$(get_address $AZERO_ADDRESSES_FILE most)
-  --eth-contract-address=$(get_address $ETH_ADDRESSES_FILE most)
   --eth-node-http-url=${ETH_NETWORK}
   --azero-node-wss-url=${AZERO_NETWORK}
   --dev-account-index=${RELAYER_ID}
   --redis-node=${REDIS}
   --azero-contract-metadata=${AZERO_MOST_METADATA}
 )
+
+# --- Addresses can be passed as environment variables.
+# --- If they are not, they should be present in the docker container. 
+if [[ -n "${ADVISORY_ADDRESSES}" ]]; then
+  ARGS+=(--advisory-contract-addresses=${ADVISORY_ADDRESSES})
+else
+  if [[ -f "${AZERO_ADDRESSES_FILE}" ]]; then
+    ARGS+=(--advisory-contract-addresses=$(get_address $AZERO_ADDRESSES_FILE advisory))
+  else
+    echo "! Advisory contract addresses are missing"
+    exit 1
+  fi
+fi
+
+if [[ -n "${AZERO_MOST_ADDRESS}" ]]; then
+  ARGS+=(--azero-contract-address=${AZERO_MOST_ADDRESS})
+else
+  if [[ -f "${AZERO_ADDRESSES_FILE}" ]]; then
+    ARGS+=(--azero-contract-address=$(get_address $AZERO_ADDRESSES_FILE most))
+  else
+    echo "! Azero most contract address is missing"
+    exit 1
+  fi
+fi
+
+if [[ -n "${ETH_MOST_ADDRESS}" ]]; then
+  ARGS+=(--eth-contract-address=${ETH_MOST_ADDRESS})
+else
+  if [[ -f "${ETH_ADDRESSES_FILE}" ]]; then
+    ARGS+=(--eth-contract-address=$(get_address $ETH_ADDRESSES_FILE most))
+  else
+    echo "! Eth most contract address is missing"
+    exit 1
+  fi
+fi
 
 if [[ -n "${KEYSTORE_PATH}" ]]; then
   ARGS+=(--keystore-path=${KEYSTORE_PATH})
