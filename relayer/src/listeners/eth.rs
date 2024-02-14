@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{atomic::AtomicBool, Arc};
 
 use ethers::{
     abi::EncodePackedError,
@@ -64,6 +64,7 @@ impl EthListener {
         azero_connection: Arc<SignedAzeroWsConnection>,
         eth_connection: Arc<SignedEthConnection>,
         redis_connection: Arc<Mutex<RedisConnection>>,
+        emergency: Arc<AtomicBool>,
     ) -> Result<(), EthListenerError> {
         let Config {
             eth_contract_address,
@@ -98,6 +99,10 @@ impl EthListener {
             )
             .await;
 
+            match emergency.load(std::sync::atomic::Ordering::Relaxed) {
+                true => trace!("Event handling paused due to an emergency state in one of the Advisory contracts"),
+                false => {
+
             // Don't query for more than `sync_step` blocks at one time.
             let to_block = std::cmp::min(
                 next_finalized_block_number,
@@ -120,7 +125,12 @@ impl EthListener {
 
             // Handle events.
             for event in events {
-                handle_event(&event, &config, Arc::clone(&azero_connection)).await?
+                handle_event(
+                    &event,
+                    &config,
+                    Arc::clone(&azero_connection),
+                )
+                .await?
             }
 
             // Update the last block number.
@@ -134,6 +144,8 @@ impl EthListener {
                 to_block,
             )
             .await?;
+                },
+            }
         }
     }
 }

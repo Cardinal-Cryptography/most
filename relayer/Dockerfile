@@ -17,5 +17,6 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 COPY ./azero_addresses.json /usr/local/azero_addresses.json
 COPY ./eth_addresses.json /usr/local/eth_addresses.json
 COPY ./most.json /usr/local/most.json
+COPY ./advisory.json /usr/local/advisory.json
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

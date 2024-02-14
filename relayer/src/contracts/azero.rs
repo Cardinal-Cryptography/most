@@ -12,7 +12,7 @@ use aleph_client::{
     contract_transcode::{ContractMessageTranscoder, Value, Value::Seq},
     pallets::contract::ContractsUserApi,
     sp_weights::weight_v2::Weight,
-    AccountId, AlephConfig, SignedConnection, TxInfo, TxStatus,
+    AccountId, AlephConfig, Connection, SignedConnection, TxInfo, TxStatus,
 };
 use log::trace;
 use subxt::events::Events;
@@ -33,6 +33,36 @@ pub enum AzeroContractError {
 
     #[error("Missing or invalid field")]
     MissingOrInvalidField(String),
+}
+
+pub struct AdvisoryInstance {
+    pub contract: ContractInstance,
+    pub address: AccountId,
+}
+
+impl AdvisoryInstance {
+    pub fn new(address: &str, metadata_path: &str) -> Result<Self, AzeroContractError> {
+        let address = AccountId::from_str(address)
+            .map_err(|why| AzeroContractError::NotAccountId(why.to_string()))?;
+        Ok(Self {
+            address: address.clone(),
+            contract: ContractInstance::new(address, metadata_path)?,
+        })
+    }
+
+    pub async fn is_emergency(
+        &self,
+        connection: &Connection,
+    ) -> Result<(bool, AccountId), AzeroContractError> {
+        match self
+            .contract
+            .contract_read0::<bool, _>(connection, "is_emergency")
+            .await
+        {
+            Ok(is_emergency) => Ok((is_emergency, self.address.clone())),
+            Err(why) => Err(AzeroContractError::AlephClient(why)),
+        }
+    }
 }
 
 pub struct MostInstance {
