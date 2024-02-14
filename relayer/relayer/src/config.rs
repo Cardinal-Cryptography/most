@@ -18,6 +18,12 @@ pub struct Config {
     #[arg(long, default_value = "0")]
     pub relayers_committee_id: u128,
 
+    #[arg(long, use_value_delimiter = true, value_delimiter = ',')]
+    pub advisory_contract_addresses: Option<Vec<String>>,
+
+    #[arg(long, default_value = "../azero/artifacts/advisory.json")]
+    pub advisory_contract_metadata: String,
+
     #[arg(long)]
     pub signer_cid: Option<u32>,
 
@@ -65,9 +71,6 @@ pub struct Config {
 
     #[arg(long, default_value = "redis://127.0.0.1:6379")]
     pub redis_node: String,
-
-    #[arg(long, default_value = "info")]
-    pub rust_log: log::Level,
 
     #[arg(long, default_value = "200000")]
     pub eth_gas_limit: u32,

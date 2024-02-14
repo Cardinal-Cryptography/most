@@ -52,6 +52,11 @@ devnet-eth: # Run eth devnet
 devnet-eth:
 	docker compose -f ./devnet-eth/devnet-eth-compose.yml up -d
 
+.PHONY: devnet-eth-logs
+devnet-eth-logs: # show ethereum devnet node logs
+devnet-eth-logs:
+	docker container logs geth --follow
+
 .PHONY: redis-instance
 redis-instance: # Run a redis instance
 redis-instance:
@@ -143,7 +148,13 @@ deploy: deploy-eth deploy-azero setup-eth
 watch-relayer:
 	cd relayer && cargo watch -s 'cargo clippy' -c
 
-run-relayers: # Run the relayer
+.PHONY: run-relayer
+run-relayer: # Run a single relayer
+run-relayer:
+	cd relayer && ./scripts/run.sh
+
+.PHONY: run-relayers
+run-relayers: # Run three relayers
 run-relayers: build-docker-relayer
 	docker compose -f ./relayer/scripts/devnet-relayers-compose.yml up -d
 
@@ -294,8 +305,9 @@ build-docker-relayer: compile-azero compile-eth
 	cp azero/addresses.json relayer/azero_addresses.json
 	cp eth/addresses.json relayer/eth_addresses.json
 	cp azero/artifacts/most.json relayer/most.json
+	cp azero/artifacts/advisory.json relayer/advisory.json
 	cd relayer && docker build -t $(DOCKER_RELAYER_NAME) .
-	rm relayer/azero_addresses.json relayer/eth_addresses.json relayer/most.json
+	rm relayer/azero_addresses.json relayer/eth_addresses.json relayer/most.json relayer/advisory.json
 
 contract_spec.json: # Generate a a file describing deployed contracts based on addresses.json files
 contract_spec.json: azero/addresses.json eth/addresses.json

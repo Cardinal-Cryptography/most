@@ -27,11 +27,14 @@ RELAYER_ID=${RELAYER_ID:-0}
 ARGS=(
   run --bin relayer -- --rust-log=info \
   --name "guardian_${RELAYER_ID}" \
+  --advisory-contract-addresses=$(get_address $AZERO_ADDRESSES_FILE advisory) \
   --azero-contract-address=$(get_address $AZERO_ADDRESSES_FILE most) \
   --eth-contract-address=$(get_address $ETH_ADDRESSES_FILE most) \
   --eth-node-http-url=${ETH_NETWORK} \
   --azero-node-wss-url=${AZERO_NETWORK} \
   --dev-account-index=${RELAYER_ID} \
+  --default-sync-from-block-eth=0 \
+  --default-sync-from-block-azero=0 \
   --dev
 )
 
@@ -40,5 +43,7 @@ if [[ -n "${SIGNER_CID}" ]]; then
 fi
 
 # --- RUN
+
+export RUST_LOG=info,aleph-client=warn
 
 cargo "${ARGS[@]}"

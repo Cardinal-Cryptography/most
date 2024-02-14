@@ -133,8 +133,8 @@ To deploy the contracts on the Aleph Zero chain:
 make deploy-azero
 ```
 
-## Running the relayer process
+## Running the relayer processes
 
 ```bash
-make run-relayer
+make run-relayers
 ```
