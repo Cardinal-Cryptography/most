@@ -28,6 +28,8 @@ jobs:
     runs-on: self-hosted
     needs: [check-vars-and-secrets]
     #needs: [test-eth-contracts, test-azero-contracts]
+    outputs:
+      artifact-matrix-json: ${{ steps.get-artifact-matrix.outputs.artifact-matrix }}
 
     steps:
       - name: Checkout code
@@ -66,37 +68,40 @@ jobs:
             azero/artifacts
             azero/addresses.json
 
+      - name: Get list of contracts
+        shell: bash
+        id: get-artifact-matrix
+        run: |
+          find eth/artifacts/contracts | grep .json > tmp-files.txt
+          find azero/artifacts | grep '.json\|.contract' >> tmp-files.txt
+
+          touch tmp-artifacts-matrix.txt
+
+          for filepath in `cat tmp-files.txt | grep .json`; do
+            filename=$(basename ${filepath});
+            filename_without_ext=${filename%.json};
+            filename_without_ext=${filename_without_ext%.contract};
+            filename_without_ext_lc=$(echo "${filename_without_ext}" | tr '[:upper:]' '[:lower:]')
+            contract_type=$(echo "${filepath}" | cut -d/ -f1)
+            contract_name="${contract_type}_${filename_without_ext_lc}"
+
+            echo "${filepath}|${contract_name}" >> tmp-artifacts-matrix.txt
+          done
+
+          cat tmp-artifacts-matrix.txt | \
+            jq -nRc '{"include":[ inputs | split(" ") | { "from":(.[0]), "to": (.[1]) } ]}' \
+            > tmp-artifacts-matrix-json.txt
+
+          cat tmp-artifacts-matrix-json.txt
+
+          echo "artifact-matrix=$(cat tmp-artifacts-matrix-json.txt)" >> $GITHUB_OUTPUT
+
   upload-contract-artifacts:
     name: Upload contract artifacts to S3
     runs-on: self-hosted
     needs: [deploy-contracts]
     strategy:
-      matrix:
-        include:
-          - from: eth/artifacts/contracts/Governance.sol/Governance.json
-            to: eth_governance
-          - from: eth/artifacts/contracts/Most.sol/Most.json
-            to: eth_most
-          - from: eth/artifacts/contracts/Token.sol/Token.json
-            to: eth_token
-          - from: eth/artifacts/contracts/WETH9.sol/WETH9.json
-            to: eth_weth9
-          - from: azero/artifacts/most.json
-            to: azero_most
-          - from: azero/artifacts/most.contract
-            to: azero_most
-          - from: azero/artifacts/governance.json
-            to: azero_governance
-          - from: azero/artifacts/governance.contract
-            to: azero_governance
-          - from: azero/artifacts/token.json
-            to: azero_token
-          - from: azero/artifacts/token.contract
-            to: azero_token
-          - from: azero/artifacts/advisory.json
-            to: azero_advisory
-          - from: azero/artifacts/advisory.contract
-            to: azero_advisory
+      matrix: ${{ needs.deploy-contracts.outputs.artifact-matrix-json }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
