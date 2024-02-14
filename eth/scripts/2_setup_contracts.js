@@ -5,6 +5,42 @@ const { u8aToHex } = require("@polkadot/util");
 const contracts = require("../addresses.json");
 const azeroContracts = require("../../azero/addresses.json");
 
+async function transferOwnershipToGovernance(
+  fromContract,
+  governanceContract,
+  signers
+) {
+  let iface = await new ethers.Interface(["function acceptOwnership()"]);
+  let calldata = await iface.encodeFunctionData("acceptOwnership", []);
+  let initialOwner = await fromContract.owner();
+  console.log(
+    "Transferring ownership: ",
+    initialOwner,
+    "=>",
+    governanceContract.address
+  );
+
+  await fromContract.transferOwnership(governanceContract.address);
+  // accept ownership by governance
+  await governanceContract
+    .connect(signers[1])
+    .submitProposal(fromContract.address, calldata);
+  console.log("Proposal submitted");
+  console.log("Awaiting proposal ID...");
+  let proposalId = await new Promise((resolve) => {
+    governanceContract.on("ProposalSubmitted", (by, id) => {
+      console.log(`Proposal ID: ${id}`);
+      resolve(id);
+    });
+  });
+  console.log("Signing proposal...");
+  await governanceContract.connect(signers[2]).vote(proposalId);
+  await governanceContract.connect(signers[3]).vote(proposalId);
+  // execute proposal
+  await governanceContract.connect(signers[1]).executeProposal(proposalId);
+  console.log(`${initialOwner} ownership transferred successfully`);
+}
+
 async function main() {
   const signers = await ethers.getSigners();
   accounts = signers.map((s) => s.address);
@@ -19,70 +55,48 @@ async function main() {
   // Add a pair
   const wethAddressBytes = ethers.zeroPadValue(
     ethers.getBytes(contracts.weth9),
-    32,
+    32
   );
   const wethAddressBytesAzero = u8aToHex(
-    new Keyring({ type: "sr25519" }).decodeAddress(azeroContracts.weth),
+    new Keyring({ type: "sr25519" }).decodeAddress(azeroContracts.weth)
   );
 
   console.log(
     "Adding wETH token pair to Most:",
     contracts.weth9,
     "=>",
-    azeroContracts.weth,
+    azeroContracts.weth
   );
 
   await most.addPair(wethAddressBytes, wethAddressBytesAzero);
 
+  // transfer governance ownership
+  // we need "contractInstance" to be able to switch the signer
   const Governance = artifacts.require("Governance");
-  const governance = await Governance.at(contracts.governance);
-
-  let initialGovernanceOwner = await governance.owner();
-  console.log(
-    "Transferring Governance ownership from",
-    initialGovernanceOwner,
-    "to",
-    governance.address,
-  );
-  await governance.transferOwnership(contracts.governance);
-  // accept ownership by governance
   let governanceInstance = await new ethers.Contract(
     contracts.governance,
     Governance.abi,
-    signers[0],
+    signers[0]
+    );
+    governanceInstance.address = governanceInstance.runner.address;
+    await transferOwnershipToGovernance(
+      governanceInstance,
+      governanceInstance,
+    signers
+    );
+    
+  // transfer most ownership
+  let mostInstance = await new ethers.Contract(
+    contracts.most,
+    Most.abi,
+    signers[0]
   );
-  let iface = await new ethers.Interface(["function acceptOwnership()"]);
-  let calldata = await iface.encodeFunctionData("acceptOwnership", []);
-  await governanceInstance
-    .connect(signers[1])
-    .submitProposal(contracts.governance, calldata);
-  console.log("Proposal submitted");
-  console.log("Signing proposal...");
-  await governanceInstance.connect(signers[2]).vote(0);
-  await governanceInstance.connect(signers[3]).vote(0);
-  // execute proposal
-  await governance.executeProposal(0);
-  console.log("Governance ownership transferred successfully");
-
-  let initialMostOwner = await most.owner();
-  console.log(
-    "Transferring Most ownership from",
-    initialMostOwner,
-    "to",
-    contracts.governance,
+  mostInstance.address = mostInstance.runner.address;
+  await transferOwnershipToGovernance(
+    mostInstance,
+    governanceInstance,
+    signers
   );
-  await most.transferOwnership(contracts.governance);
-  // accept ownership by governance
-  await governanceInstance
-    .connect(signers[1])
-    .submitProposal(contracts.most, calldata);
-  console.log("Proposal submitted");
-  console.log("Signing proposal...");
-  await governanceInstance.connect(signers[2]).vote(1);
-  await governanceInstance.connect(signers[3]).vote(1);
-  // execute proposal
-  await governance.executeProposal(1);
-  console.log("Most ownership transferred successfully");
 
   const Migrations = artifacts.require("Migrations");
   const migrations = await Migrations.at(contracts.migrations);

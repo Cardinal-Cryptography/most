@@ -13,6 +13,7 @@ import {
   Addresses,
   storeAddresses,
   estimateContractInit,
+  transferOwnershipToGovernance,
 } from "./utils";
 import "dotenv/config";
 import "@polkadot/api-augment";
@@ -194,73 +195,12 @@ async function main(): Promise<void> {
     await governance.tx.addMember(address);
   }
 
-  console.log("Transferring ownership of most to governance...");
-  await most.tx.transferOwnership(governanceAddress);
-  console.log("Accepting ownership of most by governance...");
-  //create proposal with transaction acceptOwnership()
-  console.log("Creating proposal...");
-  await governance
-    .withSigner(governance_members[0])
-    .tx.submitProposal(
-      mostAddress,
-      most.contractAbi
-        .findMessage("Ownable2Step::accept_ownership")
-        .selector.toU8a() as any,
-      [],
-      true,
-    );
-  //Members signing proposal...
-  console.log("Members signing proposal...");
-  await governance.withSigner(governance_members[1]).tx.vote(0);
-  await governance.withSigner(governance_members[2]).tx.vote(0);
-  //execute proposal
-  console.log("Executing proposal...");
-  await governance.tx.executeProposal(0);
-
+  await transferOwnershipToGovernance(most, governance, governance_members);
+  
   const token = new Token(wethAddress, deployer, api);
-  console.log("Transferring ownership of weth to governance...");
-  await token.tx.transferOwnership(governanceAddress);
-  console.log("Accepting ownership of weth by governance...");
-  //create proposal with transaction acceptOwnership()
-  console.log("Creating proposal...");
-  await governance
-    .withSigner(governance_members[0])
-    .tx.submitProposal(
-      wethAddress,
-      token.contractAbi.findMessage("Ownable2Step::accept_ownership")
-        .selector as any,
-      [],
-      true,
-    );
-  //Members signing proposal...
-  console.log("Members signing proposal...");
-  await governance.withSigner(governance_members[1]).tx.vote(1);
-  await governance.withSigner(governance_members[2]).tx.vote(1);
-  //execute proposal
-  console.log("Executing proposal...");
-  await governance.tx.executeProposal(1);
-
-  console.log("Transferring ownership of governance to governance...");
-  await governance.tx.transferOwnership(governanceAddress);
-  console.log("Accepting ownership of governance by governance...");
-  //create proposal with transaction acceptOwnership()
-  console.log("Creating proposal...");
-  await governance
-    .withSigner(governance_members[0])
-    .tx.submitProposal(
-      governanceAddress,
-      governance.contractAbi.findMessage("Ownable2Step::accept_ownership")
-        .selector as any,
-      [],
-      true,
-    );
-  //Members signing proposal...
-  console.log("Members signing proposal...");
-  await governance.withSigner(governance_members[1]).tx.vote(2);
-  await governance.withSigner(governance_members[2]).tx.vote(2);
-  //execute proposal
-  console.log("Executing proposal...");
-  await governance.tx.executeProposal(2);
+  await transferOwnershipToGovernance(token, governance, governance_members);
+  
+  await transferOwnershipToGovernance(governance, governance, governance_members);
 
   const addresses: Addresses = {
     governance: governanceAddress,
