@@ -103,17 +103,37 @@ jobs:
           contract: azero_most
           dst-artifact: downloaded-artifact-azero-most
 
+      - name: Download artifact from S3 bucket
+        uses: Cardinal-Cryptography/github-actions/download-contract-artifact@v6
+        with:
+          aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
+          s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
+          project: most
+          version: ${{ github.sha }}
+          contract: azero_advisory
+          dst-artifact: downloaded-artifact-azero-advisory
+
       - name: Install Rust toolchain
         uses: Cardinal-Cryptography/github-actions/install-rust-toolchain@v6
+
+      - name: Add cargo-contract
+        shell: bash
+        run: |
+          cargo install --force --locked cargo-contract
+          cargo install cargo-dylint dylint-link
 
       - name: Build relayer
         id: build
         env:
           TMP_ADDRESSES_FILE: downloaded-addresses-${{ inputs.environment }}-${{ inputs.frontend-environment }}.json
-          TMP_ADDRESSES_DIR: downloaded-artifact-azero-most
+          TMP_ARTIFACT_AZERO_MOST_DIR: downloaded-artifact-azero-most
+          TMP_ARTIFACT_AZERO_ADVISORY_DIR: downloaded-artifact-azero-advisory
         run: |
           mkdir -p azero/artifacts
-          cp -rf '${{ env.TMP_ADDRESSES_DIR }}'/* azero/artifacts/
+          cp -rf '${{ env.TMP_ARTIFACT_AZERO_MOST_DIR }}'/* azero/artifacts/
+          cp -rf '${{ env.TMP_ARTIFACT_AZERO_ADVISORY_DIR }}'/* azero/artifacts/
 
           # Extract eth and azero addresses into separate JSON files, as required for building relayer
           # TODO: It's a hack for now, get that sorted with developers!
