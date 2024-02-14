@@ -93,7 +93,9 @@ jobs:
             to: azero_token
           - from: azero/artifacts/token.contract
             to: azero_token
-          - from: azero/advisory/advisory.json
+          - from: azero/artifacts/advisory.json
+            to: azero_advisory
+          - from: azero/artifacts/advisory.contract
             to: azero_advisory
     steps:
       - name: Checkout code
