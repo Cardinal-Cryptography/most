@@ -125,13 +125,13 @@ impl AlephZeroListener {
             config.azero_proof_size_limit,
         )?;
         let mut first_unprocessed_block_number = if *override_azero_cache {
-            *default_sync_from_block_azero
+            **default_sync_from_block_azero
         } else {
             read_first_unprocessed_block_number(
                 name.clone(),
                 ALEPH_LAST_BLOCK_KEY.to_string(),
                 redis_connection.clone(),
-                *default_sync_from_block_azero,
+                **default_sync_from_block_azero,
             )
             .await
         };
