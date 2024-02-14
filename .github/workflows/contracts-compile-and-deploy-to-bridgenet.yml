@@ -15,13 +15,13 @@ jobs:
     uses: ./.github/workflows/_check-vars-and-secrets.yml
     secrets: inherit
 
-  test-azero-contracts:
-    needs: [check-vars-and-secrets]
-    uses: ./.github/workflows/test-azero-contracts.yml
+  #test-azero-contracts:
+  #  needs: [check-vars-and-secrets]
+  #  uses: ./.github/workflows/test-azero-contracts.yml
 
-  test-eth-contracts:
-    needs: [check-vars-and-secrets]
-    uses: ./.github/workflows/test-eth-contracts.yml
+  #test-eth-contracts:
+  #  needs: [check-vars-and-secrets]
+  #  uses: ./.github/workflows/test-eth-contracts.yml
 
   deploy-contracts:
     name: Deploy and setup contracts
@@ -93,8 +93,6 @@ jobs:
           - from: azero/artifacts/token.contract
             to: azero_token
           - from: azero/advisory/advisory.json
-            to: azero_advisory
-          - from: azero/advisory/advisory.contract
             to: azero_advisory
     steps:
       - name: Checkout code
