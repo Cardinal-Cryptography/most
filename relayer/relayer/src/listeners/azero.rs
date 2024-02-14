@@ -29,7 +29,7 @@ use tokio::{
 use crate::{
     config::Config,
     connections::{
-        azero::SignedAzeroWsConnection,
+        azero::AzeroWsConnection,
         eth::{EthConnection, EthConnectionError, SignedEthConnection},
         redis_helpers::{read_first_unprocessed_block_number, write_last_processed_block},
     },
@@ -98,7 +98,7 @@ pub struct AlephZeroListener;
 impl AlephZeroListener {
     pub async fn run(
         config: Arc<Config>,
-        azero_connection: Arc<SignedAzeroWsConnection>,
+        azero_connection: Arc<AzeroWsConnection>,
         eth_connection: Arc<SignedEthConnection>,
         redis_connection: Arc<Mutex<RedisConnection>>,
         emergency: Arc<AtomicBool>,
@@ -196,7 +196,7 @@ impl AlephZeroListener {
 }
 
 async fn fetch_events_in_block_range(
-    azero_connection: Arc<SignedAzeroWsConnection>,
+    azero_connection: Arc<AzeroWsConnection>,
     from_block: u32,
     to_block: u32,
 ) -> Result<Vec<(BlockDetails, Events<AlephConfig>)>, AzeroListenerError> {
@@ -448,7 +448,7 @@ pub async fn wait_for_eth_tx_finality(
 }
 
 async fn get_next_finalized_block_number_azero(
-    azero_connection: Arc<SignedAzeroWsConnection>,
+    azero_connection: Arc<AzeroWsConnection>,
     not_older_than: u32,
 ) -> u32 {
     loop {

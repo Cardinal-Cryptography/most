@@ -13,6 +13,9 @@ pub struct Config {
     pub override_eth_cache: bool,
 
     #[arg(long, default_value = "0")]
+    pub dev_account_index: u32,
+
+    #[arg(long, default_value = "0")]
     pub relayers_committee_id: u128,
 
     #[arg(long, use_value_delimiter = true, value_delimiter = ',')]
@@ -20,6 +23,12 @@ pub struct Config {
 
     #[arg(long, default_value = "../azero/artifacts/advisory.json")]
     pub advisory_contract_metadata: String,
+
+    #[arg(long)]
+    pub signer_cid: Option<u32>,
+
+    #[arg(long, default_value = "1234")]
+    pub signer_port: u32,
 
     #[arg(long)]
     pub azero_contract_address: String,
@@ -38,9 +47,6 @@ pub struct Config {
 
     #[arg(long, default_value = "")]
     pub eth_keystore_password: String,
-
-    #[arg(long, default_value = "0")]
-    pub dev_account_index: u32,
 
     #[arg(long, default_value = "")]
     pub eth_keystore_path: String,
