@@ -89,12 +89,12 @@ jobs:
           done
 
           cat tmp-artifacts-matrix.txt | \
-            jq -nRc '{"include":[ inputs | split(" ") | { "from":(.[0]), "to": (.[1]) } ]}' \
-            > tmp-artifacts-matrix-json.txt
+            jq -nRc '{"include":[ inputs | split("|") | { "from":(.[0]), "to": (.[1]) } ]}' \
+            > tmp-artifacts-matrix.json
 
-          cat tmp-artifacts-matrix-json.txt
+          cat tmp-artifacts-matrix.json
 
-          echo "artifact-matrix=$(cat tmp-artifacts-matrix-json.txt)" >> $GITHUB_OUTPUT
+          echo "artifact-matrix=$(cat tmp-artifacts-matrix.json)" >> $GITHUB_OUTPUT
 
   upload-contract-artifacts:
     name: Upload contract artifacts to S3
@@ -147,9 +147,19 @@ jobs:
           name: eth-deployed-contracts
           path: eth
 
-      - name: Prepare contract_spec.json
+      - name: Prepare contract_spec JSON
         shell: bash
-        run: make contract_spec.json
+        run: |
+          cat eth/addresses.json | \
+            jq '. | to_entries | map({("eth_" + .key): {"contract": ("eth_" + .key), "address": .value}}) | add | {addresses: ., version: "0.1", contract_version: "xxx"}' \
+            > tmp-addresses-eth.json
+          cat azero/addresses.json | \
+            jq '. | to_entries | map({("azero_" + .key): {"contract": ("azero_" + .key), "address": .value}}) | add | {addresses: ., version: "0.1", contract_version: "xxx"}' \
+            > tmp-addresses-azero.json
+          jq -s '.[0] * .[1]' tmp-addresses-eth.json tmp-addresses-azero.json \
+            > contract_spec.json
+
+          cat contract_spec.json
 
       - name: Store addresses in S3 bucket
         uses: Cardinal-Cryptography/github-actions/store-contract-addresses@v6
