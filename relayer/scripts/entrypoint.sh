@@ -35,16 +35,18 @@ fi
 echo "RELAYER_ID=${RELAYER_ID}"
 
 AZERO_MOST_METADATA=${AZERO_MOST_METADATA:-"/usr/local/most.json"}
+ADVISORY_METADATA=${ADVISORY_METADATA:-"/usr/local/advisory.json"}
 
 ARGS=(
   --name "guardian_${RELAYER_ID}"
+  --advisory-contract-addresses=$(get_address $AZERO_ADDRESSES_FILE advisory)
+  --advisory-contract-metadata=${ADVISORY_METADATA}
   --azero-contract-address=$(get_address $AZERO_ADDRESSES_FILE most)
   --eth-contract-address=$(get_address $ETH_ADDRESSES_FILE most)
   --eth-node-http-url=${ETH_NETWORK}
   --azero-node-wss-url=${AZERO_NETWORK}
   --dev-account-index=${RELAYER_ID}
   --redis-node=${REDIS}
-  --rust-log=info
   --azero-contract-metadata=${AZERO_MOST_METADATA}
 )
 

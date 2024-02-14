@@ -1,7 +1,7 @@
 use ethers::{
-    prelude::{k256::ecdsa::SigningKey, signer::SignerMiddlewareError, SignerMiddleware},
-    providers::{Http, Provider, ProviderExt},
-    signers::{LocalWallet, Wallet},
+    prelude::{signer::SignerMiddlewareError, SignerMiddleware},
+    providers::{Http, Provider, ProviderError, ProviderExt},
+    signers::{LocalWallet, WalletError},
 };
 use thiserror::Error;
 
@@ -12,8 +12,14 @@ pub type SignedEthConnection = SignerMiddleware<EthConnection, LocalWallet>;
 #[error(transparent)]
 #[non_exhaustive]
 pub enum EthConnectionError {
+    #[error("connection error")]
+    Provider(#[from] ProviderError),
+
+    #[error("wallet error")]
+    Wallet(#[from] WalletError),
+
     #[error("signer error")]
-    SignerMiddleware(#[from] SignerMiddlewareError<EthConnection, Wallet<SigningKey>>),
+    Signer(#[from] SignerMiddlewareError<EthConnection, LocalWallet>),
 }
 
 pub async fn connect(url: &str) -> EthConnection {
