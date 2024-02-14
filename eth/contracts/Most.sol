@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.20;
 
+import "./WETH9.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -10,6 +11,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     uint256 public requestNonce;
     uint256 public committeeId;
+    address public wEthAddress;
 
     struct Request {
         uint256 signatureCount;
@@ -23,7 +25,7 @@ contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     mapping(bytes32 => bool) private committee;
     mapping(uint256 => uint256) public committeeSize;
     mapping(uint256 => uint256) public signatureThreshold;
-    
+
     event CrosschainTransferRequest(
         uint256 indexed committeeId,
         bytes32 indexed destTokenAddress,
@@ -47,7 +49,8 @@ contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     function initialize(
         address[] calldata _committee,
         uint256 _signatureThreshold,
-        address owner
+        address owner,
+        address _wEthAddress
     ) public initializer {
         require(
             _signatureThreshold > 0,
@@ -68,7 +71,7 @@ contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
 
         committeeSize[committeeId] = _committee.length;
         signatureThreshold[committeeId] = _signatureThreshold;
-
+        wEthAddress = _wEthAddress;
         // inititialize the OwnableUpgradeable
         __Ownable_init(owner);
     }
@@ -108,6 +111,25 @@ contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         );
 
         requestNonce++;
+    }
+
+    // Invoke this tx to transfer funds to the destination chain.
+    // Account needs to send native ETH which are wrapped to wETH
+    // tokens.
+    //
+    // Tx emits a CrosschainTransferRequest event that the relayers listen to
+    // & forward to the destination chain.
+    function sendRequestNative(
+        bytes32 destReceiverAddress
+    ) external payable {
+        uint256 amount = msg.value;
+
+        WETH9 wethContract = WETH9(wEthAddress);
+
+        // send ETH back if reverts??
+        wethContract.deposit.value(amount)();
+
+        sendRequest(addressToBytes32(wEthAddress), amount, destReceiverAddress);
     }
 
     // aggregates relayer signatures and returns the locked tokens
@@ -154,12 +176,17 @@ contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
             delete pendingRequests[requestHash];
 
             // return the locked tokens
-            IERC20 token = IERC20(bytes32ToAddress(destTokenAddress));
+            if (bytes32ToAddress(destTokenAddress) == wEthAddress ) {
+                IWETH weth = IWETH(bytes32ToAddress(destTokenAddress));
+                weth.withdraw(amound);
+            } else {
+                IERC20 token = IERC20(bytes32ToAddress(destTokenAddress));
 
-            token.transfer(
-                bytes32ToAddress(destReceiverAddress),
-                amount
-            );
+                token.transfer(
+                    bytes32ToAddress(destReceiverAddress),
+                    amount
+                );
+            }
             emit RequestProcessed(requestHash);
         }
     }
