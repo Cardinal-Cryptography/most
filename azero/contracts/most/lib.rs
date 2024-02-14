@@ -271,10 +271,8 @@ pub mod most {
                 .checked_add(current_base_fee)
                 .ok_or(MostError::Arithmetic)?;
 
-            data.request_nonce = data
-                .request_nonce
-                .checked_add(1)
-                .ok_or(MostError::Arithmetic)?;
+            let request_nonce = data.request_nonce;
+            data.request_nonce = request_nonce.checked_add(1).ok_or(MostError::Arithmetic)?;
 
             self.data.set(&data);
 
@@ -288,7 +286,7 @@ pub mod most {
                 dest_token_address,
                 amount,
                 dest_receiver_address,
-                request_nonce: data.request_nonce.saturating_sub(1),
+                request_nonce,
             });
 
             Ok(())
