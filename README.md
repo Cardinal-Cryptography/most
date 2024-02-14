@@ -68,7 +68,7 @@ Next, run the relayer, passing the signer CID to connect to:
 
 ```bash
 # in most/relayer
-SIGNER_CID=2 scripts/run.sh
+SIGNER_CID=2 scripts/run_relayer.sh
 ```
 
 ## Cleaning up

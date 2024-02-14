@@ -151,7 +151,7 @@ watch-relayer:
 .PHONY: run-relayer
 run-relayer: # Run a single relayer
 run-relayer:
-	cd relayer && ./scripts/run.sh
+	cd relayer && ./scripts/run_relayer.sh
 
 .PHONY: run-relayers
 run-relayers: # Run three relayers
