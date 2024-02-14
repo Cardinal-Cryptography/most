@@ -25,8 +25,7 @@ KEYSTORE_PATH=${KEYSTORE_PATH:-""}
 RELAYER_ID=${RELAYER_ID:-0}
 
 ARGS=(
-  run --bin relayer -- --rust-log=info \
-  --name "guardian_${RELAYER_ID}" \
+  run --bin relayer -- --name "guardian_${RELAYER_ID}" \
   --advisory-contract-addresses=$(get_address $AZERO_ADDRESSES_FILE advisory) \
   --azero-contract-address=$(get_address $AZERO_ADDRESSES_FILE most) \
   --eth-contract-address=$(get_address $ETH_ADDRESSES_FILE most) \
