@@ -142,6 +142,11 @@ fn do_handle_client(
                 let signature = eth_wallet.sign_hash(hash)?;
                 client.send(&Response::SignedEthHash { hash, signature })?;
             }
+
+            Command::SignEthTx { tx } => {
+                let signature = eth_wallet.sign_transaction_sync(&tx)?;
+                client.send(&Response::SignedEthTx { tx, signature })?;
+            }
         }
     }
 }
@@ -151,7 +156,7 @@ mod test {
     use std::{env, str::FromStr};
 
     use assert2::{assert, let_assert};
-    use ethers::addressbook::Address;
+    use ethers::{addressbook::Address, types::transaction::eip2718::TypedTransaction};
     use serial_test::serial;
     use subxt::ext::sp_runtime::traits::Verify;
     use vsock::VMADDR_CID_HOST;
@@ -161,6 +166,7 @@ mod test {
     const ETH_PUBLIC_ADDRESS: &str = "0xEe88da44b4901d7F86970c52dC5139Af80C83edD";
     const ETH_PRIVATE_KEY: &str =
         "58039a48427a62f77e5562d7f565d10595d92abdd4813233607ec2ac5ac4b9de";
+    const TEST_CHAIN_ID: u64 = 1;
 
     #[test]
     #[serial]
@@ -223,14 +229,28 @@ mod test {
     #[serial]
     fn test_sign_eth_hash() {
         let client = connect();
-
         let payload = b"Hello, world!".to_vec();
         let hash = ethers::utils::keccak256(payload).into();
 
         let signature = client.sign_eth_hash(hash).unwrap();
-        let address = Address::from_str(ETH_PUBLIC_ADDRESS).unwrap();
 
+        let address = Address::from_str(ETH_PUBLIC_ADDRESS).unwrap();
         assert!(signature.verify(hash, address).is_ok());
+    }
+
+    #[test]
+    #[serial]
+    fn test_sign_eth_tx() {
+        let client = connect();
+        let mut tx = TypedTransaction::Eip1559(Default::default());
+
+        let signature = client.sign_eth_tx(&tx).unwrap();
+
+        // This is set by the wallet, but not serialized when sent either way
+        tx.set_chain_id(TEST_CHAIN_ID);
+        let address = Address::from_str(ETH_PUBLIC_ADDRESS).unwrap();
+        let hash = tx.sighash();
+        assert!(signature.verify(hash, address).is_ok())
     }
 
     fn connect() -> Client {

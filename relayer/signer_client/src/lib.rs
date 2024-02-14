@@ -1,3 +1,4 @@
+use aleph_client::sp_runtime::print;
 use serde::{Deserialize, Serialize};
 use serde_json::Deserializer;
 use subxt::ext::{sp_core::crypto::AccountId32, sp_runtime::MultiSignature};
@@ -22,9 +23,16 @@ pub enum Error {
 pub enum Command {
     Ping,
     AccountIdAzero,
-    Sign { payload: Vec<u8> },
+    Sign {
+        payload: Vec<u8>,
+    },
     EthAddress,
-    SignEthHash { hash: EthH256 },
+    SignEthHash {
+        hash: EthH256,
+    },
+    SignEthTx {
+        tx: ethers::types::transaction::eip2718::TypedTransaction,
+    },
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -42,6 +50,10 @@ pub enum Response {
     },
     SignedEthHash {
         hash: EthH256,
+        signature: EthSignature,
+    },
+    SignedEthTx {
+        tx: EthTypedTransaction,
         signature: EthSignature,
     },
 }
@@ -126,6 +138,18 @@ impl Client {
     }
 
     pub fn sign_eth_tx(&self, tx: &EthTypedTransaction) -> Result<EthSignature, Error> {
-        todo!("sign_eth_tx")
+        self.send(&Command::SignEthTx { tx: tx.clone() })?;
+
+        if let Response::SignedEthTx {
+            tx: return_tx,
+            signature,
+        } = self.recv()?
+        {
+            if return_tx == *tx {
+                return Ok(signature);
+            }
+        }
+
+        Err(Error::InvalidResponse)
     }
 }
