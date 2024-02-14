@@ -18,6 +18,12 @@ pub struct Config {
     #[arg(long, default_value = "0")]
     pub relayers_committee_id: u128,
 
+    #[arg(long, use_value_delimiter = true, value_delimiter = ',')]
+    pub advisory_contract_addresses: Option<Vec<String>>,
+
+    #[arg(long, default_value = "../azero/artifacts/advisory.json")]
+    pub advisory_contract_metadata: String,
+
     #[arg(long)]
     pub azero_contract_address: String,
 
