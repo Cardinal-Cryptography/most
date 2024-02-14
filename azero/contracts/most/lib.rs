@@ -669,8 +669,8 @@ pub mod most {
         #[ink(message)]
         pub fn set_halted(&mut self, new_state: bool) -> Result<(), MostError> {
             self.ensure_owner()?;
-            let mut data = self.data()?;
 
+            let mut data = self.data()?;
             let previous_state = data.is_halted;
 
             if new_state != previous_state {
