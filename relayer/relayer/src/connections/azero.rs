@@ -6,7 +6,7 @@ use aleph_client::{
     SignedConnectionApi, TxInfo, TxStatus,
 };
 use anyhow::anyhow;
-use log::info;
+use log::debug;
 use signer_client::Client;
 use subxt::tx::TxPayload;
 use tokio::task::spawn_blocking;
@@ -126,7 +126,10 @@ impl SignedConnectionApi for AzeroConnectionWithSigner {
         status: TxStatus,
     ) -> anyhow::Result<TxInfo> {
         if let Some(details) = tx.validation_details() {
-            info!(target:"aleph-client", "Sending extrinsic {}.{} with params: {:?}", details.pallet_name, details.call_name, params);
+            debug!(
+                "Sending extrinsic {}.{} with params: {:?}",
+                details.pallet_name, details.call_name, params
+            );
         }
 
         let tx = self
@@ -160,7 +163,10 @@ impl SignedConnectionApi for AzeroConnectionWithSigner {
                 })
             }
         };
-        info!(target: "aleph-client", "tx with hash {:?} included in block {:?}", info.tx_hash, info.block_hash);
+        debug!(
+            "tx with hash {:?} included in block {:?}",
+            info.tx_hash, info.block_hash
+        );
 
         Ok(info)
     }
