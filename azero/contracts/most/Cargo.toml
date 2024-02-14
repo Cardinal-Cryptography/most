@@ -15,7 +15,7 @@ scale-info = { version = "2.5", default-features = false, features = [
     "derive",
 ], optional = true }
 
-ownable = { path = "../ownable", default-features = false }
+ownable2step = { path = "../ownable2step", default-features = false }
 psp22-traits = { path = "../psp22-traits" , default-features = false }
 gas-oracle-trait = { path = "../gas-price-oracle/trait", default-features = false }
 shared = { path = "../shared" }
@@ -25,7 +25,7 @@ path = "lib.rs"
 
 [features]
 default = ["std"]
-std = ["ink/std", "scale/std", "scale-info/std", "ownable/std", "psp22/std", "psp22-traits/std", "gas-oracle-trait/std"]
+std = ["ink/std", "scale/std", "scale-info/std", "ownable2step/std", "psp22/std", "psp22-traits/std", "gas-oracle-trait/std"]
 ink-as-dependency = []
 
 [profile.release]

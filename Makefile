@@ -223,7 +223,7 @@ ink-lint:
 	cd azero/contracts/tests && cargo clippy -- --no-deps -D warnings
 	cd azero/contracts/gas-price-oracle/contract && cargo clippy -- --no-deps -D warnings
 	cd azero/contracts/gas-price-oracle/trait && cargo clippy -- --no-deps -D warnings
-	cd azero/contracts/ownable && cargo clippy -- --no-deps -D warnings
+	cd azero/contracts/ownable2step && cargo clippy -- --no-deps -D warnings
 
 .PHONY: contracts-lint
 contracts-lint: # Lint contracts
@@ -240,7 +240,7 @@ rust-format-check:
 	cd azero/contracts/tests && cargo fmt -- --check
 	cd azero/contracts/gas-price-oracle/contract && cargo fmt -- --check
 	cd azero/contracts/gas-price-oracle/trait && cargo fmt -- --check
-	cd azero/contracts/ownable && cargo fmt -- --check
+	cd azero/contracts/ownable2step && cargo fmt -- --check
 	cd e2e-tests && cargo fmt -- --check
 
 .PHONY: rust-format
@@ -254,7 +254,7 @@ rust-format:
 	cd azero/contracts/tests && cargo fmt
 	cd azero/contracts/gas-price-oracle/contract && cargo fmt
 	cd azero/contracts/gas-price-oracle/trait && cargo fmt
-	cd azero/contracts/ownable && cargo fmt
+	cd azero/contracts/ownable2step && cargo fmt
 	cd e2e-tests && cargo fmt
 
 .PHONY: js-format-check

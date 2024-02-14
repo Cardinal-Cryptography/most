@@ -1,6 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
 
-pub use ownable::OwnableError;
+pub use ownable2step::Ownable2StepError;
 
 pub use self::most::{MostError, MostRef};
 
@@ -18,7 +18,7 @@ pub mod most {
         prelude::{format, string::String, vec, vec::Vec},
         storage::{traits::ManualKey, Lazy, Mapping},
     };
-    use ownable::{Ownable2Step, Ownable2StepData, OwnableError, OwnableResult};
+    use ownable2step::*;
     use psp22::PSP22Error;
     use psp22_traits::{Burnable, Mintable};
     use scale::{Decode, Encode};
@@ -149,7 +149,7 @@ pub mod most {
         NotInCommittee,
         HashDoesNotMatchData,
         PSP22(PSP22Error),
-        Ownable(OwnableError),
+        Ownable(Ownable2StepError),
         RequestNotProcessed,
         RequestAlreadyProcessed,
         UnsupportedPair,
@@ -174,8 +174,8 @@ pub mod most {
         }
     }
 
-    impl From<OwnableError> for MostError {
-        fn from(inner: OwnableError) -> Self {
+    impl From<Ownable2StepError> for MostError {
+        fn from(inner: Ownable2StepError) -> Self {
             MostError::Ownable(inner)
         }
     }
@@ -682,26 +682,26 @@ pub mod most {
             self.data.get().ok_or(MostError::CorruptedStorage)
         }
 
-        fn ownable_data(&self) -> Result<Ownable2StepData, OwnableError> {
+        fn ownable_data(&self) -> Result<Ownable2StepData, Ownable2StepError> {
             self.ownable_data
                 .get()
-                .ok_or(OwnableError::Custom("CorruptedStorage".into()))
+                .ok_or(Ownable2StepError::Custom("CorruptedStorage".into()))
         }
     }
 
     impl Ownable2Step for Most {
         #[ink(message)]
-        fn get_owner(&self) -> OwnableResult<AccountId> {
+        fn get_owner(&self) -> Ownable2StepResult<AccountId> {
             self.ownable_data()?.get_owner()
         }
 
         #[ink(message)]
-        fn get_pending_owner(&self) -> OwnableResult<AccountId> {
+        fn get_pending_owner(&self) -> Ownable2StepResult<AccountId> {
             self.ownable_data()?.get_pending_owner()
         }
 
         #[ink(message)]
-        fn transfer_ownership(&mut self, new_owner: AccountId) -> OwnableResult<()> {
+        fn transfer_ownership(&mut self, new_owner: AccountId) -> Ownable2StepResult<()> {
             let mut ownable_data = self.ownable_data()?;
             ownable_data.transfer_ownership(self.env().caller(), new_owner)?;
             self.ownable_data.set(&ownable_data);
@@ -711,7 +711,7 @@ pub mod most {
         }
 
         #[ink(message)]
-        fn accept_ownership(&mut self) -> OwnableResult<()> {
+        fn accept_ownership(&mut self) -> Ownable2StepResult<()> {
             let new_owner = self.env().caller();
             let mut ownable_data = self.ownable_data()?;
             ownable_data.accept_ownership(new_owner)?;
@@ -722,7 +722,7 @@ pub mod most {
         }
 
         #[ink(message)]
-        fn ensure_owner(&self) -> OwnableResult<()> {
+        fn ensure_owner(&self) -> Ownable2StepResult<()> {
             self.ownable_data()?.ensure_owner(self.env().caller())
         }
     }
@@ -814,7 +814,7 @@ pub mod most {
             set_caller::<DefEnv>(guardian_accounts()[0]);
             assert_eq!(
                 most.ensure_owner(),
-                Err(OwnableError::CallerNotOwner(guardian_accounts()[0]))
+                Err(Ownable2StepError::CallerNotOwner(guardian_accounts()[0]))
             );
         }
 
@@ -858,7 +858,7 @@ pub mod most {
             set_caller::<DefEnv>(accounts.bob);
             assert_eq!(
                 most.ensure_owner(),
-                Err(OwnableError::CallerNotOwner(accounts.bob))
+                Err(Ownable2StepError::CallerNotOwner(accounts.bob))
             );
             set_caller::<DefEnv>(accounts.alice);
             assert_eq!(most.ensure_owner(), Ok(()));
@@ -867,13 +867,13 @@ pub mod most {
             set_caller::<DefEnv>(accounts.bob);
             assert_eq!(
                 most.ensure_owner(),
-                Err(OwnableError::CallerNotOwner(accounts.bob))
+                Err(Ownable2StepError::CallerNotOwner(accounts.bob))
             );
             // check that only bob can accept the pending new ownership
             set_caller::<DefEnv>(accounts.charlie);
             assert_eq!(
                 most.accept_ownership(),
-                Err(OwnableError::CallerNotOwner(accounts.charlie))
+                Err(Ownable2StepError::CallerNotOwner(accounts.charlie))
             );
             set_caller::<DefEnv>(accounts.bob);
             assert_eq!(most.accept_ownership(), Ok(()));

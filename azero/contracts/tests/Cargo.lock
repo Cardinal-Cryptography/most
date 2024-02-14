@@ -2692,7 +2692,7 @@ version = "1.0.0"
 dependencies = [
  "gas-oracle-trait",
  "ink",
- "ownable",
+ "ownable2step",
  "parity-scale-codec",
  "psp22",
  "psp22-traits",
@@ -2841,7 +2841,7 @@ version = "1.0.0"
 dependencies = [
  "gas-oracle-trait",
  "ink",
- "ownable",
+ "ownable2step",
  "parity-scale-codec",
  "scale-info",
 ]
@@ -2857,7 +2857,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ownable"
+name = "ownable2step"
 version = "0.1.0"
 dependencies = [
  "ink",
@@ -4815,7 +4815,7 @@ name = "token"
 version = "1.0.0"
 dependencies = [
  "ink",
- "ownable",
+ "ownable2step",
  "parity-scale-codec",
  "psp22",
  "psp22-traits",

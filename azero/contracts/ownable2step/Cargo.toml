@@ -1,7 +1,7 @@
 [package]
-name = "ownable"
-version = "0.1.0"
-authors = ["[your_name] <[your_email]>"]
+name = "ownable2step"
+version = "1.0.0"
+authors = ["Cardinal Cryptography"]
 edition = "2021"
 
 [dependencies]
@@ -24,4 +24,3 @@ std = [
     "scale-info/std",
 ]
 ink-as-dependency = []
-e2e-tests = []

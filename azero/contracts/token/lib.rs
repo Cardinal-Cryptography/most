@@ -5,7 +5,7 @@ pub use self::token::TokenRef;
 #[ink::contract]
 pub mod token {
     use ink::prelude::{string::String, vec::Vec};
-    use ownable::{Ownable2Step, Ownable2StepData, OwnableResult};
+    use ownable2step::*;
     use psp22::{PSP22Data, PSP22Error, PSP22Event, PSP22Metadata, PSP22};
     use psp22_traits::{Burnable, Mintable};
 
@@ -258,17 +258,17 @@ pub mod token {
 
     impl Ownable2Step for Token {
         #[ink(message)]
-        fn get_owner(&self) -> OwnableResult<AccountId> {
+        fn get_owner(&self) -> Ownable2StepResult<AccountId> {
             self.ownable_data.get_owner()
         }
 
         #[ink(message)]
-        fn get_pending_owner(&self) -> OwnableResult<AccountId> {
+        fn get_pending_owner(&self) -> Ownable2StepResult<AccountId> {
             self.ownable_data.get_pending_owner()
         }
 
         #[ink(message)]
-        fn transfer_ownership(&mut self, new_owner: AccountId) -> OwnableResult<()> {
+        fn transfer_ownership(&mut self, new_owner: AccountId) -> Ownable2StepResult<()> {
             self.ownable_data
                 .transfer_ownership(self.env().caller(), new_owner)?;
             self.env()
@@ -277,7 +277,7 @@ pub mod token {
         }
 
         #[ink(message)]
-        fn accept_ownership(&mut self) -> OwnableResult<()> {
+        fn accept_ownership(&mut self) -> Ownable2StepResult<()> {
             let new_owner = self.env().caller();
             self.ownable_data.accept_ownership(new_owner)?;
             self.env()
@@ -286,7 +286,7 @@ pub mod token {
         }
 
         #[ink(message)]
-        fn ensure_owner(&self) -> OwnableResult<()> {
+        fn ensure_owner(&self) -> Ownable2StepResult<()> {
             self.ownable_data.ensure_owner(self.env().caller())
         }
     }
@@ -294,7 +294,7 @@ pub mod token {
     #[cfg(test)]
     mod tests {
         use ink::env::{test::*, DefaultEnvironment as E};
-        use ownable::OwnableError;
+        use ownable2step::Ownable2StepError;
 
         use super::*;
 
@@ -325,7 +325,7 @@ pub mod token {
             set_caller::<E>(bob);
             assert_eq!(
                 token.transfer_ownership(alice),
-                Err(OwnableError::CallerNotOwner(bob)),
+                Err(Ownable2StepError::CallerNotOwner(bob)),
             );
         }
 

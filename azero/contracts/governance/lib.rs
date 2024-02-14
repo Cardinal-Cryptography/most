@@ -10,7 +10,7 @@ mod governance {
         prelude::{format, string::String, vec::Vec},
         storage::Mapping,
     };
-    use ownable::{Ownable2Step, Ownable2StepData, OwnableError, OwnableResult};
+    use ownable2step::*;
     use scale::{Decode, Encode};
     use shared::{CallInput, Selector};
 
@@ -100,7 +100,7 @@ mod governance {
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub enum GovernanceError {
         InkEnvError(String),
-        Ownable(OwnableError),
+        Ownable(Ownable2StepError),
         ExecuteProposalFailed,
         MemberAccount,
         NotMember,
@@ -117,8 +117,8 @@ mod governance {
         }
     }
 
-    impl From<OwnableError> for GovernanceError {
-        fn from(inner: OwnableError) -> Self {
+    impl From<Ownable2StepError> for GovernanceError {
+        fn from(inner: Ownable2StepError) -> Self {
             GovernanceError::Ownable(inner)
         }
     }
@@ -350,17 +350,17 @@ mod governance {
 
     impl Ownable2Step for Governance {
         #[ink(message)]
-        fn get_owner(&self) -> OwnableResult<AccountId> {
+        fn get_owner(&self) -> Ownable2StepResult<AccountId> {
             self.ownable_data.get_owner()
         }
 
         #[ink(message)]
-        fn get_pending_owner(&self) -> OwnableResult<AccountId> {
+        fn get_pending_owner(&self) -> Ownable2StepResult<AccountId> {
             self.ownable_data.get_pending_owner()
         }
 
         #[ink(message)]
-        fn transfer_ownership(&mut self, new_owner: AccountId) -> OwnableResult<()> {
+        fn transfer_ownership(&mut self, new_owner: AccountId) -> Ownable2StepResult<()> {
             self.ownable_data
                 .transfer_ownership(self.env().caller(), new_owner)?;
             self.env()
@@ -369,7 +369,7 @@ mod governance {
         }
 
         #[ink(message)]
-        fn accept_ownership(&mut self) -> OwnableResult<()> {
+        fn accept_ownership(&mut self) -> Ownable2StepResult<()> {
             let new_owner = self.env().caller();
             self.ownable_data.accept_ownership(new_owner)?;
             self.env()
@@ -378,7 +378,7 @@ mod governance {
         }
 
         #[ink(message)]
-        fn ensure_owner(&self) -> OwnableResult<()> {
+        fn ensure_owner(&self) -> Ownable2StepResult<()> {
             self.ownable_data.ensure_owner(self.env().caller())
         }
     }

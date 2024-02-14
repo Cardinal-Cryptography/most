@@ -17,16 +17,18 @@ use scale::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Eq, Encode, Decode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
-pub enum OwnableError {
+pub enum Ownable2StepError {
     /// The caller didn't have the permissions to call a given method
     CallerNotOwner(AccountId),
+    /// The caller tried to accept ownership but caller in not the pending owner
+    CallerNotPengingOwner(AccountId),
     /// The caller tried to accept ownership but the process hasn't been started
     NoPendingOwner,
     /// Useful in cases, when the `Data` struct is not accessed directly but inside of `Lazy` or a `Mapping`, means that we failed to access the `Data` struct itself.
     Custom(String),
 }
 
-pub type OwnableResult<T> = Result<T, OwnableError>;
+pub type Ownable2StepResult<T> = Result<T, Ownable2StepError>;
 
 #[derive(Debug)]
 #[ink::storage_item]
@@ -47,21 +49,17 @@ impl Ownable2StepData {
         &mut self,
         caller: AccountId,
         new_owner: AccountId,
-    ) -> OwnableResult<()> {
-        if caller != self.owner {
-            return Err(OwnableError::CallerNotOwner(caller));
-        }
-
+    ) -> Ownable2StepResult<()> {
+        self.ensure_owner(caller)?;
         self.pending_owner = Some(new_owner);
-
         Ok(())
     }
 
-    pub fn accept_ownership(&mut self, caller: AccountId) -> OwnableResult<()> {
-        let pending_owner = self.pending_owner.ok_or(OwnableError::NoPendingOwner)?;
+    pub fn accept_ownership(&mut self, caller: AccountId) -> Ownable2StepResult<()> {
+        let pending_owner = self.pending_owner.ok_or(Ownable2StepError::NoPendingOwner)?;
 
         if caller != pending_owner {
-            return Err(OwnableError::CallerNotOwner(caller));
+            return Err(Ownable2StepError::CallerNotPengingOwner(caller));
         }
 
         self.owner = pending_owner;
@@ -70,17 +68,17 @@ impl Ownable2StepData {
         Ok(())
     }
 
-    pub fn get_owner(&self) -> OwnableResult<AccountId> {
+    pub fn get_owner(&self) -> Ownable2StepResult<AccountId> {
         Ok(self.owner)
     }
 
-    pub fn get_pending_owner(&self) -> OwnableResult<AccountId> {
-        self.pending_owner.ok_or(OwnableError::NoPendingOwner)
+    pub fn get_pending_owner(&self) -> Ownable2StepResult<AccountId> {
+        self.pending_owner.ok_or(Ownable2StepError::NoPendingOwner)
     }
 
-    pub fn ensure_owner(&self, caller: AccountId) -> OwnableResult<()> {
+    pub fn ensure_owner(&self, caller: AccountId) -> Ownable2StepResult<()> {
         if caller != self.owner {
-            Err(OwnableError::CallerNotOwner(caller))
+            Err(Ownable2StepError::CallerNotOwner(caller))
         } else {
             Ok(())
         }
@@ -94,27 +92,27 @@ impl Ownable2StepData {
 /// * the contract still has the owner: Alice and a pending owner: bob,
 /// * when Bob claims the ownership by calling `self.accept_ownership()` he becomes the new owner and pending owner is removed.
 ///
-/// The methods are all wrapper in `OwnableResult` to make it possible to use them in settings where the `Data` is e.g. behid `Lazy`.
+/// The methods are all wrapper in `Ownable2StepResult` to make it possible to use them in settings where the `Data` is e.g. behid `Lazy`.
 #[ink::trait_definition]
 pub trait Ownable2Step {
     /// Returns the address of the current owner.
     #[ink(message)]
-    fn get_owner(&self) -> OwnableResult<AccountId>;
+    fn get_owner(&self) -> Ownable2StepResult<AccountId>;
 
     /// Returns the address of the pending owner.
     #[ink(message)]
-    fn get_pending_owner(&self) -> OwnableResult<AccountId>;
+    fn get_pending_owner(&self) -> Ownable2StepResult<AccountId>;
 
     /// Starts the ownership transfer of the contract to a new account. Replaces the pending transfer if there is one.
     /// Can only be called by the current owner.
     #[ink(message)]
-    fn transfer_ownership(&mut self, new_owner: AccountId) -> OwnableResult<()>;
+    fn transfer_ownership(&mut self, new_owner: AccountId) -> Ownable2StepResult<()>;
 
     /// The new owner accepts the ownership transfer.
     #[ink(message)]
-    fn accept_ownership(&mut self) -> OwnableResult<()>;
+    fn accept_ownership(&mut self) -> Ownable2StepResult<()>;
 
     /// Return error if called by any account other than the owner.
     #[ink(message)]
-    fn ensure_owner(&self) -> OwnableResult<()>;
+    fn ensure_owner(&self) -> Ownable2StepResult<()>;
 }

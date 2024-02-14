@@ -15,7 +15,7 @@ scale-info = { version = "2.5", default-features = false, features = [
       "derive",
 ], optional = true }
 
-ownable = { path = "../ownable", default-features = false }
+ownable2step = { path = "../ownable2step", default-features = false }
 psp22-traits = { path = "../psp22-traits", default-features = false }
 
 [lib]
@@ -27,7 +27,7 @@ std = [
     "ink/std",
     "scale/std",
     "scale-info/std",
-    "ownable/std",
+    "ownable2step/std",
     "psp22/std",
     "psp22-traits/std",
 ]
