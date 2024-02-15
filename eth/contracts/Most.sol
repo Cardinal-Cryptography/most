@@ -184,6 +184,7 @@ contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
             if (bytes32ToAddress(destTokenAddress) == wethAddress ) {
                 WETH9 weth = WETH9(wethAddress);
                 weth.withdraw(amount);
+                (payable(bytes32ToAddress(destReceiverAddress))).call{value: amount}("");
             } else {
                 IERC20 token = IERC20(bytes32ToAddress(destTokenAddress));
 
