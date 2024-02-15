@@ -72,6 +72,10 @@ jobs:
         shell: bash
         id: get-artifact-matrix
         run: |
+          find eth
+          echo '--'
+          find azero
+          echo '--'
           find eth/artifacts/contracts | grep .json > tmp-files.txt
           find azero/artifacts | grep '.json\|.contract' >> tmp-files.txt
 
