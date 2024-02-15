@@ -294,10 +294,10 @@ format: rust-format js-format
 build-docker-relayer: # Build relayer docker image
 build-docker-relayer: compile-azero compile-eth
 	cd relayer && cargo build --release
-	if [ "$(DOCKER_RELAYER_COPY_ADDRESSES)" = "copy" ]; then
-	  cp azero/addresses.json relayer/azero_addresses.json
-	  cp eth/addresses.json relayer/eth_addresses.json
-	fi
+ifeq ($(DOCKER_RELAYER_COPY_ADDRESSES),copy)
+	cp azero/addresses.json relayer/azero_addresses.json
+	cp eth/addresses.json relayer/eth_addresses.json
+endif
 	cp azero/artifacts/most.json relayer/most.json
 	cp azero/artifacts/advisory.json relayer/advisory.json
 	cd relayer && docker build -t $(DOCKER_RELAYER_NAME) --build-arg COPY_ADDRESSES=$(DOCKER_RELAYER_COPY_ADDRESSES) .
