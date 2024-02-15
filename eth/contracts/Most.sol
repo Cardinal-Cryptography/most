@@ -11,7 +11,7 @@ import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
     uint256 public requestNonce;
     uint256 public committeeId;
-    address public wEthAddress;
+    address payable public wethAddress;
 
     struct Request {
         uint256 signatureCount;
@@ -52,7 +52,7 @@ contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
         address[] calldata _committee,
         uint256 _signatureThreshold,
         address owner,
-        address _wEthAddress
+        address payable _wEthAddress
     ) public initializer {
         require(
             _signatureThreshold > 0,
@@ -73,7 +73,7 @@ contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
 
         committeeSize[committeeId] = _committee.length;
         signatureThreshold[committeeId] = _signatureThreshold;
-        wEthAddress = _wEthAddress;
+        wethAddress = _wEthAddress;
         // inititialize the OwnableUpgradeable
         __Ownable_init(owner);
     }
@@ -129,12 +129,12 @@ contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
     ) external payable {
         uint256 amount = msg.value;
 
-        WETH9 wethContract = WETH9(wEthAddress);
+        WETH9 weth = WETH9(wethAddress);
 
         // send ETH back if reverts??
-        wethContract.deposit.value(amount)();
+        weth.deposit{ value: amount }();
 
-        sendRequest(addressToBytes32(wEthAddress), amount, destReceiverAddress);
+        this.sendRequest(addressToBytes32(wethAddress), amount, destReceiverAddress);
     }
 
     // aggregates relayer signatures and returns the locked tokens
@@ -181,9 +181,9 @@ contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
             delete pendingRequests[requestHash];
 
             // return the locked tokens
-            if (bytes32ToAddress(destTokenAddress) == wEthAddress ) {
-                IWETH weth = IWETH(bytes32ToAddress(destTokenAddress));
-                weth.withdraw(amound);
+            if (bytes32ToAddress(destTokenAddress) == wethAddress ) {
+                WETH9 weth = WETH9(wethAddress);
+                weth.withdraw(amount);
             } else {
                 IERC20 token = IERC20(bytes32ToAddress(destTokenAddress));
 
