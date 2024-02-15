@@ -5,9 +5,9 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 
-contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
+contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
     uint256 public requestNonce;
     uint256 public committeeId;
 
@@ -38,6 +38,8 @@ contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
 
     // Emitted when guardian signs a request that has already been processed
     event ProcessedRequestSigned(bytes32 requestHash, address signer);
+
+    event RequestAlreadySigned(bytes32 requestHash, address signer);
 
     modifier _onlyCommitteeMember(uint256 _committeeId) {
         require(isInCommittee(_committeeId, msg.sender), "Not a member of the guardian committee");
@@ -75,6 +77,9 @@ contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
 
     // required by the OZ UUPS module
     function _authorizeUpgrade(address) internal override onlyOwner {}
+
+    // Disable possibility to renounce ownership
+    function renounceOwnership() public virtual override onlyOwner {}
 
     // Invoke this tx to transfer funds to the destination chain.
     // Account needs to approve the Most contract to spend the `srcTokenAmount`
@@ -136,13 +141,13 @@ contract Most is Initializable, UUPSUpgradeable, OwnableUpgradeable {
             )
         );
 
-        require(_requestHash == requestHash, "Hash does not match the data");
-
         Request storage request = pendingRequests[requestHash];
-        require(
-            !request.signatures[msg.sender],
-            "This guardian has already signed this request"
-        );
+        if (request.signatures[msg.sender]) {
+            emit RequestAlreadySigned(requestHash, msg.sender);
+            return;
+        }
+
+        require(_requestHash == requestHash, "Hash does not match the data");
 
         request.signatures[msg.sender] = true;
         request.signatureCount++;

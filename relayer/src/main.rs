@@ -1,14 +1,10 @@
-use std::{
-    process,
-    sync::{atomic::AtomicBool, Arc},
-};
+use std::{env, process, sync::Arc};
 
 use clap::Parser;
 use config::Config;
 use connections::EthConnectionError;
 use ethers::signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, Signer, WalletError};
 use eyre::Result;
-use listeners::AdvisoryListenerError;
 use log::{debug, error, info};
 use redis::{Client as RedisClient, RedisError};
 use thiserror::Error;
@@ -16,9 +12,7 @@ use tokio::{sync::Mutex, task::JoinSet};
 
 use crate::{
     connections::{azero, eth},
-    listeners::{
-        AdvisoryListener, AlephZeroListener, AzeroListenerError, EthListener, EthListenerError,
-    },
+    listeners::{AlephZeroListener, AzeroListenerError, EthListener, EthListenerError},
 };
 
 mod config;
@@ -48,20 +42,18 @@ pub enum ListenerError {
 
     #[error("redis error")]
     Redis(#[from] RedisError),
-
-    #[error("advisory listener error")]
-    Advisory(#[from] AdvisoryListenerError),
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let config = Arc::new(Config::parse());
+
+    env::set_var("RUST_LOG", config.rust_log.as_str());
     env_logger::init();
 
     info!("{:#?}", &config);
 
     let mut tasks = JoinSet::new();
-    let emergency = Arc::new(AtomicBool::new(false));
 
     let client = RedisClient::open(config.redis_node.clone())?;
     let redis_connection = Arc::new(Mutex::new(client.get_async_connection().await?));
@@ -73,22 +65,12 @@ async fn main() -> Result<()> {
         unimplemented!("Only dev mode is supported for now");
     };
 
-    let azero_connection = Arc::new(azero::init(&config.azero_node_wss_url).await);
-    let azero_signed_connection = Arc::new(azero::sign(&azero_connection, &azero_keypair));
+    let azero_connection = Arc::new(azero::sign(
+        &azero::init(&config.azero_node_wss_url).await,
+        &azero_keypair,
+    ));
 
     debug!("Established connection to Aleph Zero node");
-
-    let advisory_config_rc = Arc::clone(&config);
-    let advisory_emergency_rc = Arc::clone(&emergency);
-
-    // run task only if address passed on CLI
-    if config.advisory_contract_addresses.is_some() {
-        tasks.spawn(async move {
-            AdvisoryListener::run(advisory_config_rc, azero_connection, advisory_emergency_rc)
-                .await
-                .map_err(ListenerError::from)
-        });
-    }
 
     let wallet = if config.dev {
         // If no keystore path is provided, we use the default development mnemonic
@@ -111,41 +93,27 @@ async fn main() -> Result<()> {
 
     debug!("Established connection to Ethereum node");
 
-    let eth_listener_config_rc = Arc::clone(&config);
-    let eth_listener_azero_signed_connection_rc = Arc::clone(&azero_signed_connection);
-    let eth_listener_eth_connection_rc = Arc::clone(&eth_connection);
-    let eth_listener_redis_connection_rc = Arc::clone(&redis_connection);
-    let eth_listener_emergency_rc = Arc::clone(&emergency);
+    let config_rc2 = Arc::clone(&config);
+    let azero_connection_rc2 = Arc::clone(&azero_connection);
+    let eth_connection_rc2 = Arc::clone(&eth_connection);
+    let redis_connection_rc2 = Arc::clone(&redis_connection);
 
     info!("Starting Ethereum listener");
 
     tasks.spawn(async move {
-        EthListener::run(
-            eth_listener_config_rc,
-            eth_listener_azero_signed_connection_rc,
-            eth_listener_eth_connection_rc,
-            eth_listener_redis_connection_rc,
-            eth_listener_emergency_rc,
-        )
-        .await
-        .map_err(ListenerError::from)
+        EthListener::run(config, azero_connection, eth_connection, redis_connection)
+            .await
+            .map_err(ListenerError::from)
     });
 
     info!("Starting AlephZero listener");
 
-    let aleph_zero_listener_config_rc = Arc::clone(&config);
-    let aleph_zero_listener_azero_signed_connection_rc = Arc::clone(&azero_signed_connection);
-    let aleph_zero_listener_eth_connection_rc = Arc::clone(&eth_connection);
-    let aleph_zero_listener_redis_connection_rc = Arc::clone(&redis_connection);
-    let aleph_zero_listener_emergency_rc = Arc::clone(&emergency);
-
     tasks.spawn(async move {
         AlephZeroListener::run(
-            aleph_zero_listener_config_rc,
-            aleph_zero_listener_azero_signed_connection_rc,
-            aleph_zero_listener_eth_connection_rc,
-            aleph_zero_listener_redis_connection_rc,
-            aleph_zero_listener_emergency_rc,
+            config_rc2,
+            azero_connection_rc2,
+            eth_connection_rc2,
+            redis_connection_rc2,
         )
         .await
         .map_err(ListenerError::from)
@@ -158,3 +126,4 @@ async fn main() -> Result<()> {
 
     process::exit(-1);
 }
+
