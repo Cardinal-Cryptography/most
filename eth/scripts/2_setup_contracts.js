@@ -8,7 +8,7 @@ const azeroContracts = require("../../azero/addresses.json");
 async function transferOwnershipToGovernance(
   fromContract,
   governanceContract,
-  signers
+  governanceSigners,
 ) {
   let iface = await new ethers.Interface(["function acceptOwnership()"]);
   let calldata = await iface.encodeFunctionData("acceptOwnership", []);
@@ -17,13 +17,11 @@ async function transferOwnershipToGovernance(
     "Transferring ownership: ",
     initialOwner,
     "=>",
-    governanceContract.address
+    governanceContract.address,
   );
-
   await fromContract.transferOwnership(governanceContract.address);
-  // accept ownership by governance
   await governanceContract
-    .connect(signers[1])
+    .connect(governanceSigners[0])
     .submitProposal(fromContract.address, calldata);
   console.log("Proposal submitted");
   console.log("Awaiting proposal ID...");
@@ -34,10 +32,12 @@ async function transferOwnershipToGovernance(
     });
   });
   console.log("Signing proposal...");
-  await governanceContract.connect(signers[2]).vote(proposalId);
-  await governanceContract.connect(signers[3]).vote(proposalId);
-  // execute proposal
-  await governanceContract.connect(signers[1]).executeProposal(proposalId);
+  for (const member of governanceSigners.slice(1)) {
+    await governanceContract.connect(member).vote(proposalId);
+  }
+  await governanceContract
+    .connect(governanceSigners[0])
+    .executeProposal(proposalId);
   console.log(`${initialOwner} ownership transferred successfully`);
 }
 
@@ -55,17 +55,17 @@ async function main() {
   // Add a pair
   const wethAddressBytes = ethers.zeroPadValue(
     ethers.getBytes(contracts.weth9),
-    32
+    32,
   );
   const wethAddressBytesAzero = u8aToHex(
-    new Keyring({ type: "sr25519" }).decodeAddress(azeroContracts.weth)
+    new Keyring({ type: "sr25519" }).decodeAddress(azeroContracts.weth),
   );
 
   console.log(
     "Adding wETH token pair to Most:",
     contracts.weth9,
     "=>",
-    azeroContracts.weth
+    azeroContracts.weth,
   );
 
   await most.addPair(wethAddressBytes, wethAddressBytesAzero);
@@ -76,26 +76,26 @@ async function main() {
   let governanceInstance = await new ethers.Contract(
     contracts.governance,
     Governance.abi,
-    signers[0]
-    );
-    governanceInstance.address = governanceInstance.runner.address;
-    await transferOwnershipToGovernance(
-      governanceInstance,
-      governanceInstance,
-    signers
-    );
-    
+    signers[0],
+  );
+  governanceInstance.address = governanceInstance.runner.address;
+  await transferOwnershipToGovernance(
+    governanceInstance,
+    governanceInstance,
+    signers.slice(1, 4),
+  );
+
   // transfer most ownership
   let mostInstance = await new ethers.Contract(
     contracts.most,
     Most.abi,
-    signers[0]
+    signers[0],
   );
   mostInstance.address = mostInstance.runner.address;
   await transferOwnershipToGovernance(
     mostInstance,
     governanceInstance,
-    signers
+    signers.slice(1, 4),
   );
 
   const Migrations = artifacts.require("Migrations");

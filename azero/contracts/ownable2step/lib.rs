@@ -56,7 +56,9 @@ impl Ownable2StepData {
     }
 
     pub fn accept_ownership(&mut self, caller: AccountId) -> Ownable2StepResult<()> {
-        let pending_owner = self.pending_owner.ok_or(Ownable2StepError::NoPendingOwner)?;
+        let pending_owner = self
+            .pending_owner
+            .ok_or(Ownable2StepError::NoPendingOwner)?;
 
         if caller != pending_owner {
             return Err(Ownable2StepError::CallerNotPengingOwner(caller));

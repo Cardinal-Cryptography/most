@@ -31,10 +31,10 @@ export type Addresses = {
 export async function uploadCode(
   api: ApiPromise,
   deployer: KeyringPair,
-  contractName: string
+  contractName: string,
 ): Promise<HexString> {
   const tokenContractRaw = JSON.parse(
-    fs.readFileSync(__dirname + `/../artifacts/` + contractName, "utf8")
+    fs.readFileSync(__dirname + `/../artifacts/` + contractName, "utf8"),
   );
   const tokenAbi = new Abi(tokenContractRaw);
   const _txHash = await new Promise(async (resolve, reject) => {
@@ -61,7 +61,7 @@ export async function uploadCode(
 export function storeAddresses(addresses: Addresses): void {
   fs.writeFileSync(
     __dirname + "/../addresses.json",
-    JSON.stringify(addresses, null, 2)
+    JSON.stringify(addresses, null, 2),
   );
 }
 
@@ -74,10 +74,10 @@ export async function estimateContractInit(
   api: ApiPromise,
   deployer: KeyringPair,
   contractName: string,
-  sampleArgs: unknown[]
+  sampleArgs: unknown[],
 ): Promise<WeightV2> {
   const contractRaw = JSON.parse(
-    fs.readFileSync(__dirname + `/../artifacts/` + contractName, "utf8")
+    fs.readFileSync(__dirname + `/../artifacts/` + contractName, "utf8"),
   );
   const contractAbi = new Abi(contractRaw);
   const { gasRequired } = (await api.call.contractsApi.instantiate(
@@ -87,7 +87,7 @@ export async function estimateContractInit(
     null,
     { Upload: contractAbi.info.source.wasm },
     contractAbi.constructors[0].toU8a(sampleArgs),
-    ""
+    "",
   )) as unknown as ContractInstantiateResult;
   return gasRequired;
 }
@@ -98,13 +98,22 @@ interface IOwnable2Step {
   contractAbi: Abi;
 }
 
-export async function transferOwnershipToGovernance<Contract extends IOwnable2Step>(
+/**
+ * Transfers `fromContract` ownership to new owner.
+ * @param fromContract - Contract which ownership is changed
+ * @param governanceContract - Governance contract
+ * @param governanceKeyringPairs - List of governance members KeyringPairs needed to create and sign proposal
+ * NOTE: At least one governance member is required.
+ */
+export async function transferOwnershipToGovernance<
+  Contract extends IOwnable2Step,
+>(
   fromContract: Contract,
   governanceContract: Governance,
-  governanceKeyringPairs: KeyringPair[]
+  governanceKeyringPairs: KeyringPair[],
 ) {
   console.log(
-    `Transferring ownership of ${fromContract.address} to governance (${governanceContract.address})...`
+    `Transferring ownership of ${fromContract.address} to governance (${governanceContract.address})...`,
   );
   let poroposalId = 0;
   governanceContract.events.subscribeOnProposalSubmittedEvent((event) => {
@@ -113,9 +122,8 @@ export async function transferOwnershipToGovernance<Contract extends IOwnable2St
   });
   await fromContract.tx.transferOwnership(governanceContract.address);
   console.log(
-    `Accepting ownership of ${fromContract.address} by governance (${governanceContract.address})...`
+    `Accepting ownership of ${fromContract.address} by governance (${governanceContract.address})...`,
   );
-  //create proposal with transaction acceptOwnership()
   console.log("Creating proposal...");
   await governanceContract
     .withSigner(governanceKeyringPairs[0])
@@ -124,17 +132,12 @@ export async function transferOwnershipToGovernance<Contract extends IOwnable2St
       fromContract.contractAbi.findMessage("Ownable2Step::accept_ownership")
         .selector as any,
       [],
-      true
+      true,
     );
-  //Members signing proposal...
   console.log("Members signing proposal...");
-  await governanceContract
-    .withSigner(governanceKeyringPairs[1])
-    .tx.vote(poroposalId);
-  await governanceContract
-    .withSigner(governanceKeyringPairs[2])
-    .tx.vote(poroposalId);
-  //execute proposal
+  for (const member of governanceKeyringPairs.slice(1)) {
+    await governanceContract.withSigner(member).tx.vote(poroposalId);
+  }
   console.log("Executing proposal...");
   await governanceContract.tx.executeProposal(poroposalId);
 }

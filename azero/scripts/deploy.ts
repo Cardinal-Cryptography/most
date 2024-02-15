@@ -203,11 +203,15 @@ async function main(): Promise<void> {
   }
 
   await transferOwnershipToGovernance(most, governance, governance_members);
-  
+
   const token = new Token(wethAddress, deployer, api);
   await transferOwnershipToGovernance(token, governance, governance_members);
-  
-  await transferOwnershipToGovernance(governance, governance, governance_members);
+
+  await transferOwnershipToGovernance(
+    governance,
+    governance,
+    governance_members,
+  );
 
   const addresses: Addresses = {
     governance: governanceAddress,
