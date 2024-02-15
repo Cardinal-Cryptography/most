@@ -677,18 +677,6 @@ pub mod most {
             Ok(())
         }
 
-        /// Sets a new owner account
-        ///
-        /// Can only be called by contracts owner
-        #[ink(message)]
-        pub fn set_owner(&mut self, new_owner: AccountId) -> Result<(), MostError> {
-            self.ensure_owner()?;
-            let mut data = self.data()?;
-            data.owner = new_owner;
-            self.data.set(&data);
-            Ok(())
-        }
-
         /// Halt/resume the bridge contract
         ///
         /// Can only be called by the contracts owner
@@ -725,15 +713,6 @@ pub mod most {
             match self.is_halted()? {
                 true => Err(MostError::IsHalted),
                 false => Ok(()),
-            }
-        }
-
-        fn ensure_owner(&mut self) -> Result<(), MostError> {
-            let caller = self.env().caller();
-            let data = self.data()?;
-            match caller.eq(&data.owner) {
-                true => Ok(()),
-                false => Err(MostError::NotOwner(caller)),
             }
         }
 
