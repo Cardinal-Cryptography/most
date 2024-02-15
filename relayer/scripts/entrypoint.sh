@@ -5,8 +5,8 @@ set -eo pipefail
 
 # --- GLOBAL CONSTANTS
 
-ETH_ADDRESSES_FILE="/usr/local/eth_addresses.json"
-AZERO_ADDRESSES_FILE="/usr/local/azero_addresses.json"
+ETH_ADDRESSES_FILE="/usr/local/contracts/eth_addresses.json"
+AZERO_ADDRESSES_FILE="/usr/local/contracts/azero_addresses.json"
 
 # --- FUNCTIONS
 
