@@ -135,15 +135,14 @@ jobs:
           cp -rf '${{ env.TMP_ARTIFACT_AZERO_MOST_DIR }}'/* azero/artifacts/
           cp -rf '${{ env.TMP_ARTIFACT_AZERO_ADVISORY_DIR }}'/* azero/artifacts/
 
-          # Extract eth and azero addresses into separate JSON files, as required for building relayer
-          # TODO: It's a hack for now, get that sorted with developers!
+          # Remove that in the final version
           cat '${{ env.TMP_ADDRESSES_FILE }}' | jq '.addresses | to_entries | map(select(.key | contains("eth_"))) | map({(.key | sub("eth_";"")): .value.address}) | add' > eth/addresses.json
           cat '${{ env.TMP_ADDRESSES_FILE }}' | jq '.addresses | to_entries | map(select(.key | contains("azero_"))) | map({(.key | sub("azero_";"")): .value.address}) | add' > azero/addresses.json
 
           docker_tag=${{ steps.get-ref-properties.outputs.sha }}-${{ inputs.environment }}-${{ inputs.frontend-environment }}
           docker_name=most-relayer-${docker_tag}
 
-          make build-docker-relayer DOCKER_RELAYER_NAME=${docker_name} DOCKER_RELAYER_COPY_ADDRESSES=copy
+          make build-docker-relayer-ci DOCKER_RELAYER_NAME=${docker_name}
 
           echo "docker-name=${docker_name}" >> $GITHUB_OUTPUT
           echo "docker-tag=${docker_tag}" >> $GITHUB_OUTPUT
