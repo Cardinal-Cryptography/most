@@ -95,6 +95,15 @@ pub mod most {
         pub new_owner: AccountId,
     }
 
+    #[ink(event)]
+    #[derive(Debug)]
+    #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
+    pub struct RequestAlreadySigned {
+        pub request_hash: HashedRequest,
+        #[ink(topic)]
+        pub signer: AccountId,
+    }
+
     #[derive(Default, Debug, Encode, Decode, Clone, Copy, PartialEq, Eq)]
     #[cfg_attr(
         feature = "std",
@@ -162,15 +171,11 @@ pub mod most {
         HashDoesNotMatchData,
         PSP22(PSP22Error),
         Ownable(Ownable2StepError),
-        RequestNotProcessed,
-        RequestAlreadyProcessed,
         UnsupportedPair,
         InkEnvError(String),
         RequestAlreadySigned,
         BaseFeeTooLow,
         Arithmetic,
-        NoRewards,
-        NoMoreRewards,
         CorruptedStorage,
         IsHalted,
     }
@@ -353,6 +358,14 @@ pub mod most {
                 return Ok(());
             }
 
+            if self.signatures.contains((request_hash, caller)) {
+                self.env().emit_event(RequestAlreadySigned {
+                    request_hash,
+                    signer: caller,
+                });
+                return Ok(());
+            }
+
             let bytes = concat_u8_arrays(vec![
                 &committee_id.to_le_bytes(),
                 &dest_token_address,
@@ -365,10 +378,6 @@ pub mod most {
 
             if !request_hash.eq(&hash) {
                 return Err(MostError::HashDoesNotMatchData);
-            }
-
-            if self.signatures.contains((request_hash, caller)) {
-                return Err(MostError::RequestAlreadySigned);
             }
 
             let mut request = self.pending_requests.get(request_hash).unwrap_or_default(); //  {

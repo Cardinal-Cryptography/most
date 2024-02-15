@@ -144,7 +144,7 @@ describe("Most", function () {
       ).to.be.revertedWith("Not a member of the guardian committee");
     });
 
-    it("Reverts if request has already been signed by a guardian", async () => {
+    it("Ignores consecutive signatures", async () => {
       const { most, tokenAddressBytes32 } = await loadFixture(
         deployEightGuardianMostFixture,
       );
@@ -176,7 +176,9 @@ describe("Most", function () {
             ethAddress,
             0,
           ),
-      ).to.be.revertedWith("This guardian has already signed this request");
+      )
+        .to.emit(most, "RequestAlreadySigned")
+        .withArgs(requestHash, accounts[1].address);
     });
 
     it("Ignores already executed requests", async () => {
