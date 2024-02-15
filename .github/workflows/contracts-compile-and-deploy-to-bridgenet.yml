@@ -152,10 +152,10 @@ jobs:
         shell: bash
         run: |
           cat eth/addresses.json | \
-            jq '. | to_entries | map({("eth_" + .key): {"contract": ("eth_" + .key), "address": .value}}) | add | {addresses: ., version: "0.1", contract_version: "xxx"}' \
+            jq '. | to_entries | map({("eth_" + .key): {"contract": ("eth_" + .key), "address": .value}}) | add | {addresses: ., version: "0.1", contract_version: "${{ github.sha }}"}' \
             > tmp-addresses-eth.json
           cat azero/addresses.json | \
-            jq '. | to_entries | map({("azero_" + .key): {"contract": ("azero_" + .key), "address": .value}}) | add | {addresses: ., version: "0.1", contract_version: "xxx"}' \
+            jq '. | to_entries | map({("azero_" + .key): {"contract": ("azero_" + .key), "address": .value}}) | add | {addresses: ., version: "0.1", contract_version: "${{ github.sha }}"}' \
             > tmp-addresses-azero.json
           jq -s '.[0] * .[1]' tmp-addresses-eth.json tmp-addresses-azero.json \
             > contract_spec.json
