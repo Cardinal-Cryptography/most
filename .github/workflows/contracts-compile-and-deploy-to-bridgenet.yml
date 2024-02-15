@@ -72,9 +72,9 @@ jobs:
         shell: bash
         id: get-artifact-matrix
         run: |
-          find eth/artifacts/contracts -depth 2 -regex '.*\/[a-zA-Z0-9_-]*\.json$' \
+          find eth/artifacts/contracts -maxdepth 2 -regex '.*\/[a-zA-Z0-9_-]*\.json$' \
             > tmp-files.txt
-          find azero/artifacts -depth 1 -type f -regex '.*\/[a-zA-Z0-9_-]*\.json$' -o -regex '.*\/[a-zA-Z0-9_-]*\.contract$' \
+          find azero/artifacts -maxdepth 1 -type f -regex '.*\/[a-zA-Z0-9_-]*\.json$' -o -regex '.*\/[a-zA-Z0-9_-]*\.contract$' \
             >> tmp-files.txt
 
           touch tmp-artifacts-matrix.txt
