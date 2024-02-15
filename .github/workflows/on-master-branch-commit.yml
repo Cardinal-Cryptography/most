@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - master
+      - fix-bridgenete-deployment-env
 
 jobs:
   check-vars-and-secrets:
