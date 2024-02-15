@@ -3,9 +3,8 @@ use std::sync::{atomic::AtomicBool, Arc};
 use ethers::{
     abi::EncodePackedError,
     core::types::Address,
-    prelude::{k256::ecdsa::SigningKey, ContractError, SignerMiddleware},
+    prelude::ContractError,
     providers::{Middleware, ProviderError},
-    signers::Wallet,
     types::BlockNumber,
     utils::keccak256,
 };
@@ -21,7 +20,7 @@ use crate::{
     config::Config,
     connections::{
         azero::AzeroConnectionWithSigner,
-        eth::{EthConnection, SignedEthConnection},
+        eth::SignedEthConnection,
         redis_helpers::{read_first_unprocessed_block_number, write_last_processed_block},
     },
     contracts::{
@@ -41,7 +40,7 @@ pub enum EthListenerError {
     FromHex(#[from] rustc_hex::FromHexError),
 
     #[error("contract error")]
-    Contract(#[from] ContractError<SignerMiddleware<EthConnection, Wallet<SigningKey>>>),
+    Contract(#[from] ContractError<SignedEthConnection>),
 
     #[error("azero contract error")]
     AzeroContract(#[from] AzeroContractError),
