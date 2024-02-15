@@ -204,12 +204,12 @@ pub mod oracle {
             set_caller::<DefEnv>(new_owner);
             assert!(oracle.update_price(new_price).is_err());
             set_caller::<DefEnv>(owner);
-            oracle.transfer_ownership(new_owner);
+            let _ = oracle.transfer_ownership(new_owner);
             // before `new owner` accepts ownership, the old `owner` holds the role
             assert!(oracle.update_price(new_price).is_ok());
             set_caller::<DefEnv>(new_owner);
             assert!(oracle.update_price(new_price).is_err());
-            oracle.accept_ownership();
+            let _ = oracle.accept_ownership();
             // below Alice is not the owner anymore
             set_caller::<DefEnv>(owner);
             assert!(oracle.update_price(new_price).is_err());

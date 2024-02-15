@@ -21,7 +21,7 @@ pub enum Ownable2StepError {
     /// The caller didn't have the permissions to call a given method
     CallerNotOwner(AccountId),
     /// The caller tried to accept ownership but caller in not the pending owner
-    CallerNotPengingOwner(AccountId),
+    CallerNotPendingOwner(AccountId),
     /// The caller tried to accept ownership but the process hasn't been started
     NoPendingOwner,
     /// Useful in cases, when the `Data` struct is not accessed directly but inside of `Lazy` or a `Mapping`, means that we failed to access the `Data` struct itself.
@@ -61,7 +61,7 @@ impl Ownable2StepData {
             .ok_or(Ownable2StepError::NoPendingOwner)?;
 
         if caller != pending_owner {
-            return Err(Ownable2StepError::CallerNotPengingOwner(caller));
+            return Err(Ownable2StepError::CallerNotPendingOwner(caller));
         }
 
         self.owner = pending_owner;

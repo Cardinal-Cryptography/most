@@ -941,7 +941,7 @@ pub mod most {
             set_caller::<DefEnv>(accounts.charlie);
             assert_eq!(
                 most.accept_ownership(),
-                Err(Ownable2StepError::CallerNotOwner(accounts.charlie))
+                Err(Ownable2StepError::CallerNotPendingOwner(accounts.charlie))
             );
             set_caller::<DefEnv>(accounts.bob);
             assert_eq!(most.accept_ownership(), Ok(()));
