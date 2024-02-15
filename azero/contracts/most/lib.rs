@@ -88,10 +88,8 @@ pub mod most {
         committee_id: CommitteeId,
         /// a fixed subsidy transferred along with the bridged tokens to the destination account on aleph zero to bootstrap
         pocket_money: u128,
-        /// total rewards collected by all commitees
-        rewards_all: u128,
-        /// total rewards paid out to any committee member
-        paid_out_rewards_all: u128,
+        /// balance that can be paid out as pocket money
+        pocket_money_balance: u128,
         /// How much gas does a single confirmation of a cross-chain transfer request use on the destination chain on average.
         /// This value is calculated by summing the total gas usage of *all* the transactions it takes to relay a single request and dividing it by the current committee size and multiplying by 1.2
         relay_gas_usage: u128,
@@ -197,8 +195,7 @@ pub mod most {
                 request_nonce: 0,
                 committee_id,
                 pocket_money,
-                rewards_all: 0,
-                paid_out_rewards_all: 0,
+                pocket_money_balance: 0,
                 relay_gas_usage,
                 min_fee,
                 max_fee,
@@ -266,11 +263,6 @@ pub mod most {
             self.collected_committee_rewards
                 .insert(data.committee_id, &base_fee_total);
 
-            data.rewards_all = data
-                .rewards_all
-                .checked_add(current_base_fee)
-                .ok_or(MostError::Arithmetic)?;
-
             let request_nonce = data.request_nonce;
             data.request_nonce = request_nonce.checked_add(1).ok_or(MostError::Arithmetic)?;
 
@@ -306,7 +298,7 @@ pub mod most {
             let caller = self.env().caller();
             self.only_committee_member(committee_id, caller)?;
 
-            let data = self.data()?;
+            let mut data = self.data()?;
 
             // Don't revert if the request has already been processed as
             // such a call can be made during regular guardian operation.
@@ -362,15 +354,16 @@ pub mod most {
                     amount,
                 )?;
 
-                let unclaimed_rewards_all =
-                    data.rewards_all.saturating_sub(data.paid_out_rewards_all);
-
                 // bootstrap account with pocket money
-                if self.env().balance() >= unclaimed_rewards_all.saturating_add(data.pocket_money) {
+                if data.pocket_money_balance >= data.pocket_money {
                     // don't revert if the transfer fails
                     _ = self
                         .env()
                         .transfer(dest_receiver_address.into(), data.pocket_money);
+                    data.pocket_money_balance = data
+                        .pocket_money_balance
+                        .checked_sub(data.pocket_money)
+                        .ok_or(MostError::Arithmetic)?;
                 }
 
                 // mark it as processed
@@ -405,12 +398,6 @@ pub mod most {
             if outstanding_rewards.gt(&0) {
                 self.env().transfer(member_id, outstanding_rewards)?;
 
-                let mut data = self.data()?;
-                data.paid_out_rewards_all = data
-                    .paid_out_rewards_all
-                    .saturating_add(outstanding_rewards);
-                self.data.set(&data);
-
                 self.paid_out_member_rewards.insert(
                     (member_id, committee_id),
                     &paid_out_rewards
@@ -419,6 +406,19 @@ pub mod most {
                 );
             }
 
+            Ok(())
+        }
+
+        /// Method used to provide the contract with funds for pocket money
+        #[ink(message, payable)]
+        pub fn fund_pocket_money(&mut self) -> Result<(), MostError> {
+            let funds = self.env().transferred_value();
+            let mut data = self.data()?;
+            data.pocket_money_balance = data
+                .pocket_money_balance
+                .checked_add(funds)
+                .ok_or(MostError::Arithmetic)?;
+            self.data.set(&data);
             Ok(())
         }
 
@@ -465,6 +465,14 @@ pub mod most {
         #[ink(message)]
         pub fn get_pocket_money(&self) -> Result<Balance, MostError> {
             Ok(self.data()?.pocket_money)
+        }
+
+        /// Query pocket money balance
+        ///
+        /// An amount of the native token that can be used for pocket money transfers
+        #[ink(message)]
+        pub fn get_pocket_money_balance(&self) -> Result<Balance, MostError> {
+            Ok(self.data()?.pocket_money_balance)
         }
 
         /// Returns current active committee id

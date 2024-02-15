@@ -25,8 +25,8 @@ mod e2e {
         primitives::AccountId,
     };
     use ink_e2e::{
-        account_id, alice, bob, build_message, charlie, dave, eve, ferdie, subxt::dynamic::Value,
-        AccountKeyring, Keypair, PolkadotConfig,
+        account_id, alice, bob, build_message, charlie, dave, eve, ferdie, AccountKeyring, Keypair,
+        PolkadotConfig,
     };
     use most::{
         most::{CrosschainTransferRequest, RequestProcessed, RequestSigned},
@@ -474,15 +474,14 @@ mod e2e {
         let (most_address, token_address) = setup_default_most_and_token(&mut client, false).await;
 
         // seed contract with some funds for pocket money transfers
-        let call_data = vec![
-            Value::unnamed_variant("Id", [Value::from_bytes(most_address)]),
-            Value::u128(10 * DEFAULT_POCKET_MONEY),
-        ];
-
-        client
-            .runtime_call(&alice(), "Balances", "transfer", call_data)
-            .await
-            .expect("runtime call failed");
+        most_fund_pocket_money(
+            &mut client,
+            &alice(),
+            most_address,
+            10 * DEFAULT_POCKET_MONEY,
+        )
+        .await
+        .expect("fund pocket money should succeed");
 
         let amount = 841189100000000;
         let receiver_address = account_id(AccountKeyring::One);
@@ -1164,6 +1163,22 @@ mod e2e {
                 )
             },
             None,
+        )
+        .await
+    }
+
+    async fn most_fund_pocket_money(
+        client: &mut E2EClient,
+        caller: &Keypair,
+        most: AccountId,
+        amount: u128,
+    ) -> CallResult<(), MostError> {
+        call_message::<MostRef, _, _, _, _>(
+            client,
+            caller,
+            most,
+            |most| most.fund_pocket_money(),
+            Some(amount),
         )
         .await
     }
