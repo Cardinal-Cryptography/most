@@ -140,8 +140,7 @@ describe("Most", function () {
 
   describe("sendRequestNative", function () {
     it("Reverts if token is not whitelisted", async () => {
-      const { most, token, tokenAddressBytes32, mostAddress } =
-        await loadFixture(deployEightGuardianMostFixture);
+      const { most } = await loadFixture(deployEightGuardianMostFixture);
 
       await expect(
         most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
@@ -153,7 +152,6 @@ describe("Most", function () {
         deployEightGuardianMostFixture,
       );
 
-      await token.approve(mostAddress, TOKEN_AMOUNT);
       await most.addPair(addressToBytes32(wethAddress), WRAPPED_TOKEN_ADDRESS);
       await most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT });
 
@@ -161,10 +159,10 @@ describe("Most", function () {
     });
 
     it("Emits correct event", async () => {
-      const { most, token, tokenAddressBytes32, mostAddress, wethAddress } =
-        await loadFixture(deployEightGuardianMostFixture);
+      const { most, token, mostAddress, wethAddress } = await loadFixture(
+        deployEightGuardianMostFixture,
+      );
 
-      await token.approve(mostAddress, TOKEN_AMOUNT);
       await most.addPair(addressToBytes32(wethAddress), WRAPPED_TOKEN_ADDRESS);
       await expect(
         most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
@@ -408,6 +406,48 @@ describe("Most", function () {
             0,
           ),
       ).to.be.revertedWith("Not a member of the guardian committee");
+    });
+  });
+
+  describe("receiveRequestNative", function () {
+    it("Unlocks tokens for the user", async () => {
+      const { most, weth, wethAddress, mostAddress } = await loadFixture(
+        deployEightGuardianMostFixture,
+      );
+      const accounts = await ethers.getSigners();
+      const ethAddress = addressToBytes32(accounts[10].address);
+      const requestHash = ethers.solidityPackedKeccak256(
+        ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
+        [0, addressToBytes32(wethAddress), TOKEN_AMOUNT, ethAddress, 0],
+      );
+
+      // Provide funds for Most
+      await weth.deposit({ value: TOKEN_AMOUNT * 2 });
+      await weth.transfer(mostAddress, TOKEN_AMOUNT * 2);
+      // Provide  native ETH to weth
+      await accounts[1].sendTransaction({
+        to: wethAddress,
+        value: TOKEN_AMOUNT,
+      });
+
+      expect(
+        await new Promise(async (resolve) => {
+          for (let i = 1; i < 6; i++) {
+            await most
+              .connect(accounts[i])
+              .receiveRequest(
+                requestHash,
+                0,
+                addressToBytes32(wethAddress),
+                TOKEN_AMOUNT,
+                ethAddress,
+                0,
+              );
+          }
+          resolve();
+        }),
+      ).to.changeEtherBalance(accounts[10].address, TOKEN_AMOUNT);
+      expect(await weth.balanceOf(accounts[10].address)).to.equal(0);
     });
   });
 
