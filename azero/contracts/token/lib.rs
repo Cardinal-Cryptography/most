@@ -5,6 +5,7 @@ pub use self::token::TokenRef;
 #[ink::contract]
 pub mod token {
     use ink::prelude::{string::String, vec::Vec};
+    use ownable2step::*;
     use psp22::{PSP22Data, PSP22Error, PSP22Event, PSP22Metadata, PSP22};
     use psp22_traits::{Burnable, Mintable};
 
@@ -30,9 +31,24 @@ pub mod token {
         pub value: u128,
     }
 
+    #[ink(event)]
+    #[derive(Debug)]
+    #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
+    pub struct TransferOwnershipInitiated {
+        pub new_owner: AccountId,
+    }
+
+    #[ink(event)]
+    #[derive(Debug)]
+    #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
+    pub struct TransferOwnershipAccepted {
+        pub new_owner: AccountId,
+    }
+
     #[ink(storage)]
     pub struct Token {
         data: PSP22Data,
+        ownable_data: Ownable2StepData,
         name: Option<String>,
         symbol: Option<String>,
         decimals: u8,
@@ -49,19 +65,19 @@ pub mod token {
             decimals: u8,
             minter_burner: AccountId,
         ) -> Self {
+            let caller = Self::env().caller();
+            let data = PSP22Data::new(total_supply, caller);
+            let ownable_data = Ownable2StepData::new(caller);
+
             Self {
-                data: PSP22Data::new(total_supply, Self::env().caller()),
+                data,
+                ownable_data,
                 name,
                 symbol,
                 decimals,
-                admin: Self::env().caller(),
+                admin: caller,
                 minter_burner,
             }
-        }
-
-        #[ink(message)]
-        pub fn admin(&self) -> AccountId {
-            self.admin
         }
 
         #[ink(message)]
@@ -70,30 +86,18 @@ pub mod token {
         }
 
         #[ink(message)]
-        pub fn set_admin(&mut self, new_admin: AccountId) -> Result<(), PSP22Error> {
-            self.ensure_admin()?;
-            self.admin = new_admin;
-            Ok(())
-        }
-
-        #[ink(message)]
         pub fn set_minter_burner(
             &mut self,
             new_minter_burner: AccountId,
         ) -> Result<(), PSP22Error> {
-            self.ensure_admin()?;
+            self.ensure_owner()?;
             self.minter_burner = new_minter_burner;
             Ok(())
         }
 
-        fn ensure_admin(&self) -> Result<(), PSP22Error> {
-            if self.env().caller() != self.admin {
-                Err(PSP22Error::Custom(String::from(
-                    "Caller has to be the admin.",
-                )))
-            } else {
-                Ok(())
-            }
+        fn ensure_owner(&self) -> Result<(), PSP22Error> {
+            <Self as Ownable2Step>::ensure_owner(self)
+                .map_err(|_| PSP22Error::Custom(String::from("Caller has to be the admin.")))
         }
 
         fn ensure_minter_burner(&self) -> Result<(), PSP22Error> {
@@ -252,9 +256,45 @@ pub mod token {
         }
     }
 
+    impl Ownable2Step for Token {
+        #[ink(message)]
+        fn get_owner(&self) -> Ownable2StepResult<AccountId> {
+            self.ownable_data.get_owner()
+        }
+
+        #[ink(message)]
+        fn get_pending_owner(&self) -> Ownable2StepResult<AccountId> {
+            self.ownable_data.get_pending_owner()
+        }
+
+        #[ink(message)]
+        fn transfer_ownership(&mut self, new_owner: AccountId) -> Ownable2StepResult<()> {
+            self.ownable_data
+                .transfer_ownership(self.env().caller(), new_owner)?;
+            self.env()
+                .emit_event(TransferOwnershipInitiated { new_owner });
+            Ok(())
+        }
+
+        #[ink(message)]
+        fn accept_ownership(&mut self) -> Ownable2StepResult<()> {
+            let new_owner = self.env().caller();
+            self.ownable_data.accept_ownership(new_owner)?;
+            self.env()
+                .emit_event(TransferOwnershipInitiated { new_owner });
+            Ok(())
+        }
+
+        #[ink(message)]
+        fn ensure_owner(&self) -> Ownable2StepResult<()> {
+            self.ownable_data.ensure_owner(self.env().caller())
+        }
+    }
+
     #[cfg(test)]
     mod tests {
         use ink::env::{test::*, DefaultEnvironment as E};
+        use ownable2step::Ownable2StepError;
 
         use super::*;
 
@@ -269,9 +309,11 @@ pub mod token {
             let bob = default_accounts::<E>().bob;
 
             set_caller::<E>(alice);
-            assert_eq!(token.admin(), alice);
-            assert!(token.set_admin(bob).is_ok());
-            assert_eq!(token.admin(), bob);
+            assert_eq!(token.get_owner(), Ok(alice));
+            assert!(token.transfer_ownership(bob).is_ok());
+            set_caller::<E>(bob);
+            assert!(token.accept_ownership().is_ok());
+            assert_eq!(token.get_owner(), Ok(bob));
         }
 
         #[ink::test]
@@ -282,10 +324,8 @@ pub mod token {
 
             set_caller::<E>(bob);
             assert_eq!(
-                token.set_admin(alice),
-                Err(PSP22Error::Custom(String::from(
-                    "Caller has to be the admin.",
-                )))
+                token.transfer_ownership(alice),
+                Err(Ownable2StepError::CallerNotOwner(bob)),
             );
         }
 
