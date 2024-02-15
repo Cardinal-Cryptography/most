@@ -38,6 +38,8 @@ function accountIdToHex(accountId: string): string {
 }
 
 async function main(): Promise<void> {
+  const config = await import_env();
+
   const {
     ws_node,
     relayers_keys,
@@ -51,7 +53,9 @@ async function main(): Promise<void> {
     max_fee,
     default_fee,
     authority,
-  } = await import_env();
+  } = config;
+
+  console.log("config:", config);
 
   const { weth9 } = await import_eth_addresses();
   const wethEthAddress = ethers.zeroPadValue(ethers.getBytes(weth9), 32);
@@ -151,7 +155,10 @@ async function main(): Promise<void> {
   const symbol = "wETH";
   const name = symbol;
   const decimals = 12;
-  const minterBurner = (process.env.AZERO_ENV == "dev" || process.env.AZERO_ENV == "bridgenet") ? authority : mostAddress;
+  const minterBurner =
+    process.env.AZERO_ENV == "dev" || process.env.AZERO_ENV == "bridgenet"
+      ? authority
+      : mostAddress;
   const estimatedGasToken = await estimateContractInit(
     api,
     deployer,
