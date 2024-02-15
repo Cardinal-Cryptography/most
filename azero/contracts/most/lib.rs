@@ -65,6 +65,16 @@ pub mod most {
     #[ink(event)]
     #[derive(Debug)]
     #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
+    pub struct HaltedStateChanged {
+        pub previous_state: bool,
+        pub new_state: bool,
+        #[ink(topic)]
+        pub caller: AccountId,
+    }
+
+    #[ink(event)]
+    #[derive(Debug)]
+    #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
     pub struct SignedProcessedRequest {
         pub request_hash: HashedRequest,
         #[ink(topic)]
@@ -114,6 +124,8 @@ pub mod most {
         default_fee: u128,
         /// gas price oracle that is used to calculate the fee for a cross-chain transfer request
         gas_price_oracle: Option<AccountId>,
+        /// Is the bridge in a halted state
+        is_halted: bool,
     }
 
     #[ink(storage)]
@@ -160,6 +172,7 @@ pub mod most {
         NoRewards,
         NoMoreRewards,
         CorruptedStorage,
+        IsHalted,
     }
 
     impl From<InkEnvError> for MostError {
@@ -220,6 +233,7 @@ pub mod most {
                 max_fee,
                 default_fee,
                 gas_price_oracle,
+                is_halted: false,
             });
 
             let mut ownable_data = Lazy::new();
@@ -253,6 +267,8 @@ pub mod most {
             amount: u128,
             dest_receiver_address: [u8; 32],
         ) -> Result<(), MostError> {
+            self.check_halted()?;
+
             let mut data = self.data()?;
 
             let dest_token_address = self
@@ -320,6 +336,8 @@ pub mod most {
             dest_receiver_address: [u8; 32],
             request_nonce: u128,
         ) -> Result<(), MostError> {
+            self.check_halted()?;
+
             let caller = self.env().caller();
             self.only_committee_member(committee_id, caller)?;
 
@@ -406,6 +424,8 @@ pub mod most {
             committee_id: CommitteeId,
             member_id: AccountId,
         ) -> Result<(), MostError> {
+            self.check_halted()?;
+
             let paid_out_rewards = self.get_paid_out_member_rewards(committee_id, member_id);
 
             let outstanding_rewards =
@@ -655,6 +675,66 @@ pub mod most {
                 .insert(committee_id, &signature_threshold);
 
             Ok(())
+        }
+
+        /// Sets a new owner account
+        ///
+        /// Can only be called by contracts owner
+        #[ink(message)]
+        pub fn set_owner(&mut self, new_owner: AccountId) -> Result<(), MostError> {
+            self.ensure_owner()?;
+            let mut data = self.data()?;
+            data.owner = new_owner;
+            self.data.set(&data);
+            Ok(())
+        }
+
+        /// Halt/resume the bridge contract
+        ///
+        /// Can only be called by the contracts owner
+        #[ink(message)]
+        pub fn set_halted(&mut self, new_state: bool) -> Result<(), MostError> {
+            self.ensure_owner()?;
+
+            let mut data = self.data()?;
+            let previous_state = data.is_halted;
+
+            if new_state != previous_state {
+                data.is_halted = new_state;
+
+                self.data.set(&data);
+                self.env().emit_event(HaltedStateChanged {
+                    previous_state,
+                    new_state,
+                    caller: self.env().caller(),
+                });
+            }
+
+            Ok(())
+        }
+
+        /// Is the bridge halted?
+        #[ink(message)]
+        pub fn is_halted(&self) -> Result<bool, MostError> {
+            Ok(self.data()?.is_halted)
+        }
+
+        // ---  helper functions
+
+        fn check_halted(&self) -> Result<(), MostError> {
+            match self.is_halted()? {
+                true => Err(MostError::IsHalted),
+                false => Ok(()),
+            }
+        }
+
+        fn ensure_owner(&mut self) -> Result<(), MostError> {
+            let caller = self.env().caller();
+            let data = self.data()?;
+            match caller.eq(&data.owner) {
+                true => Ok(()),
+                false => Err(MostError::NotOwner(caller)),
+            }
         }
 
         /// Mints the specified amount of token to the designated account
