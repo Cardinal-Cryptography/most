@@ -13,6 +13,7 @@ import {
   Addresses,
   storeAddresses,
   estimateContractInit,
+  transferOwnershipToGovernance,
 } from "./utils";
 import "dotenv/config";
 import "@polkadot/api-augment";
@@ -41,6 +42,7 @@ async function main(): Promise<void> {
     ws_node,
     relayers_keys,
     governance_keys,
+    governance_seeds,
     authority_seed,
     signature_threshold,
     pocket_money,
@@ -60,6 +62,10 @@ async function main(): Promise<void> {
 
   const api = await ApiPromise.create({ provider: wsProvider });
   const deployer = keyring.addFromUri(authority_seed);
+  const governance_members = [];
+  governance_seeds.forEach((governance_seed) => {
+    governance_members.push(keyring.addFromUri(governance_seed));
+  });
 
   const tokenCodeHash = await uploadCode(api, deployer, "token.contract");
   console.log("token code hash:", tokenCodeHash);
@@ -196,14 +202,16 @@ async function main(): Promise<void> {
     await governance.tx.addMember(address);
   }
 
-  console.log("Transferring ownership of most to governance...");
-  await most.tx.setOwner(governanceAddress);
+  await transferOwnershipToGovernance(most, governance, governance_members);
 
-  console.log("Transferring ownership of weth to governance...");
-  await new Token(wethAddress, deployer, api).tx.setAdmin(governanceAddress);
+  const token = new Token(wethAddress, deployer, api);
+  await transferOwnershipToGovernance(token, governance, governance_members);
 
-  console.log("Transferring ownership of governance to governance...");
-  await governance.tx.setOwner(governanceAddress);
+  await transferOwnershipToGovernance(
+    governance,
+    governance,
+    governance_members,
+  );
 
   const addresses: Addresses = {
     governance: governanceAddress,

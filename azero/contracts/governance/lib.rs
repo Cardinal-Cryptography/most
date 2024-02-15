@@ -10,6 +10,7 @@ mod governance {
         prelude::{format, string::String, vec::Vec},
         storage::Mapping,
     };
+    use ownable2step::*;
     use scale::{Decode, Encode};
     use shared::{CallInput, Selector};
 
@@ -47,6 +48,20 @@ mod governance {
         pub result: Vec<u8>,
     }
 
+    #[ink(event)]
+    #[derive(Debug)]
+    #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
+    pub struct TransferOwnershipInitiated {
+        pub new_owner: AccountId,
+    }
+
+    #[ink(event)]
+    #[derive(Debug)]
+    #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
+    pub struct TransferOwnershipAccepted {
+        pub new_owner: AccountId,
+    }
+
     #[derive(Debug, Encode, Decode, Clone, PartialEq, Eq)]
     #[cfg_attr(
         feature = "std",
@@ -66,7 +81,7 @@ mod governance {
     #[ink(storage)]
     pub struct Governance {
         /// owner, typicaly set to be the governance contract itself
-        owner: AccountId,
+        ownable_data: Ownable2StepData,
         /// The whitelised accounts that can propose & vote on proposals
         members: Mapping<AccountId, ()>,
         /// The Minimum number of members that have to confirm a proposal before it can be executed
@@ -85,6 +100,7 @@ mod governance {
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub enum GovernanceError {
         InkEnvError(String),
+        Ownable(Ownable2StepError),
         ExecuteProposalFailed,
         MemberAccount,
         NotMember,
@@ -101,6 +117,12 @@ mod governance {
         }
     }
 
+    impl From<Ownable2StepError> for GovernanceError {
+        fn from(inner: Ownable2StepError) -> Self {
+            GovernanceError::Ownable(inner)
+        }
+    }
+
     impl Governance {
         /// Constructs a new instance of the governance contract
         ///
@@ -108,7 +130,7 @@ mod governance {
         #[ink(constructor)]
         pub fn new(quorum: u32) -> Self {
             Self {
-                owner: Self::env().caller(),
+                ownable_data: Ownable2StepData::new(Self::env().caller()),
                 members: Mapping::new(),
                 quorum,
                 signatures: Mapping::new(),
@@ -272,16 +294,6 @@ mod governance {
             Ok(())
         }
 
-        /// Sets a new owner account
-        ///
-        /// Can only be called by the contracts owner (typically the contract itself)
-        #[ink(message)]
-        pub fn set_owner(&mut self, new_owner: AccountId) -> Result<(), GovernanceError> {
-            self.ensure_owner()?;
-            self.owner = new_owner;
-            Ok(())
-        }
-
         /// Sets a new threshold for quorum
         ///
         /// Can only be called by the contracts owner (typically the contract itself)
@@ -334,13 +346,40 @@ mod governance {
             }
             Ok(())
         }
+    }
 
-        fn ensure_owner(&self) -> Result<(), GovernanceError> {
-            let caller = self.env().caller();
-            match caller.eq(&self.owner) {
-                true => Ok(()),
-                false => Err(GovernanceError::NotOwner),
-            }
+    impl Ownable2Step for Governance {
+        #[ink(message)]
+        fn get_owner(&self) -> Ownable2StepResult<AccountId> {
+            self.ownable_data.get_owner()
+        }
+
+        #[ink(message)]
+        fn get_pending_owner(&self) -> Ownable2StepResult<AccountId> {
+            self.ownable_data.get_pending_owner()
+        }
+
+        #[ink(message)]
+        fn transfer_ownership(&mut self, new_owner: AccountId) -> Ownable2StepResult<()> {
+            self.ownable_data
+                .transfer_ownership(self.env().caller(), new_owner)?;
+            self.env()
+                .emit_event(TransferOwnershipInitiated { new_owner });
+            Ok(())
+        }
+
+        #[ink(message)]
+        fn accept_ownership(&mut self) -> Ownable2StepResult<()> {
+            let new_owner = self.env().caller();
+            self.ownable_data.accept_ownership(new_owner)?;
+            self.env()
+                .emit_event(TransferOwnershipInitiated { new_owner });
+            Ok(())
+        }
+
+        #[ink(message)]
+        fn ensure_owner(&self) -> Ownable2StepResult<()> {
+            self.ownable_data.ensure_owner(self.env().caller())
         }
     }
 }

@@ -7,12 +7,13 @@ pub mod oracle {
         env::{set_code_hash, Error as InkEnvError},
         prelude::{format, string::String},
     };
+    use ownable2step::*;
     use scale::{Decode, Encode};
 
     #[ink(storage)]
     pub struct Oracle {
-        /// oracle owner
-        owner: AccountId,
+        /// data for Ownable2Step - oracle owner
+        ownable_data: Ownable2StepData,
         /// timestamp of the last update in ms since UNIX epoch
         last_update: u64,
         /// price of one unit of ETH gas in picoAZERO (i.e. 10^-12 AZERO)
@@ -24,13 +25,19 @@ pub mod oracle {
     #[derive(Debug, PartialEq, Eq, Encode, Decode)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub enum OracleError {
-        OnlyOwnerAllowed,
+        Ownable(Ownable2StepError),
         InkEnvError(String),
     }
 
     impl From<InkEnvError> for OracleError {
         fn from(why: InkEnvError) -> Self {
             Self::InkEnvError(format!("{:?}", why))
+        }
+    }
+
+    impl From<Ownable2StepError> for OracleError {
+        fn from(inner: Ownable2StepError) -> Self {
+            OracleError::Ownable(inner)
         }
     }
 
@@ -45,7 +52,14 @@ pub mod oracle {
     #[ink(event)]
     #[derive(Debug)]
     #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
-    pub struct OwnerUpdated {
+    pub struct TransferOwnershipInitiated {
+        pub new_owner: AccountId,
+    }
+
+    #[ink(event)]
+    #[derive(Debug)]
+    #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
+    pub struct TransferOwnershipAccepted {
         pub new_owner: AccountId,
     }
 
@@ -60,18 +74,10 @@ pub mod oracle {
         #[ink(constructor)]
         pub fn new(owner: AccountId, init_price: u128) -> Self {
             Self {
-                owner,
+                ownable_data: Ownable2StepData::new(owner),
                 last_update: Self::env().block_timestamp(),
                 last_price: init_price,
                 reserved: None,
-            }
-        }
-
-        fn ensure_owner(&self) -> Result<(), OracleError> {
-            if self.owner == self.env().caller() {
-                Ok(())
-            } else {
-                Err(OracleError::OnlyOwnerAllowed)
             }
         }
 
@@ -84,14 +90,6 @@ pub mod oracle {
                 price: new_price,
                 timestamp: self.last_update,
             });
-            Ok(())
-        }
-
-        #[ink(message)]
-        pub fn set_owner(&mut self, new_owner: AccountId) -> Result<(), OracleError> {
-            self.ensure_owner()?;
-            self.owner = new_owner;
-            self.env().emit_event(OwnerUpdated { new_owner });
             Ok(())
         }
 
@@ -113,6 +111,41 @@ pub mod oracle {
         /// - timestamp is the timestamp of the last update in milliseconds from UNIX epoch
         fn get_price(&self) -> (u128, u64) {
             (self.last_price, self.last_update)
+        }
+    }
+
+    impl Ownable2Step for Oracle {
+        #[ink(message)]
+        fn get_owner(&self) -> Ownable2StepResult<AccountId> {
+            self.ownable_data.get_owner()
+        }
+
+        #[ink(message)]
+        fn get_pending_owner(&self) -> Ownable2StepResult<AccountId> {
+            self.ownable_data.get_pending_owner()
+        }
+
+        #[ink(message)]
+        fn transfer_ownership(&mut self, new_owner: AccountId) -> Ownable2StepResult<()> {
+            self.ownable_data
+                .transfer_ownership(self.env().caller(), new_owner)?;
+            self.env()
+                .emit_event(TransferOwnershipInitiated { new_owner });
+            Ok(())
+        }
+
+        #[ink(message)]
+        fn accept_ownership(&mut self) -> Ownable2StepResult<()> {
+            let new_owner = self.env().caller();
+            self.ownable_data.accept_ownership(new_owner)?;
+            self.env()
+                .emit_event(TransferOwnershipAccepted { new_owner });
+            Ok(())
+        }
+
+        #[ink(message)]
+        fn ensure_owner(&self) -> Ownable2StepResult<()> {
+            self.ownable_data.ensure_owner(self.env().caller())
         }
     }
 
@@ -171,8 +204,14 @@ pub mod oracle {
             set_caller::<DefEnv>(new_owner);
             assert!(oracle.update_price(new_price).is_err());
             set_caller::<DefEnv>(owner);
-            oracle.set_owner(new_owner).unwrap();
+            let _ = oracle.transfer_ownership(new_owner);
+            // before `new owner` accepts ownership, the old `owner` holds the role
+            assert!(oracle.update_price(new_price).is_ok());
+            set_caller::<DefEnv>(new_owner);
+            assert!(oracle.update_price(new_price).is_err());
+            let _ = oracle.accept_ownership();
             // below Alice is not the owner anymore
+            set_caller::<DefEnv>(owner);
             assert!(oracle.update_price(new_price).is_err());
 
             set_caller::<DefEnv>(new_owner);
