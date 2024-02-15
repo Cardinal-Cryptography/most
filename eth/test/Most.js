@@ -18,24 +18,38 @@ describe("Most", function () {
       const signers = await ethers.getSigners();
       const accounts = signers.map((s) => s.address);
 
+      const WETH = await ethers.getContractFactory("WETH9");
+      const weth = await WETH.deploy();
+
       const Most = await ethers.getContractFactory("Most");
       await expect(
-        upgrades.deployProxy(Most, [[accounts[0]], 0, accounts[0]], {
-          initializer: "initialize",
-          kind: "uups",
-        }),
+        upgrades.deployProxy(
+          Most,
+          [[accounts[0]], 0, accounts[0], await weth.getAddress()],
+          {
+            initializer: "initialize",
+            kind: "uups",
+          },
+        ),
       ).to.be.revertedWith("Signature threshold must be greater than 0");
     });
     it("Reverts if threshold is greater than number of guardians", async () => {
       const signers = await ethers.getSigners();
       const accounts = signers.map((s) => s.address);
 
+      const WETH = await ethers.getContractFactory("WETH9");
+      const weth = await WETH.deploy();
+
       const Most = await ethers.getContractFactory("Most");
       await expect(
-        upgrades.deployProxy(Most, [[accounts[0]], 2, accounts[0]], {
-          initializer: "initialize",
-          kind: "uups",
-        }),
+        upgrades.deployProxy(
+          Most,
+          [[accounts[0]], 2, accounts[0], await weth.getAddress()],
+          {
+            initializer: "initialize",
+            kind: "uups",
+          },
+        ),
       ).to.be.revertedWith("Not enough guardians specified");
     });
   });
@@ -44,10 +58,14 @@ describe("Most", function () {
     const signers = await ethers.getSigners();
     const accounts = signers.map((s) => s.address);
 
+    const WETH = await ethers.getContractFactory("WETH9");
+    const weth = await WETH.deploy();
+    const wethAddress = await weth.getAddress();
+
     const Most = await ethers.getContractFactory("Most");
     const most = await upgrades.deployProxy(
       Most,
-      [accounts.slice(1, 9), 5, accounts[0]],
+      [accounts.slice(1, 9), 5, accounts[0], wethAddress],
       {
         initializer: "initialize",
         kind: "uups",
@@ -66,8 +84,10 @@ describe("Most", function () {
     return {
       most,
       token,
+      weth,
       tokenAddressBytes32,
       mostAddress,
+      wethAddress,
     };
   }
 
@@ -112,6 +132,42 @@ describe("Most", function () {
       await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
       await expect(
         most.sendRequest(tokenAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT),
+      )
+        .to.emit(most, "CrosschainTransferRequest")
+        .withArgs(0, WRAPPED_TOKEN_ADDRESS, TOKEN_AMOUNT, ALEPH_ACCOUNT, 0);
+    });
+  });
+
+  describe("sendRequestNative", function () {
+    it("Reverts if token is not whitelisted", async () => {
+      const { most, token, tokenAddressBytes32, mostAddress } =
+        await loadFixture(deployEightGuardianMostFixture);
+
+      await expect(
+        most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
+      ).to.be.revertedWith("Unsupported pair");
+    });
+
+    it("Transfers tokens to Most", async () => {
+      const { most, token, mostAddress, wethAddress, weth } = await loadFixture(
+        deployEightGuardianMostFixture,
+      );
+
+      await token.approve(mostAddress, TOKEN_AMOUNT);
+      await most.addPair(addressToBytes32(wethAddress), WRAPPED_TOKEN_ADDRESS);
+      await most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT });
+
+      expect(await weth.balanceOf(mostAddress)).to.equal(TOKEN_AMOUNT);
+    });
+
+    it("Emits correct event", async () => {
+      const { most, token, tokenAddressBytes32, mostAddress, wethAddress } =
+        await loadFixture(deployEightGuardianMostFixture);
+
+      await token.approve(mostAddress, TOKEN_AMOUNT);
+      await most.addPair(addressToBytes32(wethAddress), WRAPPED_TOKEN_ADDRESS);
+      await expect(
+        most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
       )
         .to.emit(most, "CrosschainTransferRequest")
         .withArgs(0, WRAPPED_TOKEN_ADDRESS, TOKEN_AMOUNT, ALEPH_ACCOUNT, 0);
