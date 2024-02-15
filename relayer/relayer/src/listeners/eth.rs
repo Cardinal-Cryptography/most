@@ -3,9 +3,8 @@ use std::sync::{atomic::AtomicBool, Arc};
 use ethers::{
     abi::EncodePackedError,
     core::types::Address,
-    prelude::{k256::ecdsa::SigningKey, ContractError, SignerMiddleware},
+    prelude::ContractError,
     providers::{Middleware, ProviderError},
-    signers::Wallet,
     types::BlockNumber,
     utils::keccak256,
 };
@@ -20,8 +19,8 @@ use tokio::{
 use crate::{
     config::Config,
     connections::{
-        azero::SignedAzeroWsConnection,
-        eth::{EthConnection, SignedEthConnection},
+        azero::AzeroConnectionWithSigner,
+        eth::SignedEthConnection,
         redis_helpers::{read_first_unprocessed_block_number, write_last_processed_block},
     },
     contracts::{
@@ -41,7 +40,7 @@ pub enum EthListenerError {
     FromHex(#[from] rustc_hex::FromHexError),
 
     #[error("contract error")]
-    Contract(#[from] ContractError<SignerMiddleware<EthConnection, Wallet<SigningKey>>>),
+    Contract(#[from] ContractError<SignedEthConnection>),
 
     #[error("azero contract error")]
     AzeroContract(#[from] AzeroContractError),
@@ -61,7 +60,7 @@ pub struct EthListener;
 impl EthListener {
     pub async fn run(
         config: Arc<Config>,
-        azero_connection: Arc<SignedAzeroWsConnection>,
+        azero_connection: AzeroConnectionWithSigner,
         eth_connection: Arc<SignedEthConnection>,
         redis_connection: Arc<Mutex<RedisConnection>>,
         emergency: Arc<AtomicBool>,
@@ -79,13 +78,13 @@ impl EthListener {
         let contract = Most::new(address, Arc::clone(&eth_connection));
 
         let mut first_unprocessed_block_number = if *override_eth_cache {
-            *default_sync_from_block_eth
+            **default_sync_from_block_eth
         } else {
             read_first_unprocessed_block_number(
                 name.clone(),
                 ETH_LAST_BLOCK_KEY.to_string(),
                 redis_connection.clone(),
-                *default_sync_from_block_eth,
+                **default_sync_from_block_eth,
             )
             .await
         };
@@ -125,12 +124,7 @@ impl EthListener {
 
             // Handle events.
             for event in events {
-                handle_event(
-                    &event,
-                    &config,
-                    Arc::clone(&azero_connection),
-                )
-                .await?
+                handle_event(&event, &config, &azero_connection).await?
             }
 
             // Update the last block number.
@@ -153,7 +147,7 @@ impl EthListener {
 async fn handle_event(
     event: &MostEvents,
     config: &Config,
-    azero_connection: Arc<SignedAzeroWsConnection>,
+    azero_connection: &AzeroConnectionWithSigner,
 ) -> Result<(), EthListenerError> {
     if let MostEvents::CrosschainTransferRequestFilter(
         crosschain_transfer_event @ CrosschainTransferRequestFilter {
@@ -207,7 +201,7 @@ async fn handle_event(
         // send vote
         contract
             .receive_request(
-                &azero_connection,
+                azero_connection,
                 request_hash,
                 committee_id.as_u128(),
                 *dest_token_address,

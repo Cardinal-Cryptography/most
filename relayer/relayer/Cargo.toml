@@ -1,0 +1,38 @@
+[package]
+name = "relayer"
+version = "0.1.0"
+authors = ["Cardinal Cryptography"]
+edition = "2021"
+
+[dependencies]
+aleph_client = { workspace = true }
+anyhow = "1.0.75"
+clap = { version = "4.3.4", features = ["derive"] }
+codec = { package = 'parity-scale-codec', version = "3.0.0", features = [
+    'derive',
+] }
+env_logger = "0.10.0"
+ethers = { version = "2.0.9", features = [
+    "abigen",
+    "rustls",
+    "ws",
+    "ethers-solc",
+] }
+eyre = "0.6.8"
+futures = "0.3.28"
+hex = "0.4.3"
+log = "0.4.20"
+redis = { version = "*", features = ["tokio-comp", "aio"] }
+rustc-hex = "2.1.0"
+serde = "1.0.188"
+serde_json = "1.0.105"
+subxt = { workspace = true }
+thiserror = "1.0.48"
+tokio = { version = "1.36", features = [
+    "rt",
+    "rt-multi-thread",
+    "macros",
+    "test-util",
+] }
+signer_client = { path = "../signer_client" }
+async-trait = "0.1.77"
