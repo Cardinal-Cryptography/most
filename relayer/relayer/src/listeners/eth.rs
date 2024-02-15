@@ -19,7 +19,7 @@ use tokio::{
 use crate::{
     config::Config,
     connections::{
-        azero::SignedAzeroWsConnection,
+        azero::AzeroConnectionWithSigner,
         eth::SignedEthConnection,
         redis_helpers::{read_first_unprocessed_block_number, write_last_processed_block},
     },
@@ -60,7 +60,7 @@ pub struct EthListener;
 impl EthListener {
     pub async fn run(
         config: Arc<Config>,
-        azero_connection: Arc<SignedAzeroWsConnection>,
+        azero_connection: AzeroConnectionWithSigner,
         eth_connection: Arc<SignedEthConnection>,
         redis_connection: Arc<Mutex<RedisConnection>>,
         emergency: Arc<AtomicBool>,
@@ -78,13 +78,13 @@ impl EthListener {
         let contract = Most::new(address, Arc::clone(&eth_connection));
 
         let mut first_unprocessed_block_number = if *override_eth_cache {
-            *default_sync_from_block_eth
+            **default_sync_from_block_eth
         } else {
             read_first_unprocessed_block_number(
                 name.clone(),
                 ETH_LAST_BLOCK_KEY.to_string(),
                 redis_connection.clone(),
-                *default_sync_from_block_eth,
+                **default_sync_from_block_eth,
             )
             .await
         };
@@ -124,12 +124,7 @@ impl EthListener {
 
             // Handle events.
             for event in events {
-                handle_event(
-                    &event,
-                    &config,
-                    Arc::clone(&azero_connection),
-                )
-                .await?
+                handle_event(&event, &config, &azero_connection).await?
             }
 
             // Update the last block number.
@@ -152,7 +147,7 @@ impl EthListener {
 async fn handle_event(
     event: &MostEvents,
     config: &Config,
-    azero_connection: Arc<SignedAzeroWsConnection>,
+    azero_connection: &AzeroConnectionWithSigner,
 ) -> Result<(), EthListenerError> {
     if let MostEvents::CrosschainTransferRequestFilter(
         crosschain_transfer_event @ CrosschainTransferRequestFilter {
@@ -206,7 +201,7 @@ async fn handle_event(
         // send vote
         contract
             .receive_request(
-                &azero_connection,
+                azero_connection,
                 request_hash,
                 committee_id.as_u128(),
                 *dest_token_address,

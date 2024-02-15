@@ -151,7 +151,7 @@ watch-relayer:
 .PHONY: run-relayer
 run-relayer: # Run a single relayer
 run-relayer:
-	cd relayer && ./scripts/run.sh
+	cd relayer && ./scripts/run_relayer.sh
 
 .PHONY: run-relayers
 run-relayers: # Run three relayers
@@ -190,11 +190,7 @@ test-solidity: eth-deps
 
 .PHONY: test-ink
 test-ink: # Run ink tests
-test-ink: test-ink-e2e
-	cd azero/contracts/most && cargo test
-	cd azero/contracts/governance && cargo test
-	cd azero/contracts/token && cargo test
-	cd azero/contracts/gas-price-oracle/contract && cargo test
+test-ink: test-ink-unit test-ink-e2e
 
 .PHONY: test-ink-e2e
 test-ink-e2e: # Run ink e2e tests
@@ -203,8 +199,21 @@ test-ink-e2e: bootstrap-azero
 	cd azero/contracts/tests && \
 	cargo test e2e -- --test-threads=1 --nocapture
 
+.PHONY: test-ink-unit
+test-ink-unit: # Run ink unit tests
+test-ink-unit:
+	cd azero/contracts/most && cargo test
+	cd azero/contracts/governance && cargo test
+	cd azero/contracts/token && cargo test
+	cd azero/contracts/gas-price-oracle/contract && cargo test
+
+.PHONY: test-relayer
+test-relayer: # Run relayer tests
+test-relayer: compile-azero-docker compile-eth
+	cd relayer && cargo test
+
 .PHONY: e2e-tests
-e2e-tests: # Run specific e2e test. Requires: `test_module::test_name`.
+e2e-tests: # Run specific e2e test. Requires: `TEST_CASE=test_module::test_name`.
 e2e-tests:
 	cd e2e-tests && \
 		RUST_LOG=info cargo test test::$(TEST_CASE) -- --color always --exact --nocapture --test-threads=1
