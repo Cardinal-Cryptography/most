@@ -25,7 +25,7 @@ jobs:
 
   deploy-contracts:
     name: Deploy and setup contracts
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux, X64, large]
     needs: [check-vars-and-secrets]
     #needs: [test-eth-contracts, test-azero-contracts]
     outputs:
@@ -100,7 +100,7 @@ jobs:
 
   upload-contract-artifacts:
     name: Upload contract artifacts to S3
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux, X64, small]
     needs: [deploy-contracts]
     strategy:
       matrix: ${{ fromJson(needs.deploy-contracts.outputs.artifact-matrix-json) }}
@@ -133,7 +133,7 @@ jobs:
 
   upload-contract-addresses:
     name: Upload contract addresses to S3
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux, X64, small]
     needs: [deploy-contracts]
     steps:
       - name: Checkout code
