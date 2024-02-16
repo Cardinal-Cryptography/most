@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - master
-      - A0-4026-fix-downloading-from-s3-bucket
 
 jobs:
   check-vars-and-secrets:
