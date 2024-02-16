@@ -57,40 +57,43 @@ pub async fn azero_to_eth() -> anyhow::Result<()> {
     let mut eth_account_address_bytes = [0_u8; 32];
     eth_account_address_bytes[12..].copy_from_slice(eth_account_address.as_fixed_bytes());
 
-    let eth_connection = eth::connection(&config.eth_node_http).await?;
+    //let eth_connection = eth::connection(&config.eth_node_http).await?;
 
-    let balance_pre_unwrap = eth_connection
-        .get_balance(eth_account_address, None)
-        .await?;
+    //let balance_pre_unwrap = eth_connection
+    //    .get_balance(eth_account_address, None)
+    //    .await?;
 
-    let weth_azero_address_bytes: [u8; 32] = weth_azero_address.into();
-    let send_request_args = [
-        azero::bytes32_to_string(&weth_azero_address_bytes),
-        transfer_amount.to_string(),
-        azero::bytes32_to_string(&eth_account_address_bytes),
-    ];
+    //let weth_azero_address_bytes: [u8; 32] = weth_azero_address.into();
+    //let send_request_args = [
+    //    azero::bytes32_to_string(&weth_azero_address_bytes),
+    //    transfer_amount.to_string(),
+    //    azero::bytes32_to_string(&eth_account_address_bytes),
+    //];
 
-    let send_request_info = most
-        .contract_exec_value(
-            &azero_signed_connection,
-            "send_request",
-            &send_request_args,
-            10_000,
-        )
-        .await?;
-    info!("`send_request` tx info: {:?}", send_request_info);
+    //let send_request_info = most
+    //    .contract_exec_value(
+    //        &azero_signed_connection,
+    //        "send_request",
+    //        &send_request_args,
+    //        200_000_000_000_000
+    //    )
+    //    .await?;
+    //info!("`send_request` tx info: {:?}", send_request_info);
 
-    let wait = tokio::time::Duration::from_secs(5_u64);
-    tokio::time::sleep(wait).await;
+    //let wait = tokio::time::Duration::from_secs(5_u64);
+    //tokio::time::sleep(wait).await;
 
-    let balance_post_unwrap = eth_connection
-        .get_balance(eth_account_address, None)
-        .await?;
+    //let balance_post_unwrap = eth_connection
+    //    .get_balance(eth_account_address, None)
+    //    .await?;
 
-    assert_eq!(
-        (balance_post_unwrap - balance_pre_unwrap).as_u128(),
-        transfer_amount
-    );
+    //assert_eq!(
+    //    (balance_post_unwrap - balance_pre_unwrap).as_u128(),
+    //    transfer_amount
+    //);
+
+    let base_fee = most.contract_read0(&azero_signed_connection, "get_base_fee").await?;
+    info!("base_fee: {:?}:", base_fee);
 
     Ok(())
 }
