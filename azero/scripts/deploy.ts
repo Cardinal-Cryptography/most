@@ -14,7 +14,6 @@ import {
   storeAddresses,
   estimateContractInit,
   transferOwnershipToGovernance,
-  delay,
 } from "./utils";
 import "dotenv/config";
 import "@polkadot/api-augment";
