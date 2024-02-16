@@ -114,6 +114,8 @@ async function main() {
   await migrations.setCompleted(2);
 
   console.log("Done");
+  // NOTE: neccessary because script hangs in CI
+  process.exit(0);
 }
 
 main().catch((error) => {
