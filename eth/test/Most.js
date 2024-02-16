@@ -415,6 +415,7 @@ describe("Most", function () {
       const { most, weth, wethAddress, mostAddress } = await loadFixture(
         deployEightGuardianMostFixture
       );
+      const token_amount = ethToWei(TOKEN_AMOUNT);
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
       const requestHash = ethers.solidityPackedKeccak256(
@@ -422,7 +423,7 @@ describe("Most", function () {
         [
           0,
           addressToBytes32(wethAddress),
-          ethToWei(TOKEN_AMOUNT),
+          token_amount,
           ethAddress,
           0,
         ]
@@ -430,10 +431,10 @@ describe("Most", function () {
 
       const provider = await hre.ethers.provider;
       // Provide funds for Most
-      await weth.deposit({ value: ethToWei(TOKEN_AMOUNT) });
-      expect(await weth.balanceOf(accounts[0].address)).to.equal(ethToWei(TOKEN_AMOUNT));
-      await weth.transfer(mostAddress, ethToWei(TOKEN_AMOUNT));
-      expect(await weth.balanceOf(mostAddress)).to.equal(ethToWei(TOKEN_AMOUNT));
+      await weth.deposit({ value: token_amount });
+      expect(await weth.balanceOf(accounts[0].address)).to.equal(token_amount);
+      await weth.transfer(mostAddress, token_amount);
+      expect(await weth.balanceOf(mostAddress)).to.equal(token_amount);
 
       const balanceBefore = await provider.getBalance(accounts[10].address);
       const balanceBeforeMost = await provider.getBalance(mostAddress);
@@ -445,7 +446,7 @@ describe("Most", function () {
             requestHash,
             0,
             addressToBytes32(wethAddress),
-            ethToWei(TOKEN_AMOUNT),
+            token_amount,
             ethAddress,
             0
           );
@@ -456,7 +457,7 @@ describe("Most", function () {
       expect(await weth.balanceOf(mostAddress)).to.equal(0);
       expect(await weth.balanceOf(accounts[10].address)).to.equal(0);
       expect(balanceAfterMost - balanceBeforeMost).to.equal(0);
-      expect(balanceAfter - balanceBefore).to.equal(ethToWei(TOKEN_AMOUNT));
+      expect(balanceAfter - balanceBefore).to.equal(token_amount);
     });
   });
 

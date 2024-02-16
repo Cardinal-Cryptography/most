@@ -15,10 +15,14 @@ describe("MostBenchmark", function () {
     const token = await Token.deploy("10000", "TestToken", "TEST");
     const tokenAddress = await token.getAddress();
 
+    const Weth = await hre.ethers.getContractFactory("WETH9");
+    const weth = await Weth.deploy();
+    const wethAddress = await weth.getAddress();
+
     const Most = await hre.ethers.getContractFactory("Most");
     const most = await upgrades.deployProxy(
       Most,
-      [guardianAddresses, 5, accounts[0].address],
+      [guardianAddresses, 5, accounts[0].address, wethAddress],
       {
         initializer: "initialize",
         kind: "uups",
@@ -69,9 +73,10 @@ describe("MostBenchmark", function () {
 
     // Gas estimate for bridgeReceive
     let ethAccount = addressToBytes32(accounts[9].address);
+    let committeeId = 0;
     let requestHash = hre.ethers.solidityPackedKeccak256(
-      ["bytes32", "uint256", "bytes32", "uint256"],
-      [tokenAddressBytes32, 1000, ethAccount, 1],
+      ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
+      [committeeId, tokenAddressBytes32, 1000, ethAccount, 1],
     );
 
     // Estimate gas for each signature
@@ -82,6 +87,7 @@ describe("MostBenchmark", function () {
           .connect(guardianKeys[i])
           .receiveRequest.estimateGas(
             requestHash,
+            committeeId,
             tokenAddressBytes32,
             1000,
             ethAccount,
@@ -92,7 +98,7 @@ describe("MostBenchmark", function () {
       // Check if gas estimate is high enough
       await most
         .connect(guardianKeys[i])
-        .receiveRequest(requestHash, tokenAddressBytes32, 1000, ethAccount, 1, {
+        .receiveRequest(requestHash, committeeId, tokenAddressBytes32, 1000, ethAccount, 1, {
           gas: gasEstimates[i],
         });
     }
