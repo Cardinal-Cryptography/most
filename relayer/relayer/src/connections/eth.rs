@@ -32,6 +32,12 @@ pub enum EthConnectionError {
 
     #[error("Nonce manager error")]
     NonceManager(#[from] NonceManagerError<Provider<Http>>),
+
+    #[error("Join error {0}")]
+    Join(#[from] tokio::task::JoinError),
+
+    #[error("Signer client error {0}")]
+    SignerClient(#[from] signer_client::Error),
 }
 
 #[derive(Debug, Error)]
@@ -191,13 +197,39 @@ pub async fn connect(url: &str) -> EthConnection {
     Provider::<Http>::connect(url).await
 }
 
-pub async fn sign(
+pub async fn with_local_wallet(
     connection: EthConnection,
     wallet: LocalWallet,
 ) -> Result<SignedEthConnection, EthConnectionError> {
     let nonce_manager = connection.nonce_manager(wallet.address());
     nonce_manager.initialize_nonce(None).await?;
     let signer = EthereumSigner::Local(wallet);
+
+    Ok(SignerMiddleware::new_with_provider_chain(nonce_manager, signer).await?)
+}
+
+pub async fn with_signer(
+    connection: EthConnection,
+    cid: u32,
+    port: u32,
+) -> Result<SignedEthConnection, EthConnectionError> {
+    let client = signer_client::Client::new(cid, port)?;
+    let client = Arc::new(Mutex::new(client));
+    let client_rc = client.clone();
+    let address = spawn_blocking(move || {
+        let client = client_rc.lock().unwrap();
+        client.eth_address()
+    })
+    .await??;
+
+    let nonce_manager = connection.nonce_manager(address);
+
+    let signer = EthVsockSigner {
+        client,
+        chain_id: 0,
+        address,
+    };
+    let signer = EthereumSigner::Vsock(signer);
 
     Ok(SignerMiddleware::new_with_provider_chain(nonce_manager, signer).await?)
 }

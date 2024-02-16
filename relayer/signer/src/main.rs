@@ -1,7 +1,10 @@
 use std::thread;
 
 use clap::Parser;
-use ethers::signers::{LocalWallet, Signer};
+use ethers::{
+    signers::{LocalWallet, Signer},
+    types::Address,
+};
 use log::info;
 use signer_client::{Client, Command, Response};
 use subxt::ext::{
@@ -19,7 +22,7 @@ struct ServerArguments {
     azero_key: String,
 
     #[clap(short, long)]
-    eth_wallet_mnemonic: String,
+    eth_key: String,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -47,10 +50,11 @@ fn main() -> Result<(), Error> {
     env_logger::init();
 
     let args = ServerArguments::parse();
-    let server = Server::new(args.azero_key, args.eth_wallet_mnemonic, args.port)?;
+    let server = Server::new(args.azero_key, args.eth_key, args.port)?;
 
     info!("Server listening on: {:?}", server.local_addr()?);
-    info!("Azero account ID: {:?}", server.account_id());
+    info!("Azero account ID: {:?}", server.azero_account_id());
+    info!("ETH address: {:?}", server.eth_address());
 
     server.accept_loop()?;
 
@@ -77,8 +81,12 @@ impl Server {
         })
     }
 
-    fn account_id(&self) -> AccountId32 {
+    fn azero_account_id(&self) -> AccountId32 {
         self.azero_key.public().into()
+    }
+
+    fn eth_address(&self) -> Address {
+        self.eth_wallet.address()
     }
 
     fn local_addr(&self) -> Result<VsockAddr, Error> {
