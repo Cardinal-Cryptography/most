@@ -10,7 +10,6 @@ async function transferOwnershipToGovernance(
   governanceContract,
   governanceSigners,
 ) {
-
   let iface = await new ethers.Interface(["function acceptOwnership()"]);
   let calldata = await iface.encodeFunctionData("acceptOwnership", []);
   let initialOwner = await fromContract.owner();
@@ -47,6 +46,14 @@ async function main() {
   accounts = signers.map((s) => s.address);
 
   console.log("Using ", accounts[0], "as signer");
+
+  // NOTE : TEMPorary before devnet is fixed and uses propere genesis that seeds these accounts with funds
+  for (const to of signers.slice(1, 4)) {
+    await signers[0].sendTransaction({
+      to: to.address,
+      value: ethers.parseEther("1.0"), // Send 1.0 ether
+    });
+  }
 
   // --- setup
 
