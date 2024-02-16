@@ -10,6 +10,7 @@ async function transferOwnershipToGovernance(
   governanceContract,
   governanceSigners,
 ) {
+
   let iface = await new ethers.Interface(["function acceptOwnership()"]);
   let calldata = await iface.encodeFunctionData("acceptOwnership", []);
   let initialOwner = await fromContract.owner();
@@ -17,12 +18,12 @@ async function transferOwnershipToGovernance(
     "Transferring ownership: ",
     initialOwner,
     "=>",
-    governanceContract.address,
+    governanceContract.target,
   );
-  await fromContract.transferOwnership(governanceContract.address);
+  await fromContract.transferOwnership(governanceContract.target);
   await governanceContract
     .connect(governanceSigners[0])
-    .submitProposal(fromContract.address, calldata);
+    .submitProposal(fromContract.target, calldata);
   console.log("Proposal submitted");
   console.log("Awaiting proposal ID...");
   let proposalId = await new Promise((resolve) => {
@@ -78,7 +79,7 @@ async function main() {
     Governance.abi,
     signers[0],
   );
-  governanceInstance.address = governanceInstance.runner.address;
+
   await transferOwnershipToGovernance(
     governanceInstance,
     governanceInstance,
@@ -91,7 +92,7 @@ async function main() {
     Most.abi,
     signers[0],
   );
-  mostInstance.address = mostInstance.runner.address;
+
   await transferOwnershipToGovernance(
     mostInstance,
     governanceInstance,
