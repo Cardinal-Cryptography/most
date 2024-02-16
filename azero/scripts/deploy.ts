@@ -14,6 +14,7 @@ import {
   storeAddresses,
   estimateContractInit,
   transferOwnershipToGovernance,
+  delay,
 } from "./utils";
 import "dotenv/config";
 import "@polkadot/api-augment";
@@ -202,9 +203,16 @@ async function main(): Promise<void> {
   console.log("Adding weth pair to most:", wethHex, wethEthAddress);
   await most.tx.addPair(hexToBytes(wethHex), hexToBytes(wethEthAddress));
 
+  const amount = 1000000000000;
   for (const address of governance_keys) {
     console.log("Adding", address, "as governance member...");
     await governance.tx.addMember(address);
+    await delay(1000);
+    // seed governance account with some funds (1 A0)
+    var transfer = api.tx.balances.transferAllowDeath(address, amount);
+    console.log("Seeding", address, "with", amount / 1e12, "azero");
+    await transfer.signAndSend(deployer);
+    await delay(1000);
   }
 
   await transferOwnershipToGovernance(most, governance, governance_members);

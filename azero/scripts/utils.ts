@@ -141,3 +141,12 @@ export async function transferOwnershipToGovernance<
   console.log("Executing proposal...");
   await governanceContract.tx.executeProposal(poroposalId);
 }
+
+/**
+ * Sleeps the thread for a set amount of time
+ * @param time - milliseconds
+ * NOTE: async function
+ */
+export async function delay(time) {
+  return new Promise((resolve) => setTimeout(resolve, time));
+}
