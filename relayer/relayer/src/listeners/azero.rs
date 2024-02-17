@@ -106,6 +106,7 @@ impl AlephZeroListener {
             azero_contract_address,
             azero_max_event_handler_tasks,
             default_sync_from_block_azero,
+            eth_contract_address,
             name,
             sync_step,
             override_azero_cache,
@@ -188,7 +189,25 @@ impl AlephZeroListener {
 
                     // Check for errors in the event handler tasks.
                     while let Some(result) = block_sealing_tasks.try_join_next() {
-                        result??;
+                        match result? {
+                            Ok(_) => {}
+                            Err(e) => {
+                                error!("Error in event handler task: {}", e);
+                                return Err(e).into();
+                                /*let address = eth_contract_address.parse::<Address>()?;
+                                let most_eth = Most::new(address, eth_connection.clone());
+
+                                if most_eth.method("is_halted", [])?.call().await? {
+                                    error!("MostInstance is halted, pausing event handling");
+                                    loop {
+                                        if !most_eth.is_halted().await? {
+                                            break;
+                                        }
+                                        sleep(Duration::from_secs(10)).await;
+                                    }
+                                }*/
+                            }
+                        }
                     }
 
                     // Update the last block number.

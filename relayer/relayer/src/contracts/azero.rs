@@ -7,7 +7,7 @@ use std::{
 use aleph_client::{
     contract::{
         event::{translate_events, BlockDetails, ContractEvent},
-        ContractInstance,
+        ContractInstance, ConvertibleValue,
     },
     contract_transcode::{ContractMessageTranscoder, Value, Value::Seq},
     pallets::contract::ContractsUserApi,
@@ -18,7 +18,7 @@ use log::trace;
 use subxt::events::Events;
 use thiserror::Error;
 
-use crate::connections::azero::AzeroConnectionWithSigner;
+use crate::{connections::azero::AzeroConnectionWithSigner, contracts::azero::Value::Tuple};
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -63,6 +63,24 @@ impl AdvisoryInstance {
         {
             Ok(is_emergency) => Ok((is_emergency, self.address.clone())),
             Err(why) => Err(AzeroContractError::AlephClient(why)),
+        }
+    }
+}
+
+impl TryFrom<ConvertibleValue> for Result<bool, anyhow::Error> {
+    type Error = anyhow::Error;
+
+    fn try_from(value: ConvertibleValue) -> anyhow::Result<Result<bool, anyhow::Error>> {
+        match value.0 {
+            Value::Tuple(Tuple {
+                ident: "Ok",
+                values,
+            }) => Ok(values[0].try_into()),
+            Value::Tuple(Tuple {
+                ident: "Err",
+                values,
+            }) => Err(anyhow::anyhow!(values[0].to_string())),
+            _ => anyhow::bail!("Expected {:?} to be {}", value, "bool or error"),
         }
     }
 }
@@ -128,6 +146,17 @@ impl MostInstance {
             )
             .await
             .map_err(AzeroContractError::AlephClient)
+    }
+
+    pub async fn is_halted(&self, connection: &Connection) -> Result<bool, AzeroContractError> {
+        match self
+            .contract
+            .contract_read0::<Result<bool, anyhow::Error>, _>(connection, "is_halted")
+            .await
+        {
+            Ok(is_halted) => Ok(is_halted),
+            Err(why) => Err(AzeroContractError::AlephClient(why)),
+        }
     }
 
     pub fn filter_events(

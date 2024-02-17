@@ -1,5 +1,6 @@
 use std::sync::{atomic::AtomicBool, Arc};
 
+use aleph_client::AsConnection;
 use ethers::{
     abi::EncodePackedError,
     core::types::Address,
@@ -8,7 +9,7 @@ use ethers::{
     types::BlockNumber,
     utils::keccak256,
 };
-use log::{debug, info, trace, warn};
+use log::{debug, error, info, trace, warn};
 use redis::{aio::Connection as RedisConnection, RedisError};
 use thiserror::Error;
 use tokio::{
@@ -199,7 +200,7 @@ async fn handle_event(
         )?;
 
         // send vote
-        contract
+        match contract
             .receive_request(
                 azero_connection,
                 request_hash,
@@ -209,7 +210,26 @@ async fn handle_event(
                 *dest_receiver_address,
                 request_nonce.as_u128(),
             )
-            .await?;
+            .await
+        {
+            Ok(_) => {
+                info!("Vote sent for request: {request_hash:?}");
+            }
+            Err(e) => {
+                error!("Error sending vote for request: {request_hash:?}, error: {e}");
+                if contract.is_halted(azero_connection.as_connection()).await? {
+                    error!("Contract is halted, stopping event handling");
+                    loop {
+                        if !contract.is_halted(azero_connection.as_connection()).await? {
+                            break;
+                        }
+                        sleep(Duration::from_secs(10)).await;
+                    }
+                } else {
+                    return Err(EthListenerError::AzeroContract(e));
+                }
+            }
+        }
     }
 
     Ok(())
