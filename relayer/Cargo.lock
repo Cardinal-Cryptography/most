@@ -5166,6 +5166,8 @@ dependencies = [
  "assert2",
  "clap",
  "env_logger",
+ "ethers",
+ "hex",
  "log",
  "serde",
  "serde_json",
@@ -5181,6 +5183,7 @@ name = "signer_client"
 version = "0.1.0"
 dependencies = [
  "aleph_client",
+ "ethers",
  "serde",
  "serde_json",
  "subxt",
