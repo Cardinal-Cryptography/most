@@ -184,8 +184,8 @@ contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
             if (bytes32ToAddress(destTokenAddress) == wethAddress ) {
                 WETH9 weth = WETH9(wethAddress);
                 weth.withdraw(amount);
-                (bool sent, ) = payable(bytes32ToAddress(destReceiverAddress)).call{value: amount}("");
-                require(sent, "Failed to send the native ETH back to the user");
+                (bool success, ) = payable(bytes32ToAddress(destReceiverAddress)).call{value: amount}("");
+                require(success, "Failed to send the native ETH back to the user");
             } else {
                 IERC20 token = IERC20(bytes32ToAddress(destTokenAddress));
 
