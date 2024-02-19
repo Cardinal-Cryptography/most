@@ -123,13 +123,23 @@ async fn main() -> Result<()> {
 
     info!("Wallet address: {}", wallet.address());
 
-    let eth_connection =
-        Arc::new(eth::sign(eth::connect(&config.eth_node_http_url).await, wallet).await?);
+    let eth_signed_connection = if let Some(cid) = config.signer_cid {
+        eth::with_signer(
+            eth::connect(&config.eth_node_http_url).await,
+            cid,
+            config.signer_port,
+        )
+        .await?
+    } else {
+        eth::with_local_wallet(eth::connect(&config.eth_node_http_url).await, wallet).await?
+    };
+    let eth_signed_connection = Arc::new(eth_signed_connection);
+
+    let eth_connection = Arc::new(eth::connect(&config.eth_node_http_url).await);
 
     debug!("Established connection to Ethereum node");
 
     let eth_listener_config_rc = Arc::clone(&config);
-    let eth_listener_eth_connection_rc = Arc::clone(&eth_connection);
     let eth_listener_redis_connection_rc = Arc::clone(&redis_connection);
     let eth_listener_emergency_rc = Arc::clone(&emergency);
 
@@ -139,7 +149,7 @@ async fn main() -> Result<()> {
         EthListener::run(
             eth_listener_config_rc,
             azero_signed_connection,
-            eth_listener_eth_connection_rc,
+            eth_connection,
             eth_listener_redis_connection_rc,
             eth_listener_emergency_rc,
         )
@@ -151,7 +161,6 @@ async fn main() -> Result<()> {
 
     let aleph_zero_listener_config_rc = Arc::clone(&config);
     let aleph_zero_listener_azero_signed_connection_rc = azero_connection.clone();
-    let aleph_zero_listener_eth_connection_rc = Arc::clone(&eth_connection);
     let aleph_zero_listener_redis_connection_rc = Arc::clone(&redis_connection);
     let aleph_zero_listener_emergency_rc = Arc::clone(&emergency);
 
@@ -159,7 +168,7 @@ async fn main() -> Result<()> {
         AlephZeroListener::run(
             aleph_zero_listener_config_rc,
             aleph_zero_listener_azero_signed_connection_rc,
-            aleph_zero_listener_eth_connection_rc,
+            eth_signed_connection,
             aleph_zero_listener_redis_connection_rc,
             aleph_zero_listener_emergency_rc,
         )
