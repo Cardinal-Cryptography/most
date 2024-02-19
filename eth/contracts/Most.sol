@@ -261,4 +261,6 @@ contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
     function removePair(bytes32 from) external onlyOwner {
         delete supportedPairs[from];
     }
+
+    receive() external payable {}
 }
