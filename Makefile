@@ -305,7 +305,7 @@ format: rust-format js-format
 
 .PHONY: build-docker-relayer
 build-docker-relayer: # Build relayer docker image
-ifeq ($(DOCKER_RELAYER_COMPILE_CONTRACTS),copy)
+ifeq ($(DOCKER_RELAYER_COMPILE_CONTRACTS),compile)
 build-docker-relayer: compile-azero compile-eth
 endif
 	cd relayer && cargo build --release
