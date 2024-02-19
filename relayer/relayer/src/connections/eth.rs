@@ -201,8 +201,7 @@ pub async fn with_local_wallet(
     connection: EthConnection,
     wallet: LocalWallet,
 ) -> Result<SignedEthConnection, EthConnectionError> {
-    let nonce_manager = connection.nonce_manager(wallet.address());
-    nonce_manager.initialize_nonce(None).await?;
+    let nonce_manager = with_nonce_manager(connection, wallet.address()).await?;
     let signer = EthereumSigner::Local(wallet);
 
     Ok(SignerMiddleware::new_with_provider_chain(nonce_manager, signer).await?)
@@ -221,8 +220,7 @@ pub async fn with_signer(
         client.eth_address()
     })
     .await??;
-
-    let nonce_manager = connection.nonce_manager(address);
+    let nonce_manager = with_nonce_manager(connection, address).await?;
 
     let signer = EthVsockSigner {
         client,
@@ -232,4 +230,14 @@ pub async fn with_signer(
     let signer = EthereumSigner::Vsock(signer);
 
     Ok(SignerMiddleware::new_with_provider_chain(nonce_manager, signer).await?)
+}
+
+async fn with_nonce_manager(
+    connection: EthConnection,
+    address: Address,
+) -> Result<NonceManagerMiddleware<Provider<Http>>, EthConnectionError> {
+    let nonce_manager = connection.nonce_manager(address);
+    nonce_manager.initialize_nonce(None).await?;
+
+    Ok(nonce_manager)
 }
