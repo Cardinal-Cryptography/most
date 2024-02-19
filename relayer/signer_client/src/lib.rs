@@ -7,6 +7,9 @@ type EthAddress = ethers::types::Address;
 type EthSignature = ethers::types::Signature;
 type EthH256 = ethers::types::H256;
 type EthTypedTransaction = ethers::types::transaction::eip2718::TypedTransaction;
+type EthChainId = ethers::types::U64;
+
+const ETH_MAINNET_CHAIN_ID: EthChainId = EthChainId::one();
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -18,7 +21,7 @@ pub enum Error {
     InvalidResponse { expected: String, got: Response },
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum Command {
     Ping,
     AccountIdAzero,
@@ -31,10 +34,11 @@ pub enum Command {
     },
     SignEthTx {
         tx: ethers::types::transaction::eip2718::TypedTransaction,
+        chain_id: EthChainId,
     },
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum Response {
     Pong,
     AccountIdAzero {
@@ -54,6 +58,7 @@ pub enum Response {
     SignedEthTx {
         tx: EthTypedTransaction,
         signature: EthSignature,
+        chain_id: EthChainId,
     },
 }
 
@@ -143,17 +148,34 @@ impl Client {
     }
 
     pub fn sign_eth_tx(&self, tx: &EthTypedTransaction) -> Result<EthSignature, Error> {
-        self.send(&Command::SignEthTx { tx: tx.clone() })?;
+        let chain_id = tx.chain_id().unwrap_or(ETH_MAINNET_CHAIN_ID);
+        self.send(&Command::SignEthTx {
+            tx: tx.clone(),
+            chain_id,
+        })?;
+        let res = self.recv::<Response>()?;
 
-        match self.recv()? {
-            Response::SignedEthTx {
-                tx: return_tx,
-                signature,
-            } if return_tx == *tx => Ok(signature),
-            other => Err(Error::InvalidResponse {
-                expected: format!("SignedEthTx(tx: {:?})", tx),
-                got: other,
-            }),
+        if let Response::SignedEthTx {
+            tx: mut return_tx,
+            signature,
+            chain_id: return_chain_id,
+        } = res.clone()
+        {
+            // The Serialize and Deserialize implementations for TypedTransacion do not
+            // serialize and deserialize the chain_id field, so we need to supply it
+            // manually to the comparison here.
+            if tx.chain_id().is_some() {
+                return_tx.set_chain_id(return_chain_id);
+            }
+
+            if return_tx == *tx {
+                return Ok(signature);
+            }
         }
+
+        Err(Error::InvalidResponse {
+            expected: format!("SignedEthTx(tx: {:?})", tx),
+            got: res,
+        })
     }
 }
