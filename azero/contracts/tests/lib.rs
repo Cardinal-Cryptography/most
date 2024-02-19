@@ -25,8 +25,8 @@ mod e2e {
         primitives::AccountId,
     };
     use ink_e2e::{
-        account_id, alice, bob, build_message, charlie, dave, eve, ferdie, subxt::dynamic::Value,
-        AccountKeyring, Keypair, PolkadotConfig,
+        account_id, alice, bob, build_message, charlie, dave, eve, ferdie, AccountKeyring, Keypair,
+        PolkadotConfig,
     };
     use most::{
         most::{CrosschainTransferRequest, RequestProcessed, RequestSigned},
@@ -476,15 +476,14 @@ mod e2e {
         let (most_address, token_address) = setup_default_most_and_token(&mut client, false).await;
 
         // seed contract with some funds for pocket money transfers
-        let call_data = vec![
-            Value::unnamed_variant("Id", [Value::from_bytes(most_address)]),
-            Value::u128(10 * DEFAULT_POCKET_MONEY),
-        ];
-
-        client
-            .runtime_call(&alice(), "Balances", "transfer", call_data)
-            .await
-            .expect("runtime call failed");
+        most_fund_pocket_money(
+            &mut client,
+            &alice(),
+            most_address,
+            10 * DEFAULT_POCKET_MONEY,
+        )
+        .await
+        .expect("fund pocket money should succeed");
 
         let amount = 841189100000000;
         let receiver_address = account_id(AccountKeyring::One);
@@ -528,6 +527,80 @@ mod e2e {
             azero_balance_after,
             azero_balance_before + DEFAULT_POCKET_MONEY
         );
+    }
+
+    #[ink_e2e::test]
+    fn pocket_money_wont_pay_from_rewards(mut client: ink_e2e::Client<C, E>) {
+        let (most_address, token_address) = setup_default_most_and_token(&mut client, true).await;
+
+        let amount_to_send = 1000;
+
+        let base_fee = most_base_fee(&mut client, most_address)
+            .await
+            .expect("should return base fee");
+
+        psp22_approve(
+            &mut client,
+            &alice(),
+            token_address,
+            most_address,
+            amount_to_send,
+        )
+        .await
+        .expect("approval should succeed");
+
+        // Send request so there are rewards in the contract
+        most_send_request(
+            &mut client,
+            &alice(),
+            most_address,
+            token_address,
+            amount_to_send,
+            REMOTE_RECEIVER,
+            base_fee,
+        )
+        .await
+        .expect("Request should succeed");
+
+        let amount = 841189100000000;
+        let receiver_address = account_id(AccountKeyring::One);
+        let request_nonce = 1;
+
+        let request_hash = hash_request_data(
+            DEFAULT_COMMITTEE_ID,
+            token_address,
+            amount,
+            receiver_address,
+            request_nonce,
+        );
+
+        let azero_balance_before = client
+            .balance(receiver_address)
+            .await
+            .expect("native balance before");
+
+        for signer in &guardian_keys()[0..(DEFAULT_THRESHOLD as usize)] {
+            most_receive_request(
+                &mut client,
+                signer,
+                most_address,
+                request_hash,
+                DEFAULT_COMMITTEE_ID,
+                *token_address.as_ref(),
+                amount,
+                *receiver_address.as_ref(),
+                request_nonce,
+            )
+            .await
+            .expect("Receive request should succeed");
+        }
+
+        let azero_balance_after = client
+            .balance(receiver_address)
+            .await
+            .expect("native balance after");
+
+        assert_eq!(azero_balance_after, azero_balance_before);
     }
 
     #[ink_e2e::test]
@@ -1092,6 +1165,22 @@ mod e2e {
                 )
             },
             None,
+        )
+        .await
+    }
+
+    async fn most_fund_pocket_money(
+        client: &mut E2EClient,
+        caller: &Keypair,
+        most: AccountId,
+        amount: u128,
+    ) -> CallResult<(), MostError> {
+        call_message::<MostRef, _, _, _, _>(
+            client,
+            caller,
+            most,
+            |most| most.fund_pocket_money(),
+            Some(amount),
         )
         .await
     }
