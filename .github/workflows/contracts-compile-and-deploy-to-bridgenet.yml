@@ -149,7 +149,7 @@ jobs:
           path: eth
 
       - name: Prepare contract_spec JSON
-        uses: Cardinal-Cryptography/github-actions/generate-contract-spec
+        uses: Cardinal-Cryptography/github-actions/generate-contract-spec@v6
         with:
           src-files: |-
             eth/addresses.json|eth_
