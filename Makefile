@@ -2,6 +2,7 @@ NETWORK ?= development
 AZERO_ENV ?= dev
 DOCKER_RELAYER_NAME ?= most-relayer
 DOCKER_RELAYER_COPY_ADDRESSES ?= copy
+DOCKER_RELAYER_COMPILE_CONTRACTS ?= compile
 
 export BRIDGENET_AZERO_START_BLOCK=`ENDPOINT=https://rpc-fe-bridgenet.dev.azero.dev ./relayer/scripts/azero_best_finalized.sh`
 export BRIDGENET_ETH_START_BLOCK=`ENDPOINT=https://rpc-eth-bridgenet.dev.azero.dev ./relayer/scripts/eth_best_finalized.sh`
@@ -304,7 +305,9 @@ format: rust-format js-format
 
 .PHONY: build-docker-relayer
 build-docker-relayer: # Build relayer docker image
+ifeq ($(DOCKER_RELAYER_COMPILE_CONTRACTS),copy)
 build-docker-relayer: compile-azero compile-eth
+endif
 	cd relayer && cargo build --release
 ifeq ($(DOCKER_RELAYER_COPY_ADDRESSES),copy)
 	cp azero/addresses.json relayer/azero_addresses.json
