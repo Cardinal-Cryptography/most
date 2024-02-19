@@ -98,9 +98,17 @@ describe("MostBenchmark", function () {
       // Check if gas estimate is high enough
       await most
         .connect(guardianKeys[i])
-        .receiveRequest(requestHash, committeeId, tokenAddressBytes32, 1000, ethAccount, 1, {
-          gas: gasEstimates[i],
-        });
+        .receiveRequest(
+          requestHash,
+          committeeId,
+          tokenAddressBytes32,
+          1000,
+          ethAccount,
+          1,
+          {
+            gas: gasEstimates[i],
+          },
+        );
     }
 
     console.log("Gas estimates for receiveRequest: ", gasEstimates);
