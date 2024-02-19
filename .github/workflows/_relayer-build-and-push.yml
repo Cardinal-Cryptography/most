@@ -99,7 +99,7 @@ jobs:
           aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
           s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
           project: most
-          version: dedc33b2b265a0ef2f6dd3369d0995af4e1dce12
+          version: ${{ github.sha }}
           contract: azero_most
           dst-artifact: downloaded-artifact-azero-most
 
@@ -111,7 +111,7 @@ jobs:
           aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
           s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
           project: most
-          version: dedc33b2b265a0ef2f6dd3369d0995af4e1dce12
+          version: ${{ github.sha }}
           contract: azero_advisory
           dst-artifact: downloaded-artifact-azero-advisory
 
@@ -123,18 +123,12 @@ jobs:
           aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
           s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
           project: most
-          version: dedc33b2b265a0ef2f6dd3369d0995af4e1dce12
+          version: ${{ github.sha }}
           contract: eth_most
           dst-artifact: downloaded-artifact-eth-most
 
       - name: Install Rust toolchain
         uses: Cardinal-Cryptography/github-actions/install-rust-toolchain@v6
-
-      #- name: Add cargo-contract
-      #  shell: bash
-      #  run: |
-      #    cargo install --force --locked cargo-contract
-      #    cargo install cargo-dylint dylint-link
 
       - name: Build relayer
         id: build
@@ -162,19 +156,19 @@ jobs:
           echo "docker-name=${docker_name}" >> $GITHUB_OUTPUT
           echo "docker-tag=${docker_tag}" >> $GITHUB_OUTPUT
 
-#      - name: Login to Amazon ECR
-#        uses: docker/login-action@v3
-#        with:
-#          registry: ${{ secrets.ECR_PRIVATE_HOST }}
-#          username: ${{ secrets.AWS_MAINNET_ACCESS_KEY_ID }}
-#          password: ${{ secrets.AWS_MAINNET_SECRET_ACCESS_KEY }}
-#        env:
-#          AWS_REGION: us-east-1
+      - name: Login to Amazon ECR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.ECR_PRIVATE_HOST }}
+          username: ${{ secrets.AWS_MAINNET_ACCESS_KEY_ID }}
+          password: ${{ secrets.AWS_MAINNET_SECRET_ACCESS_KEY }}
+        env:
+          AWS_REGION: us-east-1
 
-#      - name: Push docker image to ECR
-#        shell: bash
-#        run: |
-#          docker_image='${{ secrets.ECR_PRIVATE_HOST }}/most-relayer:${{ steps.build.outputs.docker-tag }}'
-#
-#          docker tag '${{ steps.build.outputs.docker-name }}' "${docker_image}"
-#          docker push "${docker_image}"
+      - name: Push docker image to ECR
+        shell: bash
+        run: |
+          docker_image='${{ secrets.ECR_PRIVATE_HOST }}/most-relayer:${{ steps.build.outputs.docker-tag }}'
+
+          docker tag '${{ steps.build.outputs.docker-name }}' "${docker_image}"
+          docker push "${docker_image}"
