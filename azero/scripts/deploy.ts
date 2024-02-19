@@ -152,7 +152,7 @@ async function main(): Promise<void> {
   const initialSupply = 0;
   const symbol = "wETH";
   const name = symbol;
-  const decimals = 12;
+  const decimals = 18;
   const minterBurner =
     process.env.AZERO_ENV == "dev" || process.env.AZERO_ENV == "bridgenet"
       ? authority
