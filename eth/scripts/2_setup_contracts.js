@@ -17,12 +17,12 @@ async function transferOwnershipToGovernance(
     "Transferring ownership: ",
     initialOwner,
     "=>",
-    governanceContract.address,
+    governanceContract.target,
   );
-  await fromContract.transferOwnership(governanceContract.address);
+  await fromContract.transferOwnership(governanceContract.target);
   await governanceContract
     .connect(governanceSigners[0])
-    .submitProposal(fromContract.address, calldata);
+    .submitProposal(fromContract.target, calldata);
   console.log("Proposal submitted");
   console.log("Awaiting proposal ID...");
   let proposalId = await new Promise((resolve) => {
@@ -46,6 +46,14 @@ async function main() {
   accounts = signers.map((s) => s.address);
 
   console.log("Using ", accounts[0], "as signer");
+
+  // NOTE : TEMPorary before devnet is fixed and uses propere genesis that seeds these accounts with funds
+  for (const to of signers.slice(1, 4)) {
+    await signers[0].sendTransaction({
+      to: to.address,
+      value: ethers.parseEther("1.0"), // Send 1.0 ether
+    });
+  }
 
   // --- setup
 
@@ -78,7 +86,7 @@ async function main() {
     Governance.abi,
     signers[0],
   );
-  governanceInstance.address = governanceInstance.runner.address;
+
   await transferOwnershipToGovernance(
     governanceInstance,
     governanceInstance,
@@ -91,7 +99,7 @@ async function main() {
     Most.abi,
     signers[0],
   );
-  mostInstance.address = mostInstance.runner.address;
+
   await transferOwnershipToGovernance(
     mostInstance,
     governanceInstance,
@@ -106,6 +114,8 @@ async function main() {
   await migrations.setCompleted(2);
 
   console.log("Done");
+  // NOTE: neccessary because script hangs in CI
+  process.exit(0);
 }
 
 main().catch((error) => {
