@@ -91,7 +91,7 @@ jobs:
           frontend-environment: ${{ inputs.frontend-environment }}
           dst-addresses: downloaded-addresses-${{ inputs.environment }}-${{ inputs.frontend-environment }}.json
 
-      - name: Download artifact from S3 bucket
+      - name: Download azero_most artifact from S3 bucket
         uses: Cardinal-Cryptography/github-actions/download-contract-artifact@v6
         with:
           aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_ACCESS_KEY_ID }}
@@ -103,7 +103,7 @@ jobs:
           contract: azero_most
           dst-artifact: downloaded-artifact-azero-most
 
-      - name: Download artifact from S3 bucket
+      - name: Download azero_advisory artifact from S3 bucket
         uses: Cardinal-Cryptography/github-actions/download-contract-artifact@v6
         with:
           aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_ACCESS_KEY_ID }}
@@ -114,6 +114,18 @@ jobs:
           version: dedc33b2b265a0ef2f6dd3369d0995af4e1dce12
           contract: azero_advisory
           dst-artifact: downloaded-artifact-azero-advisory
+
+      - name: Download eth_most artifact from S3 bucket
+        uses: Cardinal-Cryptography/github-actions/download-contract-artifact@v6
+        with:
+          aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
+          s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
+          project: most
+          version: dedc33b2b265a0ef2f6dd3369d0995af4e1dce12
+          contract: eth_most
+          dst-artifact: downloaded-artifact-eth-most
 
       - name: Install Rust toolchain
         uses: Cardinal-Cryptography/github-actions/install-rust-toolchain@v6
@@ -130,13 +142,14 @@ jobs:
           TMP_ADDRESSES_FILE: downloaded-addresses-${{ inputs.environment }}-${{ inputs.frontend-environment }}.json
           TMP_ARTIFACT_AZERO_MOST_DIR: downloaded-artifact-azero-most
           TMP_ARTIFACT_AZERO_ADVISORY_DIR: downloaded-artifact-azero-advisory
+          TMP_ARTIFACT_ETH_MOST_DIR: downloaded-artifact-eth-most
         run: |
           mkdir -p azero/artifacts
           cp -rf '${{ env.TMP_ARTIFACT_AZERO_MOST_DIR }}'/* azero/artifacts/
           cp -rf '${{ env.TMP_ARTIFACT_AZERO_ADVISORY_DIR }}'/* azero/artifacts/
 
-          mkdir -p azero/artifacts/contracts/Most.sol
-          cp -rf '${{ env.TMP_ARTIFACT_AZERO_MOST_DIR }}'/most.json azero/artifacts/contracts/Most.sol/Most.json
+          mkdir -p eth/artifacts/contracts/Most.sol
+          cp -rf '${{ env.TMP_ARTIFACT_ETH_MOST_DIR }}'/Most.json eth/artifacts/contracts/Most.sol/Most.json
 
           docker_tag=${{ steps.get-ref-properties.outputs.sha }}-${{ inputs.environment }}-${{ inputs.frontend-environment }}
           docker_name=most-relayer-${docker_tag}
