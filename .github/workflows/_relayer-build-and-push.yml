@@ -111,7 +111,7 @@ jobs:
           aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
           s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
           project: most
-          version: ${{ github.sha }}
+          version: dedc33b2b265a0ef2f6dd3369d0995af4e1dce12
           contract: azero_advisory
           dst-artifact: downloaded-artifact-azero-advisory
 
