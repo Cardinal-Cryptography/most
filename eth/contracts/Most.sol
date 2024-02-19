@@ -51,7 +51,7 @@ contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
         address[] calldata _committee,
         uint256 _signatureThreshold,
         address owner,
-        address payable _wEthAddress
+        address payable _wethAddress
     ) public initializer {
         require(
             _signatureThreshold > 0,
@@ -72,7 +72,7 @@ contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
 
         committeeSize[committeeId] = _committee.length;
         signatureThreshold[committeeId] = _signatureThreshold;
-        wethAddress = _wEthAddress;
+        wethAddress = _wethAddress;
         // inititialize the OwnableUpgradeable
         __Ownable_init(owner);
     }
@@ -128,9 +128,22 @@ contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
     ) external payable {
         uint256 amount = msg.value;
 
-        (bool success, ) = wethAddress.call{ value: amount }(abi.encodeWithSignature("deposit()"));
-        require(success, "Couldn't deposit native ETH.");
-        this.sendRequest(addressToBytes32(wethAddress), amount, destReceiverAddress);
+        // check if the token is supported
+        bytes32 destTokenAddress = supportedPairs[addressToBytes32(wethAddress)];
+        require(destTokenAddress != 0x0, "Unsupported pair");
+
+        (bool success, ) = wethAddress.call{value: amount}(abi.encodeWithSignature("deposit()"));
+        require(success, "Failed deposit native ETH.");
+
+        emit CrosschainTransferRequest(
+            committeeId,
+            destTokenAddress,
+            amount,
+            destReceiverAddress,
+            requestNonce
+        );
+
+        requestNonce++;
     }
 
     // aggregates relayer signatures and returns the locked tokens
