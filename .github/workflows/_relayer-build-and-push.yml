@@ -136,7 +136,7 @@ jobs:
           cp -rf '${{ env.TMP_ARTIFACT_AZERO_ADVISORY_DIR }}'/* azero/artifacts/
 
           mkdir -p azero/artifacts/contracts/Most.sol
-          find '${{ env.TMP_ARTIFACT_AZERO_MOST_DIR }}'
+          cp -rf '${{ env.TMP_ARTIFACT_AZERO_MOST_DIR }}'/most.json azero/artifacts/contracts/Most.sol/Most.json
 
           docker_tag=${{ steps.get-ref-properties.outputs.sha }}-${{ inputs.environment }}-${{ inputs.frontend-environment }}
           docker_name=most-relayer-${docker_tag}
