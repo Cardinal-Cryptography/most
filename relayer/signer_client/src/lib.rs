@@ -15,7 +15,7 @@ pub enum Error {
     #[error("Serde error: {0}")]
     Serde(#[from] serde_json::Error),
     #[error("Invalid response from server")]
-    InvalidResponse,
+    InvalidResponse { expected: String, got: Response },
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -88,10 +88,13 @@ impl Client {
 
     pub fn azero_account_id(&self) -> Result<AccountId32, Error> {
         self.send(&Command::AccountIdAzero)?;
-        if let Response::AccountIdAzero { account_id } = self.recv()? {
-            Ok(account_id)
-        } else {
-            Err(Error::InvalidResponse)
+
+        match self.recv()? {
+            Response::AccountIdAzero { account_id } => Ok(account_id),
+            other => Err(Error::InvalidResponse {
+                expected: "AccountIdAzero".to_string(),
+                got: other,
+            }),
         }
     }
 
@@ -99,56 +102,58 @@ impl Client {
         self.send(&Command::SignAzero {
             payload: payload.to_vec(),
         })?;
-        let signed = self.recv::<Response>()?;
 
-        match signed {
+        match self.recv()? {
             Response::SignedAzero {
                 payload: return_payload,
                 signature,
             } if return_payload == payload => Ok(signature),
-            _ => Err(Error::InvalidResponse),
+            other => Err(Error::InvalidResponse {
+                expected: format!("SignedAzero(payload: {:?})", payload),
+                got: other,
+            }),
         }
     }
 
     pub fn eth_address(&self) -> Result<EthAddress, Error> {
         self.send(&Command::EthAddress)?;
 
-        if let Response::EthAddress { address } = self.recv()? {
-            Ok(address)
-        } else {
-            Err(Error::InvalidResponse)
+        match self.recv()? {
+            Response::EthAddress { address } => Ok(address),
+            other => Err(Error::InvalidResponse {
+                expected: "EthAddress".to_string(),
+                got: other,
+            }),
         }
     }
 
     pub fn sign_eth_hash(&self, hash: EthH256) -> Result<EthSignature, Error> {
         self.send(&Command::SignEthHash { hash })?;
 
-        if let Response::SignedEthHash {
-            hash: return_hash,
-            signature,
-        } = self.recv()?
-        {
-            if return_hash == hash {
-                return Ok(signature);
-            }
+        match self.recv()? {
+            Response::SignedEthHash {
+                hash: return_hash,
+                signature,
+            } if return_hash == hash => Ok(signature),
+            other => Err(Error::InvalidResponse {
+                expected: format!("SignedEthHash(hash: {:?})", hash),
+                got: other,
+            }),
         }
-
-        Err(Error::InvalidResponse)
     }
 
     pub fn sign_eth_tx(&self, tx: &EthTypedTransaction) -> Result<EthSignature, Error> {
         self.send(&Command::SignEthTx { tx: tx.clone() })?;
 
-        if let Response::SignedEthTx {
-            tx: return_tx,
-            signature,
-        } = self.recv()?
-        {
-            if return_tx == *tx {
-                return Ok(signature);
-            }
+        match self.recv()? {
+            Response::SignedEthTx {
+                tx: return_tx,
+                signature,
+            } if return_tx == *tx => Ok(signature),
+            other => Err(Error::InvalidResponse {
+                expected: format!("SignedEthTx(tx: {:?})", tx),
+                got: other,
+            }),
         }
-
-        Err(Error::InvalidResponse)
     }
 }
