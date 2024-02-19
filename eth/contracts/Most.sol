@@ -2,7 +2,6 @@
 
 pragma solidity ^0.8.20;
 
-import "./WETH9.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -129,11 +128,8 @@ contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
     ) external payable {
         uint256 amount = msg.value;
 
-        WETH9 weth = WETH9(wethAddress);
-
-        // send ETH back if reverts??
-        weth.deposit{ value: amount }();
-
+        (bool success, ) = wethAddress.call{ value: amount }(abi.encodeWithSignature("deposit()"));
+        require(success, "Couldn't deposit native ETH.");
         this.sendRequest(addressToBytes32(wethAddress), amount, destReceiverAddress);
     }
 
@@ -182,10 +178,10 @@ contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
 
             // return the locked tokens
             if (bytes32ToAddress(destTokenAddress) == wethAddress ) {
-                WETH9 weth = WETH9(wethAddress);
-                weth.withdraw(amount);
-                (bool success, ) = payable(bytes32ToAddress(destReceiverAddress)).call{value: amount}("");
-                require(success, "Failed to send the native ETH back to the user");
+                (bool unwrapSuccess, ) = (wethAddress).call(abi.encodeWithSignature("withdraw(uint256)", amount));
+                require(unwrapSuccess, "Failed to uwrap wrapped ETH to native ETH.");
+                (bool sendNativeEthSuccess, ) = bytes32ToAddress(destReceiverAddress).call{value: amount}("");
+                require(sendNativeEthSuccess, "Failed to send the native ETH back to the user.");
             } else {
                 IERC20 token = IERC20(bytes32ToAddress(destTokenAddress));
 
