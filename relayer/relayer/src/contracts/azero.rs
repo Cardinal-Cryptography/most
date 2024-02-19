@@ -12,7 +12,7 @@ use aleph_client::{
     contract_transcode::{ContractMessageTranscoder, Value, Value::Seq},
     pallets::contract::ContractsUserApi,
     sp_weights::weight_v2::Weight,
-    AccountId, AlephConfig, Connection, TxInfo, TxStatus,
+    AccountId, AlephConfig, Connection, TxInfo, TxStatus, SignedConnectionApi, AsConnection,
 };
 use log::trace;
 use subxt::events::Events;
@@ -35,6 +35,9 @@ pub enum AzeroContractError {
 
     #[error("Missing or invalid field")]
     MissingOrInvalidField(String),
+
+    #[error("Dry run failed")]
+    DryRunFailed(String),
 }
 
 pub struct AdvisoryInstance {
@@ -63,24 +66,6 @@ impl AdvisoryInstance {
         {
             Ok(is_emergency) => Ok((is_emergency, self.address.clone())),
             Err(why) => Err(AzeroContractError::AlephClient(why)),
-        }
-    }
-}
-
-impl TryFrom<ConvertibleValue> for Result<bool, anyhow::Error> {
-    type Error = anyhow::Error;
-
-    fn try_from(value: ConvertibleValue) -> anyhow::Result<Result<bool, anyhow::Error>> {
-        match value.0 {
-            Value::Tuple(Tuple {
-                ident: "Ok",
-                values,
-            }) => Ok(values[0].try_into()),
-            Value::Tuple(Tuple {
-                ident: "Err",
-                values,
-            }) => Err(anyhow::anyhow!(values[0].to_string())),
-            _ => anyhow::bail!("Expected {:?} to be {}", value, "bool or error"),
         }
     }
 }
@@ -148,14 +133,30 @@ impl MostInstance {
             .map_err(AzeroContractError::AlephClient)
     }
 
-    pub async fn is_halted(&self, connection: &Connection) -> Result<bool, AzeroContractError> {
-        match self
-            .contract
-            .contract_read0::<Result<bool, anyhow::Error>, _>(connection, "is_halted")
-            .await
-        {
-            Ok(is_halted) => Ok(is_halted),
-            Err(why) => Err(AzeroContractError::AlephClient(why)),
+    pub async fn is_halted(&self, connection: &AzeroConnectionWithSigner) -> Result<bool, AzeroContractError> {
+        let data = self.encode("is_halted", [])?;
+        let args = ContractCallArgs {
+            origin: connection.account_id(),
+            dest: self.address.clone(),
+            0,
+            gas_limit: None,
+            input_data: data,
+            storage_deposit_limit: None,
+        };
+
+        let contract_read_result = connection
+            .as_connection()
+            .call_and_get(args)
+            .await?;
+
+        if let Ok(res) = &contract_read_result.result { 
+            match self.decode(message, res.data.clone())? {
+                Tuple(Tuple{ident: Some("Ok"), value: value_vec}) => Ok(value_vec[0] as bool),
+                Tuple(Tuple{ident: Some("Err"), value: value_vec}) => Err(AzeroContractError::DryRunFailed(String::from_utf8(value_vec)?)),
+                _ => Err(AzeroContractError::DryRunFailed("Invalid response".to_string())),
+            }
+        } else {
+            contract_read_result.result
         }
     }
 
