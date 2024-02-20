@@ -33,7 +33,10 @@ contract Governance is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
         _;
     }
 
-    function initialize(address[] calldata _members, uint256 _quorum) public initializer {
+    function initialize(
+        address[] calldata _members,
+        uint256 _quorum
+    ) public initializer {
         require(_members.length >= _quorum, "Not enough members specified");
 
         quorum = _quorum;

@@ -30,9 +30,9 @@ pub async fn eth_to_azero() -> anyhow::Result<()> {
     let eth_signed_connection = eth::signed_connection(&config.eth_node_http, wallet).await?;
 
     let eth_contract_addresses = eth::contract_addresses(&config.eth_contract_addresses_path)?;
-    let weth_eth_address = eth_contract_addresses.weth9.parse::<Address>()?;
+    let weth_eth_address = eth_contract_addresses.weth.parse::<Address>()?;
 
-    let weth_abi = eth::contract_abi(&config.contract_metadata_paths.eth_weth9)?;
+    let weth_abi = eth::contract_abi(&config.contract_metadata_paths.eth_weth)?;
     let weth = eth::contract_from_deployed(weth_eth_address, weth_abi, &eth_signed_connection)?;
 
     let transfer_amount = utils::parse_ether(config.test_args.transfer_amount)?;

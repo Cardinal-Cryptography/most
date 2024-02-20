@@ -10,6 +10,7 @@ import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
     uint256 public requestNonce;
     uint256 public committeeId;
+    address payable public wethAddress;
 
     struct Request {
         uint256 signatureCount;
@@ -23,7 +24,7 @@ contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
     mapping(bytes32 => bool) private committee;
     mapping(uint256 => uint256) public committeeSize;
     mapping(uint256 => uint256) public signatureThreshold;
-    
+
     event CrosschainTransferRequest(
         uint256 indexed committeeId,
         bytes32 indexed destTokenAddress,
@@ -42,14 +43,18 @@ contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
     event RequestAlreadySigned(bytes32 requestHash, address signer);
 
     modifier _onlyCommitteeMember(uint256 _committeeId) {
-        require(isInCommittee(_committeeId, msg.sender), "Not a member of the guardian committee");
+        require(
+            isInCommittee(_committeeId, msg.sender),
+            "Not a member of the guardian committee"
+        );
         _;
     }
 
     function initialize(
         address[] calldata _committee,
         uint256 _signatureThreshold,
-        address owner
+        address owner,
+        address payable _wethAddress
     ) public initializer {
         require(
             _signatureThreshold > 0,
@@ -70,7 +75,7 @@ contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
 
         committeeSize[committeeId] = _committee.length;
         signatureThreshold[committeeId] = _signatureThreshold;
-
+        wethAddress = _wethAddress;
         // inititialize the OwnableUpgradeable
         __Ownable_init(owner);
     }
@@ -103,6 +108,37 @@ contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
         // lock tokens in this contract
         // message sender needs to give approval else this tx will revert
         token.transferFrom(sender, address(this), amount);
+
+        emit CrosschainTransferRequest(
+            committeeId,
+            destTokenAddress,
+            amount,
+            destReceiverAddress,
+            requestNonce
+        );
+
+        requestNonce++;
+    }
+
+    // Invoke this tx to transfer funds to the destination chain.
+    // Account needs to send native ETH which are wrapped to wETH
+    // tokens.
+    //
+    // Tx emits a CrosschainTransferRequest event that the relayers listen to
+    // & forward to the destination chain.
+    function sendRequestNative(bytes32 destReceiverAddress) external payable {
+        uint256 amount = msg.value;
+
+        // check if the token is supported
+        bytes32 destTokenAddress = supportedPairs[
+            addressToBytes32(wethAddress)
+        ];
+        require(destTokenAddress != 0x0, "Unsupported pair");
+
+        (bool success, ) = wethAddress.call{value: amount}(
+            abi.encodeWithSignature("deposit()")
+        );
+        require(success, "Failed deposit native ETH.");
 
         emit CrosschainTransferRequest(
             committeeId,
@@ -159,12 +195,26 @@ contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
             delete pendingRequests[requestHash];
 
             // return the locked tokens
-            IERC20 token = IERC20(bytes32ToAddress(destTokenAddress));
+            if (bytes32ToAddress(destTokenAddress) == wethAddress) {
+                (bool unwrapSuccess, ) = wethAddress.call(
+                    abi.encodeWithSignature("withdraw(uint256)", amount)
+                );
+                require(
+                    unwrapSuccess,
+                    "Failed to uwrap wrapped ETH to native ETH."
+                );
+                (bool sendNativeEthSuccess, ) = bytes32ToAddress(
+                    destReceiverAddress
+                ).call{value: amount}("");
+                require(
+                    sendNativeEthSuccess,
+                    "Failed to send the native ETH back to the user."
+                );
+            } else {
+                IERC20 token = IERC20(bytes32ToAddress(destTokenAddress));
 
-            token.transfer(
-                bytes32ToAddress(destReceiverAddress),
-                amount
-            );
+                token.transfer(bytes32ToAddress(destReceiverAddress), amount);
+            }
             emit RequestProcessed(requestHash);
         }
     }
@@ -223,4 +273,6 @@ contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
     function removePair(bytes32 from) external onlyOwner {
         delete supportedPairs[from];
     }
+
+    receive() external payable {}
 }

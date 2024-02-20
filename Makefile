@@ -3,6 +3,7 @@ AZERO_ENV ?= dev
 DOCKER_RELAYER_NAME ?= most-relayer
 DOCKER_RELAYER_COPY_ADDRESSES ?= copy
 DOCKER_RELAYER_COMPILE_CONTRACTS ?= compile
+DOCKER_SIGNER_NAME ?= most-signer
 
 export BRIDGENET_AZERO_START_BLOCK=`ENDPOINT=https://rpc-fe-bridgenet.dev.azero.dev ./relayer/scripts/azero_best_finalized.sh`
 export BRIDGENET_ETH_START_BLOCK=`ENDPOINT=https://rpc-eth-bridgenet.dev.azero.dev ./relayer/scripts/eth_best_finalized.sh`
@@ -228,7 +229,7 @@ check-js-format:
 .PHONY: solidity-lint
 solidity-lint: # Lint solidity contracts
 solidity-lint: eth-deps
-	cd eth && npx solium -d contracts
+	cd eth && npx prettier --check --plugin=prettier-plugin-solidity 'contracts/**/*.sol'
 
 .PHONY: relayer-lint
 relayer-lint: # Lint relayer
@@ -250,6 +251,11 @@ ink-lint:
 .PHONY: contracts-lint
 contracts-lint: # Lint contracts
 contracts-lint: solidity-lint ink-lint
+
+.PHONY: solidity-format
+solidity-format: # Format solidity contracts
+solidity-format: eth-deps
+	cd eth && npx prettier --write --plugin=prettier-plugin-solidity 'contracts/**/*.sol'
 
 .PHONY: rust-format-check
 rust-format-check: # Check rust code formatting
@@ -301,7 +307,7 @@ format-check: rust-format-check js-format-check
 
 .PHONY: format
 format: # Format code
-format: rust-format js-format
+format: rust-format js-format solidity-format
 
 .PHONY: build-docker-relayer
 build-docker-relayer: # Build relayer docker image
@@ -321,3 +327,10 @@ endif
 contract_spec.json: # Generate a a file describing deployed contracts based on addresses.json files
 contract_spec.json: azero/addresses.json eth/addresses.json
 	VERSION=${CONTRACT_VERSION} node scripts/contract_spec.js > contract_spec.json
+
+.PHONY: build-docker-signer
+build-docker-signer: # Build signer docker image
+build-docker-signer:
+	cd relayer && cargo build -p signer --release --target x86_64-unknown-linux-musl
+	cp relayer/target/x86_64-unknown-linux-musl/release/signer relayer/signer_docker
+	cd relayer/signer_docker && docker build -t $(DOCKER_SIGNER_NAME) .
