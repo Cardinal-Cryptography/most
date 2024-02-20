@@ -28,7 +28,7 @@ static GLOBAL_CONFIG: Lazy<Config> = Lazy::new(|| Config {
             .unwrap_or("../eth/artifacts/contracts/Migrations.sol/Migrations.json".to_string()),
         eth_most: get_env("ETH_MOST")
             .unwrap_or("../eth/artifacts/contracts/Most.sol/Most.json".to_string()),
-        eth_weth9: get_env("ETH_WETH9")
+        eth_weth: get_env("ETH_WETH9")
             .unwrap_or("../eth/artifacts/contracts/WETH9.sol/WETH9.json".to_string()),
     },
     eth_mnemonic: get_env("ETH_MNEMONIC").unwrap_or(
@@ -78,7 +78,7 @@ pub struct ContractMetadataPaths {
     pub eth_governance: String,
     pub eth_migrations: String,
     pub eth_most: String,
-    pub eth_weth9: String,
+    pub eth_weth: String,
 }
 
 pub struct TestArgs {

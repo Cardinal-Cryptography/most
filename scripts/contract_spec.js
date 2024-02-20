@@ -48,9 +48,9 @@ let result = {
             address: eth.most
         },
 
-        eth_weth9: {
-            contract: "eth_weth9",
-            address: eth.weth9
+        eth_weth: {
+            contract: "eth_weth",
+            address: eth.weth
         },
 
         eth_usdt: {

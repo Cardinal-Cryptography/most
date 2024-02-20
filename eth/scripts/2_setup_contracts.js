@@ -62,7 +62,7 @@ async function main() {
 
   // Add a pair
   const wethAddressBytes = ethers.zeroPadValue(
-    ethers.getBytes(contracts.weth9),
+    ethers.getBytes(contracts.weth),
     32,
   );
   const wethAddressBytesAzero = u8aToHex(
@@ -71,7 +71,7 @@ async function main() {
 
   console.log(
     "Adding wETH token pair to Most:",
-    contracts.weth9,
+    contracts.weth,
     "=>",
     azeroContracts.weth,
   );
