@@ -72,6 +72,9 @@ pub enum AzeroListenerError {
     #[error("Missing data from event")]
     MissingEventData(String),
 
+    #[error("Bridge was halted, restart required")]
+    BridgeHaltedRestartRequired,
+
     #[error("Redis connection error")]
     Redis(#[from] RedisError),
 
@@ -105,6 +108,7 @@ impl AlephZeroListener {
             azero_contract_metadata,
             azero_contract_address,
             azero_max_event_handler_tasks,
+            eth_contract_address,
             default_sync_from_block_azero,
             name,
             sync_step,
@@ -192,19 +196,26 @@ impl AlephZeroListener {
                             Ok(_) => {}
                             Err(e) => {
                                 error!("Error in event handler task: {}", e);
-                                return Err(e).into();
-                                /*let address = eth_contract_address.parse::<Address>()?;
+                                let address = eth_contract_address.parse::<Address>()?;
                                 let most_eth = Most::new(address, eth_connection.clone());
 
-                                if most_eth.method("is_halted", [])?.call().await? {
-                                    error!("MostInstance is halted, pausing event handling");
+                                if most_eth.paused().call().await? {
+                                    error!("Most contract on Ethereum is halted, pausing event handling");
+                                    // Wait for current tasks to finish
+                                    while let Some(result) = block_sealing_tasks.join_next().await {
+                                        result?;
+                                    }
+
                                     loop {
-                                        if !most_eth.is_halted().await? {
+                                        if !most_eth.paused().await? {
                                             break;
                                         }
                                         sleep(Duration::from_secs(10)).await;
                                     }
-                                }*/
+                                    return Err(AzeroListenerError::BridgeHaltedRestartRequired);
+                                } else {
+                                    return Err(e).into();
+                                }
                             }
                         }
                     }
