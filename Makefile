@@ -2,6 +2,7 @@ NETWORK ?= development
 AZERO_ENV ?= dev
 DOCKER_RELAYER_NAME ?= most-relayer
 DOCKER_RELAYER_COPY_ADDRESSES ?= copy
+DOCKER_SIGNER_NAME ?= most-signer
 
 export BRIDGENET_AZERO_START_BLOCK=`ENDPOINT=https://rpc-fe-bridgenet.dev.azero.dev ./relayer/scripts/azero_best_finalized.sh`
 export BRIDGENET_ETH_START_BLOCK=`ENDPOINT=https://rpc-eth-bridgenet.dev.azero.dev ./relayer/scripts/eth_best_finalized.sh`
@@ -323,3 +324,10 @@ endif
 contract_spec.json: # Generate a a file describing deployed contracts based on addresses.json files
 contract_spec.json: azero/addresses.json eth/addresses.json
 	VERSION=${CONTRACT_VERSION} node scripts/contract_spec.js > contract_spec.json
+
+.PHONY: build-docker-signer
+build-docker-signer: # Build signer docker image
+build-docker-signer:
+	cd relayer && cargo build -p signer --release --target x86_64-unknown-linux-musl
+	cp relayer/target/x86_64-unknown-linux-musl/release/signer relayer/signer_docker
+	cd relayer/signer_docker && docker build -t $(DOCKER_SIGNER_NAME) .
