@@ -4,7 +4,7 @@ use ethers::{
     abi::EncodePackedError,
     core::types::Address,
     prelude::ContractError,
-    providers::{Middleware, ProviderError},
+    providers::{Http, Middleware, Provider, ProviderError},
     types::BlockNumber,
     utils::keccak256,
 };
@@ -20,7 +20,7 @@ use crate::{
     config::Config,
     connections::{
         azero::AzeroConnectionWithSigner,
-        eth::SignedEthConnection,
+        eth::EthConnection,
         redis_helpers::{read_first_unprocessed_block_number, write_last_processed_block},
     },
     contracts::{
@@ -40,7 +40,7 @@ pub enum EthListenerError {
     FromHex(#[from] rustc_hex::FromHexError),
 
     #[error("contract error")]
-    Contract(#[from] ContractError<SignedEthConnection>),
+    Contract(#[from] ContractError<Provider<Http>>),
 
     #[error("azero contract error")]
     AzeroContract(#[from] AzeroContractError),
@@ -61,7 +61,7 @@ impl EthListener {
     pub async fn run(
         config: Arc<Config>,
         azero_connection: AzeroConnectionWithSigner,
-        eth_connection: Arc<SignedEthConnection>,
+        eth_connection: Arc<EthConnection>,
         redis_connection: Arc<Mutex<RedisConnection>>,
         emergency: Arc<AtomicBool>,
     ) -> Result<(), EthListenerError> {
@@ -244,7 +244,7 @@ async fn handle_event(
 }
 
 pub async fn get_next_finalized_block_number_eth(
-    eth_connection: Arc<SignedEthConnection>,
+    eth_connection: Arc<EthConnection>,
     not_older_than: u32,
 ) -> u32 {
     loop {

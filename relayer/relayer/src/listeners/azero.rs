@@ -471,8 +471,8 @@ pub async fn wait_for_eth_tx_finality(
     loop {
         sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
 
-        let finalized_head_number =
-            get_next_finalized_block_number_eth(eth_connection.clone(), 0).await;
+        let connection_rc = Arc::new(eth_connection.provider().clone());
+        let finalized_head_number = get_next_finalized_block_number_eth(connection_rc, 0).await;
 
         match eth_connection.get_transaction(tx_hash).await {
             Ok(Some(tx)) => {

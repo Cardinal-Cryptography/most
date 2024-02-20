@@ -1,0 +1,19 @@
+{
+  "extends": "solhint:recommended",
+  "plugins": ["prettier"],
+  "rules": {
+    "prettier/prettier": "error",
+    "quotes": ["error", "double"],
+    "no-global-import": "",
+    "custom-errors": "",
+    "no-empty-blocks": "",
+    "reason-string": "",
+    "func-visibility": [
+      "warn",
+      {
+        "ignoreConstructors": true
+      }
+    ],
+    "avoid-low-level-calls": ""
+  }
+}

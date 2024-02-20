@@ -55,8 +55,8 @@ async function main(): Promise<void> {
     authority,
   } = config;
 
-  const { weth9 } = await import_eth_addresses();
-  const wethEthAddress = ethers.zeroPadValue(ethers.getBytes(weth9), 32);
+  const { weth } = await import_eth_addresses();
+  const wethEthAddress = ethers.zeroPadValue(ethers.getBytes(weth), 32);
   console.log("weth eth address:", wethEthAddress);
 
   const wsProvider = new WsProvider(ws_node);
