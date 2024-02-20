@@ -4,4 +4,5 @@ resolver = "2"
 
 [workspace.dependencies]
 aleph_client = { git = "https://github.com/Cardinal-Cryptography/aleph-node", rev = "f637e2df9ecce892c6da5b2d8072b7e5cc8099d4" }
+ethers = { version = "2.0.9" }
 subxt = { version = "0.30.1", features = ["substrate-compat"] }

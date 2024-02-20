@@ -3,6 +3,14 @@ use serde_json::Deserializer;
 use subxt::ext::{sp_core::crypto::AccountId32, sp_runtime::MultiSignature};
 use vsock::VsockStream;
 
+type EthAddress = ethers::types::Address;
+type EthSignature = ethers::types::Signature;
+type EthH256 = ethers::types::H256;
+type EthTypedTransaction = ethers::types::transaction::eip2718::TypedTransaction;
+type EthChainId = ethers::types::U64;
+
+const ETH_MAINNET_CHAIN_ID: EthChainId = EthChainId::one();
+
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("IO error: {0}")]
@@ -10,28 +18,51 @@ pub enum Error {
     #[error("Serde error: {0}")]
     Serde(#[from] serde_json::Error),
     #[error("Invalid response from server")]
-    InvalidResponse,
+    InvalidResponse { expected: String, got: Response },
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum Command {
     Ping,
-    AccountId,
-    Sign { payload: Vec<u8> },
+    AccountIdAzero,
+    SignAzero {
+        payload: Vec<u8>,
+    },
+    EthAddress,
+    SignEthHash {
+        hash: EthH256,
+    },
+    SignEthTx {
+        tx: ethers::types::transaction::eip2718::TypedTransaction,
+        chain_id: EthChainId,
+    },
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum Response {
     Pong,
-    AccountId {
+    AccountIdAzero {
         account_id: AccountId32,
     },
-    Signed {
+    SignedAzero {
         payload: Vec<u8>,
         signature: MultiSignature,
     },
+    EthAddress {
+        address: EthAddress,
+    },
+    SignedEthHash {
+        hash: EthH256,
+        signature: EthSignature,
+    },
+    SignedEthTx {
+        tx: EthTypedTransaction,
+        signature: EthSignature,
+        chain_id: EthChainId,
+    },
 }
 
+#[derive(Debug)]
 pub struct Client {
     connection: VsockStream,
 }
@@ -60,27 +91,91 @@ impl Client {
         Ok(res)
     }
 
-    pub fn account_id(&self) -> Result<AccountId32, Error> {
-        self.send(&Command::AccountId)?;
-        if let Response::AccountId { account_id } = self.recv()? {
-            Ok(account_id)
-        } else {
-            Err(Error::InvalidResponse)
+    pub fn azero_account_id(&self) -> Result<AccountId32, Error> {
+        self.send(&Command::AccountIdAzero)?;
+
+        match self.recv()? {
+            Response::AccountIdAzero { account_id } => Ok(account_id),
+            other => Err(Error::InvalidResponse {
+                expected: "AccountIdAzero".to_string(),
+                got: other,
+            }),
         }
     }
 
-    pub fn sign(&self, payload: &[u8]) -> Result<MultiSignature, Error> {
-        self.send(&Command::Sign {
+    pub fn sign_azero(&self, payload: &[u8]) -> Result<MultiSignature, Error> {
+        self.send(&Command::SignAzero {
             payload: payload.to_vec(),
         })?;
-        let signed = self.recv::<Response>()?;
 
-        match signed {
-            Response::Signed {
+        match self.recv()? {
+            Response::SignedAzero {
                 payload: return_payload,
                 signature,
             } if return_payload == payload => Ok(signature),
-            _ => Err(Error::InvalidResponse),
+            other => Err(Error::InvalidResponse {
+                expected: format!("SignedAzero(payload: {:?})", payload),
+                got: other,
+            }),
         }
+    }
+
+    pub fn eth_address(&self) -> Result<EthAddress, Error> {
+        self.send(&Command::EthAddress)?;
+
+        match self.recv()? {
+            Response::EthAddress { address } => Ok(address),
+            other => Err(Error::InvalidResponse {
+                expected: "EthAddress".to_string(),
+                got: other,
+            }),
+        }
+    }
+
+    pub fn sign_eth_hash(&self, hash: EthH256) -> Result<EthSignature, Error> {
+        self.send(&Command::SignEthHash { hash })?;
+
+        match self.recv()? {
+            Response::SignedEthHash {
+                hash: return_hash,
+                signature,
+            } if return_hash == hash => Ok(signature),
+            other => Err(Error::InvalidResponse {
+                expected: format!("SignedEthHash(hash: {:?})", hash),
+                got: other,
+            }),
+        }
+    }
+
+    pub fn sign_eth_tx(&self, tx: &EthTypedTransaction) -> Result<EthSignature, Error> {
+        let chain_id = tx.chain_id().unwrap_or(ETH_MAINNET_CHAIN_ID);
+        self.send(&Command::SignEthTx {
+            tx: tx.clone(),
+            chain_id,
+        })?;
+        let res = self.recv::<Response>()?;
+
+        if let Response::SignedEthTx {
+            tx: mut return_tx,
+            signature,
+            chain_id: return_chain_id,
+        } = res.clone()
+        {
+            // The Serialize and Deserialize implementations for TypedTransacion do not
+            // serialize and deserialize the chain_id field, so we need to supply it
+            // manually to the comparison here.
+            if tx.chain_id().is_some() {
+                return_tx.set_chain_id(return_chain_id);
+            }
+
+            if return_tx == *tx {
+                return Ok(signature);
+            }
+        }
+
+        Err(Error::InvalidResponse {
+            expected: format!("SignedEthTx(tx: {:?})", tx),
+            got: res,
+        })
     }
 }
