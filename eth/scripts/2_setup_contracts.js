@@ -87,11 +87,11 @@ async function main() {
     signers[0],
   );
 
-  /*await transferOwnershipToGovernance(
+  await transferOwnershipToGovernance(
     governanceInstance,
     governanceInstance,
     signers.slice(1, 4),
-  );*/
+  );
 
   // transfer most ownership
   let mostInstance = await new ethers.Contract(
@@ -100,11 +100,11 @@ async function main() {
     signers[0],
   );
 
-  /*await transferOwnershipToGovernance(
+  await transferOwnershipToGovernance(
     mostInstance,
     governanceInstance,
     signers.slice(1, 4),
-  );*/
+  );
 
   const Migrations = artifacts.require("Migrations");
   const migrations = await Migrations.at(contracts.migrations);
