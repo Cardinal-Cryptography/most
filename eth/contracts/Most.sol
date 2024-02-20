@@ -8,7 +8,12 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
-contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable, PausableUpgradeable {
+contract Most is
+    Initializable,
+    UUPSUpgradeable,
+    Ownable2StepUpgradeable,
+    PausableUpgradeable
+{
     uint256 public requestNonce;
     uint256 public committeeId;
     address payable public wethAddress;
