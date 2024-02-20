@@ -43,7 +43,10 @@ contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
     event RequestAlreadySigned(bytes32 requestHash, address signer);
 
     modifier _onlyCommitteeMember(uint256 _committeeId) {
-        require(isInCommittee(_committeeId, msg.sender), "Not a member of the guardian committee");
+        require(
+            isInCommittee(_committeeId, msg.sender),
+            "Not a member of the guardian committee"
+        );
         _;
     }
 
@@ -123,16 +126,18 @@ contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
     //
     // Tx emits a CrosschainTransferRequest event that the relayers listen to
     // & forward to the destination chain.
-    function sendRequestNative(
-        bytes32 destReceiverAddress
-    ) external payable {
+    function sendRequestNative(bytes32 destReceiverAddress) external payable {
         uint256 amount = msg.value;
 
         // check if the token is supported
-        bytes32 destTokenAddress = supportedPairs[addressToBytes32(wethAddress)];
+        bytes32 destTokenAddress = supportedPairs[
+            addressToBytes32(wethAddress)
+        ];
         require(destTokenAddress != 0x0, "Unsupported pair");
 
-        (bool success, ) = wethAddress.call{value: amount}(abi.encodeWithSignature("deposit()"));
+        (bool success, ) = wethAddress.call{value: amount}(
+            abi.encodeWithSignature("deposit()")
+        );
         require(success, "Failed deposit native ETH.");
 
         emit CrosschainTransferRequest(
@@ -190,18 +195,25 @@ contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
             delete pendingRequests[requestHash];
 
             // return the locked tokens
-            if (bytes32ToAddress(destTokenAddress) == wethAddress ) {
-                (bool unwrapSuccess, ) = (wethAddress).call(abi.encodeWithSignature("withdraw(uint256)", amount));
-                require(unwrapSuccess, "Failed to uwrap wrapped ETH to native ETH.");
-                (bool sendNativeEthSuccess, ) = bytes32ToAddress(destReceiverAddress).call{value: amount}("");
-                require(sendNativeEthSuccess, "Failed to send the native ETH back to the user.");
+            if (bytes32ToAddress(destTokenAddress) == wethAddress) {
+                (bool unwrapSuccess, ) = wethAddress.call(
+                    abi.encodeWithSignature("withdraw(uint256)", amount)
+                );
+                require(
+                    unwrapSuccess,
+                    "Failed to uwrap wrapped ETH to native ETH."
+                );
+                (bool sendNativeEthSuccess, ) = bytes32ToAddress(
+                    destReceiverAddress
+                ).call{value: amount}("");
+                require(
+                    sendNativeEthSuccess,
+                    "Failed to send the native ETH back to the user."
+                );
             } else {
                 IERC20 token = IERC20(bytes32ToAddress(destTokenAddress));
 
-                token.transfer(
-                    bytes32ToAddress(destReceiverAddress),
-                    amount
-                );
+                token.transfer(bytes32ToAddress(destReceiverAddress), amount);
             }
             emit RequestProcessed(requestHash);
         }
