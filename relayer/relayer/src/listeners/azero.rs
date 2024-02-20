@@ -106,7 +106,6 @@ impl AlephZeroListener {
             azero_contract_address,
             azero_max_event_handler_tasks,
             default_sync_from_block_azero,
-            eth_contract_address,
             name,
             sync_step,
             override_azero_cache,

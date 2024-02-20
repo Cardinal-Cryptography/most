@@ -1,6 +1,5 @@
 use std::sync::{atomic::AtomicBool, Arc};
 
-use aleph_client::AsConnection;
 use ethers::{
     abi::EncodePackedError,
     core::types::Address,
@@ -68,6 +67,10 @@ impl EthListener {
     ) -> Result<(), EthListenerError> {
         let Config {
             eth_contract_address,
+            azero_contract_address,
+            azero_contract_metadata,
+            azero_proof_size_limit,
+            azero_ref_time_limit,
             name,
             default_sync_from_block_eth,
             sync_step,
@@ -76,7 +79,13 @@ impl EthListener {
         } = &*config;
 
         let address = eth_contract_address.parse::<Address>()?;
-        let contract = Most::new(address, Arc::clone(&eth_connection));
+        let most_eth = Most::new(address, Arc::clone(&eth_connection));
+        let most_azero = MostInstance::new(
+            azero_contract_address,
+            azero_contract_metadata,
+            *azero_ref_time_limit,
+            *azero_proof_size_limit,
+        )?;
 
         let mut first_unprocessed_block_number = if *override_eth_cache {
             **default_sync_from_block_eth
@@ -102,43 +111,61 @@ impl EthListener {
             match emergency.load(std::sync::atomic::Ordering::Relaxed) {
                 true => trace!("Event handling paused due to an emergency state in one of the Advisory contracts"),
                 false => {
+                    // Don't query for more than `sync_step` blocks at one time.
+                    let to_block = std::cmp::min(
+                        next_finalized_block_number,
+                        first_unprocessed_block_number + sync_step - 1,
+                    );
 
-            // Don't query for more than `sync_step` blocks at one time.
-            let to_block = std::cmp::min(
-                next_finalized_block_number,
-                first_unprocessed_block_number + sync_step - 1,
-            );
+                    log::info!(
+                        "Processing events from blocks {} - {}",
+                        first_unprocessed_block_number,
+                        to_block
+                    );
 
-            log::info!(
-                "Processing events from blocks {} - {}",
-                first_unprocessed_block_number,
-                to_block
-            );
+                    // Query for events.
+                    let events = most_eth
+                        .events()
+                        .from_block(first_unprocessed_block_number)
+                        .to_block(to_block)
+                        .query()
+                        .await?;
 
-            // Query for events.
-            let events = contract
-                .events()
-                .from_block(first_unprocessed_block_number)
-                .to_block(to_block)
-                .query()
-                .await?;
+                    // Handle events.
+                    for event in events {
+                        loop {
+                            match handle_event(&event, &config, &azero_connection).await {
+                                Ok(_) => break,
+                                Err(EthListenerError::AzeroContract(e)) => {
+                                    error!("Error sending vote for request error: {e}");
+                                    if most_azero.is_halted(&azero_connection).await? {
+                                        error!("Most contract on Aleph Zero is halted, stopping event handling");
+                                        loop {
+                                            if !most_azero.is_halted(&azero_connection).await? {
+                                                break;
+                                            }
+                                            sleep(Duration::from_secs(10)).await;
+                                        }
+                                    } else {
+                                        return Err(EthListenerError::AzeroContract(e));
+                                    }
+                                },
+                                Err(e) => return Err(e),
+                            }
+                        }
+                    }
 
-            // Handle events.
-            for event in events {
-                handle_event(&event, &config, &azero_connection).await?
-            }
+                    // Update the last block number.
+                    first_unprocessed_block_number = to_block + 1;
 
-            // Update the last block number.
-            first_unprocessed_block_number = to_block + 1;
-
-            // Cache the last processed block number.
-            write_last_processed_block(
-                name.clone(),
-                ETH_LAST_BLOCK_KEY.to_string(),
-                redis_connection.clone(),
-                to_block,
-            )
-            .await?;
+                    // Cache the last processed block number.
+                    write_last_processed_block(
+                        name.clone(),
+                        ETH_LAST_BLOCK_KEY.to_string(),
+                        redis_connection.clone(),
+                        to_block,
+                    )
+                    .await?;
                 },
             }
         }
@@ -200,7 +227,7 @@ async fn handle_event(
         )?;
 
         // send vote
-        match contract
+        contract
             .receive_request(
                 azero_connection,
                 request_hash,
@@ -210,26 +237,7 @@ async fn handle_event(
                 *dest_receiver_address,
                 request_nonce.as_u128(),
             )
-            .await
-        {
-            Ok(_) => {
-                info!("Vote sent for request: {request_hash:?}");
-            }
-            Err(e) => {
-                error!("Error sending vote for request: {request_hash:?}, error: {e}");
-                if contract.is_halted(azero_connection.as_connection()).await? {
-                    error!("Contract is halted, stopping event handling");
-                    loop {
-                        if !contract.is_halted(azero_connection.as_connection()).await? {
-                            break;
-                        }
-                        sleep(Duration::from_secs(10)).await;
-                    }
-                } else {
-                    return Err(EthListenerError::AzeroContract(e));
-                }
-            }
-        }
+            .await?;
     }
 
     Ok(())

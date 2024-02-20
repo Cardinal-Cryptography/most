@@ -74,6 +74,8 @@ contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable, Pausab
 
         // inititialize the OwnableUpgradeable
         __Ownable_init(owner);
+        // inititialize the PausableUpgradeable
+        __Pausable_init();
     }
 
     // required by the OZ UUPS module
@@ -168,6 +170,14 @@ contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable, Pausab
             );
             emit RequestProcessed(requestHash);
         }
+    }
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
     }
 
     function hasSignedRequest(
