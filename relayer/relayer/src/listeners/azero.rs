@@ -203,7 +203,7 @@ impl AlephZeroListener {
                                     error!("Most contract on Ethereum is halted, pausing event handling");
                                     // Wait for current tasks to finish
                                     while let Some(result) = block_sealing_tasks.join_next().await {
-                                        result?;
+                                        _ = result?;
                                     }
 
                                     loop {
@@ -214,7 +214,7 @@ impl AlephZeroListener {
                                     }
                                     return Err(AzeroListenerError::BridgeHaltedRestartRequired);
                                 } else {
-                                    return Err(e).into();
+                                    return Err(e);
                                 }
                             }
                         }
