@@ -12,6 +12,15 @@ use log::info;
 
 use crate::{azero, config::setup_test, eth, wait::wait_for_balance_change};
 
+/// One-way `Aleph Zero` -> `Ethereum` transfer through `most`.
+/// Requires a prior transaction in the other direction to have completed.
+/// This is easily done by running the test for the other direction first.
+/// Approves the `most` contract to use the wETH funds.
+/// Burns the required funds in the wETH contract on Aleph Zero.
+/// Transfers `transfer_amount` of burned wETH over the bridge, unwrapping the transfer to a specified Ethereum account.
+/// Waits for the transfer to complete.
+/// Verifies that the correct amount of ETH is present on the Ethereum chain.
+/// It relies on all the relevant contracts being deployed on both ends and the (wETH_ETH:wETH_AZERO) pair having been added to `most`.
 #[tokio::test]
 pub async fn azero_to_eth() -> anyhow::Result<()> {
     let config = setup_test();
