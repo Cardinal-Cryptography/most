@@ -1,6 +1,5 @@
 use std::{fs, sync::Arc};
 
-use anyhow;
 use ethers::{
     contract::{Contract, ContractInstance},
     core::{

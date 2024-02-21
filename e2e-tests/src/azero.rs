@@ -1,7 +1,6 @@
 use std::fs;
 
 use aleph_client::{Connection, KeyPair, SignedConnection};
-use anyhow;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize)]
