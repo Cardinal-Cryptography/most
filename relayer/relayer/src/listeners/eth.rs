@@ -273,7 +273,7 @@ async fn wait_until_not_halted(
     azero_connection: &AzeroConnectionWithSigner,
 ) -> Result<(), EthListenerError> {
     loop {
-        if !most_azero.is_halted(&azero_connection).await? {
+        if !most_azero.is_halted(azero_connection).await? {
             return Ok(());
         }
         sleep(Duration::from_secs(10)).await;
