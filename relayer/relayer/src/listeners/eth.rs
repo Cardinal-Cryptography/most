@@ -1,11 +1,10 @@
-use std::sync::Arc;
+use std::sync::{atomic::AtomicBool, Arc};
 
 use ethers::{
     abi::EncodePackedError,
     core::types::Address,
-    prelude::{k256::ecdsa::SigningKey, ContractError, SignerMiddleware},
-    providers::{Middleware, ProviderError},
-    signers::Wallet,
+    prelude::ContractError,
+    providers::{Http, Middleware, Provider, ProviderError},
     types::BlockNumber,
     utils::keccak256,
 };
@@ -20,8 +19,8 @@ use tokio::{
 use crate::{
     config::Config,
     connections::{
-        azero::SignedAzeroWsConnection,
-        eth::{EthConnection, SignedEthConnection},
+        azero::AzeroConnectionWithSigner,
+        eth::EthConnection,
         redis_helpers::{read_first_unprocessed_block_number, write_last_processed_block},
     },
     contracts::{
@@ -41,7 +40,7 @@ pub enum EthListenerError {
     FromHex(#[from] rustc_hex::FromHexError),
 
     #[error("contract error")]
-    Contract(#[from] ContractError<SignerMiddleware<EthConnection, Wallet<SigningKey>>>),
+    Contract(#[from] ContractError<Provider<Http>>),
 
     #[error("azero contract error")]
     AzeroContract(#[from] AzeroContractError),
@@ -61,9 +60,10 @@ pub struct EthListener;
 impl EthListener {
     pub async fn run(
         config: Arc<Config>,
-        azero_connection: Arc<SignedAzeroWsConnection>,
-        eth_connection: Arc<SignedEthConnection>,
+        azero_connection: AzeroConnectionWithSigner,
+        eth_connection: Arc<EthConnection>,
         redis_connection: Arc<Mutex<RedisConnection>>,
+        emergency: Arc<AtomicBool>,
     ) -> Result<(), EthListenerError> {
         let Config {
             eth_contract_address,
@@ -78,13 +78,13 @@ impl EthListener {
         let contract = Most::new(address, Arc::clone(&eth_connection));
 
         let mut first_unprocessed_block_number = if *override_eth_cache {
-            *default_sync_from_block_eth
+            **default_sync_from_block_eth
         } else {
             read_first_unprocessed_block_number(
                 name.clone(),
                 ETH_LAST_BLOCK_KEY.to_string(),
                 redis_connection.clone(),
-                *default_sync_from_block_eth,
+                **default_sync_from_block_eth,
             )
             .await
         };
@@ -97,6 +97,10 @@ impl EthListener {
                 first_unprocessed_block_number,
             )
             .await;
+
+            match emergency.load(std::sync::atomic::Ordering::Relaxed) {
+                true => trace!("Event handling paused due to an emergency state in one of the Advisory contracts"),
+                false => {
 
             // Don't query for more than `sync_step` blocks at one time.
             let to_block = std::cmp::min(
@@ -120,7 +124,7 @@ impl EthListener {
 
             // Handle events.
             for event in events {
-                handle_event(&event, &config, Arc::clone(&azero_connection)).await?
+                handle_event(&event, &config, &azero_connection).await?
             }
 
             // Update the last block number.
@@ -134,6 +138,8 @@ impl EthListener {
                 to_block,
             )
             .await?;
+                },
+            }
         }
     }
 }
@@ -141,7 +147,7 @@ impl EthListener {
 async fn handle_event(
     event: &MostEvents,
     config: &Config,
-    azero_connection: Arc<SignedAzeroWsConnection>,
+    azero_connection: &AzeroConnectionWithSigner,
 ) -> Result<(), EthListenerError> {
     if let MostEvents::CrosschainTransferRequestFilter(
         crosschain_transfer_event @ CrosschainTransferRequestFilter {
@@ -195,7 +201,7 @@ async fn handle_event(
         // send vote
         contract
             .receive_request(
-                &azero_connection,
+                azero_connection,
                 request_hash,
                 committee_id.as_u128(),
                 *dest_token_address,
@@ -210,7 +216,7 @@ async fn handle_event(
 }
 
 pub async fn get_next_finalized_block_number_eth(
-    eth_connection: Arc<SignedEthConnection>,
+    eth_connection: Arc<EthConnection>,
     not_older_than: u32,
 ) -> u32 {
     loop {

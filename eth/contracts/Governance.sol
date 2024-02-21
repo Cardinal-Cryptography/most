@@ -5,9 +5,9 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 
-contract Governance is Initializable, UUPSUpgradeable, OwnableUpgradeable {
+contract Governance is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
     uint256 public quorum;
     uint256 public nextId;
 
@@ -33,7 +33,10 @@ contract Governance is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         _;
     }
 
-    function initialize(address[] calldata _members, uint256 _quorum) public initializer {
+    function initialize(
+        address[] calldata _members,
+        uint256 _quorum
+    ) public initializer {
         require(_members.length >= _quorum, "Not enough members specified");
 
         quorum = _quorum;
@@ -42,12 +45,15 @@ contract Governance is Initializable, UUPSUpgradeable, OwnableUpgradeable {
             members[_members[i]] = true;
         }
 
-        // inititialize the OwnableUpgradeable
+        // inititialize the Ownable2StepUpgradeable
         __Ownable_init(msg.sender);
     }
 
     // required by the OZ UUPS module
     function _authorizeUpgrade(address) internal override onlyOwner {}
+
+    // Disable possibility to renounce ownership
+    function renounceOwnership() public virtual override onlyOwner {}
 
     function submitProposal(
         address destination,

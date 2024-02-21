@@ -21,7 +21,7 @@ pub struct EthContractAddresses {
     pub migrations: String,
     pub most: String,
     pub usdt: String,
-    pub weth9: String,
+    pub weth: String,
 }
 
 pub async fn connection(node_http: &str) -> anyhow::Result<Provider<Http>> {

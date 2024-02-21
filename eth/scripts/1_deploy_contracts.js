@@ -8,10 +8,10 @@ async function main() {
 
   console.log("Using ", accounts[0], "as signer");
 
-  const WETH9 = await ethers.getContractFactory("WETH9");
-  console.log("Deploying WETH9...");
-  const weth9 = await WETH9.deploy();
-  console.log("WETH9 deployed to:", weth9.target);
+  const WETH = await ethers.getContractFactory("WETH9");
+  console.log("Deploying WETH...");
+  const weth = await WETH.deploy();
+  console.log("WETH deployed to:", weth.target);
 
   const Token = await ethers.getContractFactory("Token");
   console.log("Deploying USDT...");
@@ -39,7 +39,7 @@ async function main() {
   console.log("Deploying Most...");
   const most = await upgrades.deployProxy(
     Most,
-    [config.guardianIds, config.threshold, accounts[0]],
+    [config.guardianIds, config.threshold, accounts[0], weth.target],
     {
       initializer: "initialize",
       kind: "uups",
@@ -61,7 +61,7 @@ async function main() {
     migrations: migrations.target,
     governance: governance.target,
     most: most.target,
-    weth9: weth9.target,
+    weth: weth.target,
     usdt: usdt.target,
   };
 

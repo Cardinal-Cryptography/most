@@ -13,6 +13,7 @@ import {
   Addresses,
   storeAddresses,
   estimateContractInit,
+  transferOwnershipToGovernance,
 } from "./utils";
 import "dotenv/config";
 import "@polkadot/api-augment";
@@ -37,10 +38,13 @@ function accountIdToHex(accountId: string): string {
 }
 
 async function main(): Promise<void> {
+  const config = await import_env();
+
   const {
     ws_node,
     relayers_keys,
     governance_keys,
+    governance_seeds,
     authority_seed,
     signature_threshold,
     pocket_money,
@@ -49,10 +53,10 @@ async function main(): Promise<void> {
     max_fee,
     default_fee,
     authority,
-  } = await import_env();
+  } = config;
 
-  const { weth9 } = await import_eth_addresses();
-  const wethEthAddress = ethers.zeroPadValue(ethers.getBytes(weth9), 32);
+  const { weth } = await import_eth_addresses();
+  const wethEthAddress = ethers.zeroPadValue(ethers.getBytes(weth), 32);
   console.log("weth eth address:", wethEthAddress);
 
   const wsProvider = new WsProvider(ws_node);
@@ -60,6 +64,10 @@ async function main(): Promise<void> {
 
   const api = await ApiPromise.create({ provider: wsProvider });
   const deployer = keyring.addFromUri(authority_seed);
+  const governance_members = [];
+  governance_seeds.forEach((governance_seed) => {
+    governance_members.push(keyring.addFromUri(governance_seed));
+  });
 
   const tokenCodeHash = await uploadCode(api, deployer, "token.contract");
   console.log("token code hash:", tokenCodeHash);
@@ -144,8 +152,11 @@ async function main(): Promise<void> {
   const initialSupply = 0;
   const symbol = "wETH";
   const name = symbol;
-  const decimals = 12;
-  const minterBurner = mostAddress;
+  const decimals = 18;
+  const minterBurner =
+    process.env.AZERO_ENV == "dev" || process.env.AZERO_ENV == "bridgenet"
+      ? authority
+      : mostAddress;
   const estimatedGasToken = await estimateContractInit(
     api,
     deployer,
@@ -162,6 +173,13 @@ async function main(): Promise<void> {
     { gasLimit: estimatedGasToken },
   );
   console.log("token address:", wethAddress);
+
+  // premint some token for DEV
+  if (process.env.AZERO_ENV == "dev" || process.env.AZERO_ENV == "bridgenet") {
+    const weth = new Token(wethAddress, deployer, api);
+    await weth.tx.mint(authority, 1000000000000000);
+    await weth.tx.setMinterBurner(mostAddress);
+  }
 
   const most = new Most(mostAddress, deployer, api);
 
@@ -189,14 +207,16 @@ async function main(): Promise<void> {
     await governance.tx.addMember(address);
   }
 
-  console.log("Transferring ownership of most to governance...");
-  await most.tx.setOwner(governanceAddress);
+  await transferOwnershipToGovernance(most, governance, governance_members);
 
-  console.log("Transferring ownership of weth to governance...");
-  await new Token(wethAddress, deployer, api).tx.setAdmin(governanceAddress);
+  const token = new Token(wethAddress, deployer, api);
+  await transferOwnershipToGovernance(token, governance, governance_members);
 
-  console.log("Transferring ownership of governance to governance...");
-  await governance.tx.setOwner(governanceAddress);
+  await transferOwnershipToGovernance(
+    governance,
+    governance,
+    governance_members,
+  );
 
   const addresses: Addresses = {
     governance: governanceAddress,

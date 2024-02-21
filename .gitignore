@@ -39,3 +39,6 @@ relayer/src/ markdown-code-fontification:rustic-mode
 
 # idea
 /.idea/
+
+# most-signer docker image artifacts
+relayer/signer_docker/signer

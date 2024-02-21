@@ -1,5 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
 
+pub use ownable2step::Ownable2StepError;
+
 pub use self::most::{MostError, MostRef};
 
 #[ink::contract]
@@ -16,6 +18,7 @@ pub mod most {
         prelude::{format, string::String, vec, vec::Vec},
         storage::{traits::ManualKey, Lazy, Mapping},
     };
+    use ownable2step::*;
     use psp22::PSP22Error;
     use psp22_traits::{Burnable, Mintable};
     use scale::{Decode, Encode};
@@ -62,7 +65,40 @@ pub mod most {
     #[ink(event)]
     #[derive(Debug)]
     #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
+    pub struct HaltedStateChanged {
+        pub previous_state: bool,
+        pub new_state: bool,
+        #[ink(topic)]
+        pub caller: AccountId,
+    }
+
+    #[ink(event)]
+    #[derive(Debug)]
+    #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
     pub struct SignedProcessedRequest {
+        pub request_hash: HashedRequest,
+        #[ink(topic)]
+        pub signer: AccountId,
+    }
+
+    #[ink(event)]
+    #[derive(Debug)]
+    #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
+    pub struct TransferOwnershipInitiated {
+        pub new_owner: AccountId,
+    }
+
+    #[ink(event)]
+    #[derive(Debug)]
+    #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
+    pub struct TransferOwnershipAccepted {
+        pub new_owner: AccountId,
+    }
+
+    #[ink(event)]
+    #[derive(Debug)]
+    #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
+    pub struct RequestAlreadySigned {
         pub request_hash: HashedRequest,
         #[ink(topic)]
         pub signer: AccountId,
@@ -80,14 +116,14 @@ pub mod most {
     #[derive(Debug)]
     #[ink::storage_item]
     pub struct Data {
-        /// an account that can perform a subset of actions
-        owner: AccountId,
         /// nonce for outgoing cross-chain transfer requests
         request_nonce: u128,
         /// accounting helper
         committee_id: CommitteeId,
         /// a fixed subsidy transferred along with the bridged tokens to the destination account on aleph zero to bootstrap
         pocket_money: u128,
+        /// balance that can be paid out as pocket money
+        pocket_money_balance: u128,
         /// How much gas does a single confirmation of a cross-chain transfer request use on the destination chain on average.
         /// This value is calculated by summing the total gas usage of *all* the transactions it takes to relay a single request and dividing it by the current committee size and multiplying by 1.2
         relay_gas_usage: u128,
@@ -99,11 +135,15 @@ pub mod most {
         default_fee: u128,
         /// gas price oracle that is used to calculate the fee for a cross-chain transfer request
         gas_price_oracle: Option<AccountId>,
+        /// Is the bridge in a halted state
+        is_halted: bool,
     }
 
     #[ink(storage)]
     pub struct Most {
         data: Lazy<Data, ManualKey<0x44415441>>,
+        /// stores the data used by the Ownable2Step trait
+        ownable_data: Lazy<Ownable2StepData, ManualKey<0xDEADBEEF>>,
         /// requests that are still collecting signatures
         pending_requests: Mapping<HashedRequest, Request, ManualKey<0x50454E44>>,
         /// signatures per cross chain transfer request
@@ -132,17 +172,14 @@ pub mod most {
         NotInCommittee,
         HashDoesNotMatchData,
         PSP22(PSP22Error),
-        RequestNotProcessed,
-        RequestAlreadyProcessed,
+        Ownable(Ownable2StepError),
         UnsupportedPair,
         InkEnvError(String),
-        NotOwner(AccountId),
         RequestAlreadySigned,
         BaseFeeTooLow,
         Arithmetic,
-        NoRewards,
-        NoMoreRewards,
         CorruptedStorage,
+        IsHalted,
     }
 
     impl From<InkEnvError> for MostError {
@@ -154,6 +191,12 @@ pub mod most {
     impl From<PSP22Error> for MostError {
         fn from(inner: PSP22Error) -> Self {
             MostError::PSP22(inner)
+        }
+    }
+
+    impl From<Ownable2StepError> for MostError {
+        fn from(inner: Ownable2StepError) -> Self {
+            MostError::Ownable(inner)
         }
     }
 
@@ -189,19 +232,24 @@ pub mod most {
 
             let mut data = Lazy::new();
             data.set(&Data {
-                owner: Self::env().caller(),
                 request_nonce: 0,
                 committee_id,
                 pocket_money,
+                pocket_money_balance: 0,
                 relay_gas_usage,
                 min_fee,
                 max_fee,
                 default_fee,
                 gas_price_oracle,
+                is_halted: false,
             });
+
+            let mut ownable_data = Lazy::new();
+            ownable_data.set(&Ownable2StepData::new(Self::env().caller()));
 
             Ok(Self {
                 data,
+                ownable_data,
                 signature_thresholds,
                 committees,
                 committee_sizes,
@@ -227,6 +275,8 @@ pub mod most {
             amount: u128,
             dest_receiver_address: [u8; 32],
         ) -> Result<(), MostError> {
+            self.check_halted()?;
+
             let mut data = self.data()?;
 
             let dest_token_address = self
@@ -235,9 +285,9 @@ pub mod most {
                 .ok_or(MostError::UnsupportedPair)?;
 
             let current_base_fee = self.get_base_fee()?;
-            let base_fee = self.env().transferred_value();
+            let transferred_fee = self.env().transferred_value();
 
-            if base_fee.lt(&current_base_fee) {
+            if transferred_fee.lt(&current_base_fee) {
                 return Err(MostError::BaseFeeTooLow);
             }
 
@@ -254,31 +304,29 @@ pub mod most {
                 .collected_committee_rewards
                 .get(data.committee_id)
                 .unwrap_or(0)
-                .checked_add(base_fee)
+                .checked_add(current_base_fee)
                 .ok_or(MostError::Arithmetic)?;
 
             self.collected_committee_rewards
                 .insert(data.committee_id, &base_fee_total);
+
+            let request_nonce = data.request_nonce;
+            data.request_nonce = request_nonce.checked_add(1).ok_or(MostError::Arithmetic)?;
+
+            self.data.set(&data);
+
+            // return surplus if any
+            if let Some(surplus) = transferred_fee.checked_sub(current_base_fee) {
+                self.env().transfer(sender, surplus)?;
+            };
 
             self.env().emit_event(CrosschainTransferRequest {
                 committee_id: data.committee_id,
                 dest_token_address,
                 amount,
                 dest_receiver_address,
-                request_nonce: data.request_nonce,
+                request_nonce,
             });
-
-            data.request_nonce = data
-                .request_nonce
-                .checked_add(1)
-                .ok_or(MostError::Arithmetic)?;
-
-            self.data.set(&data);
-
-            // return surplus if any
-            if let Some(surplus) = base_fee.checked_sub(current_base_fee) {
-                self.env().transfer(sender, surplus)?;
-            };
 
             Ok(())
         }
@@ -294,15 +342,25 @@ pub mod most {
             dest_receiver_address: [u8; 32],
             request_nonce: u128,
         ) -> Result<(), MostError> {
+            self.check_halted()?;
+
             let caller = self.env().caller();
             self.only_committee_member(committee_id, caller)?;
 
-            let data = self.data()?;
+            let mut data = self.data()?;
 
             // Don't revert if the request has already been processed as
             // such a call can be made during regular guardian operation.
             if self.processed_requests.contains(request_hash) {
                 self.env().emit_event(SignedProcessedRequest {
+                    request_hash,
+                    signer: caller,
+                });
+                return Ok(());
+            }
+
+            if self.signatures.contains((request_hash, caller)) {
+                self.env().emit_event(RequestAlreadySigned {
                     request_hash,
                     signer: caller,
                 });
@@ -323,14 +381,13 @@ pub mod most {
                 return Err(MostError::HashDoesNotMatchData);
             }
 
-            if self.signatures.contains((request_hash, caller)) {
-                return Err(MostError::RequestAlreadySigned);
-            }
-
             let mut request = self.pending_requests.get(request_hash).unwrap_or_default(); //  {
 
             // record vote
-            request.signature_count += 1;
+            request.signature_count = request
+                .signature_count
+                .checked_add(1)
+                .ok_or(MostError::Arithmetic)?;
             self.signatures.insert((request_hash, caller), &());
 
             self.env().emit_event(RequestSigned {
@@ -351,10 +408,16 @@ pub mod most {
                 )?;
 
                 // bootstrap account with pocket money
-                // NOTE: we don't revert on a failure!
-                _ = self
-                    .env()
-                    .transfer(dest_receiver_address.into(), data.pocket_money);
+                if data.pocket_money_balance >= data.pocket_money {
+                    // don't revert if the transfer fails
+                    _ = self
+                        .env()
+                        .transfer(dest_receiver_address.into(), data.pocket_money);
+                    data.pocket_money_balance = data
+                        .pocket_money_balance
+                        .checked_sub(data.pocket_money)
+                        .ok_or(MostError::Arithmetic)?;
+                }
 
                 // mark it as processed
                 self.processed_requests.insert(request_hash, &());
@@ -380,6 +443,8 @@ pub mod most {
             committee_id: CommitteeId,
             member_id: AccountId,
         ) -> Result<(), MostError> {
+            self.check_halted()?;
+
             let paid_out_rewards = self.get_paid_out_member_rewards(committee_id, member_id);
 
             let outstanding_rewards =
@@ -396,6 +461,19 @@ pub mod most {
                 );
             }
 
+            Ok(())
+        }
+
+        /// Method used to provide the contract with funds for pocket money
+        #[ink(message, payable)]
+        pub fn fund_pocket_money(&mut self) -> Result<(), MostError> {
+            let funds = self.env().transferred_value();
+            let mut data = self.data()?;
+            data.pocket_money_balance = data
+                .pocket_money_balance
+                .checked_add(funds)
+                .ok_or(MostError::Arithmetic)?;
+            self.data.set(&data);
             Ok(())
         }
 
@@ -442,6 +520,14 @@ pub mod most {
         #[ink(message)]
         pub fn get_pocket_money(&self) -> Result<Balance, MostError> {
             Ok(self.data()?.pocket_money)
+        }
+
+        /// Query pocket money balance
+        ///
+        /// An amount of the native token that can be used for pocket money transfers
+        #[ink(message)]
+        pub fn get_pocket_money_balance(&self) -> Result<Balance, MostError> {
+            Ok(self.data()?.pocket_money_balance)
         }
 
         /// Returns current active committee id
@@ -631,25 +717,42 @@ pub mod most {
             Ok(())
         }
 
-        /// Sets a new owner account
+        /// Halt/resume the bridge contract
         ///
-        /// Can only be called by contracts owner
+        /// Can only be called by the contracts owner
         #[ink(message)]
-        pub fn set_owner(&mut self, new_owner: AccountId) -> Result<(), MostError> {
+        pub fn set_halted(&mut self, new_state: bool) -> Result<(), MostError> {
             self.ensure_owner()?;
+
             let mut data = self.data()?;
-            data.owner = new_owner;
-            self.data.set(&data);
+            let previous_state = data.is_halted;
+
+            if new_state != previous_state {
+                data.is_halted = new_state;
+
+                self.data.set(&data);
+                self.env().emit_event(HaltedStateChanged {
+                    previous_state,
+                    new_state,
+                    caller: self.env().caller(),
+                });
+            }
+
             Ok(())
         }
 
+        /// Is the bridge halted?
+        #[ink(message)]
+        pub fn is_halted(&self) -> Result<bool, MostError> {
+            Ok(self.data()?.is_halted)
+        }
+
         // ---  helper functions
-        fn ensure_owner(&mut self) -> Result<(), MostError> {
-            let caller = self.env().caller();
-            let data = self.data()?;
-            match caller.eq(&data.owner) {
-                true => Ok(()),
-                false => Err(MostError::NotOwner(caller)),
+
+        fn check_halted(&self) -> Result<(), MostError> {
+            match self.is_halted()? {
+                true => Err(MostError::IsHalted),
+                false => Ok(()),
             }
         }
 
@@ -676,6 +779,50 @@ pub mod most {
 
         fn data(&self) -> Result<Data, MostError> {
             self.data.get().ok_or(MostError::CorruptedStorage)
+        }
+
+        fn ownable_data(&self) -> Result<Ownable2StepData, Ownable2StepError> {
+            self.ownable_data
+                .get()
+                .ok_or(Ownable2StepError::Custom("CorruptedStorage".into()))
+        }
+    }
+
+    impl Ownable2Step for Most {
+        #[ink(message)]
+        fn get_owner(&self) -> Ownable2StepResult<AccountId> {
+            self.ownable_data()?.get_owner()
+        }
+
+        #[ink(message)]
+        fn get_pending_owner(&self) -> Ownable2StepResult<AccountId> {
+            self.ownable_data()?.get_pending_owner()
+        }
+
+        #[ink(message)]
+        fn transfer_ownership(&mut self, new_owner: AccountId) -> Ownable2StepResult<()> {
+            let mut ownable_data = self.ownable_data()?;
+            ownable_data.transfer_ownership(self.env().caller(), new_owner)?;
+            self.ownable_data.set(&ownable_data);
+            self.env()
+                .emit_event(TransferOwnershipInitiated { new_owner });
+            Ok(())
+        }
+
+        #[ink(message)]
+        fn accept_ownership(&mut self) -> Ownable2StepResult<()> {
+            let new_owner = self.env().caller();
+            let mut ownable_data = self.ownable_data()?;
+            ownable_data.accept_ownership(new_owner)?;
+            self.ownable_data.set(&ownable_data);
+            self.env()
+                .emit_event(TransferOwnershipAccepted { new_owner });
+            Ok(())
+        }
+
+        #[ink(message)]
+        fn ensure_owner(&self) -> Ownable2StepResult<()> {
+            self.ownable_data()?.ensure_owner(self.env().caller())
         }
     }
 
@@ -750,7 +897,7 @@ pub mod most {
         #[ink::test]
         fn new_sets_caller_as_owner() {
             set_caller::<DefEnv>(default_accounts::<DefEnv>().alice);
-            let mut most = Most::new(
+            let most = Most::new(
                 guardian_accounts(),
                 THRESHOLD,
                 POCKET_MONEY,
@@ -766,7 +913,7 @@ pub mod most {
             set_caller::<DefEnv>(guardian_accounts()[0]);
             assert_eq!(
                 most.ensure_owner(),
-                Err(MostError::NotOwner(guardian_accounts()[0]))
+                Err(Ownable2StepError::CallerNotOwner(guardian_accounts()[0]))
             );
         }
 
@@ -808,11 +955,27 @@ pub mod most {
             )
             .expect("Threshold is valid.");
             set_caller::<DefEnv>(accounts.bob);
-            assert_eq!(most.ensure_owner(), Err(MostError::NotOwner(accounts.bob)));
+            assert_eq!(
+                most.ensure_owner(),
+                Err(Ownable2StepError::CallerNotOwner(accounts.bob))
+            );
             set_caller::<DefEnv>(accounts.alice);
             assert_eq!(most.ensure_owner(), Ok(()));
-            assert_eq!(most.set_owner(accounts.bob), Ok(()));
+            assert_eq!(most.transfer_ownership(accounts.bob), Ok(()));
+            // check that bob has to accept before being granted ownership
             set_caller::<DefEnv>(accounts.bob);
+            assert_eq!(
+                most.ensure_owner(),
+                Err(Ownable2StepError::CallerNotOwner(accounts.bob))
+            );
+            // check that only bob can accept the pending new ownership
+            set_caller::<DefEnv>(accounts.charlie);
+            assert_eq!(
+                most.accept_ownership(),
+                Err(Ownable2StepError::CallerNotPendingOwner(accounts.charlie))
+            );
+            set_caller::<DefEnv>(accounts.bob);
+            assert_eq!(most.accept_ownership(), Ok(()));
             assert_eq!(most.ensure_owner(), Ok(()));
         }
 

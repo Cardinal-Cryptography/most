@@ -1,4 +1,8 @@
-use std::{cmp::min, collections::BTreeSet, sync::Arc};
+use std::{
+    cmp::min,
+    collections::BTreeSet,
+    sync::{atomic::AtomicBool, Arc},
+};
 
 use aleph_client::{
     contract::event::{BlockDetails, ContractEvent},
@@ -10,9 +14,10 @@ use ethers::{
     core::types::Address,
     prelude::{ContractCall, ContractError},
     providers::{Middleware, ProviderError},
+    types::U64,
     utils::keccak256,
 };
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 use redis::{aio::Connection as RedisConnection, RedisError};
 use subxt::{events::Events, utils::H256};
 use thiserror::Error;
@@ -25,8 +30,8 @@ use tokio::{
 use crate::{
     config::Config,
     connections::{
-        azero::SignedAzeroWsConnection,
-        eth::{EthConnection, EthConnectionError, SignedEthConnection},
+        azero::AzeroWsConnection,
+        eth::SignedEthConnection,
         redis_helpers::{read_first_unprocessed_block_number, write_last_processed_block},
     },
     contracts::{
@@ -40,47 +45,44 @@ use crate::{
 #[error(transparent)]
 #[non_exhaustive]
 pub enum AzeroListenerError {
-    #[error("aleph-client error")]
+    #[error("Aleph-client error")]
     AlephClient(#[from] anyhow::Error),
 
-    #[error("error when parsing ethereum address")]
+    #[error("Error when parsing ethereum address")]
     FromHex(#[from] rustc_hex::FromHexError),
 
-    #[error("subxt error")]
+    #[error("Subxt error")]
     Subxt(#[from] subxt::Error),
 
-    #[error("azero provider error")]
+    #[error("Ethers provider error")]
     Provider(#[from] ProviderError),
 
-    #[error("azero contract error")]
+    #[error("Azero contract error")]
     AzeroContract(#[from] AzeroContractError),
 
-    #[error("eth connection error")]
-    EthConnection(#[from] EthConnectionError),
-
-    #[error("eth contract error")]
-    EthContractListen(#[from] ContractError<EthConnection>),
-
-    #[error("eth contract error")]
+    #[error("Eth contract error")]
     EthContractTx(#[from] ContractError<SignedEthConnection>),
 
-    #[error("no block found")]
+    #[error("No block found")]
     BlockNotFound,
 
-    #[error("tx was not present in any block or mempool after the maximum number of retries")]
+    #[error("Tx was not present in any block or mempool after the maximum number of retries")]
     TxNotPresentInBlockOrMempool,
 
-    #[error("missing data from event")]
+    #[error("Missing data from event")]
     MissingEventData(String),
 
-    #[error("redis connection error")]
+    #[error("Redis connection error")]
     Redis(#[from] RedisError),
 
-    #[error("join error")]
+    #[error("Join error")]
     Join(#[from] tokio::task::JoinError),
 
-    #[error("semaphore error")]
+    #[error("Semaphore error")]
     Semaphore(#[from] AcquireError),
+
+    #[error("Contract reverted")]
+    EthContractReverted,
 }
 
 const ALEPH_LAST_BLOCK_KEY: &str = "alephzero_last_known_block_number";
@@ -88,14 +90,16 @@ const ALEPH_BLOCK_PROD_TIME_SEC: u64 = 1;
 // This is more than the maximum number of send_request calls than will fit into the block (execution time)
 const ALEPH_MAX_REQUESTS_PER_BLOCK: usize = 50;
 
+#[derive(Copy, Clone)]
 pub struct AlephZeroListener;
 
 impl AlephZeroListener {
     pub async fn run(
         config: Arc<Config>,
-        azero_connection: Arc<SignedAzeroWsConnection>,
+        azero_connection: Arc<AzeroWsConnection>,
         eth_connection: Arc<SignedEthConnection>,
         redis_connection: Arc<Mutex<RedisConnection>>,
+        emergency: Arc<AtomicBool>,
     ) -> Result<(), AzeroListenerError> {
         let Config {
             azero_contract_metadata,
@@ -111,6 +115,7 @@ impl AlephZeroListener {
         let pending_blocks: Arc<Mutex<BTreeSet<u32>>> = Arc::new(Mutex::new(BTreeSet::new()));
         let event_handler_tasks_semaphore =
             Arc::new(Semaphore::new(*azero_max_event_handler_tasks));
+        let mut block_sealing_tasks = JoinSet::new();
 
         let most_instance = MostInstance::new(
             azero_contract_address,
@@ -119,13 +124,13 @@ impl AlephZeroListener {
             config.azero_proof_size_limit,
         )?;
         let mut first_unprocessed_block_number = if *override_azero_cache {
-            *default_sync_from_block_azero
+            **default_sync_from_block_azero
         } else {
             read_first_unprocessed_block_number(
                 name.clone(),
                 ALEPH_LAST_BLOCK_KEY.to_string(),
                 redis_connection.clone(),
-                *default_sync_from_block_azero,
+                **default_sync_from_block_azero,
             )
             .await
         };
@@ -135,56 +140,67 @@ impl AlephZeroListener {
 
         // Main AlephZero event loop
         loop {
-            // Query for the next unknown finalized block number, if not present we wait for it.
+            // Query for the next unknown finalized block number, if not present we wait for it
             let mut to_block = get_next_finalized_block_number_azero(
                 azero_connection.clone(),
                 first_unprocessed_block_number,
             )
             .await;
 
-            to_block = min(to_block, first_unprocessed_block_number + (*sync_step) - 1);
+            match emergency.load(std::sync::atomic::Ordering::Relaxed) {
+                true => trace!("Event handling paused due to an emergency state in one of the Advisory contracts"),
+                false => {
+                    to_block = min(to_block, first_unprocessed_block_number + (*sync_step) - 1);
 
-            info!(
-                "Processing events from blocks {} - {}",
-                first_unprocessed_block_number, to_block
-            );
+                    info!(
+                        "Processing events from blocks {} - {}",
+                        first_unprocessed_block_number, to_block
+                    );
 
-            // Add the next block numbers now, so that there is always some block number in the set.
-            for block_number in first_unprocessed_block_number..=to_block {
-                add_to_pending(block_number + 1, pending_blocks.clone()).await;
+                    // Add the next block numbers now, so that there is always some block number in the set.
+                    for block_number in first_unprocessed_block_number..=to_block {
+                        add_to_pending(block_number + 1, pending_blocks.clone()).await;
+                    }
+
+                    // Fetch the events in parallel.
+                    let block_events = fetch_events_in_block_range(
+                        azero_connection.clone(),
+                        first_unprocessed_block_number,
+                        to_block,
+                    )
+                    .await?;
+
+                    for (block_details, events) in block_events {
+                        let filtered_events = most_instance.filter_events(events, block_details.clone());
+
+                        handle_events(
+                            config.clone(),
+                            eth_connection.clone(),
+                            filtered_events,
+                            block_details.block_number,
+                            pending_blocks.clone(),
+                            redis_connection.clone(),
+                            event_handler_tasks_semaphore.clone(),
+                            &mut block_sealing_tasks,
+                        )
+                        .await?;
+                    }
+
+                    // Check for errors in the event handler tasks.
+                    while let Some(result) = block_sealing_tasks.try_join_next() {
+                        result??;
+                    }
+
+                    // Update the last block number.
+                    first_unprocessed_block_number = to_block + 1;
+                }
             }
-
-            // Fetch the events in parallel.
-            let block_events = fetch_events_in_block_range(
-                azero_connection.clone(),
-                first_unprocessed_block_number,
-                to_block,
-            )
-            .await?;
-
-            for (block_details, events) in block_events {
-                let filtered_events = most_instance.filter_events(events, block_details.clone());
-
-                handle_events(
-                    config.clone(),
-                    eth_connection.clone(),
-                    filtered_events,
-                    block_details.block_number,
-                    pending_blocks.clone(),
-                    redis_connection.clone(),
-                    event_handler_tasks_semaphore.clone(),
-                )
-                .await?;
-            }
-
-            // Update the last block number.
-            first_unprocessed_block_number = to_block + 1;
         }
     }
 }
 
 async fn fetch_events_in_block_range(
-    azero_connection: Arc<SignedAzeroWsConnection>,
+    azero_connection: Arc<AzeroWsConnection>,
     from_block: u32,
     to_block: u32,
 ) -> Result<Vec<(BlockDetails, Events<AlephConfig>)>, AzeroListenerError> {
@@ -234,6 +250,7 @@ async fn add_to_pending(block_number: u32, pending_blocks: Arc<Mutex<BTreeSet<u3
 }
 
 // handle all events present in one block
+#[allow(clippy::too_many_arguments)]
 async fn handle_events(
     config: Arc<Config>,
     eth_connection: Arc<SignedEthConnection>,
@@ -242,6 +259,7 @@ async fn handle_events(
     pending_blocks: Arc<Mutex<BTreeSet<u32>>>,
     redis_connection: Arc<Mutex<RedisConnection>>,
     event_handler_tasks_semaphore: Arc<Semaphore>,
+    block_sealing_tasks: &mut JoinSet<Result<(), AzeroListenerError>>,
 ) -> Result<(), AzeroListenerError> {
     let mut event_tasks = JoinSet::new();
     for event in events {
@@ -259,8 +277,8 @@ async fn handle_events(
         }
     }
 
-    tokio::spawn(async move {
-        handle_processed_block(
+    block_sealing_tasks.spawn(async move {
+        seal_processed_block(
             config.clone(),
             block_number,
             event_tasks,
@@ -285,6 +303,7 @@ async fn handle_event(
         eth_tx_submission_retries,
         ..
     } = &*config;
+
     if let Some(name) = &event.name {
         if name.eq("CrosschainTransferRequest") {
             let data = event.data;
@@ -307,7 +326,7 @@ async fn handle_event(
             }
 
             info!(
-                "Decoded event data: [dest_token_address: 0x{}, amount: {amount}, dest_receiver_address: 0x{}, request_nonce: {request_nonce}]", 
+                "Decoded event data: [dest_token_address: 0x{}, amount: {amount}, dest_receiver_address: 0x{}, request_nonce: {request_nonce}]",
                 hex::encode(dest_token_address),
                 hex::encode(dest_receiver_address)
             );
@@ -343,22 +362,32 @@ async fn handle_event(
             );
 
             info!(
-                "Sending tx with request nonce {} to the Ethereum network and waiting for {} confirmations",
+                "Sending tx with request nonce {} to the Ethereum network and waiting for {} confirmations.",
                 request_nonce,
                 eth_tx_min_confirmations
             );
 
             // This shouldn't fail unless there is something wrong with our config.
             // NOTE: this does not check whether the actual tx reverted on-chain. Reverts are only checked on dry-run.
-            let tx_hash = call
+            let receipt = call
                 .gas(config.eth_gas_limit)
+                .nonce(eth_connection.inner().next())
                 .send()
                 .await?
                 .confirmations(*eth_tx_min_confirmations)
                 .retries(*eth_tx_submission_retries)
                 .await?
-                .ok_or(AzeroListenerError::TxNotPresentInBlockOrMempool)?
-                .transaction_hash;
+                .ok_or(AzeroListenerError::TxNotPresentInBlockOrMempool)?;
+
+            let tx_hash = receipt.transaction_hash;
+            let tx_status = receipt.status;
+
+            if tx_status == Some(U64::from(0)) {
+                warn!(
+                    "Tx with nonce {request_nonce} has been sent to the Ethereum network: {tx_hash:?} but it reverted."
+                );
+                return Err(AzeroListenerError::EthContractReverted);
+            }
 
             info!("Tx with nonce {request_nonce} has been sent to the Ethereum network: {tx_hash:?} and received {eth_tx_min_confirmations} confirmations.");
 
@@ -369,7 +398,7 @@ async fn handle_event(
 }
 
 // Awaits for all requests from the block to be processed, then updates the last processed block number in Redis.
-async fn handle_processed_block(
+async fn seal_processed_block(
     config: Arc<Config>,
     block_number: u32,
     mut event_tasks: JoinSet<Result<(), AzeroListenerError>>,
@@ -413,8 +442,8 @@ pub async fn wait_for_eth_tx_finality(
     loop {
         sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
 
-        let finalized_head_number =
-            get_next_finalized_block_number_eth(eth_connection.clone(), 0).await;
+        let connection_rc = Arc::new(eth_connection.provider().clone());
+        let finalized_head_number = get_next_finalized_block_number_eth(connection_rc, 0).await;
 
         match eth_connection.get_transaction(tx_hash).await {
             Ok(Some(tx)) => {
@@ -434,7 +463,7 @@ pub async fn wait_for_eth_tx_finality(
 }
 
 async fn get_next_finalized_block_number_azero(
-    azero_connection: Arc<SignedAzeroWsConnection>,
+    azero_connection: Arc<AzeroWsConnection>,
     not_older_than: u32,
 ) -> u32 {
     loop {

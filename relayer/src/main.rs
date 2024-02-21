@@ -37,7 +37,7 @@ pub enum ListenerError {
     #[error("eth wallet error")]
     EthWallet(#[from] WalletError),
 
-    #[error("eth listener error")]
+    #[error("azero listener error")]
     Azero(#[from] AzeroListenerError),
 
     #[error("redis error")]
@@ -126,3 +126,4 @@ async fn main() -> Result<()> {
 
     process::exit(-1);
 }
+

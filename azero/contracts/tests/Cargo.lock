@@ -2692,6 +2692,7 @@ version = "1.0.0"
 dependencies = [
  "gas-oracle-trait",
  "ink",
+ "ownable2step",
  "parity-scale-codec",
  "psp22",
  "psp22-traits",
@@ -2840,6 +2841,7 @@ version = "1.0.0"
 dependencies = [
  "gas-oracle-trait",
  "ink",
+ "ownable2step",
  "parity-scale-codec",
  "scale-info",
 ]
@@ -2852,6 +2854,15 @@ checksum = "0ae859aa07428ca9a929b936690f8b12dc5f11dd8c6992a18ca93919f28bc177"
 dependencies = [
  "libc",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "ownable2step"
+version = "1.0.0"
+dependencies = [
+ "ink",
+ "parity-scale-codec",
+ "scale-info",
 ]
 
 [[package]]
@@ -4804,6 +4815,7 @@ name = "token"
 version = "1.0.0"
 dependencies = [
  "ink",
+ "ownable2step",
  "parity-scale-codec",
  "psp22",
  "psp22-traits",

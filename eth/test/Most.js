@@ -2,11 +2,16 @@ const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
 const {
   loadFixture,
+  setBalance,
 } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 const { execSync: exec } = require("child_process");
 
 // Import utils
-const { addressToBytes32, getRandomAlephAccount } = require("./TestUtils");
+const {
+  addressToBytes32,
+  getRandomAlephAccount,
+  ethToWei,
+} = require("./TestUtils");
 
 const TOKEN_AMOUNT = 1000;
 const ALEPH_ACCOUNT = getRandomAlephAccount(3);
@@ -18,24 +23,38 @@ describe("Most", function () {
       const signers = await ethers.getSigners();
       const accounts = signers.map((s) => s.address);
 
+      const WETH = await ethers.getContractFactory("WETH9");
+      const weth = await WETH.deploy();
+
       const Most = await ethers.getContractFactory("Most");
       await expect(
-        upgrades.deployProxy(Most, [[accounts[0]], 0, accounts[0]], {
-          initializer: "initialize",
-          kind: "uups",
-        }),
+        upgrades.deployProxy(
+          Most,
+          [[accounts[0]], 0, accounts[0], await weth.getAddress()],
+          {
+            initializer: "initialize",
+            kind: "uups",
+          },
+        ),
       ).to.be.revertedWith("Signature threshold must be greater than 0");
     });
     it("Reverts if threshold is greater than number of guardians", async () => {
       const signers = await ethers.getSigners();
       const accounts = signers.map((s) => s.address);
 
+      const WETH = await ethers.getContractFactory("WETH9");
+      const weth = await WETH.deploy();
+
       const Most = await ethers.getContractFactory("Most");
       await expect(
-        upgrades.deployProxy(Most, [[accounts[0]], 2, accounts[0]], {
-          initializer: "initialize",
-          kind: "uups",
-        }),
+        upgrades.deployProxy(
+          Most,
+          [[accounts[0]], 2, accounts[0], await weth.getAddress()],
+          {
+            initializer: "initialize",
+            kind: "uups",
+          },
+        ),
       ).to.be.revertedWith("Not enough guardians specified");
     });
   });
@@ -44,10 +63,14 @@ describe("Most", function () {
     const signers = await ethers.getSigners();
     const accounts = signers.map((s) => s.address);
 
+    const WETH = await ethers.getContractFactory("WETH9");
+    const weth = await WETH.deploy();
+    const wethAddress = await weth.getAddress();
+
     const Most = await ethers.getContractFactory("Most");
     const most = await upgrades.deployProxy(
       Most,
-      [accounts.slice(1, 9), 5, accounts[0]],
+      [accounts.slice(1, 9), 5, accounts[0], wethAddress],
       {
         initializer: "initialize",
         kind: "uups",
@@ -66,8 +89,10 @@ describe("Most", function () {
     return {
       most,
       token,
+      weth,
       tokenAddressBytes32,
       mostAddress,
+      wethAddress,
     };
   }
 
@@ -118,6 +143,40 @@ describe("Most", function () {
     });
   });
 
+  describe("sendRequestNative", function () {
+    it("Reverts if token is not whitelisted", async () => {
+      const { most } = await loadFixture(deployEightGuardianMostFixture);
+
+      await expect(
+        most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
+      ).to.be.revertedWith("Unsupported pair");
+    });
+
+    it("Transfers tokens to Most", async () => {
+      const { most, token, mostAddress, wethAddress, weth } = await loadFixture(
+        deployEightGuardianMostFixture,
+      );
+
+      await most.addPair(addressToBytes32(wethAddress), WRAPPED_TOKEN_ADDRESS);
+      await most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT });
+
+      expect(await weth.balanceOf(mostAddress)).to.equal(TOKEN_AMOUNT);
+    });
+
+    it("Emits correct event", async () => {
+      const { most, token, mostAddress, wethAddress } = await loadFixture(
+        deployEightGuardianMostFixture,
+      );
+
+      await most.addPair(addressToBytes32(wethAddress), WRAPPED_TOKEN_ADDRESS);
+      await expect(
+        most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
+      )
+        .to.emit(most, "CrosschainTransferRequest")
+        .withArgs(0, WRAPPED_TOKEN_ADDRESS, TOKEN_AMOUNT, ALEPH_ACCOUNT, 0);
+    });
+  });
+
   describe("receiveRequest", function () {
     it("Reverts if caller is not a guardian", async () => {
       const { most, tokenAddressBytes32 } = await loadFixture(
@@ -144,7 +203,7 @@ describe("Most", function () {
       ).to.be.revertedWith("Not a member of the guardian committee");
     });
 
-    it("Reverts if request has already been signed by a guardian", async () => {
+    it("Ignores consecutive signatures", async () => {
       const { most, tokenAddressBytes32 } = await loadFixture(
         deployEightGuardianMostFixture,
       );
@@ -176,7 +235,9 @@ describe("Most", function () {
             ethAddress,
             0,
           ),
-      ).to.be.revertedWith("This guardian has already signed this request");
+      )
+        .to.emit(most, "RequestAlreadySigned")
+        .withArgs(requestHash, accounts[1].address);
     });
 
     it("Ignores already executed requests", async () => {
@@ -350,6 +411,51 @@ describe("Most", function () {
             0,
           ),
       ).to.be.revertedWith("Not a member of the guardian committee");
+    });
+  });
+
+  describe("receiveRequestNative", function () {
+    it("Unlocks tokens for the user", async () => {
+      const { most, weth, wethAddress, mostAddress } = await loadFixture(
+        deployEightGuardianMostFixture,
+      );
+      const token_amount = ethToWei(TOKEN_AMOUNT);
+      const accounts = await ethers.getSigners();
+      const ethAddress = addressToBytes32(accounts[10].address);
+      const requestHash = ethers.solidityPackedKeccak256(
+        ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
+        [0, addressToBytes32(wethAddress), token_amount, ethAddress, 0],
+      );
+
+      const provider = await hre.ethers.provider;
+      // Provide funds for Most
+      await weth.deposit({ value: token_amount });
+      expect(await weth.balanceOf(accounts[0].address)).to.equal(token_amount);
+      await weth.transfer(mostAddress, token_amount);
+      expect(await weth.balanceOf(mostAddress)).to.equal(token_amount);
+
+      const balanceBefore = await provider.getBalance(accounts[10].address);
+      const balanceBeforeMost = await provider.getBalance(mostAddress);
+
+      for (const signer of accounts.slice(1, 6)) {
+        await most
+          .connect(signer)
+          .receiveRequest(
+            requestHash,
+            0,
+            addressToBytes32(wethAddress),
+            token_amount,
+            ethAddress,
+            0,
+          );
+      }
+      const balanceAfter = await provider.getBalance(accounts[10].address);
+      const balanceAfterMost = await provider.getBalance(mostAddress);
+
+      expect(await weth.balanceOf(mostAddress)).to.equal(0);
+      expect(await weth.balanceOf(accounts[10].address)).to.equal(0);
+      expect(balanceAfterMost - balanceBeforeMost).to.equal(0);
+      expect(balanceAfter - balanceBefore).to.equal(token_amount);
     });
   });
 

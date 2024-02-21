@@ -28,6 +28,11 @@ let result = {
             address: azero.oracle
         },
 
+        azero_advisory: {
+            contract: "azero_advisory",
+            address: azero.advisory
+        },
+
         eth_migrations: {
             contract: "azero_migrations",
             address: eth.migrations
@@ -43,9 +48,9 @@ let result = {
             address: eth.most
         },
 
-        eth_weth9: {
-            contract: "eth_weth9",
-            address: eth.weth9
+        eth_weth: {
+            contract: "eth_weth",
+            address: eth.weth
         },
 
         eth_usdt: {
