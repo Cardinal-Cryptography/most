@@ -117,7 +117,7 @@ impl EthListener {
                         first_unprocessed_block_number + sync_step - 1,
                     );
 
-                    log::info!(
+                    info!(
                         "Processing events from blocks {} - {}",
                         first_unprocessed_block_number,
                         to_block
@@ -133,19 +133,15 @@ impl EthListener {
 
                     // Handle events.
                     for event in events {
+                        // In case of the halt, we want to retry the event handling after the halt is resolved.
                         loop {
                             match handle_event(&event, &config, &azero_connection).await {
                                 Ok(_) => break,
                                 Err(EthListenerError::AzeroContract(e)) => {
-                                    error!("Error sending vote for request error: {e}");
+                                    error!("Error when handling event {event:?}: {e}");
                                     if most_azero.is_halted(&azero_connection).await? {
-                                        error!("Most contract on Aleph Zero is halted, stopping event handling");
-                                        loop {
-                                            if !most_azero.is_halted(&azero_connection).await? {
-                                                break;
-                                            }
-                                            sleep(Duration::from_secs(10)).await;
-                                        }
+                                        warn!("Most contract on Aleph Zero is halted, stopping event handling");
+                                        wait_until_not_halted(&most_azero, &azero_connection).await?;
                                     } else {
                                         return Err(EthListenerError::AzeroContract(e));
                                     }
@@ -269,5 +265,17 @@ pub async fn get_next_finalized_block_number_eth(
         };
 
         sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
+    }
+}
+
+async fn wait_until_not_halted(
+    most_azero: &MostInstance,
+    azero_connection: &AzeroConnectionWithSigner,
+) -> Result<(), EthListenerError> {
+    loop {
+        if !most_azero.is_halted(&azero_connection).await? {
+            return Ok(());
+        }
+        sleep(Duration::from_secs(10)).await;
     }
 }

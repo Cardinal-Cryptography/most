@@ -1,7 +1,10 @@
 use std::{
     cmp::min,
     collections::BTreeSet,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
 use aleph_client::{
@@ -107,6 +110,8 @@ impl AlephZeroListener {
         let Config {
             azero_contract_metadata,
             azero_contract_address,
+            azero_ref_time_limit,
+            azero_proof_size_limit,
             azero_max_event_handler_tasks,
             eth_contract_address,
             default_sync_from_block_azero,
@@ -121,12 +126,16 @@ impl AlephZeroListener {
             Arc::new(Semaphore::new(*azero_max_event_handler_tasks));
         let mut block_sealing_tasks = JoinSet::new();
 
-        let most_instance = MostInstance::new(
+        let most_azero = MostInstance::new(
             azero_contract_address,
             azero_contract_metadata,
-            config.azero_ref_time_limit,
-            config.azero_proof_size_limit,
+            *azero_ref_time_limit,
+            *azero_proof_size_limit,
         )?;
+
+        let most_eth_address = eth_contract_address.parse::<Address>()?;
+        let most_eth = Most::new(most_eth_address, eth_connection.clone());
+
         let mut first_unprocessed_block_number = if *override_azero_cache {
             **default_sync_from_block_azero
         } else {
@@ -151,7 +160,7 @@ impl AlephZeroListener {
             )
             .await;
 
-            match emergency.load(std::sync::atomic::Ordering::Relaxed) {
+            match emergency.load(Ordering::Relaxed) {
                 true => trace!("Event handling paused due to an emergency state in one of the Advisory contracts"),
                 false => {
                     to_block = min(to_block, first_unprocessed_block_number + (*sync_step) - 1);
@@ -175,7 +184,7 @@ impl AlephZeroListener {
                     .await?;
 
                     for (block_details, events) in block_events {
-                        let filtered_events = most_instance.filter_events(events, block_details.clone());
+                        let filtered_events = most_azero.filter_events(events, block_details.clone());
 
                         handle_events(
                             config.clone(),
@@ -196,22 +205,18 @@ impl AlephZeroListener {
                             Ok(_) => {}
                             Err(e) => {
                                 error!("Error in event handler task: {}", e);
-                                let address = eth_contract_address.parse::<Address>()?;
-                                let most_eth = Most::new(address, eth_connection.clone());
 
                                 if most_eth.paused().call().await? {
-                                    error!("Most contract on Ethereum is halted, pausing event handling");
-                                    // Wait for current tasks to finish
+                                    warn!("Most contract on Ethereum is halted, pausing event handling");
+
+                                    // Wait for currently active block tasks to finish before restarting the listener
                                     while let Some(result) = block_sealing_tasks.join_next().await {
                                         _ = result?;
                                     }
 
-                                    loop {
-                                        if !most_eth.paused().await? {
-                                            break;
-                                        }
-                                        sleep(Duration::from_secs(10)).await;
-                                    }
+                                    wait_until_unpaused(&most_eth).await?;
+
+                                    // Simplest way to recover from a halted bridge is to restart the azero listener
                                     return Err(AzeroListenerError::BridgeHaltedRestartRequired);
                                 } else {
                                     return Err(e);
@@ -276,6 +281,17 @@ async fn fetch_events_in_block_range(
 async fn add_to_pending(block_number: u32, pending_blocks: Arc<Mutex<BTreeSet<u32>>>) {
     let mut pending_blocks = pending_blocks.lock().await;
     pending_blocks.insert(block_number);
+}
+
+async fn wait_until_unpaused(
+    most_eth: &Most<SignedEthConnection>,
+) -> Result<(), AzeroListenerError> {
+    loop {
+        if !most_eth.paused().call().await? {
+            return Ok(());
+        }
+        sleep(Duration::from_secs(10)).await;
+    }
 }
 
 // handle all events present in one block
@@ -411,6 +427,7 @@ async fn handle_event(
             let tx_hash = receipt.transaction_hash;
             let tx_status = receipt.status;
 
+            // Check if the tx reverted.
             if tx_status == Some(U64::from(0)) {
                 warn!(
                     "Tx with nonce {request_nonce} has been sent to the Ethereum network: {tx_hash:?} but it reverted."
