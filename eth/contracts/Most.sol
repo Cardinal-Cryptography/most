@@ -6,8 +6,14 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
-contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
+contract Most is
+    Initializable,
+    UUPSUpgradeable,
+    Ownable2StepUpgradeable,
+    PausableUpgradeable
+{
     uint256 public requestNonce;
     uint256 public committeeId;
     address payable public wethAddress;
@@ -78,6 +84,8 @@ contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
         wethAddress = _wethAddress;
         // inititialize the OwnableUpgradeable
         __Ownable_init(owner);
+        // inititialize the PausableUpgradeable
+        __Pausable_init();
     }
 
     // required by the OZ UUPS module
@@ -96,7 +104,7 @@ contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
         bytes32 srcTokenAddress,
         uint256 amount,
         bytes32 destReceiverAddress
-    ) external {
+    ) external whenNotPaused {
         address sender = msg.sender;
 
         IERC20 token = IERC20(bytes32ToAddress(srcTokenAddress));
@@ -159,7 +167,7 @@ contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
         uint256 amount,
         bytes32 destReceiverAddress,
         uint256 _requestNonce
-    ) external _onlyCommitteeMember(_committeeId) {
+    ) external whenNotPaused _onlyCommitteeMember(_committeeId) {
         // Don't revert if the request has already been processed as
         // such a call can be made during regular guardian operation.
         if (processedRequests[_requestHash]) {
@@ -217,6 +225,14 @@ contract Most is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
             }
             emit RequestProcessed(requestHash);
         }
+    }
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
     }
 
     function hasSignedRequest(
