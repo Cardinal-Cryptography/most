@@ -1,4 +1,7 @@
-use std::sync::{atomic::AtomicBool, Arc};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 
 use ethers::{
     abi::EncodePackedError,
@@ -50,6 +53,9 @@ pub enum EthListenerError {
 
     #[error("redis connection error")]
     Redis(#[from] RedisError),
+
+    #[error("Committee ID mismatch in the transfer request event data - required restart with updated committee ID")]
+    CommitteeIdMismatch,
 }
 
 pub const ETH_BLOCK_PROD_TIME_SEC: u64 = 15;
@@ -108,8 +114,11 @@ impl EthListener {
             )
             .await;
 
-            match emergency.load(std::sync::atomic::Ordering::Relaxed) {
-                true => trace!("Event handling paused due to an emergency state in one of the Advisory contracts"),
+            match emergency.load(Ordering::Relaxed) {
+                true => {
+                    warn!("Event handling paused due to an emergency state in one of the Advisory contracts");
+                    sleep(Duration::from_secs(20)).await;
+                }
                 false => {
                     // Don't query for more than `sync_step` blocks at one time.
                     let to_block = std::cmp::min(
@@ -119,8 +128,7 @@ impl EthListener {
 
                     info!(
                         "Processing events from blocks {} - {}",
-                        first_unprocessed_block_number,
-                        to_block
+                        first_unprocessed_block_number, to_block
                     );
 
                     // Query for events.
@@ -141,11 +149,12 @@ impl EthListener {
                                     error!("Error when handling event {event:?}: {e}");
                                     if most_azero.is_halted(&azero_connection).await? {
                                         warn!("Most contract on Aleph Zero is halted, stopping event handling");
-                                        wait_until_not_halted(&most_azero, &azero_connection).await?;
+                                        wait_until_not_halted(&most_azero, &azero_connection)
+                                            .await?;
                                     } else {
                                         return Err(EthListenerError::AzeroContract(e));
                                     }
-                                },
+                                }
                                 Err(e) => return Err(e),
                             }
                         }
@@ -162,7 +171,7 @@ impl EthListener {
                         to_block,
                     )
                     .await?;
-                },
+                }
             }
         }
     }
@@ -192,11 +201,7 @@ async fn handle_event(
         } = config;
 
         if *relayers_committee_id != committee_id.as_u128() {
-            warn!(
-                "Ignoring event from committee {}, expected {}",
-                committee_id, relayers_committee_id
-            );
-            return Ok(());
+            return Err(EthListenerError::CommitteeIdMismatch);
         }
 
         info!("handling eth contract event: {crosschain_transfer_event:?}");

@@ -3,14 +3,15 @@ use std::{
     sync::{atomic::AtomicBool, Arc},
 };
 
+use aleph_client::Connection;
 use clap::Parser;
 use config::Config;
 use connections::EthConnectionError;
 use ethers::signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, Signer, WalletError};
 use eyre::Result;
 use listeners::AdvisoryListenerError;
-use log::{debug, error, info};
-use redis::{Client as RedisClient, RedisError};
+use log::{debug, error, info, warn};
+use redis::{aio::Connection as RedisConnection, Client as RedisClient, RedisError};
 use thiserror::Error;
 use tokio::{sync::Mutex, task::JoinSet};
 
@@ -19,6 +20,7 @@ use crate::{
         azero::{self, AzeroConnectionWithSigner},
         eth,
     },
+    eth::{EthConnection, SignedEthConnection},
     listeners::{
         AdvisoryListener, AlephZeroListener, AzeroListenerError, EthListener, EthListenerError,
     },
@@ -90,23 +92,6 @@ async fn main() -> Result<()> {
 
     debug!("Established connection to Aleph Zero node");
 
-    let advisory_config_rc = Arc::clone(&config);
-    let advisory_emergency_rc = Arc::clone(&emergency);
-    let advisory_listener_azero_connection_rc = azero_connection.clone();
-
-    // run task only if address passed on CLI
-    if config.advisory_contract_addresses.is_some() {
-        tasks.spawn(async move {
-            AdvisoryListener::run(
-                advisory_config_rc,
-                advisory_listener_azero_connection_rc,
-                advisory_emergency_rc,
-            )
-            .await
-            .map_err(ListenerError::from)
-        });
-    }
-
     let wallet = if config.dev {
         // If no keystore path is provided, we use the default development mnemonic
         MnemonicBuilder::<English>::default()
@@ -139,47 +124,96 @@ async fn main() -> Result<()> {
 
     debug!("Established connection to Ethereum node");
 
-    let eth_listener_config_rc = Arc::clone(&config);
-    let eth_listener_redis_connection_rc = Arc::clone(&redis_connection);
-    let eth_listener_emergency_rc = Arc::clone(&emergency);
+    // run task only if address passed on CLI
+    if config.advisory_contract_addresses.is_some() {
+        spawn_advisory_listener(
+            &mut tasks,
+            Arc::clone(&config),
+            Arc::clone(&azero_connection),
+            Arc::clone(&emergency),
+        );
+    }
 
-    info!("Starting Ethereum listener");
+    spawn_eth_listener(
+        &mut tasks,
+        Arc::clone(&config),
+        azero_signed_connection,
+        eth_connection,
+        Arc::clone(&redis_connection),
+        Arc::clone(&emergency),
+    );
 
-    tasks.spawn(async move {
-        EthListener::run(
-            eth_listener_config_rc,
-            azero_signed_connection,
-            eth_connection,
-            eth_listener_redis_connection_rc,
-            eth_listener_emergency_rc,
-        )
-        .await
-        .map_err(ListenerError::from)
-    });
-
-    info!("Starting AlephZero listener");
-
-    let aleph_zero_listener_config_rc = Arc::clone(&config);
-    let aleph_zero_listener_azero_signed_connection_rc = azero_connection.clone();
-    let aleph_zero_listener_redis_connection_rc = Arc::clone(&redis_connection);
-    let aleph_zero_listener_emergency_rc = Arc::clone(&emergency);
-
-    tasks.spawn(async move {
-        AlephZeroListener::run(
-            aleph_zero_listener_config_rc,
-            aleph_zero_listener_azero_signed_connection_rc,
-            eth_signed_connection,
-            aleph_zero_listener_redis_connection_rc,
-            aleph_zero_listener_emergency_rc,
-        )
-        .await
-        .map_err(ListenerError::from)
-    });
+    spawn_azero_listener(
+        &mut tasks,
+        Arc::clone(&config),
+        azero_connection,
+        eth_signed_connection,
+        Arc::clone(&redis_connection),
+        Arc::clone(&emergency),
+    );
 
     while let Some(result) = tasks.join_next().await {
-        error!("Listener task has finished unexpectedly: {:?}", result);
+        warn!("Listener task has finished unexpectedly: {:?}", result);
         result??;
     }
 
     process::exit(-1);
+}
+
+fn spawn_azero_listener(
+    tasks: &mut JoinSet<Result<(), ListenerError>>,
+    config: Arc<Config>,
+    azero_connection: Arc<Connection>,
+    eth_connection: Arc<SignedEthConnection>,
+    redis_connection: Arc<Mutex<RedisConnection>>,
+    emergency: Arc<AtomicBool>,
+) {
+    info!("Starting AlephZero listener");
+    tasks.spawn(async move {
+        AlephZeroListener::run(
+            config,
+            azero_connection,
+            eth_connection,
+            redis_connection,
+            emergency,
+        )
+        .await
+        .map_err(ListenerError::from)
+    });
+}
+
+fn spawn_eth_listener(
+    tasks: &mut JoinSet<Result<(), ListenerError>>,
+    config: Arc<Config>,
+    azero_connection: AzeroConnectionWithSigner,
+    eth_connection: Arc<EthConnection>,
+    redis_connection: Arc<Mutex<RedisConnection>>,
+    emergency: Arc<AtomicBool>,
+) {
+    info!("Starting Ethereum listener");
+    tasks.spawn(async move {
+        EthListener::run(
+            config,
+            azero_connection,
+            eth_connection,
+            redis_connection,
+            emergency,
+        )
+        .await
+        .map_err(ListenerError::from)
+    });
+}
+
+fn spawn_advisory_listener(
+    tasks: &mut JoinSet<Result<(), ListenerError>>,
+    config: Arc<Config>,
+    azero_connection: Arc<Connection>,
+    emergency: Arc<AtomicBool>,
+) {
+    info!("Starting Advisory listener");
+    tasks.spawn(async move {
+        AdvisoryListener::run(config, azero_connection, emergency)
+            .await
+            .map_err(ListenerError::from)
+    });
 }

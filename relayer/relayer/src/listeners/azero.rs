@@ -20,13 +20,13 @@ use ethers::{
     types::U64,
     utils::keccak256,
 };
-use log::{debug, error, info, trace, warn};
+use log::{debug, error, info, warn};
 use redis::{aio::Connection as RedisConnection, RedisError};
 use subxt::{events::Events, utils::H256};
 use thiserror::Error;
 use tokio::{
     sync::{AcquireError, Mutex, OwnedSemaphorePermit, Semaphore},
-    task::JoinSet,
+    task::{JoinError, JoinSet},
     time::{sleep, Duration},
 };
 
@@ -82,13 +82,16 @@ pub enum AzeroListenerError {
     Redis(#[from] RedisError),
 
     #[error("Join error")]
-    Join(#[from] tokio::task::JoinError),
+    Join(#[from] JoinError),
 
     #[error("Semaphore error")]
     Semaphore(#[from] AcquireError),
 
     #[error("Contract reverted")]
     EthContractReverted,
+
+    #[error("Committee ID mismatch in the transfer request event data - required restart with updated committee ID")]
+    CommitteeIdMismatch,
 }
 
 const ALEPH_LAST_BLOCK_KEY: &str = "alephzero_last_known_block_number";
@@ -161,7 +164,10 @@ impl AlephZeroListener {
             .await;
 
             match emergency.load(Ordering::Relaxed) {
-                true => trace!("Event handling paused due to an emergency state in one of the Advisory contracts"),
+                true => {
+                    warn!("Event handling paused due to an emergency state in one of the Advisory contracts");
+                    sleep(Duration::from_secs(20)).await;
+                }
                 false => {
                     to_block = min(to_block, first_unprocessed_block_number + (*sync_step) - 1);
 
@@ -184,7 +190,8 @@ impl AlephZeroListener {
                     .await?;
 
                     for (block_details, events) in block_events {
-                        let filtered_events = most_azero.filter_events(events, block_details.clone());
+                        let filtered_events =
+                            most_azero.filter_events(events, block_details.clone());
 
                         handle_events(
                             config.clone(),
@@ -203,23 +210,30 @@ impl AlephZeroListener {
                     while let Some(result) = block_sealing_tasks.try_join_next() {
                         match result? {
                             Ok(_) => {}
-                            Err(e) => {
-                                error!("Error in event handler task: {}", e);
+                            Err(err) => {
+                                error!("Error in event handler task: {}", err);
 
-                                if most_eth.paused().call().await? {
-                                    warn!("Most contract on Ethereum is halted, pausing event handling");
+                                // Wait for currently active block tasks to finish before restarting the listener
+                                while let Some(result) = block_sealing_tasks.join_next().await {
+                                    _ = result?;
+                                }
 
-                                    // Wait for currently active block tasks to finish before restarting the listener
-                                    while let Some(result) = block_sealing_tasks.join_next().await {
-                                        _ = result?;
+                                match err {
+                                    AzeroListenerError::EthContractReverted => {
+                                        if most_eth.paused().call().await? {
+                                            warn!("Most contract on Ethereum is halted, pausing event handling");
+
+                                            wait_until_unpaused(&most_eth).await?;
+
+                                            // Simplest way to recover from a halted bridge is to restart the azero listener
+                                            return Err(
+                                                AzeroListenerError::BridgeHaltedRestartRequired,
+                                            );
+                                        } else {
+                                            return Err(err);
+                                        }
                                     }
-
-                                    wait_until_unpaused(&most_eth).await?;
-
-                                    // Simplest way to recover from a halted bridge is to restart the azero listener
-                                    return Err(AzeroListenerError::BridgeHaltedRestartRequired);
-                                } else {
-                                    return Err(e);
+                                    _ => return Err(err),
                                 }
                             }
                         }
@@ -363,11 +377,7 @@ async fn handle_event(
             } = get_request_event_data(&data)?;
 
             if committee_id != *relayers_committee_id {
-                warn!(
-                    "Ignoring event from committee {}, expected {}",
-                    committee_id, relayers_committee_id
-                );
-                return Ok(());
+                return Err(AzeroListenerError::CommitteeIdMismatch);
             }
 
             info!(
