@@ -89,9 +89,6 @@ pub enum AzeroListenerError {
 
     #[error("Contract reverted")]
     EthContractReverted,
-
-    #[error("Committee ID mismatch in the transfer request event data - required restart with updated committee ID")]
-    CommitteeIdMismatch,
 }
 
 pub const ALEPH_LAST_BLOCK_KEY: &str = "alephzero_last_known_block_number";
