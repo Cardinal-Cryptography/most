@@ -3,6 +3,7 @@ use std::{
     sync::{atomic::AtomicBool, Arc},
 };
 
+use ::tokio::time::Duration;
 use aleph_client::Connection;
 use clap::Parser;
 use config::Config;
@@ -13,7 +14,7 @@ use listeners::AdvisoryListenerError;
 use log::{debug, error, info, warn};
 use redis::{aio::Connection as RedisConnection, Client as RedisClient, RedisError};
 use thiserror::Error;
-use tokio::{sync::Mutex, task::JoinSet};
+use tokio::{sync::Mutex, task::JoinSet, time::sleep};
 
 use crate::{
     connections::{
@@ -128,8 +129,23 @@ async fn main() -> Result<()> {
         eth_connection,
         eth_signed_connection,
         redis_connection,
-    ).await {
-        error!("Error spawning listeners: {}", err);
+    )
+    .await
+    {
+        loop {
+            error!("Error when running listeners, this might require manual investigation or RESTART...");
+            err.chain()
+                .enumerate()
+                .for_each(|(level, cause)| {
+                    let cause = cause.to_string();
+                    if cause.len() > 100 {
+                        error!(" {}: {}...", level, &cause[..100]);
+                    } else {
+                        error!(" {}: {}", level, cause);
+                    }
+                });
+            sleep(Duration::from_secs(50)).await;
+        }
     }
 
     process::exit(-1);
@@ -175,7 +191,6 @@ async fn run_listeners(
     );
 
     while let Some(result) = tasks.join_next().await {
-        warn!("Listener task has finished unexpectedly: {:?}", result);
         result??;
     }
 
