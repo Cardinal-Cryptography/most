@@ -10,15 +10,15 @@ use aleph_client::{
         ContractInstance,
     },
     contract_transcode::{ContractMessageTranscoder, Value, Value::Seq},
-    pallets::contract::ContractsUserApi,
+    pallets::contract::{ContractCallArgs, ContractRpc, ContractsUserApi},
     sp_weights::weight_v2::Weight,
-    AccountId, AlephConfig, Connection, TxInfo, TxStatus,
+    AccountId, AlephConfig, AsConnection, Connection, SignedConnectionApi, TxInfo, TxStatus,
 };
 use log::trace;
 use subxt::events::Events;
 use thiserror::Error;
 
-use crate::connections::azero::AzeroConnectionWithSigner;
+use crate::{connections::azero::AzeroConnectionWithSigner, contracts::azero::Value::Tuple};
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -35,6 +35,9 @@ pub enum AzeroContractError {
 
     #[error("Missing or invalid field")]
     MissingOrInvalidField(String),
+
+    #[error("Dry run failed")]
+    DryRunFailed(String),
 }
 
 pub struct AdvisoryInstance {
@@ -130,6 +133,55 @@ impl MostInstance {
             .map_err(AzeroContractError::AlephClient)
     }
 
+    pub async fn is_halted(
+        &self,
+        connection: &AzeroConnectionWithSigner,
+    ) -> Result<bool, AzeroContractError> {
+        let data = self.transcoder.encode::<_, &str>("is_halted", [])?;
+        let args = ContractCallArgs {
+            origin: connection.account_id().clone(),
+            dest: self.address.clone(),
+            value: 0,
+            gas_limit: None,
+            input_data: data,
+            storage_deposit_limit: None,
+        };
+
+        let contract_read_result = connection.as_connection().call_and_get(args).await?;
+
+        if let Ok(res) = &contract_read_result.result {
+            match self
+                .transcoder
+                .decode_return("is_halted", &mut res.data.as_slice())?
+            {
+                Tuple(tuple) => {
+                    if tuple.ident() == Some("Ok".to_string()) {
+                        Ok(decode_bool_from_tuple(
+                            tuple.values().collect::<Vec<_>>()[0],
+                        )?)
+                    } else if tuple.ident() == Some("Err".to_string()) {
+                        Err(AzeroContractError::DryRunFailed(format!(
+                            "{:?}",
+                            tuple.values().collect::<Vec<_>>()
+                        )))
+                    } else {
+                        Err(AzeroContractError::DryRunFailed(
+                            "Invalid response".to_string(),
+                        ))
+                    }
+                }
+                _ => Err(AzeroContractError::DryRunFailed(
+                    "Invalid response".to_string(),
+                )),
+            }
+        } else {
+            Err(AzeroContractError::DryRunFailed(format!(
+                "{:?}",
+                contract_read_result
+            )))
+        }
+    }
+
     pub fn filter_events(
         &self,
         events: Events<AlephConfig>,
@@ -219,6 +271,24 @@ fn decode_uint_field(
         Err(AzeroContractError::MissingOrInvalidField(format!(
             "Data field {:?} couldn't be found or has incorrect format",
             field
+        )))
+    }
+}
+
+fn decode_bool_from_tuple(data: &Value) -> Result<bool, AzeroContractError> {
+    if let Tuple(tuple_val) = data {
+        if let Value::Bool(x) = tuple_val.values().collect::<Vec<_>>()[0] {
+            Ok(*x)
+        } else {
+            Err(AzeroContractError::DryRunFailed(format!(
+                "Value {:?} couldn't be decoded as bool",
+                data
+            )))
+        }
+    } else {
+        Err(AzeroContractError::DryRunFailed(format!(
+            "Value {:?} couldn't be decoded as bool",
+            data
         )))
     }
 }
