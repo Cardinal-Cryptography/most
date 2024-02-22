@@ -1,4 +1,4 @@
-FROM public.ecr.aws/p6e8q1z1/ink-dev:1.7.0
+FROM rust:1.70
 
 RUN apt update
 RUN apt install -y curl make
@@ -11,6 +11,5 @@ RUN . "$NVM_DIR/nvm.sh" && nvm use v${NODE_VERSION}
 RUN . "$NVM_DIR/nvm.sh" && nvm alias default v${NODE_VERSION}
 ENV PATH="/root/.nvm/versions/node/v${NODE_VERSION}/bin/:${PATH}"
 
-COPY * .
-# Trigger toolchain install
-RUN cargo check || true
+COPY rust-toolchain.toml .
+RUN cargo install cargo-contract --version 3.2.0

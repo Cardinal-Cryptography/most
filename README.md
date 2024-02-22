@@ -138,3 +138,15 @@ make deploy-azero
 ```bash
 make run-relayers
 ```
+
+## Verifying deployed contracts against source code
+
+Given a deployed (by us) Aleph Zero contract with some code hash `C` it's possible to check that the contract has been
+produced from a certain version of the source code in this repo (say a given commit). To do so:
+
+1. `git checkout $COMMIT`
+2. `make print-azero-codehashes`
+3. Find the contract in question in the list and ensure that the printed code hash is the same as `C`
+
+The contracts will be deployed using the same docker image as the one used for this procedure, which smooths out
+indeterminism in ink! contract compilation.
