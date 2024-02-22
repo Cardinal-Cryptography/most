@@ -1,8 +1,6 @@
 use std::str::FromStr;
 
-use aleph_client::{
-    contract::ContractInstance, keypair_from_string, sp_runtime::AccountId32, utility::BlocksApi,
-};
+use aleph_client::{contract::ContractInstance, keypair_from_string, sp_runtime::AccountId32};
 use ethers::{
     middleware::Middleware,
     signers::{coins_bip39::English, MnemonicBuilder, Signer},
@@ -49,12 +47,6 @@ pub async fn azero_to_eth() -> anyhow::Result<()> {
         .contract_exec(&azero_signed_connection, "PSP22::approve", &approve_args)
         .await?;
     info!("`approve` tx info: {:?}", approve_info);
-
-    loop {
-        if azero_signed_connection.get_finalized_block_hash().await? == approve_info.block_hash {
-            break;
-        }
-    }
 
     let most = ContractInstance::new(most_address, &config.contract_metadata_paths.azero_most)?;
 
