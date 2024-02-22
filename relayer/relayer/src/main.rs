@@ -65,9 +65,6 @@ async fn main() -> Result<()> {
 
     info!("{:#?}", &config);
 
-    let mut tasks = JoinSet::new();
-    let emergency = Arc::new(AtomicBool::new(false));
-
     let client = RedisClient::open(config.redis_node.clone())?;
     let redis_connection = Arc::new(Mutex::new(client.get_async_connection().await?));
 
@@ -124,32 +121,57 @@ async fn main() -> Result<()> {
 
     debug!("Established connection to Ethereum node");
 
+    if let Err(err) = run_listeners(
+        config,
+        azero_connection,
+        azero_signed_connection,
+        eth_connection,
+        eth_signed_connection,
+        redis_connection,
+    ).await {
+        error!("Error spawning listeners: {}", err);
+    }
+
+    process::exit(-1);
+}
+
+async fn run_listeners(
+    config: Arc<Config>,
+    azero_connection: Arc<Connection>,
+    azero_signed_connection: AzeroConnectionWithSigner,
+    eth_connection: Arc<EthConnection>,
+    eth_signed_connection: Arc<SignedEthConnection>,
+    redis_connection: Arc<Mutex<RedisConnection>>,
+) -> Result<()> {
+    let mut tasks = JoinSet::new();
+    let emergency = Arc::new(AtomicBool::new(false));
+
     // run task only if address passed on CLI
     if config.advisory_contract_addresses.is_some() {
         spawn_advisory_listener(
             &mut tasks,
-            Arc::clone(&config),
-            Arc::clone(&azero_connection),
-            Arc::clone(&emergency),
+            config.clone(),
+            azero_connection.clone(),
+            emergency.clone(),
         );
     }
 
     spawn_eth_listener(
         &mut tasks,
-        Arc::clone(&config),
+        config.clone(),
         azero_signed_connection,
         eth_connection,
-        Arc::clone(&redis_connection),
-        Arc::clone(&emergency),
+        redis_connection.clone(),
+        emergency.clone(),
     );
 
     spawn_azero_listener(
         &mut tasks,
-        Arc::clone(&config),
+        config.clone(),
         azero_connection,
         eth_signed_connection,
-        Arc::clone(&redis_connection),
-        Arc::clone(&emergency),
+        redis_connection.clone(),
+        emergency.clone(),
     );
 
     while let Some(result) = tasks.join_next().await {
@@ -157,7 +179,7 @@ async fn main() -> Result<()> {
         result??;
     }
 
-    process::exit(-1);
+    Ok(())
 }
 
 fn spawn_azero_listener(
@@ -185,7 +207,7 @@ fn spawn_azero_listener(
 fn spawn_eth_listener(
     tasks: &mut JoinSet<Result<(), ListenerError>>,
     config: Arc<Config>,
-    azero_connection: AzeroConnectionWithSigner,
+    azero_signed_connection: AzeroConnectionWithSigner,
     eth_connection: Arc<EthConnection>,
     redis_connection: Arc<Mutex<RedisConnection>>,
     emergency: Arc<AtomicBool>,
@@ -194,7 +216,7 @@ fn spawn_eth_listener(
     tasks.spawn(async move {
         EthListener::run(
             config,
-            azero_connection,
+            azero_signed_connection,
             eth_connection,
             redis_connection,
             emergency,
