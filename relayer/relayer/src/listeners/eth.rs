@@ -210,7 +210,7 @@ async fn handle_event(
         let bytes = concat_u8_arrays(vec![
             &committee_id.as_u128().to_le_bytes(),
             dest_token_address,
-            &(amount+1).as_u128().to_le_bytes(),
+            &amount.as_u128().to_le_bytes(),
             dest_receiver_address,
             &request_nonce.as_u128().to_le_bytes(),
         ]);

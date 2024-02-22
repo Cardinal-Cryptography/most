@@ -132,6 +132,7 @@ async fn main() -> Result<()> {
     )
     .await
     {
+        // For most errors we don't want to automatically restart the relayer but wait for manual intervention
         loop {
             error!("Error when running listeners, this might require manual investigation or RESTART...");
             err.chain()
@@ -176,7 +177,7 @@ async fn run_listeners(
         &mut tasks,
         config.clone(),
         azero_signed_connection,
-        eth_connection,
+        eth_connection.clone(),
         redis_connection.clone(),
         emergency.clone(),
     );
@@ -184,14 +185,28 @@ async fn run_listeners(
     spawn_azero_listener(
         &mut tasks,
         config.clone(),
-        azero_connection,
-        eth_signed_connection,
+        azero_connection.clone(),
+        eth_signed_connection.clone(),
         redis_connection.clone(),
         emergency.clone(),
     );
 
     while let Some(result) = tasks.join_next().await {
-        result??;
+        match result? {
+            Ok(_) => {},
+            Err(ListenerError::Azero(AzeroListenerError::BridgeHaltedRestartRequired)) => {
+                warn!("Restarting AlephZero listener");
+                spawn_azero_listener(
+                    &mut tasks,
+                    config.clone(),
+                    azero_connection.clone(),
+                    eth_signed_connection.clone(),
+                    redis_connection.clone(),
+                    emergency.clone(),
+                );
+            },
+            Err(err) => return Err(err.into()),
+        }
     }
 
     Ok(())
@@ -201,7 +216,7 @@ fn spawn_azero_listener(
     tasks: &mut JoinSet<Result<(), ListenerError>>,
     config: Arc<Config>,
     azero_connection: Arc<Connection>,
-    eth_connection: Arc<SignedEthConnection>,
+    eth_signed_connection: Arc<SignedEthConnection>,
     redis_connection: Arc<Mutex<RedisConnection>>,
     emergency: Arc<AtomicBool>,
 ) {
@@ -210,7 +225,7 @@ fn spawn_azero_listener(
         AlephZeroListener::run(
             config,
             azero_connection,
-            eth_connection,
+            eth_signed_connection,
             redis_connection,
             emergency,
         )
