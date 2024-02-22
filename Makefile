@@ -118,6 +118,20 @@ compile-azero-docker: azero-deps most-builder
 		most-builder \
 		make compile-azero
 
+.PHONY: print-azero-codehashes
+print-azero-codehashes: # Print codehashes of azero contracts compiled in docker
+print-azero-codehashes: compile-azero-docker
+	@echo
+	@echo "-------------------"
+	@echo "CONTRACT CODEHASHES"
+	@echo "-------------------"
+	@echo
+
+	@cd azero && for file in artifacts/*.json; do \
+		echo "$$file"; \
+		cat "$$file" | jq '.source .hash'; \
+	done
+
 .PHONY: deploy-azero-docker
 deploy-azero-docker: # Deploy azero contracts compiling in docker
 deploy-azero-docker: azero-deps compile-azero-docker
