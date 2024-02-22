@@ -59,7 +59,7 @@ pub enum EthListenerError {
 }
 
 pub const ETH_BLOCK_PROD_TIME_SEC: u64 = 15;
-const ETH_LAST_BLOCK_KEY: &str = "ethereum_last_known_block_number";
+pub const ETH_LAST_BLOCK_KEY: &str = "ethereum_last_known_block_number";
 
 pub struct EthListener;
 
@@ -80,7 +80,6 @@ impl EthListener {
             name,
             default_sync_from_block_eth,
             sync_step,
-            override_eth_cache,
             ..
         } = &*config;
 
@@ -93,17 +92,13 @@ impl EthListener {
             *azero_proof_size_limit,
         )?;
 
-        let mut first_unprocessed_block_number = if *override_eth_cache {
-            **default_sync_from_block_eth
-        } else {
-            read_first_unprocessed_block_number(
-                name.clone(),
-                ETH_LAST_BLOCK_KEY.to_string(),
-                redis_connection.clone(),
-                **default_sync_from_block_eth,
-            )
-            .await
-        };
+        let mut first_unprocessed_block_number = read_first_unprocessed_block_number(
+            name.clone(),
+            ETH_LAST_BLOCK_KEY.to_string(),
+            redis_connection.clone(),
+            **default_sync_from_block_eth,
+        )
+        .await;
 
         // Main Ethereum event loop.
         loop {

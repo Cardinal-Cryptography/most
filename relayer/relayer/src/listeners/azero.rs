@@ -94,7 +94,7 @@ pub enum AzeroListenerError {
     CommitteeIdMismatch,
 }
 
-const ALEPH_LAST_BLOCK_KEY: &str = "alephzero_last_known_block_number";
+pub const ALEPH_LAST_BLOCK_KEY: &str = "alephzero_last_known_block_number";
 const ALEPH_BLOCK_PROD_TIME_SEC: u64 = 1;
 // This is more than the maximum number of send_request calls than will fit into the block (execution time)
 const ALEPH_MAX_REQUESTS_PER_BLOCK: usize = 50;
@@ -120,7 +120,6 @@ impl AlephZeroListener {
             default_sync_from_block_azero,
             name,
             sync_step,
-            override_azero_cache,
             ..
         } = &*config;
 
@@ -139,17 +138,13 @@ impl AlephZeroListener {
         let most_eth_address = eth_contract_address.parse::<Address>()?;
         let most_eth = Most::new(most_eth_address, eth_connection.clone());
 
-        let mut first_unprocessed_block_number = if *override_azero_cache {
-            **default_sync_from_block_azero
-        } else {
-            read_first_unprocessed_block_number(
-                name.clone(),
-                ALEPH_LAST_BLOCK_KEY.to_string(),
-                redis_connection.clone(),
-                **default_sync_from_block_azero,
-            )
-            .await
-        };
+        let mut first_unprocessed_block_number = read_first_unprocessed_block_number(
+            name.clone(),
+            ALEPH_LAST_BLOCK_KEY.to_string(),
+            redis_connection.clone(),
+            **default_sync_from_block_azero,
+        )
+        .await;
 
         // Add the first block number to the set of pending blocks.
         add_to_pending(first_unprocessed_block_number, pending_blocks.clone()).await;

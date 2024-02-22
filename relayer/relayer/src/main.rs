@@ -20,10 +20,12 @@ use crate::{
     connections::{
         azero::{self, AzeroConnectionWithSigner},
         eth,
+        redis_helpers::write_last_processed_block,
     },
     eth::{EthConnection, SignedEthConnection},
     listeners::{
         AdvisoryListener, AlephZeroListener, AzeroListenerError, EthListener, EthListenerError,
+        ALEPH_LAST_BLOCK_KEY, ETH_LAST_BLOCK_KEY,
     },
 };
 
@@ -68,6 +70,26 @@ async fn main() -> Result<()> {
 
     let client = RedisClient::open(config.redis_node.clone())?;
     let redis_connection = Arc::new(Mutex::new(client.get_async_connection().await?));
+
+    if config.override_azero_cache {
+        write_last_processed_block(
+            config.name.clone(),
+            ALEPH_LAST_BLOCK_KEY.to_string(),
+            redis_connection.clone(),
+            *config.default_sync_from_block_azero - 1,
+        )
+        .await?;
+    }
+
+    if config.override_eth_cache {
+        write_last_processed_block(
+            config.name.clone(),
+            ETH_LAST_BLOCK_KEY.to_string(),
+            redis_connection.clone(),
+            *config.default_sync_from_block_eth - 1,
+        )
+        .await?;
+    }
 
     let azero_connection = Arc::new(azero::init(&config.azero_node_wss_url).await);
     let azero_signed_connection = if let Some(cid) = config.signer_cid {
@@ -135,16 +157,14 @@ async fn main() -> Result<()> {
         // For most errors we don't want to automatically restart the relayer but wait for manual intervention
         loop {
             error!("Error when running listeners, this might require manual investigation or RESTART...");
-            err.chain()
-                .enumerate()
-                .for_each(|(level, cause)| {
-                    let cause = cause.to_string();
-                    if cause.len() > 100 {
-                        error!(" {}: {}...", level, &cause[..100]);
-                    } else {
-                        error!(" {}: {}", level, cause);
-                    }
-                });
+            err.chain().enumerate().for_each(|(level, cause)| {
+                let cause = cause.to_string();
+                if cause.len() > 100 {
+                    error!(" {}: {}...", level, &cause[..100]);
+                } else {
+                    error!(" {}: {}", level, cause);
+                }
+            });
             sleep(Duration::from_secs(50)).await;
         }
     }
@@ -193,7 +213,7 @@ async fn run_listeners(
 
     while let Some(result) = tasks.join_next().await {
         match result? {
-            Ok(_) => {},
+            Ok(_) => {}
             Err(ListenerError::Azero(AzeroListenerError::BridgeHaltedRestartRequired)) => {
                 warn!("Restarting AlephZero listener");
                 spawn_azero_listener(
@@ -204,7 +224,7 @@ async fn run_listeners(
                     redis_connection.clone(),
                     emergency.clone(),
                 );
-            },
+            }
             Err(err) => return Err(err.into()),
         }
     }
