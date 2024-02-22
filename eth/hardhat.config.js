@@ -2,16 +2,34 @@ require("@nomicfoundation/hardhat-toolbox");
 require("@openzeppelin/hardhat-upgrades");
 require("@nomicfoundation/hardhat-chai-matchers");
 require("@nomiclabs/hardhat-truffle5");
+require("@nomicfoundation/hardhat-verify");
 
 // The default account generated from this mnemonic is Ee88da44b4901d7F86970c52dC5139Af80C83edD.
 // This account is pre-seeded with money locally and on bridgenet.
 const DEV_MNEMONIC =
   "harsh master island dirt equip search awesome double turn crush wool grant";
 
+const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY;
+const SEPOLIA_KEY = process.env.SEPOLIA_KEY;
+
 module.exports = {
   defaultNetwork: "hardhat",
+  etherscan: {
+    apiKey: ETHERSCAN_API_KEY,
+  },
+
+  sourcify: {
+    enabled: true,
+  },
+
   networks: {
     hardhat: {},
+
+    sepolia: {
+      url: "https://ethereum-sepolia-rpc.publicnode.com",
+      accounts: [SEPOLIA_KEY],
+    },
+
     development: {
       url: "http://127.0.0.1:8545",
       accounts: {
@@ -34,13 +52,14 @@ module.exports = {
         governanceThreshold: 2,
       },
     },
+
     bridgenet: {
       url: "https://rpc-eth-bridgenet.dev.azero.dev",
       accounts: {
         mnemonic: DEV_MNEMONIC,
       },
       governanceThreshold: 2,
-      chainId: 12345,
+      chainId: 12_345,
       gas: 25e6, // Gas limit
       gasPrice: 20e9,
       deploymentConfig: {
@@ -88,6 +107,6 @@ module.exports = {
     artifacts: "./artifacts",
   },
   mocha: {
-    timeout: 40000,
+    timeout: 40_000,
   },
 };
