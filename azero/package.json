@@ -6,9 +6,8 @@
     "description": "azero most bridge",
     "scripts": {
         "watch": "gulp default",
-        "compile": "typechain-compiler --release --toolchain nightly-2024-01-31",
-        "deploy": "npm config set script-shell \"/bin/bash\"; ts-node scripts/deploy.ts",
-        "ethereum_to_aleph": "ts-node e2e/ethereum_to_aleph.ts"
+        "compile": "typechain-compiler --release --toolchain nightly-2024-02-16",
+        "deploy": "npm config set script-shell \"/bin/bash\"; ts-node scripts/deploy.ts"
     },
     "dependencies": {
         "@727-ventures/typechain-compiler": "^1.1.0",

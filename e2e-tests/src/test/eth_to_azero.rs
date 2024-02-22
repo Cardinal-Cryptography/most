@@ -1,4 +1,4 @@
-use std::{ops::AddAssign, str::FromStr};
+use std::str::FromStr;
 
 use aleph_client::{contract::ContractInstance, keypair_from_string, sp_runtime::AccountId32};
 use ethers::{
@@ -8,7 +8,7 @@ use ethers::{
 };
 use log::info;
 
-use crate::{azero, config::setup_test, eth};
+use crate::{azero, config::setup_test, eth, wait::wait_for_balance_change};
 
 /// One-way `Ethereum` -> `Aleph Zero` transfer through `most`.
 /// Wraps the required funds into wETH for an Ethereum account.
@@ -33,7 +33,7 @@ pub async fn eth_to_azero() -> anyhow::Result<()> {
     let weth_eth_address = eth_contract_addresses.weth.parse::<Address>()?;
 
     let weth_abi = eth::contract_abi(&config.contract_metadata_paths.eth_weth)?;
-    let weth = eth::contract_from_deployed(weth_eth_address, weth_abi, &eth_signed_connection)?;
+    let weth_eth = eth::contract_from_deployed(weth_eth_address, weth_abi, &eth_signed_connection)?;
 
     let transfer_amount = utils::parse_ether(config.test_args.transfer_amount)?;
     let send_receipt = eth::send_tx(
@@ -47,22 +47,19 @@ pub async fn eth_to_azero() -> anyhow::Result<()> {
 
     let most_address = eth_contract_addresses.most.parse::<Address>()?;
 
-    let approve_args = (
-        most_address,
-        utils::parse_ether(config.test_args.transfer_amount)?,
-    );
+    let approve_args = (most_address, transfer_amount);
 
     let approve_receipt =
-        eth::call_contract_method(weth, "approve", config.eth_gas_limit, approve_args).await?;
-    info!("'Approve' tx receipt: {:?}", approve_receipt);
+        eth::call_contract_method(weth_eth, "approve", config.eth_gas_limit, approve_args).await?;
+    info!("`Approve` tx receipt: {:?}", approve_receipt);
 
     let azero_contract_addresses =
         azero::contract_addresses(&config.azero_contract_addresses_path)?;
-    let weth_azero_account_id = AccountId32::from_str(&azero_contract_addresses.weth)
+    let weth_azero_address = AccountId32::from_str(&azero_contract_addresses.weth)
         .map_err(|e| anyhow::anyhow!("Cannot parse account id from string: {:?}", e))?;
 
-    let weth_azero_contract = ContractInstance::new(
-        weth_azero_account_id,
+    let weth_azero = ContractInstance::new(
+        weth_azero_address,
         &config.contract_metadata_paths.azero_token,
     )?;
 
@@ -71,7 +68,7 @@ pub async fn eth_to_azero() -> anyhow::Result<()> {
     let azero_account_keypair = keypair_from_string("//Alice");
     let azero_account = azero_account_keypair.account_id();
 
-    let balance_pre_transfer: u128 = weth_azero_contract
+    let balance_pre_transfer: u128 = weth_azero
         .contract_read(
             &azero_connection,
             "PSP22::balance_of",
@@ -93,49 +90,30 @@ pub async fn eth_to_azero() -> anyhow::Result<()> {
 
     let send_request_args = (
         weth_eth_address_bytes,
-        utils::parse_ether(config.test_args.transfer_amount)?,
+        transfer_amount,
         azero_account_address_bytes,
     );
     let send_request_receipt =
         eth::call_contract_method(most, "sendRequest", config.eth_gas_limit, send_request_args)
             .await?;
-    info!("'sendRequest' tx receipt: {:?}", send_request_receipt);
+    info!("`sendRequest` tx receipt: {:?}", send_request_receipt);
 
-    let tick = tokio::time::Duration::from_secs(30_u64);
-    let wait_max = tokio::time::Duration::from_secs(60_u64 * config.test_args.wait_max_minutes);
-
-    info!(
-        "Waiting a max. of {:?} minutes for finalization",
-        config.test_args.wait_max_minutes
-    );
-
-    let mut wait = tokio::time::Duration::from_secs(0_u64);
-
-    while wait <= wait_max {
-        tokio::time::sleep(tick).await;
-        wait.add_assign(tick);
-        let balance_current: u128 = weth_azero_contract
+    let get_current_balance = || async {
+        let balance_current: u128 = weth_azero
             .contract_read(
                 &azero_connection,
                 "PSP22::balance_of",
                 &[azero_account.to_string()],
             )
             .await?;
-        let balance_change = balance_current - balance_pre_transfer;
-        if balance_change == transfer_amount.as_u128() {
-            info!(
-                "wETH (Aleph Zero) required balance change detected: {:?}",
-                balance_change
-            );
-            return Ok(());
-        }
-        if wait.as_secs() % 60 == 0 {
-            info!("minutes elapsed: {:?}", wait.as_secs() / 60)
-        }
-    }
+        Ok(balance_current)
+    };
 
-    Err(anyhow::anyhow!(
-        "Failed to detect required wETH (Aleph Zero) balance change of: {:?}",
-        transfer_amount
-    ))
+    wait_for_balance_change(
+        transfer_amount.as_u128(),
+        balance_pre_transfer,
+        get_current_balance,
+        config.test_args.wait_max_minutes,
+    )
+    .await
 }

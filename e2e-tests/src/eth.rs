@@ -1,6 +1,5 @@
 use std::{fs, sync::Arc};
 
-use anyhow;
 use ethers::{
     contract::{Contract, ContractInstance},
     core::{
@@ -22,6 +21,12 @@ pub struct EthContractAddresses {
     pub most: String,
     pub usdt: String,
     pub weth: String,
+}
+
+pub async fn connection(node_http: &str) -> anyhow::Result<Provider<Http>> {
+    Provider::<Http>::try_connect(node_http)
+        .await
+        .map_err(|e| anyhow::anyhow!("Cannot establish ETH connection: {:?}", e))
 }
 
 pub async fn signed_connection(

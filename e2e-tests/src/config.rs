@@ -1,4 +1,4 @@
-use std::{env, str::FromStr, string::ToString};
+use std::{env, str::FromStr};
 
 use once_cell::sync::Lazy;
 
@@ -8,6 +8,7 @@ static GLOBAL_CONFIG: Lazy<Config> = Lazy::new(|| Config {
         .unwrap_or("../azero/addresses.json".to_string()),
     azero_metadata_path: get_env("AZERO_METADATA_PATH")
         .unwrap_or("../azero/env/dev.json".to_string()),
+    azero_account_seed: get_env("AZERO_ACCOUNT_SEED").unwrap_or("//Alice".to_string()),
     eth_node_http: get_env("ETH_NODE_HTTP").unwrap_or("http://127.0.0.1:8545".to_string()),
     eth_dev_account_index: get_env("ETH_DEV_ACOUNT_INDEX").unwrap_or(0),
     eth_contract_addresses_path: get_env("ETH_CONTRACT_ADDRESSES_PATH")
@@ -60,6 +61,7 @@ pub struct Config {
     pub azero_node_ws: String,
     pub azero_contract_addresses_path: String,
     pub azero_metadata_path: String,
+    pub azero_account_seed: String,
     pub eth_node_http: String,
     pub eth_dev_account_index: u32,
     pub eth_contract_addresses_path: String,
