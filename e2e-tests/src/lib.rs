@@ -9,3 +9,6 @@ mod eth;
 
 #[cfg(test)]
 mod test;
+
+#[cfg(test)]
+mod wait;
