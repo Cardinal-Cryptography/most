@@ -165,7 +165,7 @@ async fn main() -> Result<()> {
                     error!(" {}: {}", level, cause);
                 }
             });
-            sleep(Duration::from_secs(50)).await;
+            sleep(Duration::from_secs(60)).await;
         }
     }
 

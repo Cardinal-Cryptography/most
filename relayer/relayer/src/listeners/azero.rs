@@ -351,7 +351,6 @@ async fn handle_event(
     _permit: OwnedSemaphorePermit,
 ) -> Result<(), AzeroListenerError> {
     let Config {
-        relayers_committee_id,
         eth_contract_address,
         eth_tx_min_confirmations,
         eth_tx_submission_retries,
@@ -370,10 +369,6 @@ async fn handle_event(
                 dest_receiver_address,
                 request_nonce,
             } = get_request_event_data(&data)?;
-
-            if committee_id != *relayers_committee_id {
-                return Err(AzeroListenerError::CommitteeIdMismatch);
-            }
 
             info!(
                 "Decoded event data: [dest_token_address: 0x{}, amount: {amount}, dest_receiver_address: 0x{}, request_nonce: {request_nonce}]",

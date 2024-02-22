@@ -189,15 +189,10 @@ async fn handle_event(
     ) = event
     {
         let Config {
-            relayers_committee_id,
             azero_contract_address,
             azero_contract_metadata,
             ..
         } = config;
-
-        if *relayers_committee_id != committee_id.as_u128() {
-            return Err(EthListenerError::CommitteeIdMismatch);
-        }
 
         info!("handling eth contract event: {crosschain_transfer_event:?}");
 
