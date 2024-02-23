@@ -53,9 +53,6 @@ pub enum EthListenerError {
 
     #[error("redis connection error")]
     Redis(#[from] RedisError),
-
-    #[error("Committee ID mismatch in the transfer request event data - required restart with updated committee ID")]
-    CommitteeIdMismatch,
 }
 
 pub const ETH_BLOCK_PROD_TIME_SEC: u64 = 15;
