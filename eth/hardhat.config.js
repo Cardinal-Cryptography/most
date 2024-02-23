@@ -12,7 +12,7 @@ const DEV_MNEMONIC =
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY;
 const SEPOLIA_KEY = process.env.SEPOLIA_KEY;
 
-module.exports = {
+var config = {
   defaultNetwork: "hardhat",
   etherscan: {
     apiKey: ETHERSCAN_API_KEY,
@@ -24,11 +24,6 @@ module.exports = {
 
   networks: {
     hardhat: {},
-
-    sepolia: {
-      url: "https://ethereum-sepolia-rpc.publicnode.com",
-      accounts: [SEPOLIA_KEY],
-    },
 
     development: {
       url: "http://127.0.0.1:8545",
@@ -110,3 +105,12 @@ module.exports = {
     timeout: 40_000,
   },
 };
+
+if (SEPOLIA_KEY) {
+  config.networks.sepolia = {
+    url: "https://ethereum-sepolia-rpc.publicnode.com",
+    accounts: [SEPOLIA_KEY],
+  };
+}
+
+module.exports = config;
