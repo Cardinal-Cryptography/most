@@ -3,7 +3,7 @@ use std::{
     sync::{atomic::AtomicBool, Arc},
 };
 
-use ::tokio::time::Duration;
+
 use aleph_client::Connection;
 use clap::Parser;
 use config::Config;
@@ -14,7 +14,7 @@ use listeners::AdvisoryListenerError;
 use log::{debug, error, info, warn};
 use redis::{aio::Connection as RedisConnection, Client as RedisClient, RedisError};
 use thiserror::Error;
-use tokio::{sync::Mutex, task::JoinSet, time::sleep};
+use tokio::{sync::Mutex, task::JoinSet};
 
 use crate::{
     connections::{
@@ -154,19 +154,17 @@ async fn main() -> Result<()> {
     )
     .await
     {
-        // For most errors we don't want to automatically restart the relayer but wait for manual intervention
-        loop {
-            error!("Error when running listeners, this might require manual investigation or RESTART...");
-            err.chain().enumerate().for_each(|(level, cause)| {
-                let cause = cause.to_string();
-                if cause.len() > 100 {
-                    error!(" {}: {}...", level, &cause[..100]);
-                } else {
-                    error!(" {}: {}", level, cause);
-                }
-            });
-            sleep(Duration::from_secs(60)).await;
-        }
+        error!(
+            "Error when running listeners, this might require manual investigation or RESTART..."
+        );
+        err.chain().enumerate().for_each(|(level, cause)| {
+            let cause = cause.to_string();
+            if cause.len() > 100 {
+                error!(" {}: {}...", level, &cause[..100]);
+            } else {
+                error!(" {}: {}", level, cause);
+            }
+        });
     }
 
     process::exit(-1);
