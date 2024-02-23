@@ -153,15 +153,10 @@ async fn main() -> Result<()> {
     )
     .await
     {
-        error!("Error when running listeners, this might require manual investigation...");
-        err.chain().enumerate().for_each(|(level, cause)| {
-            let cause = cause.to_string();
-            if cause.len() > 100 {
-                error!(" {}: {}...", level, &cause[..100]);
-            } else {
-                error!(" {}: {}", level, cause);
-            }
-        });
+        error!(
+            "Error when running listeners, this might require manual investigation...: {:?}",
+            err
+        );
     }
 
     process::exit(-1);
