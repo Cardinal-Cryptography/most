@@ -3,7 +3,6 @@ use std::{
     sync::{atomic::AtomicBool, Arc},
 };
 
-
 use aleph_client::Connection;
 use clap::Parser;
 use config::Config;
@@ -154,9 +153,7 @@ async fn main() -> Result<()> {
     )
     .await
     {
-        error!(
-            "Error when running listeners, this might require manual investigation..."
-        );
+        error!("Error when running listeners, this might require manual investigation...");
         err.chain().enumerate().for_each(|(level, cause)| {
             let cause = cause.to_string();
             if cause.len() > 100 {
