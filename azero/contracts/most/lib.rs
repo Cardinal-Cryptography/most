@@ -23,6 +23,7 @@ pub mod most {
     use psp22_traits::{Burnable, Mintable};
     use scale::{Decode, Encode};
     use shared::{concat_u8_arrays, keccak256, Keccak256HashOutput as HashedRequest, Selector};
+    use scale_info::TypeInfo;
 
     type CommitteeId = u128;
 
@@ -107,10 +108,21 @@ pub mod most {
     #[derive(Default, Debug, Encode, Decode, Clone, Copy, PartialEq, Eq)]
     #[cfg_attr(
         feature = "std",
-        derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout)
+        derive(TypeInfo, ink::storage::traits::StorageLayout)
     )]
     pub struct Request {
         signature_count: u128,
+    }
+
+    #[derive(Debug, Encode, Decode, Clone, Copy)]
+    #[cfg_attr(
+        feature = "std",
+        derive(TypeInfo)
+    )]
+    pub enum RequestStatus {
+        Pending { signatures_collected: u128 },
+        Processed,
+        RequestHashNotKnown,
     }
 
     #[derive(Debug)]
@@ -747,27 +759,16 @@ pub mod most {
             Ok(self.data()?.is_halted)
         }
 
-        /// Returns the signature count for a given unprocessed request.
-        /// Will return 0 if the request has already been processed.
+        /// Returns the status of a given cross-chain transfer request
         #[ink(message)]
-        pub fn signature_count(&self, hashed_request: HashedRequest) -> u128 {
-            if let Some(Request { signature_count }) = self.pending_requests.get(hashed_request) {
-                signature_count
+        pub fn request_status(&self, hashed_request: HashedRequest) -> RequestStatus {
+            if self.processed_requests.contains(hashed_request) {
+                RequestStatus::Processed
+            } else if let Some(Request { signature_count }) = self.pending_requests.get(hashed_request) {
+                RequestStatus::Pending{ signatures_collected: signature_count }
             } else {
-                0
+                RequestStatus::RequestHashNotKnown
             }
-        }
-
-        /// Returns whether the given account has signed the given request
-        #[ink(message)]
-        pub fn has_signed(&self, hashed_request: HashedRequest, account: AccountId) -> bool {
-            self.signatures.contains((hashed_request, account))
-        }
-
-        /// Returns whether the given transfer request has been executed
-        #[ink(message)]
-        pub fn has_been_executed(&self, hashed_request: HashedRequest) -> bool {
-            self.processed_requests.contains(hashed_request)
         }
 
         // ---  helper functions
