@@ -13,6 +13,7 @@ module.exports = {
   networks: {
     hardhat: {},
     development: {
+      chainId: 12345,
       url: "http://127.0.0.1:8545",
       accounts: {
         mnemonic: DEV_MNEMONIC,

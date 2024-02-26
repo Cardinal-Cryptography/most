@@ -12,7 +12,6 @@
         "@openzeppelin/contracts-upgradeable": "=5.0.0"
     },
     "devDependencies": {
-        "@gnosis.pm/safe-core-sdk": "^3.2.0",
         "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
         "@nomicfoundation/hardhat-ethers": "^3.0.4",
         "@nomicfoundation/hardhat-toolbox": "^3.0.0",
