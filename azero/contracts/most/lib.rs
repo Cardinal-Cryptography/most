@@ -747,6 +747,29 @@ pub mod most {
             Ok(self.data()?.is_halted)
         }
 
+        /// Returns the signature count for a given unprocessed request.
+        /// Will return 0 if the request has already been processed.
+        #[ink(message)]
+        pub fn signature_count(&self, hashed_request: HashedRequest) -> u128 {
+            if let Some(Request { signature_count }) = self.pending_requests.get(hashed_request) {
+                signature_count
+            } else {
+                0
+            }
+        }
+
+        /// Returns whether the given account has signed the given request
+        #[ink(message)]
+        pub fn has_signed(&self, hashed_request: HashedRequest, account: AccountId) -> bool {
+            self.signatures.contains((hashed_request, account))
+        }
+
+        /// Returns whether the given transfer request has been executed
+        #[ink(message)]
+        pub fn has_been_executed(&self, hashed_request: HashedRequest) -> bool {
+            self.processed_requests.contains(hashed_request)
+        }
+
         // ---  helper functions
 
         fn check_halted(&self) -> Result<(), MostError> {
