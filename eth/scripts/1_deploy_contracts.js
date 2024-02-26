@@ -22,19 +22,6 @@ async function main() {
   );
   console.log("USDT deployed to:", usdt.target);
 
-  const Governance = await ethers.getContractFactory("Governance");
-  console.log("Deploying Governance...");
-  const governance = await upgrades.deployProxy(
-    Governance,
-    [config.governanceIds, config.governanceThreshold],
-    {
-      initializer: "initialize",
-      kind: "uups",
-    },
-  );
-  await governance.waitForDeployment();
-  console.log("Governance deployed to:", governance.target);
-
   const Most = await ethers.getContractFactory("Most");
   console.log("Deploying Most...");
   const most = await upgrades.deployProxy(
@@ -59,7 +46,6 @@ async function main() {
 
   const addresses = {
     migrations: migrations.target,
-    governance: governance.target,
     most: most.target,
     weth: weth.target,
     usdt: usdt.target,
