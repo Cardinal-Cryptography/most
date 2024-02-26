@@ -23,7 +23,6 @@ pub mod most {
     use psp22_traits::{Burnable, Mintable};
     use scale::{Decode, Encode};
     use shared::{concat_u8_arrays, keccak256, Keccak256HashOutput as HashedRequest, Selector};
-    use scale_info::TypeInfo;
 
     type CommitteeId = u128;
 
@@ -108,17 +107,14 @@ pub mod most {
     #[derive(Default, Debug, Encode, Decode, Clone, Copy, PartialEq, Eq)]
     #[cfg_attr(
         feature = "std",
-        derive(TypeInfo, ink::storage::traits::StorageLayout)
+        derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout)
     )]
     pub struct Request {
         signature_count: u128,
     }
 
     #[derive(Debug, Encode, Decode, Clone, Copy)]
-    #[cfg_attr(
-        feature = "std",
-        derive(TypeInfo)
-    )]
+    #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub enum RequestStatus {
         Pending { signatures_collected: u128 },
         Processed,
@@ -764,8 +760,12 @@ pub mod most {
         pub fn request_status(&self, hashed_request: HashedRequest) -> RequestStatus {
             if self.processed_requests.contains(hashed_request) {
                 RequestStatus::Processed
-            } else if let Some(Request { signature_count }) = self.pending_requests.get(hashed_request) {
-                RequestStatus::Pending{ signatures_collected: signature_count }
+            } else if let Some(Request { signature_count }) =
+                self.pending_requests.get(hashed_request)
+            {
+                RequestStatus::Pending {
+                    signatures_collected: signature_count,
+                }
             } else {
                 RequestStatus::RequestHashNotKnown
             }
