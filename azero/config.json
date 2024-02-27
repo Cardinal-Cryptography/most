@@ -2,7 +2,6 @@
   "projectFiles": [
     "contracts/most/*",
     "contracts/token/*",
-    "contracts/governance/*",
     "contracts/gas-price-oracle/contract/*",
     "contracts/advisory/*"
   ],

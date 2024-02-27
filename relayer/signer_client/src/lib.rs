@@ -1,7 +1,10 @@
+use futures::{SinkExt as _, StreamExt as _};
 use serde::{Deserialize, Serialize};
 use serde_json::Deserializer;
 use subxt::ext::{sp_core::crypto::AccountId32, sp_runtime::MultiSignature};
-use vsock::VsockStream;
+use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
+use tokio_vsock::{OwnedReadHalf, OwnedWriteHalf, VsockStream};
+use vsock::VsockAddr;
 
 type EthAddress = ethers::types::Address;
 type EthSignature = ethers::types::Signature;
@@ -19,6 +22,8 @@ pub enum Error {
     Serde(#[from] serde_json::Error),
     #[error("Invalid response from server")]
     InvalidResponse { expected: String, got: Response },
+    #[error("Connection closed")]
+    Closed,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -62,39 +67,45 @@ pub enum Response {
     },
 }
 
-#[derive(Debug)]
 pub struct Client {
-    connection: VsockStream,
+    read: FramedRead<OwnedReadHalf, LengthDelimitedCodec>,
+    write: FramedWrite<OwnedWriteHalf, LengthDelimitedCodec>,
 }
 
 impl From<VsockStream> for Client {
     fn from(connection: VsockStream) -> Self {
-        Self { connection }
+        let (read, write) = connection.into_split();
+        let write = FramedWrite::new(write, LengthDelimitedCodec::new());
+        let read = FramedRead::new(read, LengthDelimitedCodec::new());
+
+        Self { write, read }
     }
 }
 
 impl Client {
-    pub fn new(cid: u32, port: u32) -> Result<Self, Error> {
-        let connection = VsockStream::connect_with_cid_port(cid, port)?;
-        Ok(Self { connection })
+    pub async fn new(cid: u32, port: u32) -> Result<Self, Error> {
+        let connection = VsockStream::connect(VsockAddr::new(cid, port)).await?;
+        Ok(connection.into())
     }
 
-    pub fn send<T: Serialize>(&self, msg: &T) -> Result<(), Error> {
-        serde_json::to_writer(&self.connection, msg)?;
+    pub async fn send<T: Serialize>(&mut self, msg: &T) -> Result<(), Error> {
+        let msg = serde_json::to_vec(msg)?;
+        self.write.send(msg.into()).await?;
         Ok(())
     }
 
-    pub fn recv<'de, T: Deserialize<'de>>(&self) -> Result<T, Error> {
-        let mut de = Deserializer::from_reader(&self.connection);
+    pub async fn recv<'de, T: Deserialize<'de>>(&mut self) -> Result<T, Error> {
+        let msg = &self.read.next().await.ok_or(Error::Closed)??;
+        let mut de = Deserializer::from_reader(msg.as_ref());
         let res = T::deserialize(&mut de)?;
 
         Ok(res)
     }
 
-    pub fn azero_account_id(&self) -> Result<AccountId32, Error> {
-        self.send(&Command::AccountIdAzero)?;
+    pub async fn azero_account_id(&mut self) -> Result<AccountId32, Error> {
+        self.send(&Command::AccountIdAzero).await?;
 
-        match self.recv()? {
+        match self.recv().await? {
             Response::AccountIdAzero { account_id } => Ok(account_id),
             other => Err(Error::InvalidResponse {
                 expected: "AccountIdAzero".to_string(),
@@ -103,12 +114,13 @@ impl Client {
         }
     }
 
-    pub fn sign_azero(&self, payload: &[u8]) -> Result<MultiSignature, Error> {
+    pub async fn sign_azero(&mut self, payload: &[u8]) -> Result<MultiSignature, Error> {
         self.send(&Command::SignAzero {
             payload: payload.to_vec(),
-        })?;
+        })
+        .await?;
 
-        match self.recv()? {
+        match self.recv().await? {
             Response::SignedAzero {
                 payload: return_payload,
                 signature,
@@ -120,10 +132,10 @@ impl Client {
         }
     }
 
-    pub fn eth_address(&self) -> Result<EthAddress, Error> {
-        self.send(&Command::EthAddress)?;
+    pub async fn eth_address(&mut self) -> Result<EthAddress, Error> {
+        self.send(&Command::EthAddress).await?;
 
-        match self.recv()? {
+        match self.recv().await? {
             Response::EthAddress { address } => Ok(address),
             other => Err(Error::InvalidResponse {
                 expected: "EthAddress".to_string(),
@@ -132,10 +144,10 @@ impl Client {
         }
     }
 
-    pub fn sign_eth_hash(&self, hash: EthH256) -> Result<EthSignature, Error> {
-        self.send(&Command::SignEthHash { hash })?;
+    pub async fn sign_eth_hash(&mut self, hash: EthH256) -> Result<EthSignature, Error> {
+        self.send(&Command::SignEthHash { hash }).await?;
 
-        match self.recv()? {
+        match self.recv().await? {
             Response::SignedEthHash {
                 hash: return_hash,
                 signature,
@@ -147,13 +159,14 @@ impl Client {
         }
     }
 
-    pub fn sign_eth_tx(&self, tx: &EthTypedTransaction) -> Result<EthSignature, Error> {
+    pub async fn sign_eth_tx(&mut self, tx: &EthTypedTransaction) -> Result<EthSignature, Error> {
         let chain_id = tx.chain_id().unwrap_or(ETH_MAINNET_CHAIN_ID);
         self.send(&Command::SignEthTx {
             tx: tx.clone(),
             chain_id,
-        })?;
-        let res = self.recv::<Response>()?;
+        })
+        .await?;
+        let res = self.recv::<Response>().await?;
 
         if let Response::SignedEthTx {
             tx: mut return_tx,

@@ -1,5 +1,3 @@
-use std::thread;
-
 use clap::Parser;
 use ethers::{
     signers::{LocalWallet, Signer},
@@ -11,7 +9,8 @@ use subxt::ext::{
     sp_core::{crypto::SecretStringError, sr25519::Pair as KeyPair, Pair},
     sp_runtime::AccountId32,
 };
-use vsock::{VsockAddr, VsockListener, VMADDR_CID_ANY};
+use tokio::spawn;
+use tokio_vsock::{VsockAddr, VsockListener, VMADDR_CID_ANY};
 
 #[derive(Parser)]
 struct ServerArguments {
@@ -46,17 +45,18 @@ enum Error {
     Hex(#[from] hex::FromHexError),
 }
 
-fn main() -> Result<(), Error> {
+#[tokio::main]
+async fn main() -> Result<(), Error> {
     env_logger::init();
 
     let args = ServerArguments::parse();
-    let server = Server::new(args.azero_key, args.eth_key, args.port)?;
+    let mut server = Server::new(args.azero_key, args.eth_key, args.port)?;
 
     info!("Server listening on: {:?}", server.local_addr()?);
     info!("Azero account ID: {:?}", server.azero_account_id());
     info!("ETH address: {:?}", server.eth_address());
 
-    server.accept_loop()?;
+    server.accept_loop().await?;
 
     Ok(())
 }
@@ -70,7 +70,8 @@ struct Server {
 impl Server {
     fn new(azero_key: String, eth_key: String, port: u32) -> Result<Self, Error> {
         let azero_key = KeyPair::from_string(&azero_key, None)?;
-        let listener = VsockListener::bind_with_cid_port(VMADDR_CID_ANY, port)?;
+        let address = VsockAddr::new(VMADDR_CID_ANY, port);
+        let listener = VsockListener::bind(address)?;
         let eth_key = hex::decode(eth_key)?;
         let eth_wallet = LocalWallet::from_bytes(&eth_key)?;
 
@@ -93,72 +94,83 @@ impl Server {
         Ok(self.listener.local_addr()?)
     }
 
-    fn accept_one(&self) -> Result<(), Error> {
-        let (client, _) = self.listener.accept()?;
+    async fn accept_one(&mut self) -> Result<(), Error> {
+        let (client, _) = self.listener.accept().await?;
         let client = Client::from(client);
-        handle_client(client, self.azero_key.clone(), self.eth_wallet.clone());
+
+        spawn(handle_client(
+            client,
+            self.azero_key.clone(),
+            self.eth_wallet.clone(),
+        ));
 
         Ok(())
     }
 
-    fn accept_loop(&self) -> Result<(), Error> {
+    async fn accept_loop(&mut self) -> Result<(), Error> {
         loop {
-            self.accept_one()?;
+            self.accept_one().await?;
         }
     }
 }
 
-fn handle_client(client: Client, azero_key: KeyPair, eth_wallet: LocalWallet) {
-    thread::spawn(move || {
-        let result = do_handle_client(client, &azero_key, &eth_wallet);
-        info!("Client disconnected: {:?}", result);
-    });
+async fn handle_client(client: Client, azero_key: KeyPair, eth_wallet: LocalWallet) {
+    let result = do_handle_client(client, &azero_key, &eth_wallet).await;
+    info!("Client disconnected: {:?}", result);
 }
 
-fn do_handle_client(
-    client: Client,
+async fn do_handle_client(
+    mut client: Client,
     azero_key: &KeyPair,
     eth_wallet: &LocalWallet,
 ) -> Result<(), Error> {
     loop {
-        let command = client.recv()?;
+        let command = client.recv().await?;
         info!("Received command: {:?}", command);
 
         match command {
             Command::Ping => {
-                client.send(&Response::Pong)?;
+                client.send(&Response::Pong).await?;
             }
 
             Command::AccountIdAzero => {
                 let account_id = azero_key.public().into();
-                client.send(&Response::AccountIdAzero { account_id })?;
+                client
+                    .send(&Response::AccountIdAzero { account_id })
+                    .await?;
             }
 
             Command::SignAzero { payload } => {
                 let signature = azero_key.sign(&payload);
                 let signature = subxt::ext::sp_runtime::MultiSignature::Sr25519(signature);
 
-                client.send(&Response::SignedAzero { payload, signature })?;
+                client
+                    .send(&Response::SignedAzero { payload, signature })
+                    .await?;
             }
 
             Command::EthAddress => {
                 let address = eth_wallet.address();
-                client.send(&Response::EthAddress { address })?;
+                client.send(&Response::EthAddress { address }).await?;
             }
 
             Command::SignEthHash { hash } => {
                 let signature = eth_wallet.sign_hash(hash)?;
-                client.send(&Response::SignedEthHash { hash, signature })?;
+                client
+                    .send(&Response::SignedEthHash { hash, signature })
+                    .await?;
             }
 
             Command::SignEthTx { mut tx, chain_id } => {
                 tx.set_chain_id(chain_id);
                 let signature = eth_wallet.sign_transaction_sync(&tx)?;
-                client.send(&Response::SignedEthTx {
-                    tx,
-                    chain_id,
-                    signature,
-                })?;
+                client
+                    .send(&Response::SignedEthTx {
+                        tx,
+                        chain_id,
+                        signature,
+                    })
+                    .await?;
             }
         }
     }
@@ -181,41 +193,42 @@ mod test {
         "58039a48427a62f77e5562d7f565d10595d92abdd4813233607ec2ac5ac4b9de";
     const ETH_MAINNET_CHAIN_ID: u64 = 1;
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn test_ping() {
-        let client = connect();
+    async fn test_ping() {
+        let mut client = connect().await;
 
-        client.send(&Command::Ping).unwrap();
-        let response: Response = client.recv().unwrap();
+        client.send(&Command::Ping).await.unwrap();
+        let response: Response = client.recv().await.unwrap();
 
         assert!(matches!(response, Response::Pong));
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn test_account_id_azero() {
-        let client = connect();
+    async fn test_account_id_azero() {
+        let mut client = connect().await;
 
-        client.send(&Command::AccountIdAzero).unwrap();
-        let response: Response = client.recv().unwrap();
+        client.send(&Command::AccountIdAzero).await.unwrap();
+        let response: Response = client.recv().await.unwrap();
 
         let_assert!(Response::AccountIdAzero { account_id } = response);
         assert!(account_id.to_string() == "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY");
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn test_sign_azero() {
-        let client = connect();
+    async fn test_sign_azero() {
+        let mut client = connect().await;
         let payload = b"Hello, world!".to_vec();
 
         client
             .send(&Command::SignAzero {
                 payload: payload.clone(),
             })
+            .await
             .unwrap();
-        let response: Response = client.recv().unwrap();
+        let response: Response = client.recv().await.unwrap();
 
         let_assert!(
             Response::SignedAzero {
@@ -225,39 +238,39 @@ mod test {
         );
 
         assert!(signed_payload == payload);
-        assert!(signature.verify(&payload[..], &client.azero_account_id().unwrap()));
+        assert!(signature.verify(&payload[..], &client.azero_account_id().await.unwrap()));
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn test_eth_address() {
-        let client = connect();
+    async fn test_eth_address() {
+        let mut client = connect().await;
 
-        let address = client.eth_address().unwrap();
+        let address = client.eth_address().await.unwrap();
 
         assert!(address == Address::from_str(ETH_PUBLIC_ADDRESS).unwrap());
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn test_sign_eth_hash() {
-        let client = connect();
+    async fn test_sign_eth_hash() {
+        let mut client = connect().await;
         let payload = b"Hello, world!".to_vec();
         let hash = ethers::utils::keccak256(payload).into();
 
-        let signature = client.sign_eth_hash(hash).unwrap();
+        let signature = client.sign_eth_hash(hash).await.unwrap();
 
         let address = Address::from_str(ETH_PUBLIC_ADDRESS).unwrap();
         assert!(signature.verify(hash, address).is_ok());
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn test_sign_eth_tx_without_chain_id() {
-        let client = connect();
+    async fn test_sign_eth_tx_without_chain_id() {
+        let mut client = connect().await;
         let mut tx = TypedTransaction::Eip1559(Default::default());
 
-        let signature = client.sign_eth_tx(&tx).unwrap();
+        let signature = client.sign_eth_tx(&tx).await.unwrap();
 
         // Transactions with no chain id set should be treated as mainnet transactions
         tx.set_chain_id(ETH_MAINNET_CHAIN_ID);
@@ -266,25 +279,25 @@ mod test {
         assert!(signature.verify(hash, address).is_ok())
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn test_sign_eth_tx_with_chain_id() {
-        let client = connect();
+    async fn test_sign_eth_tx_with_chain_id() {
+        let mut client = connect().await;
         let mut tx = TypedTransaction::Eip1559(Default::default());
         tx.set_chain_id(1337);
 
-        let signature = client.sign_eth_tx(&tx).unwrap();
+        let signature = client.sign_eth_tx(&tx).await.unwrap();
 
         let address = Address::from_str(ETH_PUBLIC_ADDRESS).unwrap();
         let hash = tx.sighash();
         assert!(signature.verify(hash, address).is_ok())
     }
 
-    fn connect() -> Client {
-        let server =
+    async fn connect() -> Client {
+        let mut server =
             Server::new("//Alice".to_string(), ETH_PRIVATE_KEY.to_string(), port()).unwrap();
-        let client = Client::new(VMADDR_CID_HOST, port()).unwrap();
-        server.accept_one().unwrap();
+        let client = Client::new(VMADDR_CID_HOST, port()).await.unwrap();
+        server.accept_one().await.unwrap();
 
         client
     }

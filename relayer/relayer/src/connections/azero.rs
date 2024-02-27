@@ -1,5 +1,3 @@
-use std::sync::{Arc, Mutex};
-
 use aleph_client::{
     sp_runtime::{MultiAddress, MultiSignature},
     AccountId, AlephConfig, AsConnection, Connection, KeyPair, Pair, RootConnection,
@@ -9,7 +7,7 @@ use anyhow::anyhow;
 use log::debug;
 use signer_client::Client;
 use subxt::tx::TxPayload;
-use tokio::task::spawn_blocking;
+use tokio::sync::Mutex;
 
 pub type AzeroWsConnection = Connection;
 type ParamsBuilder = subxt::config::polkadot::PolkadotExtrinsicParamsBuilder<AlephConfig>;
@@ -19,7 +17,7 @@ pub async fn init(url: &str) -> AzeroWsConnection {
 }
 
 struct AzeroSignerClient {
-    client: Arc<Mutex<Client>>,
+    client: Mutex<Client>,
     account_id: AccountId,
 }
 
@@ -34,16 +32,11 @@ pub enum Error {
 
 impl AzeroSignerClient {
     async fn new(cid: u32, port: u32) -> Result<Self, Error> {
-        let res = spawn_blocking(move || {
-            let client = Client::new(cid, port)?;
-            let account_id = client.azero_account_id()?;
-            let client = Arc::new(Mutex::new(client));
+        let mut client = Client::new(cid, port).await?;
+        let account_id = client.azero_account_id().await?;
+        let client = Mutex::new(client);
 
-            Ok::<_, signer_client::Error>(Self { client, account_id })
-        })
-        .await??;
-
-        Ok(res)
+        Ok(Self { client, account_id })
     }
 }
 
@@ -64,17 +57,11 @@ impl AzeroSigner {
         match self {
             AzeroSigner::Dev(keypair) => Ok(keypair.signer().sign(payload).into()),
             AzeroSigner::Signer(signer) => {
-                let client = signer.client.clone();
+                let mut client = signer.client.lock().await;
                 let payload = payload.to_vec();
+                let signature = client.sign_azero(&payload).await?;
 
-                let res = spawn_blocking(move || {
-                    let client = client.lock().unwrap();
-                    let signature = client.sign_azero(&payload)?;
-                    Ok::<_, signer_client::Error>(signature)
-                })
-                .await??;
-
-                Ok(res)
+                Ok(signature)
             }
         }
     }
