@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize)]
 pub struct AzeroContractAddresses {
-    pub governance: String,
     pub most: String,
     pub weth: String,
     pub oracle: String,

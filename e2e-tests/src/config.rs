@@ -15,8 +15,6 @@ static GLOBAL_CONFIG: Lazy<Config> = Lazy::new(|| Config {
         .unwrap_or("../eth/addresses.json".to_string()),
     eth_gas_limit: get_env("ETH_GAS_LIMIT").unwrap_or(200_000),
     contract_metadata_paths: ContractMetadataPaths {
-        azero_governance: get_env("AZERO_GOVERNANCE")
-            .unwrap_or("../azero/artifacts/governance.json".to_string()),
         azero_migrations: get_env("AZERO_MIGRATIONS")
             .unwrap_or("../azero/artifacts/migrations.json".to_string()),
         azero_most: get_env("AZERO_MOST").unwrap_or("../azero/artifacts/most.json".to_string()),
@@ -72,7 +70,6 @@ pub struct Config {
 }
 
 pub struct ContractMetadataPaths {
-    pub azero_governance: String,
     pub azero_migrations: String,
     pub azero_most: String,
     pub azero_oracle: String,
