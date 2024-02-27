@@ -37,9 +37,6 @@ pub struct Config {
     #[arg(long)]
     pub override_eth_cache: bool,
 
-    #[arg(long, default_value = "0")]
-    pub relayers_committee_id: u128,
-
     #[arg(long, use_value_delimiter = true, value_delimiter = ',')]
     pub advisory_contract_addresses: Option<Vec<String>>,
 
