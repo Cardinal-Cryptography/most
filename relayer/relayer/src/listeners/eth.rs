@@ -1,4 +1,7 @@
-use std::sync::{atomic::AtomicBool, Arc};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 
 use ethers::{
     abi::EncodePackedError,
@@ -53,7 +56,7 @@ pub enum EthListenerError {
 }
 
 pub const ETH_BLOCK_PROD_TIME_SEC: u64 = 15;
-const ETH_LAST_BLOCK_KEY: &str = "ethereum_last_known_block_number";
+pub const ETH_LAST_BLOCK_KEY: &str = "ethereum_last_known_block_number";
 
 pub struct EthListener;
 
@@ -74,7 +77,6 @@ impl EthListener {
             name,
             default_sync_from_block_eth,
             sync_step,
-            override_eth_cache,
             ..
         } = &*config;
 
@@ -87,17 +89,13 @@ impl EthListener {
             *azero_proof_size_limit,
         )?;
 
-        let mut first_unprocessed_block_number = if *override_eth_cache {
-            **default_sync_from_block_eth
-        } else {
-            read_first_unprocessed_block_number(
-                name.clone(),
-                ETH_LAST_BLOCK_KEY.to_string(),
-                redis_connection.clone(),
-                **default_sync_from_block_eth,
-            )
-            .await
-        };
+        let mut first_unprocessed_block_number = read_first_unprocessed_block_number(
+            name.clone(),
+            ETH_LAST_BLOCK_KEY.to_string(),
+            redis_connection.clone(),
+            **default_sync_from_block_eth,
+        )
+        .await;
 
         // Main Ethereum event loop.
         loop {
@@ -108,8 +106,11 @@ impl EthListener {
             )
             .await;
 
-            match emergency.load(std::sync::atomic::Ordering::Relaxed) {
-                true => trace!("Event handling paused due to an emergency state in one of the Advisory contracts"),
+            match emergency.load(Ordering::Relaxed) {
+                true => {
+                    warn!("Event handling paused due to an emergency state in one of the Advisory contracts");
+                    sleep(Duration::from_secs(20)).await;
+                }
                 false => {
                     // Don't query for more than `sync_step` blocks at one time.
                     let to_block = std::cmp::min(
@@ -119,8 +120,7 @@ impl EthListener {
 
                     info!(
                         "Processing events from blocks {} - {}",
-                        first_unprocessed_block_number,
-                        to_block
+                        first_unprocessed_block_number, to_block
                     );
 
                     // Query for events.
@@ -141,11 +141,12 @@ impl EthListener {
                                     error!("Error when handling event {event:?}: {e}");
                                     if most_azero.is_halted(&azero_connection).await? {
                                         warn!("Most contract on Aleph Zero is halted, stopping event handling");
-                                        wait_until_not_halted(&most_azero, &azero_connection).await?;
+                                        wait_until_not_halted(&most_azero, &azero_connection)
+                                            .await?;
                                     } else {
                                         return Err(EthListenerError::AzeroContract(e));
                                     }
-                                },
+                                }
                                 Err(e) => return Err(e),
                             }
                         }
@@ -162,7 +163,7 @@ impl EthListener {
                         to_block,
                     )
                     .await?;
-                },
+                }
             }
         }
     }
@@ -185,19 +186,10 @@ async fn handle_event(
     ) = event
     {
         let Config {
-            relayers_committee_id,
             azero_contract_address,
             azero_contract_metadata,
             ..
         } = config;
-
-        if *relayers_committee_id != committee_id.as_u128() {
-            warn!(
-                "Ignoring event from committee {}, expected {}",
-                committee_id, relayers_committee_id
-            );
-            return Ok(());
-        }
 
         info!("handling eth contract event: {crosschain_transfer_event:?}");
 
