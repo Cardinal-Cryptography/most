@@ -12,7 +12,6 @@ Bring your assets to Aleph Zero and benefit from its scalable privacy-enhancing 
 
 * `azero` - Aleph Zero contracts
   * `azero/contracts/most` - the main bridge contract
-  * `azero/contracts/governance` - a contract for making governance decisions about the bridge contracts on Aleph Zero
   * `azero/contracts/gas-price-oracle` - a contract for informing the guardians about Ethereum gas prices
   * `azero/contracts/token` - a PSP22 token implementation for the tokens created by the bridge
 * `eth` - Ethereum contracts
