@@ -149,3 +149,29 @@ produced from a certain version of the source code in this repo (say a given com
 
 The contracts will be deployed using the same docker image as the one used for this procedure, which smooths out
 indeterminism in ink! contract compilation.
+
+## Verifying deployed contracts on etherscan
+
+Given a deployed Ethereum contract address it's possible to post verified sources to etherscan and sourcify. You will
+need an API key for etherscan - can be obtained at https://etherscan.io/myapikey if you have an account. To do so:
+
+1. `git checkout $COMMIT` - where `$COMMIT` is the commit from which the contract has been deployed
+2. `cd eth`
+3. `ETHERSCAN_API_KEY=[YOUR API KEY] npx hardhat verify [CONTRACT ADDRESS] [CONSTRUCTOR ARGS]`
+
+For example, if you deploy `Token.sol` to the sepolia testnet like so:
+
+```js
+const usdt = await Token.deploy(
+  "12000000000000000000000000",
+  "Tether",
+  "USDT",
+);
+```
+
+and the address is `0xbd737D2061ed3b24C95FA88566Ad896c9Fcc84b0`, then you would post verified sources like so:
+
+```bash
+ETHERSCAN_API_KEY=[YOUR API KEY] npx hardhat --network sepolia verify "0xbd737D2061ed3b24C95FA88566Ad896c9Fcc84b0" \
+  "12000000000000000000000000" "Tether" "USDT"
+```
