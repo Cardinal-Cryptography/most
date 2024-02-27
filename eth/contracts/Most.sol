@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.20;
-
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+/*
+    Remove global imports
+*/
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 contract Most is
     Initializable,
@@ -48,6 +50,18 @@ contract Most is
 
     event RequestAlreadySigned(bytes32 requestHash, address signer);
 
+    /*
+        Replace `require()` with custom errors (for gas cost optimization)
+        E.g.
+        ```
+        error OnlyCommitteeMember();
+        modifier _onlyCommitteeMember(uint256 _committeeId) {
+            if (!isInCommittee(_committeeId, msg.sender))
+                revert OnlyCommitteeMember();
+            _;
+        }
+        ```
+    */
     modifier _onlyCommitteeMember(uint256 _committeeId) {
         require(
             isInCommittee(_committeeId, msg.sender),
@@ -107,6 +121,12 @@ contract Most is
     ) external whenNotPaused {
         address sender = msg.sender;
 
+        /*
+            Disallow request with "dust" amounts
+            ref: SOL-AM-DOSA-2, SOL-Basics-Payment-4 at https://github.com/Cyfrin/audit-checklist/blob/main/checklist.json
+        */
+        require(amount > 0, "ZeroAmount");
+
         IERC20 token = IERC20(bytes32ToAddress(srcTokenAddress));
 
         // check if the token is supported
@@ -134,8 +154,19 @@ contract Most is
     //
     // Tx emits a CrosschainTransferRequest event that the relayers listen to
     // & forward to the destination chain.
-    function sendRequestNative(bytes32 destReceiverAddress) external payable {
+    /*
+        Missing `whenNotPuased` modifier
+    */
+    function sendRequestNative(
+        bytes32 destReceiverAddress
+    ) external payable whenNotPaused {
         uint256 amount = msg.value;
+
+        /*
+            Disallow request with "dust" amounts
+            ref: SOL-AM-DOSA-2, SOL-Basics-Payment-4 at https://github.com/Cyfrin/audit-checklist/blob/main/checklist.json
+        */
+        require(amount > 0, "ZeroAmount");
 
         // check if the token is supported
         bytes32 destTokenAddress = supportedPairs[
@@ -200,6 +231,12 @@ contract Most is
 
         if (request.signatureCount >= signatureThreshold[committeeId]) {
             processedRequests[requestHash] = true;
+            /*
+                When deleting a struct field with neseted mapping,
+                only non-mapping nested fields are being reset to theri default values.
+                In this case, `pendingRequests[requestHash].signatures` are being preserved.
+                Not sure if it was intented but it doesn't seem to cause any security issues in this case.
+            */
             delete pendingRequests[requestHash];
 
             // return the locked tokens
@@ -211,6 +248,11 @@ contract Most is
                     unwrapSuccess,
                     "Failed to uwrap wrapped ETH to native ETH."
                 );
+                /*
+                    If the `destReceiverAddress` is a contract, it can deny transaction through a fallback()/receive().
+                    Can it cause permanent token loss/lock?
+                    ref: SOL-Basics-Payment-1, SOL-Basics-Payment-5 at https://github.com/Cyfrin/audit-checklist/blob/main/checklist.json
+                */
                 (bool sendNativeEthSuccess, ) = bytes32ToAddress(
                     destReceiverAddress
                 ).call{value: amount}("");
@@ -290,5 +332,11 @@ contract Most is
         delete supportedPairs[from];
     }
 
-    receive() external payable {}
+    receive() external payable {
+        /* 
+            Allow to receive ETH only from the weth contract
+            so no ETH is sent to the contract by mistake
+        */
+        require(msg.sender == wethAddress);
+    }
 }
