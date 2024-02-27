@@ -95,7 +95,7 @@ compile-eth: eth-deps
 deploy-eth: # Deploy eth contracts
 deploy-eth: compile-eth
 	cd eth && \
-        npx hardhat run --network $(NETWORK) scripts/0_deploy_gnosis.js && \
+	npx hardhat run --network $(NETWORK) scripts/0_deploy_gnosis.js && \
 	npx hardhat run --network $(NETWORK) scripts/1_deploy_contracts.js
 
 .PHONY: setup-eth
@@ -243,7 +243,7 @@ check-js-format:
 .PHONY: solidity-lint
 solidity-lint: # Lint solidity contracts
 solidity-lint: eth-deps
-	cd eth && npx prettier --check --plugin=prettier-plugin-solidity 'contracts/**/*.sol'
+	cd eth && npx prettier --check --plugin=prettier-plugin-solidity 'contracts/*.sol'
 
 .PHONY: relayer-lint
 relayer-lint: # Lint relayer
