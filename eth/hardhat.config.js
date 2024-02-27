@@ -13,7 +13,7 @@ const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY;
 const SEPOLIA_KEY = process.env.SEPOLIA_KEY;
 
 var config = {
-  defaultNetwork: "development",
+  defaultNetwork: "hardhat",
   etherscan: {
     apiKey: ETHERSCAN_API_KEY,
   },
@@ -23,6 +23,8 @@ var config = {
   },
 
   networks: {
+
+    hardhat : {},
 
     development: {
       url: "http://127.0.0.1:8545",
