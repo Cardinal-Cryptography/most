@@ -51,10 +51,10 @@ async function main() {
         // let gnosisSafeProxy = await GnosisSafeProxy.deploy(singleton.target);
         // console.log("GnosisSafeProxy deployed to:", gnosisSafeProxy.target);
 
-        // const GnosisSafe = await ethers.getContractFactory("GnosisSafe");
-        // console.log("Deploying GnosisSafe...");
-        // const gnosisSafe = await GnosisSafe.deploy();
-        // console.log("GnosisSafe deployed to:", gnosisSafe.target);
+        const GnosisSafe = await ethers.getContractFactory("GnosisSafe");
+        console.log("Deploying GnosisSafe...");
+        const gnosisSafe = await GnosisSafe.deploy();
+        console.log("GnosisSafe deployed to:", gnosisSafe.target);
 
         const MultiSend = await ethers.getContractFactory("MultiSend");
         console.log("Deploying MultiSend...");
@@ -100,7 +100,7 @@ async function main() {
 
         const contractNetworks  = {
             [chainId]: {
-                safeSingletonAddress:  singleton.target,
+                safeSingletonAddress:  gnosisSafe.target,
                 safeProxyFactoryAddress:  gnosisSafeProxyFactory.target,
                 multiSendAddress: multiSend.target,
                 multiSendCallOnlyAddress: multiSendCallOnly.target,
@@ -110,7 +110,6 @@ async function main() {
                 simulateTxAccessorAddress: simulateTxAccessor.target,
 
                 // safeProxy:  gnosisSafeProxy.target,
-                // safeMasterCopyAddress: gnosisSafe.target,
             }
 
         }
