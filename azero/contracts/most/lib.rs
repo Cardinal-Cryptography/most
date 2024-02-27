@@ -116,7 +116,7 @@ pub mod most {
     #[derive(Debug, Encode, Decode, Clone, Copy)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub enum RequestStatus {
-        Pending { signatures_collected: u128 },
+        Pending { collected_signatures: u32 },
         Processed,
         RequestHashNotKnown,
     }
@@ -764,7 +764,7 @@ pub mod most {
                 self.pending_requests.get(hashed_request)
             {
                 RequestStatus::Pending {
-                    signatures_collected: signature_count,
+                    collected_signatures: signature_count as u32,
                 }
             } else {
                 RequestStatus::RequestHashNotKnown
