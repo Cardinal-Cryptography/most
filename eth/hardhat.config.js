@@ -9,9 +9,8 @@ const DEV_MNEMONIC =
   "harsh master island dirt equip search awesome double turn crush wool grant";
 
 module.exports = {
-  defaultNetwork: "hardhat",
+  defaultNetwork: "development",
   networks: {
-    hardhat: {},
     development: {
       chainId: 12345,
       url: "http://127.0.0.1:8545",

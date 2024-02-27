@@ -1,3 +1,4 @@
+const fs = require("node:fs");
 const Safe = require('@safe-global/protocol-kit').default;
 const { SafeFactory, EthersAdapter } = require('@safe-global/protocol-kit');
 const { network, ethers } = require("hardhat");
@@ -5,38 +6,17 @@ const { network, ethers } = require("hardhat");
 async function main() {
 
     switch (network.name) {
-    case 'development':
-
+    case 'development' || 'hardhat':
         const provider = new ethers.JsonRpcProvider(network.config.url);
-        const accounts = network.config.accounts;
 
-        var index = 0;
-        const wallet0 = ethers.Wallet.fromPhrase(accounts.mnemonic, accounts.path + `/${index}`);
-        const signer0 = new ethers.Wallet(wallet0.privateKey, provider)
-
-        index = 1;
-        const wallet1 = ethers.Wallet.fromPhrase(accounts.mnemonic, accounts.path + `/${index}`);
-        const signer1 = new ethers.Wallet(wallet1.privateKey, provider)
-
-        index = 2;
-        const wallet2 = ethers.Wallet.fromPhrase(accounts.mnemonic, accounts.path + `/${index}`);
-        const signer2 = new ethers.Wallet(wallet2.privateKey, provider)
-
-        // const signers = await ethers.getSigners();
-        // const accounts = signers.map((s) => s.address);
-        // const governance_accounts = accounts.slice(1,4);
-
-        // const provider = await ethers.provider;
-        // const safeOwner = await provider.getSigner(0);
+        const signer0 = await provider.getSigner(0);
         const ethAdapter = new EthersAdapter({
             ethers,
-            signerOrProvider: signer0
+            signerOrProvider: await provider.getSigner(0)
         })
 
         // deploy gnosis contracts
         const GnosisSafeProxyFactory = await ethers.getContractFactory("GnosisSafeProxyFactory");
-        // console.log("GnosisSafeProxyFactory", GnosisSafeProxyFactory);
-        // process.exit(0);
         console.log("Deploying GnosisSafeProxyFactory...");
         let gnosisSafeProxyFactory = await GnosisSafeProxyFactory.deploy();
         console.log("GnosisSafeProxyFactory deployed to:", gnosisSafeProxyFactory.target);
@@ -45,11 +25,6 @@ async function main() {
         console.log("Deploying Singleton...");
         let singleton = await Singleton.deploy();
         console.log("Singleton deployed to:", singleton.target);
-
-        // const GnosisSafeProxy = await ethers.getContractFactory("GnosisSafeProxy");
-        // console.log("Deploying GnosisSafeProxy...");
-        // let gnosisSafeProxy = await GnosisSafeProxy.deploy(singleton.target);
-        // console.log("GnosisSafeProxy deployed to:", gnosisSafeProxy.target);
 
         const GnosisSafe = await ethers.getContractFactory("GnosisSafe");
         console.log("Deploying GnosisSafe...");
@@ -108,26 +83,17 @@ async function main() {
                 signMessageLibAddress: signMessageLib.target,
                 createCallAddress: createCall.target,
                 simulateTxAccessorAddress: simulateTxAccessor.target,
-
-                // safeProxy:  gnosisSafeProxy.target,
             }
-
         }
 
         console.log("Gnosis Safe contracts", contractNetworks);
 
         const safeFactory = await SafeFactory.create({ ethAdapter, contractNetworks, isL1SafeSingleton: true });
 
-        // const safeSdk = await Safe.create({ ethAdapter, safeAddress, contractNetworks })
-        
         // deploy new Safe
         const safeAccountConfig = {
-            owners: [
-                await signer0.getAddress(),
-                // await signer1.getAddress(),
-                // await signer2.getAddress()
-            ],
-            threshold: 1,
+            owners: network.config.deploymentConfig.governanceIds,
+            threshold: network.config.deploymentConfig.threshold,
         }
 
         console.log("GnosisSafe config:", safeAccountConfig);
@@ -136,17 +102,20 @@ async function main() {
 
         const safeAddress = await safe.getAddress();
 
-        console.log("GnosisSafe:", safeAddress);
+        console.log("GnosisSafe address:", safeAddress);
 
-        // const safeSdk = await Safe.create({ ethAdapter, safeAddress: gnosisSafe.target, contractNetworks })
+        // --- spit addresses
 
+        const addresses = {
+            safe: safeAddress,
+        };
+
+        fs.writeFileSync("addresses.json", JSON.stringify(addresses));
         break;
-        // TODO: for other networks augment hardhat config with the addresses of the already deployed gnosis contracts
     default:
-        console.log(`Unknown network ${network.name}`);
+        console.log(`On network ${network.name} you should use an==the existing GnosisSafe contracts to create a GnosisSafe instance`);
         process.exit(-1);
     }
-
 }
 
 main().catch((error) => {

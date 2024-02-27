@@ -95,6 +95,7 @@ compile-eth: eth-deps
 deploy-eth: # Deploy eth contracts
 deploy-eth: compile-eth
 	cd eth && \
+        npx hardhat run --network $(NETWORK) scripts/0_deploy_gnosis.js && \
 	npx hardhat run --network $(NETWORK) scripts/1_deploy_contracts.js
 
 .PHONY: setup-eth
