@@ -20,6 +20,7 @@ async fn main() {
         .azero_account_id()
         .await
         .expect("Failed to get Azero account ID");
+
     let eth_address = client
         .eth_address()
         .await
