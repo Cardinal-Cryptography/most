@@ -5,41 +5,41 @@ const { u8aToHex } = require("@polkadot/util");
 const contracts = require("../addresses.json");
 const azeroContracts = require("../../azero/addresses.json");
 
-async function transferOwnershipToGovernance(
-  fromContract,
-  governanceContract,
-  governanceSigners,
-) {
-  let iface = await new ethers.Interface(["function acceptOwnership()"]);
-  let calldata = await iface.encodeFunctionData("acceptOwnership", []);
-  let initialOwner = await fromContract.owner();
-  console.log(
-    "Transferring ownership: ",
-    initialOwner,
-    "=>",
-    governanceContract.target,
-  );
-  await fromContract.transferOwnership(governanceContract.target);
-  await governanceContract
-    .connect(governanceSigners[0])
-    .submitProposal(fromContract.target, calldata);
-  console.log("Proposal submitted");
-  console.log("Awaiting proposal ID...");
-  let proposalId = await new Promise((resolve) => {
-    governanceContract.on("ProposalSubmitted", (by, id) => {
-      console.log(`Proposal ID: ${id}`);
-      resolve(id);
-    });
-  });
-  console.log("Signing proposal...");
-  for (const member of governanceSigners.slice(1)) {
-    await governanceContract.connect(member).vote(proposalId);
-  }
-  await governanceContract
-    .connect(governanceSigners[0])
-    .executeProposal(proposalId);
-  console.log(`${initialOwner} ownership transferred successfully`);
-}
+// async function transferOwnershipToGovernance(
+//   fromContract,
+//   governanceContract,
+//   governanceSigners,
+// ) {
+//   let iface = await new ethers.Interface(["function acceptOwnership()"]);
+//   let calldata = await iface.encodeFunctionData("acceptOwnership", []);
+//   let initialOwner = await fromContract.owner();
+//   console.log(
+//     "Transferring ownership: ",
+//     initialOwner,
+//     "=>",
+//     governanceContract.target,
+//   );
+//   await fromContract.transferOwnership(governanceContract.target);
+//   await governanceContract
+//     .connect(governanceSigners[0])
+//     .submitProposal(fromContract.target, calldata);
+//   console.log("Proposal submitted");
+//   console.log("Awaiting proposal ID...");
+//   let proposalId = await new Promise((resolve) => {
+//     governanceContract.on("ProposalSubmitted", (by, id) => {
+//       console.log(`Proposal ID: ${id}`);
+//       resolve(id);
+//     });
+//   });
+//   console.log("Signing proposal...");
+//   for (const member of governanceSigners.slice(1)) {
+//     await governanceContract.connect(member).vote(proposalId);
+//   }
+//   await governanceContract
+//     .connect(governanceSigners[0])
+//     .executeProposal(proposalId);
+//   console.log(`${initialOwner} ownership transferred successfully`);
+// }
 
 async function main() {
   const signers = await ethers.getSigners();
