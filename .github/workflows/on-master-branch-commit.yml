@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - master
+      - kz/remove-azero-governance
 
 jobs:
   check-vars-and-secrets:
