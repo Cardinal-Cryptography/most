@@ -113,6 +113,14 @@ pub mod most {
         signature_count: u128,
     }
 
+    #[derive(Debug, Encode, Decode, Clone, Copy)]
+    #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
+    pub enum RequestStatus {
+        Pending { collected_signatures: u32 },
+        Processed,
+        RequestHashNotKnown,
+    }
+
     #[derive(Debug)]
     #[ink::storage_item]
     pub struct Data {
@@ -745,6 +753,22 @@ pub mod most {
         #[ink(message)]
         pub fn is_halted(&self) -> Result<bool, MostError> {
             Ok(self.data()?.is_halted)
+        }
+
+        /// Returns the status of a given cross-chain transfer request
+        #[ink(message)]
+        pub fn request_status(&self, hashed_request: HashedRequest) -> RequestStatus {
+            if self.processed_requests.contains(hashed_request) {
+                RequestStatus::Processed
+            } else if let Some(Request { signature_count }) =
+                self.pending_requests.get(hashed_request)
+            {
+                RequestStatus::Pending {
+                    collected_signatures: signature_count as u32,
+                }
+            } else {
+                RequestStatus::RequestHashNotKnown
+            }
         }
 
         // ---  helper functions
