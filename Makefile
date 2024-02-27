@@ -220,7 +220,6 @@ test-ink-e2e: bootstrap-azero
 test-ink-unit: # Run ink unit tests
 test-ink-unit:
 	cd azero/contracts/most && cargo test
-	cd azero/contracts/governance && cargo test
 	cd azero/contracts/token && cargo test
 	cd azero/contracts/gas-price-oracle/contract && cargo test
 
@@ -254,7 +253,6 @@ relayer-lint: compile-azero-docker compile-eth
 ink-lint: # Lint ink contracts
 ink-lint:
 	cd azero/contracts/most && cargo clippy -- --no-deps -D warnings
-	cd azero/contracts/governance && cargo clippy -- --no-deps -D warnings
 	cd azero/contracts/token && cargo clippy -- --no-deps -D warnings
 	cd azero/contracts/psp22-traits && cargo clippy -- --no-deps -D warnings
 	cd azero/contracts/tests && cargo clippy -- --no-deps -D warnings
@@ -276,7 +274,6 @@ rust-format-check: # Check rust code formatting
 rust-format-check:
 	cd relayer && cargo fmt -- --check
 	cd azero/contracts/most && cargo fmt -- --check
-	cd azero/contracts/governance && cargo fmt -- --check
 	cd azero/contracts/token && cargo fmt -- --check
 	cd azero/contracts/psp22-traits && cargo fmt -- --check
 	cd azero/contracts/tests && cargo fmt -- --check
@@ -290,7 +287,6 @@ rust-format: # Format rust code
 rust-format:
 	cd relayer && cargo fmt
 	cd azero/contracts/most && cargo fmt
-	cd azero/contracts/governance && cargo fmt
 	cd azero/contracts/token && cargo fmt
 	cd azero/contracts/psp22-traits && cargo fmt
 	cd azero/contracts/tests && cargo fmt

@@ -8,10 +8,6 @@ let result = {
     version: "0.1",
     contract_version: version,
     addresses: {
-        azero_governance: {
-            contract: "azero_governance",
-            address: azero.governance
-        },
 
         azero_most: {
             contract: "azero_most",

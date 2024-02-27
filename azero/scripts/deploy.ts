@@ -2,8 +2,6 @@ import { ApiPromise, WsProvider, Keyring } from "@polkadot/api";
 import { hexToU8a, u8aToHex } from "@polkadot/util";
 import MostConstructors from "../types/constructors/most";
 import TokenConstructors from "../types/constructors/token";
-import GovernanceConstructors from "../types/constructors/governance";
-import Governance from "../types/contracts/governance";
 import Most from "../types/contracts/most";
 import Token from "../types/contracts/token";
 import OracleConstructors from "../types/constructors/oracle";
@@ -13,7 +11,6 @@ import {
   Addresses,
   storeAddresses,
   estimateContractInit,
-  transferOwnershipToGovernance,
 } from "./utils";
 import "dotenv/config";
 import "@polkadot/api-augment";
@@ -43,8 +40,6 @@ async function main(): Promise<void> {
   const {
     ws_node,
     relayers_keys,
-    governance_keys,
-    governance_seeds,
     authority_seed,
     signature_threshold,
     pocket_money,
@@ -64,10 +59,6 @@ async function main(): Promise<void> {
 
   const api = await ApiPromise.create({ provider: wsProvider });
   const deployer = keyring.addFromUri(authority_seed);
-  const governance_members = [];
-  governance_seeds.forEach((governance_seed) => {
-    governance_members.push(keyring.addFromUri(governance_seed));
-  });
 
   const tokenCodeHash = await uploadCode(api, deployer, "token.contract");
   console.log("token code hash:", tokenCodeHash);
@@ -75,20 +66,12 @@ async function main(): Promise<void> {
   const mostCodeHash = await uploadCode(api, deployer, "most.contract");
   console.log("most code hash:", mostCodeHash);
 
-  const governanceCodeHash = await uploadCode(
-    api,
-    deployer,
-    "governance.contract",
-  );
-  console.log("governance code hash:", governanceCodeHash);
-
   const oracleCodeHash = await uploadCode(api, deployer, "oracle.contract");
   console.log("oracle code hash:", oracleCodeHash);
 
   const advisoryCodeHash = await uploadCode(api, deployer, "advisory.contract");
   console.log("advisory code hash:", advisoryCodeHash);
 
-  const governanceConstructors = new GovernanceConstructors(api, deployer);
   const mostConstructors = new MostConstructors(api, deployer);
   const tokenConstructors = new TokenConstructors(api, deployer);
   const oracleConstructors = new OracleConstructors(api, deployer);
@@ -183,43 +166,11 @@ async function main(): Promise<void> {
 
   const most = new Most(mostAddress, deployer, api);
 
-  const quorum = 2;
-  const estimatedGasGovernance = await estimateContractInit(
-    api,
-    deployer,
-    "governance.contract",
-    [quorum],
-  );
-
-  const { address: governanceAddress } = await governanceConstructors.new(
-    quorum,
-    { gasLimit: estimatedGasGovernance },
-  );
-  const governance = new Governance(governanceAddress, deployer, api);
-  console.log("governance address:", governanceAddress);
-
   const wethHex = accountIdToHex(wethAddress);
   console.log("Adding weth pair to most:", wethHex, wethEthAddress);
   await most.tx.addPair(hexToBytes(wethHex), hexToBytes(wethEthAddress));
 
-  for (const address of governance_keys) {
-    console.log("Adding", address, "as governance member...");
-    await governance.tx.addMember(address);
-  }
-
-  await transferOwnershipToGovernance(most, governance, governance_members);
-
-  const token = new Token(wethAddress, deployer, api);
-  await transferOwnershipToGovernance(token, governance, governance_members);
-
-  await transferOwnershipToGovernance(
-    governance,
-    governance,
-    governance_members,
-  );
-
   const addresses: Addresses = {
-    governance: governanceAddress,
     most: mostAddress,
     weth: wethAddress,
     oracle: oracleAddress,
