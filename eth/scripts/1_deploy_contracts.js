@@ -9,7 +9,7 @@ async function main() {
   console.log("Using ", accounts[0], "as signer");
 
   // read addresses
-  const { safe } = JSON.parse(fs.readFileSync('addresses.json', { encoding: 'utf8', flag: 'r' }));
+  const gnosis_contracts = JSON.parse(fs.readFileSync('addresses.json', { encoding: 'utf8', flag: 'r' }));
 
   const WETH = await ethers.getContractFactory("WETH9");
   console.log("Deploying WETH...");
@@ -29,7 +29,7 @@ async function main() {
   console.log("Deploying Most...");
   const most = await upgrades.deployProxy(
     Most,
-    [config.guardianIds, config.threshold, safe, weth.target],
+    [config.guardianIds, config.threshold, gnosis_contracts.safe, weth.target],
     {
       initializer: "initialize",
       kind: "uups",
@@ -46,14 +46,12 @@ async function main() {
   await migrations.setCompleted(1);
 
   // --- append addresses
-
-  addresses = {
-    safe,
-    migrations: migrations.target,
-    most: most.target,
-    weth: weth.target,
-    usdt: usdt.target,
-  };
+    const addresses = Object.assign({}, gnosis_contracts, {
+        migrations: migrations.target,
+        most: most.target,
+        weth: weth.target,
+        usdt: usdt.target,
+    });
 
   console.log(addresses);
   fs.writeFileSync("addresses.json", JSON.stringify(addresses));

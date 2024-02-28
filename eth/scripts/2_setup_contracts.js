@@ -43,6 +43,34 @@ const azeroContracts = require("../../azero/addresses.json");
 //   console.log(`${initialOwner} ownership transferred successfully`);
 // }
 
+async function createSafeInstance(signer, contracts) {
+    const ethAdapter = new EthersAdapter({
+        ethers,
+        signerOrProvider: signer
+    })
+
+    const chainId = await ethAdapter.getChainId()
+    const contractNetworks  = {
+        [chainId]: {
+            safeSingletonAddress: contracts.safeSingletonAddress,
+            safeProxyFactoryAddress: contracts.safeProxyFactoryAddress
+            multiSendAddress: contracts.multiSendAddress,
+            multiSendCallOnlyAddress: contracts.multiSendCallOnlyAddress,
+            fallbackHandlerAddress: contracts.fallbackHandlerAddress,
+            signMessageLibAddress: contracts.signMessageLibAddress,
+            createCallAddress: contracts.createCallAddress,
+            simulateTxAccessorAddress: contracts.simulateTxAccessorAddress
+        }
+    }
+
+    return await Safe.create({ ethAdapter: ethAdapter, contracts.safe, contractNetworks})
+}
+
+// on-chain signature
+async function signSafeTransaction(safeInstance, txHash) {
+
+}
+
 async function main() {
   const signers = await ethers.getSigners();
   accounts = signers.map((s) => s.address);
@@ -78,22 +106,46 @@ async function main() {
     azeroContracts.weth,
   );
 
+    // IN-PROGRESS: add pair via a governance Safe action
+    // await most.addPair(wethAddressBytes, wethAddressBytesAzero);
 
-  // TODO: via a Safe call
-  await most.addPair(wethAddressBytes, wethAddressBytesAzero);
+    const signer0 = await provider.getSigner(0);
+    const safeSdk0 = await createSafeInstance(signer0, contracts);
 
-  // // transfer most ownership
-  // let mostInstance = await new ethers.Contract(
-  //   contracts.most,
-  //   Most.abi,
-  //   signers[0],
-  // );
+    let iface = await new ethers.Interface(["function addPair()"]);
+    let calldata = await iface.encodeFunctionData("addPair", [wethAddressBytes, wethAddressBytesAzero]);
+    const safeTransactionData = {
+        to: contracts.most,
+        data: calldata,
+        // value: 0
+    }
+    const safeTransaction = await safeSdk0.createTransaction({ transactions: [safeTransactionData] });
+    const safeTxHash = await safeSdk0.getTransactionHash(safeTransaction);
 
-  // await transferOwnershipToGovernance(
-  //   mostInstance,
-  //   governanceInstance,
-  //   signers.slice(1, 4),
-  // );
+    // on chain signature
+    const approveTxResponse = await safeSdk0.approveTransactionHash(safeTxHash)
+    await approveTxResponse.transactionResponse?.wait()
+
+    console.log("approve tx response:", approveTxResponse);
+
+    const signer1 = await provider.getSigner(1);
+    const safeSdk1 = await createSafeInstance(signer1, contracts);
+
+    const approveTxResponse = await safeSdk0.approveTransactionHash(safeTxHash)
+    await approveTxResponse.transactionResponse?.wait()
+
+    console.log("approve tx response:", approveTxResponse);
+
+    // execute safe tx
+
+    const executeTxResponse = await safeSdk2.executeTransaction(safeTransaction)
+    await executeTxResponse.transactionResponse?.wait()
+
+   console.log("execute tx response:", executeTxResponse);
+
+
+
+
 
   const Migrations = artifacts.require("Migrations");
   const migrations = await Migrations.at(contracts.migrations);

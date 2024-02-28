@@ -9,7 +9,7 @@ async function main() {
     case 'development' || 'hardhat':
         const provider = new ethers.JsonRpcProvider(network.config.url);
 
-        const signer0 = await provider.getSigner(0);
+        // const signer0 = await provider.getSigner(0);
         const ethAdapter = new EthersAdapter({
             ethers,
             signerOrProvider: await provider.getSigner(0)
@@ -88,7 +88,10 @@ async function main() {
 
         console.log("Gnosis Safe contracts", contractNetworks);
 
-        const safeFactory = await SafeFactory.create({ ethAdapter, contractNetworks, isL1SafeSingleton: true });
+        const safeFactory = await SafeFactory.create({ ethAdapter,
+                                                       contractNetworks,
+                                                       isL1SafeSingleton: force // forces the use of SafeL2.sol contract that emits events but consumes more more gas
+                                                     });
 
         // deploy new Safe
         const safeAccountConfig = {
@@ -108,6 +111,14 @@ async function main() {
 
         const addresses = {
             safe: safeAddress,
+            safeSingletonAddress:  gnosisSafe.target,
+            safeProxyFactoryAddress:  gnosisSafeProxyFactory.target,
+            multiSendAddress: multiSend.target,
+            multiSendCallOnlyAddress: multiSendCallOnly.target,
+            fallbackHandlerAddress: fallbackManager.target,
+            signMessageLibAddress: signMessageLib.target,
+            createCallAddress: createCall.target,
+            simulateTxAccessorAddress: simulateTxAccessor.target,
         };
 
         fs.writeFileSync("addresses.json", JSON.stringify(addresses));
