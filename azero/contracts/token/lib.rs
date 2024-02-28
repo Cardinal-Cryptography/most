@@ -251,6 +251,9 @@ pub mod token {
             }
             let events = self.data.burn(from, value)?;
             self.data.decrease_allowance(from, caller, value)?;
+            // The above outputs events that are ignored but should be emitted.
+            // Overall I think it would be simpler to get rid of `burn_from` and just use `transfer_from` + `burn`.
+            // In case we just use `burn_from` then what's the point of `burn`?
             self.emit_events(events);
             Ok(())
         }

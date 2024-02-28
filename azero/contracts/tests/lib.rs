@@ -606,6 +606,7 @@ mod e2e {
     #[ink_e2e::test]
     fn committee_rewards(mut client: ink_e2e::Client<C, E>) {
         let (most_address, token_address) = setup_default_most_and_token(&mut client, true).await;
+        
 
         let amount = 1000;
         let base_fee = most_base_fee(&mut client, most_address)
@@ -637,6 +638,33 @@ mod e2e {
             .expect("committee rewards");
 
         assert_eq!(total_rewards, base_fee);
+
+
+        
+        //=== Trying to request payout for non-guardian
+        let non_guardian = account_id(AccountKeyring::One);
+        assert!(!guardian_ids().contains(&non_guardian));
+        let non_guardian_balance_before = client
+            .balance(non_guardian)
+            .await
+            .expect("non_guardian_balance_before");
+
+    
+        most_request_payout(&mut client, &alice(), most_address, committee_id, non_guardian)
+            .await
+            .expect("request payout non_guardian");
+
+        let non_guardian_balance_after = client
+            .balance(non_guardian)
+            .await
+            .expect("non_guardian_balance_after");
+
+        assert_eq!(
+            non_guardian_balance_before,
+            non_guardian_balance_after
+        );
+        //================
+        
 
         let committee_size = guardian_ids().len();
         for i in 0..committee_size {

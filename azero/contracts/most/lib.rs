@@ -25,6 +25,7 @@ pub mod most {
     use shared::{concat_u8_arrays, keccak256, Keccak256HashOutput as HashedRequest, Selector};
 
     type CommitteeId = u128;
+    // We can save some gas by using a smaller type here -- u32 is enough.
 
     const GAS_ORACLE_MAX_AGE: u64 = 24 * 60 * 60 * 1000; // 1 day
     const ORACLE_CALL_GAS_LIMIT: u64 = 2_000_000_000;
@@ -117,7 +118,7 @@ pub mod most {
     #[ink::storage_item]
     pub struct Data {
         /// nonce for outgoing cross-chain transfer requests
-        request_nonce: u128,
+        request_nonce: u128,// definitely safe to use u64 here
         /// accounting helper
         committee_id: CommitteeId,
         /// a fixed subsidy transferred along with the bridged tokens to the destination account on aleph zero to bootstrap
@@ -153,8 +154,8 @@ pub mod most {
         /// set of guardian accounts that can sign requests
         committees: Mapping<(CommitteeId, AccountId), (), ManualKey<0x434F4D4D>>,
         /// accounting helper
-        committee_sizes: Mapping<CommitteeId, u128, ManualKey<0x53495A45>>,
-        /// number of signatures required to reach a quorum and costsxecute a transfer
+        committee_sizes: Mapping<CommitteeId, u128, ManualKey<0x53495A45>>, // u128 -> u32, 
+        /// number of signatures required to reach a quorum and execute a transfer
         signature_thresholds: Mapping<CommitteeId, u128, ManualKey<0x54485245>>,
         /// source - destination token pairs that can be transferred across the bridge
         supported_pairs: Mapping<[u8; 32], [u8; 32], ManualKey<0x53555050>>,
@@ -204,8 +205,9 @@ pub mod most {
         #[allow(clippy::too_many_arguments)]
         #[ink(constructor)]
         pub fn new(
+            // For safety -- add a check that there are no duplicates in the committee (here and where it is changed)
             committee: Vec<AccountId>,
-            signature_threshold: u128,
+            signature_threshold: u128, // u128 -> u32
             pocket_money: Balance,
             relay_gas_usage: u128,
             min_fee: Balance,
@@ -317,6 +319,7 @@ pub mod most {
 
             // return surplus if any
             if let Some(surplus) = transferred_fee.checked_sub(current_base_fee) {
+                // I'm wondering if transferring `0` works, and whether we should do it. Maybe we should check surplus > 0
                 self.env().transfer(sender, surplus)?;
             };
 
@@ -381,7 +384,7 @@ pub mod most {
                 return Err(MostError::HashDoesNotMatchData);
             }
 
-            let mut request = self.pending_requests.get(request_hash).unwrap_or_default(); //  {
+            let mut request = self.pending_requests.get(request_hash).unwrap_or_default();
 
             // record vote
             request.signature_count = request
@@ -496,6 +499,8 @@ pub mod most {
             if let Some(selector) = callback {
                 build_call::<DefaultEnvironment>()
                     .delegate(Hash::from(code_hash))
+                    // Given that there are so many gotchas with delegatecall, I would probably get rid ot the `callback` here
+                    // Instead, what you can do instead is send a tx batch (set_code, migrate) using `batch_all`.
                     .exec_input(ExecutionInput::new(ink::env::call::Selector::new(selector)))
                     .returns::<Result<(), MostError>>()
                     .invoke()?;
@@ -571,12 +576,13 @@ pub mod most {
             committee_id: CommitteeId,
             member_id: AccountId,
         ) -> Result<u128, MostError> {
+            // Waaaaaaitasec, where do we even check that `member_id` is in the committee?
             let total_amount = self
                 .get_collected_committee_rewards(committee_id)
                 .checked_div(
                     self.committee_sizes
                         .get(committee_id)
-                        .ok_or(MostError::NotInCommittee)?,
+                        .ok_or(MostError::NotInCommittee)?,// This is probably not the correct error to return here
                 )
                 .ok_or(MostError::Arithmetic)?;
 
@@ -607,6 +613,8 @@ pub mod most {
                 }
 
                 let base_fee = gas_price
+                // If the oracle is malicious, then in the line below we might return an error, and hence the bridge will not accept requests.
+                // -- we should think how to improve this, maybe instead of min_fee max_fee, there should be min_price, max_price
                     .checked_mul(self.data()?.relay_gas_usage)
                     .ok_or(MostError::Arithmetic)?
                     .checked_mul(100u128 + BASE_FEE_BUFFER_PERCENTAGE)
@@ -626,7 +634,7 @@ pub mod most {
             }
         }
 
-        /// Returns an error (reverts) if account is not in the committee with `committee_id`
+        /// Returns whether an account is in the committee with `committee_id`
         #[ink(message)]
         pub fn is_in_committee(&self, committee_id: CommitteeId, account: AccountId) -> bool {
             self.committees.contains((committee_id, account))
@@ -652,6 +660,8 @@ pub mod most {
         /// Can only be called by the contracts owner
         #[ink(message)]
         pub fn remove_pair(&mut self, from: [u8; 32]) -> Result<(), MostError> {
+            // Maybe it would be safer to allow this only if the bridge is halted?
+            // Similarly for `add_pair`
             self.ensure_owner()?;
             self.supported_pairs.remove(from);
             Ok(())
@@ -662,6 +672,7 @@ pub mod most {
         /// Can only be called by the contracts owner
         #[ink(message)]
         pub fn add_pair(&mut self, from: [u8; 32], to: [u8; 32]) -> Result<(), MostError> {
+            // Maybe this thing should check that the contract is `minter` on the `to` token? Safety.
             self.ensure_owner()?;
             self.supported_pairs.insert(from, &to);
             Ok(())
@@ -692,8 +703,11 @@ pub mod most {
             committee: Vec<AccountId>,
             signature_threshold: u128,
         ) -> Result<(), MostError> {
+            // Shall we force the bridge to be halted before changing the committee?
             self.ensure_owner()?;
-
+            // As in some other comment -- we should check for duplicates in committee, just for safety.
+            // Maybe it's best to make a function `check_committe(committee, signature_threshold)` and call it here and in `new`
+            // It would also include the check for the threshold below
             let mut data = self.data()?;
 
             if signature_threshold == 0 || committee.len().lt(&(signature_threshold as usize)) {
@@ -749,7 +763,7 @@ pub mod most {
 
         // ---  helper functions
 
-        fn check_halted(&self) -> Result<(), MostError> {
+        fn check_halted(&self) -> Result<(), MostError> { // I would call it `ensure_not_halted` for clarity
             match self.is_halted()? {
                 true => Err(MostError::IsHalted),
                 false => Ok(()),
