@@ -1,6 +1,8 @@
 const { ethers, artifacts } = require("hardhat");
 const { Keyring } = require("@polkadot/keyring");
 const { u8aToHex } = require("@polkadot/util");
+const Safe = require('@safe-global/protocol-kit').default;
+const { EthersAdapter } = require('@safe-global/protocol-kit');
 
 const contracts = require("../addresses.json");
 const azeroContracts = require("../../azero/addresses.json");
@@ -53,7 +55,7 @@ async function createSafeInstance(signer, contracts) {
     const contractNetworks  = {
         [chainId]: {
             safeSingletonAddress: contracts.safeSingletonAddress,
-            safeProxyFactoryAddress: contracts.safeProxyFactoryAddress
+            safeProxyFactoryAddress: contracts.safeProxyFactoryAddress,
             multiSendAddress: contracts.multiSendAddress,
             multiSendCallOnlyAddress: contracts.multiSendCallOnlyAddress,
             fallbackHandlerAddress: contracts.fallbackHandlerAddress,
@@ -63,103 +65,100 @@ async function createSafeInstance(signer, contracts) {
         }
     }
 
-    return await Safe.create({ ethAdapter: ethAdapter, contracts.safe, contractNetworks})
+    return await Safe.create({ ethAdapter: ethAdapter, safeAddress: contracts.safe, contractNetworks})
 }
 
 // on-chain signature
 async function signSafeTransaction(safeInstance, txHash) {
+    const approveTxResponse = await safeInstance.approveTransactionHash(safeTxHash)
+    await approveTxResponse.transactionResponse?.wait()
+    console.log("approve tx response:", approveTxResponse);
+}
 
+// on-chain signature
+async function executeSafeTransaction(safeInstance, txHash) {
+    const executeTxResponse = await safeInstance.executeTransaction(safeTransaction)
+    await executeTxResponse.transactionResponse?.wait()
+    console.log("execute tx response:", executeTxResponse);
 }
 
 async function main() {
-  const signers = await ethers.getSigners();
-  accounts = signers.map((s) => s.address);
+    const signers = await ethers.getSigners();
+    accounts = signers.map((s) => s.address);
 
-  console.log("Using ", accounts[0], "as signer");
+    console.log("Using ", accounts[0], "as signer");
 
-  // NOTE : TEMPorary before devnet is fixed and uses propere genesis that seeds these accounts with funds
-  for (const to of signers.slice(1, 4)) {
-    await signers[0].sendTransaction({
-      to: to.address,
-      value: ethers.parseEther("1.0"), // Send 1.0 ether
-    });
-  }
+    // NOTE : TEMPorary before devnet is fixed and uses propere genesis that seeds these accounts with funds
+    for (const to of signers.slice(1, 4)) {
+        await signers[0].sendTransaction({
+            to: to.address,
+            value: ethers.parseEther("1.0"), // Send 1.0 ether
+        });
+    }
 
-  // --- setup
+    // --- setup
 
-  const Most = artifacts.require("Most");
-  const most = await Most.at(contracts.most);
+    const Most = artifacts.require("Most");
+    const most = await Most.at(contracts.most);
 
-  // Add a pair
-  const wethAddressBytes = ethers.zeroPadValue(
-    ethers.getBytes(contracts.weth),
-    32,
-  );
-  const wethAddressBytesAzero = u8aToHex(
-    new Keyring({ type: "sr25519" }).decodeAddress(azeroContracts.weth),
-  );
+    // Add a pair
+    const wethAddressBytes = ethers.zeroPadValue(
+        ethers.getBytes(contracts.weth),
+        32,
+    );
+    const wethAddressBytesAzero = u8aToHex(
+        new Keyring({ type: "sr25519" }).decodeAddress(azeroContracts.weth),
+    );
 
-  console.log(
-    "Adding wETH token pair to Most:",
-    contracts.weth,
-    "=>",
-    azeroContracts.weth,
-  );
+    console.log(
+        "Adding wETH token pair to Most:",
+        contracts.weth,
+        "=>",
+        azeroContracts.weth,
+    );
 
     // IN-PROGRESS: add pair via a governance Safe action
     // await most.addPair(wethAddressBytes, wethAddressBytesAzero);
-
+    const provider = new ethers.JsonRpcProvider(network.config.url);
     const signer0 = await provider.getSigner(0);
     const safeSdk0 = await createSafeInstance(signer0, contracts);
 
-    let iface = await new ethers.Interface(["function addPair()"]);
+    let iface = await new ethers.Interface(["function addPair(bytes32 from, bytes32 to)"]);
     let calldata = await iface.encodeFunctionData("addPair", [wethAddressBytes, wethAddressBytesAzero]);
+
     const safeTransactionData = {
         to: contracts.most,
         data: calldata,
-        // value: 0
+        value: 0
     }
     const safeTransaction = await safeSdk0.createTransaction({ transactions: [safeTransactionData] });
     const safeTxHash = await safeSdk0.getTransactionHash(safeTransaction);
 
-    // on chain signature
-    const approveTxResponse = await safeSdk0.approveTransactionHash(safeTxHash)
-    await approveTxResponse.transactionResponse?.wait()
-
-    console.log("approve tx response:", approveTxResponse);
+    // on chain signatures
+    await signSafeTransaction(safeSdk0, safeTxHash);
 
     const signer1 = await provider.getSigner(1);
     const safeSdk1 = await createSafeInstance(signer1, contracts);
-
-    const approveTxResponse = await safeSdk0.approveTransactionHash(safeTxHash)
-    await approveTxResponse.transactionResponse?.wait()
-
-    console.log("approve tx response:", approveTxResponse);
+    await signSafeTransaction(safeSdk1, safeTxHash);
 
     // execute safe tx
+    await executeSafeTransaction(safeSdk1, safeTxHash);
 
-    const executeTxResponse = await safeSdk2.executeTransaction(safeTransaction)
-    await executeTxResponse.transactionResponse?.wait()
+    // -- update migrations
 
-   console.log("execute tx response:", executeTxResponse);
+    const Migrations = artifacts.require("Migrations");
+    const migrations = await Migrations.at(contracts.migrations);
 
+    let lastCompletedMigration = await migrations.last_completed_migration();
+    console.log("Updating migrations from", lastCompletedMigration, "to", 2);
+    await migrations.setCompleted(2);
 
-
-
-
-  const Migrations = artifacts.require("Migrations");
-  const migrations = await Migrations.at(contracts.migrations);
-
-  let lastCompletedMigration = await migrations.last_completed_migration();
-  console.log("Updating migrations from", lastCompletedMigration, "to", 2);
-  await migrations.setCompleted(2);
-
-  console.log("Done");
-  // NOTE: neccessary because script hangs in CI
-  process.exit(0);
+    console.log("Done");
+    // NOTE: neccessary because script hangs in CI
+    process.exit(0);
 }
 
 main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
+    console.error(error);
+    process.exitCode = 1;
 });

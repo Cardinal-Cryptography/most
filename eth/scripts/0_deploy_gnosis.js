@@ -90,7 +90,7 @@ async function main() {
 
         const safeFactory = await SafeFactory.create({ ethAdapter,
                                                        contractNetworks,
-                                                       isL1SafeSingleton: force // forces the use of SafeL2.sol contract that emits events but consumes more more gas
+                                                       isL1SafeSingleton: false // forces the use of SafeL2.sol contract that emits events but consumes more more gas
                                                      });
 
         // deploy new Safe
