@@ -3,12 +3,14 @@
 pragma solidity ^0.8.20;
 /*
     Remove global imports
+    e.g.
+    import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 */
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 contract Most is
     Initializable,
@@ -51,16 +53,17 @@ contract Most is
     event RequestAlreadySigned(bytes32 requestHash, address signer);
 
     /*
-        Replace `require()` with custom errors (for gas cost optimization)
+        Replace `require()` with custom errors** (for gas cost optimization)
         E.g.
         ```
-        error OnlyCommitteeMember();
+        error NotInComittee();
         modifier _onlyCommitteeMember(uint256 _committeeId) {
             if (!isInCommittee(_committeeId, msg.sender))
-                revert OnlyCommitteeMember();
+                revert NotInComittee();
             _;
         }
         ```
+        **It applies to all `require()` statements in this contracts.
     */
     modifier _onlyCommitteeMember(uint256 _committeeId) {
         require(
@@ -121,12 +124,6 @@ contract Most is
     ) external whenNotPaused {
         address sender = msg.sender;
 
-        /*
-            Disallow request with "dust" amounts
-            ref: SOL-AM-DOSA-2, SOL-Basics-Payment-4 at https://github.com/Cyfrin/audit-checklist/blob/main/checklist.json
-        */
-        require(amount > 0, "ZeroAmount");
-
         IERC20 token = IERC20(bytes32ToAddress(srcTokenAddress));
 
         // check if the token is supported
@@ -161,12 +158,6 @@ contract Most is
         bytes32 destReceiverAddress
     ) external payable whenNotPaused {
         uint256 amount = msg.value;
-
-        /*
-            Disallow request with "dust" amounts
-            ref: SOL-AM-DOSA-2, SOL-Basics-Payment-4 at https://github.com/Cyfrin/audit-checklist/blob/main/checklist.json
-        */
-        require(amount > 0, "ZeroAmount");
 
         // check if the token is supported
         bytes32 destTokenAddress = supportedPairs[
@@ -231,12 +222,6 @@ contract Most is
 
         if (request.signatureCount >= signatureThreshold[committeeId]) {
             processedRequests[requestHash] = true;
-            /*
-                When deleting a struct field with neseted mapping,
-                only non-mapping nested fields are being reset to theri default values.
-                In this case, `pendingRequests[requestHash].signatures` are being preserved.
-                Not sure if it was intented but it doesn't seem to cause any security issues in this case.
-            */
             delete pendingRequests[requestHash];
 
             // return the locked tokens
