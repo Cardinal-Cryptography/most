@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - master
+      - A0-4031-push-relayer-to-public-ecr-repository
 
 jobs:
   check-vars-and-secrets:
