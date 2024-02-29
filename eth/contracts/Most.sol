@@ -57,7 +57,7 @@ contract Most is
     }
 
     function initialize(
-        address[] calldata _committee,
+        address[] calldata _committee, // should check for duplicates?
         uint256 _signatureThreshold,
         address owner,
         address payable _wethAddress
@@ -115,7 +115,7 @@ contract Most is
 
         // lock tokens in this contract
         // message sender needs to give approval else this tx will revert
-        token.transferFrom(sender, address(this), amount);
+        token.transferFrom(sender, address(this), amount); // I'm always scared of reentrancy here, would it be ok to use ReentrancyGuard?
 
         emit CrosschainTransferRequest(
             committeeId,
@@ -221,7 +221,7 @@ contract Most is
             } else {
                 IERC20 token = IERC20(bytes32ToAddress(destTokenAddress));
 
-                token.transfer(bytes32ToAddress(destReceiverAddress), amount);
+                token.transfer(bytes32ToAddress(destReceiverAddress), amount); // I'm always scared of reentrancy here, would it be ok to use ReentrancyGuard?
             }
             emit RequestProcessed(requestHash);
         }
@@ -258,9 +258,9 @@ contract Most is
     }
 
     function setCommittee(
-        address[] memory _committee,
+        address[] memory _committee, // should check for duplicates?
         uint256 _signatureThreshold
-    ) external onlyOwner {
+    ) external onlyOwner {  // maybe this should use whenPaused?
         require(
             _signatureThreshold > 0,
             "Signature threshold must be greater than 0"
@@ -282,11 +282,11 @@ contract Most is
         signatureThreshold[committeeId] = _signatureThreshold;
     }
 
-    function addPair(bytes32 from, bytes32 to) external onlyOwner {
+    function addPair(bytes32 from, bytes32 to) external onlyOwner { // maybe this should use whenPaused?
         supportedPairs[from] = to;
     }
 
-    function removePair(bytes32 from) external onlyOwner {
+    function removePair(bytes32 from) external onlyOwner {  // maybe this should use whenPaused?
         delete supportedPairs[from];
     }
 
