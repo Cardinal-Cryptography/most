@@ -5,7 +5,7 @@ const { network, ethers } = require("hardhat");
 
 async function main() {
   switch (network.name) {
-    case "development" || "hardhat":
+    case "development" || "bridgenet":
       const provider = new ethers.JsonRpcProvider(network.config.url);
 
       // const signer0 = await provider.getSigner(0);
