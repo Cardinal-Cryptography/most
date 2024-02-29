@@ -10,13 +10,14 @@
 | [GAS-2](#GAS-2) | Using bools for storage incurs overhead | 3 |
 | [GAS-3](#GAS-3) | Cache array length outside of loop | 2 |
 | [GAS-4](#GAS-4) | Use calldata instead of memory for function arguments that do not get mutated | 1 |
-| [GAS-5](#GAS-5) | For Operations that will not overflow, you could use unchecked | 18 |
+| [GAS-5](#GAS-5) | For Operations that will not overflow, you could use unchecked | 11 |
 | [GAS-6](#GAS-6) | Use Custom Errors instead of Revert Strings to save Gas | 4 |
-| [GAS-7](#GAS-7) | Functions guaranteed to revert when called by normal users can be marked `payable` | 6 |
-| [GAS-8](#GAS-8) | `++i` costs less gas compared to `i++` or `i += 1` (same for `--i` vs `i--` or `i -= 1`) | 5 |
-| [GAS-9](#GAS-9) | Increments/decrements can be unchecked in for-loops | 2 |
-| [GAS-10](#GAS-10) | Use != 0 instead of > 0 for unsigned integer comparison | 2 |
-| [GAS-11](#GAS-11) | WETH address definition can be use directly | 1 |
+| [GAS-7](#GAS-7) | State variables only set in the constructor should be declared `immutable` | 1 |
+| [GAS-8](#GAS-8) | Functions guaranteed to revert when called by normal users can be marked `payable` | 6 |
+| [GAS-9](#GAS-9) | `++i` costs less gas compared to `i++` or `i += 1` (same for `--i` vs `i--` or `i -= 1`) | 5 |
+| [GAS-10](#GAS-10) | Increments/decrements can be unchecked in for-loops | 2 |
+| [GAS-11](#GAS-11) | Use != 0 instead of > 0 for unsigned integer comparison | 3 |
+| [GAS-12](#GAS-12) | WETH address definition can be use directly | 1 |
 ### <a name="GAS-1"></a>[GAS-1] `a = a + b` is more gas effective than `a += b` for state variables (excluding arrays and mappings)
 This saves **16 gas per instance.**
 
@@ -67,13 +68,13 @@ If the array is passed to an `internal` function which passes the array to anoth
 ```solidity
 File: Most.sol
 
-261:         address[] memory _committee, // should check for duplicates?
+261:         address[] memory _committee,
 
 ```
 
 ### <a name="GAS-5"></a>[GAS-5] For Operations that will not overflow, you could use unchecked
 
-*Instances (18)*:
+*Instances (11)*:
 ```solidity
 File: Most.sol
 
@@ -87,11 +88,7 @@ File: Most.sol
 
 9: import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
-60:         address[] calldata _committee, // should check for duplicates?
-
 76:         for (uint256 i = 0; i < _committee.length; i++) {
-
-118:         token.transferFrom(sender, address(this), amount); // I'm always scared of reentrancy here, would it be ok to use ReentrancyGuard?
 
 128:         requestNonce++;
 
@@ -99,19 +96,9 @@ File: Most.sol
 
 197:         request.signatureCount++;
 
-224:                 token.transfer(bytes32ToAddress(destReceiverAddress), amount); // I'm always scared of reentrancy here, would it be ok to use ReentrancyGuard?
-
-261:         address[] memory _committee, // should check for duplicates?
-
-263:     ) external onlyOwner {  // maybe this should use whenPaused?
-
 273:         committeeId += 1;
 
 275:         for (uint256 i = 0; i < _committee.length; i++) {
-
-285:     function addPair(bytes32 from, bytes32 to) external onlyOwner { // maybe this should use whenPaused?
-
-289:     function removePair(bytes32 from) external onlyOwner {  // maybe this should use whenPaused?
 
 ```
 
@@ -140,7 +127,18 @@ File: Most.sol
 
 ```
 
-### <a name="GAS-7"></a>[GAS-7] Functions guaranteed to revert when called by normal users can be marked `payable`
+### <a name="GAS-7"></a>[GAS-7] State variables only set in the constructor should be declared `immutable`
+Variables only set in the constructor and never edited afterwards should be marked as immutable, as it would avoid the expensive storage-writing operation in the constructor (around **20 000 gas** per variable) and replace the expensive storage-reading operations (around **2100 gas** per reading) to a less expensive value reading (**3 gas**)
+
+*Instances (1)*:
+```solidity
+File: Migrations.sol
+
+14:         owner = msg.sender;
+
+```
+
+### <a name="GAS-8"></a>[GAS-8] Functions guaranteed to revert when called by normal users can be marked `payable`
 If a function modifier such as `onlyOwner` is used, the function will revert if a normal user tries to pay the function. Marking the function as `payable` will lower the gas cost for legitimate callers because the compiler will not include checks for whether a payment was provided.
 
 *Instances (6)*:
@@ -155,13 +153,13 @@ File: Most.sol
 
 234:     function unpause() external onlyOwner {
 
-285:     function addPair(bytes32 from, bytes32 to) external onlyOwner { // maybe this should use whenPaused?
+285:     function addPair(bytes32 from, bytes32 to) external onlyOwner {
 
-289:     function removePair(bytes32 from) external onlyOwner {  // maybe this should use whenPaused?
+289:     function removePair(bytes32 from) external onlyOwner {
 
 ```
 
-### <a name="GAS-8"></a>[GAS-8] `++i` costs less gas compared to `i++` or `i += 1` (same for `--i` vs `i--` or `i -= 1`)
+### <a name="GAS-9"></a>[GAS-9] `++i` costs less gas compared to `i++` or `i += 1` (same for `--i` vs `i--` or `i -= 1`)
 Pre-increments and pre-decrements are cheaper.
 
 For a `uint256 i` variable, the following is true with the Optimizer enabled at 10k:
@@ -216,7 +214,7 @@ File: Most.sol
 
 ```
 
-### <a name="GAS-9"></a>[GAS-9] Increments/decrements can be unchecked in for-loops
+### <a name="GAS-10"></a>[GAS-10] Increments/decrements can be unchecked in for-loops
 In Solidity 0.8+, there's a default overflow check on unsigned integers. It's possible to uncheck this in for-loops and save some gas at each iteration, but at the cost of some code readability, as this uncheck cannot be made inline.
 
 [ethereum/solidity#10695](https://github.com/ethereum/solidity/issues/10695)
@@ -247,9 +245,16 @@ File: Most.sol
 
 ```
 
-### <a name="GAS-10"></a>[GAS-10] Use != 0 instead of > 0 for unsigned integer comparison
+### <a name="GAS-11"></a>[GAS-11] Use != 0 instead of > 0 for unsigned integer comparison
 
-*Instances (2)*:
+*Instances (3)*:
+```solidity
+File: Migrations.sol
+
+3: pragma solidity >=0.4.22 <0.9.0;
+
+```
+
 ```solidity
 File: Most.sol
 
@@ -259,7 +264,7 @@ File: Most.sol
 
 ```
 
-### <a name="GAS-11"></a>[GAS-11] WETH address definition can be use directly
+### <a name="GAS-12"></a>[GAS-12] WETH address definition can be use directly
 WETH is a wrap Ether contract with a specific address in the Ethereum network, giving the option to define it may cause false recognition, it is healthier to define it directly.
 
     Advantages of defining a specific contract directly:
@@ -285,21 +290,23 @@ File: Most.sol
 |-|:-|:-:|
 | [NC-1](#NC-1) | Replace `abi.encodeWithSignature` and `abi.encodeWithSelector` with `abi.encodeCall` which keeps the code typo/type safe | 2 |
 | [NC-2](#NC-2) | Use `string.concat()` or `bytes.concat()` instead of `abi.encodePacked` | 4 |
-| [NC-3](#NC-3) | Control structures do not follow the Solidity Style Guide | 2 |
+| [NC-3](#NC-3) | Control structures do not follow the Solidity Style Guide | 3 |
 | [NC-4](#NC-4) | Duplicated `require()`/`revert()` Checks Should Be Refactored To A Modifier Or Function | 6 |
 | [NC-5](#NC-5) | Event missing indexed field | 4 |
 | [NC-6](#NC-6) | Function ordering does not follow the Solidity style guide | 1 |
-| [NC-7](#NC-7) | Functions should not be longer than 50 lines | 7 |
-| [NC-8](#NC-8) | Missing Event for critical parameters change | 1 |
-| [NC-9](#NC-9) | NatSpec is completely non-existent on functions that should have them | 9 |
-| [NC-10](#NC-10) | Use a `modifier` instead of a `require/if` statement for a special `msg.sender` actor | 1 |
-| [NC-11](#NC-11) | Consider using named mappings | 7 |
-| [NC-12](#NC-12) | Owner can renounce while system is paused | 2 |
-| [NC-13](#NC-13) | Contract does not follow the Solidity style guide's suggested layout ordering | 1 |
-| [NC-14](#NC-14) | Internal and private variables and functions names should begin with an underscore | 3 |
-| [NC-15](#NC-15) | Event is missing `indexed` fields | 4 |
-| [NC-16](#NC-16) | `public` functions not called by the contract should be declared `external` instead | 1 |
-| [NC-17](#NC-17) | Variables need not be initialized to zero | 2 |
+| [NC-7](#NC-7) | Functions should not be longer than 50 lines | 9 |
+| [NC-8](#NC-8) | Change uint to uint256 | 1 |
+| [NC-9](#NC-9) | Lack of checks in setters | 1 |
+| [NC-10](#NC-10) | Missing Event for critical parameters change | 2 |
+| [NC-11](#NC-11) | NatSpec is completely non-existent on functions that should have them | 11 |
+| [NC-12](#NC-12) | Use a `modifier` instead of a `require/if` statement for a special `msg.sender` actor | 2 |
+| [NC-13](#NC-13) | Consider using named mappings | 7 |
+| [NC-14](#NC-14) | Owner can renounce while system is paused | 2 |
+| [NC-15](#NC-15) | Contract does not follow the Solidity style guide's suggested layout ordering | 1 |
+| [NC-16](#NC-16) | Internal and private variables and functions names should begin with an underscore | 3 |
+| [NC-17](#NC-17) | Event is missing `indexed` fields | 4 |
+| [NC-18](#NC-18) | `public` functions not called by the contract should be declared `external` instead | 3 |
+| [NC-19](#NC-19) | Variables need not be initialized to zero | 2 |
 ### <a name="NC-1"></a>[NC-1] Replace `abi.encodeWithSignature` and `abi.encodeWithSelector` with `abi.encodeCall` which keeps the code typo/type safe
 When using `abi.encodeWithSignature`, it is possible to include a typo for the correct function signature.
 When using `abi.encodeWithSignature` or `abi.encodeWithSelector`, it is also possible to provide parameters that are not of the correct type for the function.
@@ -338,7 +345,14 @@ File: Most.sol
 ### <a name="NC-3"></a>[NC-3] Control structures do not follow the Solidity Style Guide
 See the [control structures](https://docs.soliditylang.org/en/latest/style-guide.html#control-structures) section of the Solidity Style Guide
 
-*Instances (2)*:
+*Instances (3)*:
+```solidity
+File: Migrations.sol
+
+10:         if (msg.sender == owner) _;
+
+```
+
 ```solidity
 File: Most.sol
 
@@ -432,7 +446,16 @@ File: Most.sol
 ### <a name="NC-7"></a>[NC-7] Functions should not be longer than 50 lines
 Overly complex code can make understanding functionality more difficult, try to further modularize your code to ensure readability 
 
-*Instances (7)*:
+*Instances (9)*:
+```solidity
+File: Migrations.sol
+
+17:     function setCompleted(uint completed) public restricted {
+
+21:     function upgrade(address new_address) public restricted {
+
+```
+
 ```solidity
 File: Most.sol
 
@@ -446,23 +469,54 @@ File: Most.sol
 
 256:     function addressToBytes32(address addr) internal pure returns (bytes32) {
 
-285:     function addPair(bytes32 from, bytes32 to) external onlyOwner { // maybe this should use whenPaused?
+285:     function addPair(bytes32 from, bytes32 to) external onlyOwner {
 
-289:     function removePair(bytes32 from) external onlyOwner {  // maybe this should use whenPaused?
+289:     function removePair(bytes32 from) external onlyOwner {
 
 ```
 
-### <a name="NC-8"></a>[NC-8] Missing Event for critical parameters change
-Events help non-contract tools to track changes, and events prevent users from being surprised by changes.
+### <a name="NC-8"></a>[NC-8] Change uint to uint256
+Throughout the code base, some variables are declared as `uint`. To favor explicitness, consider changing all instances of `uint` to `uint256`
 
 *Instances (1)*:
+```solidity
+File: Migrations.sol
+
+17:     function setCompleted(uint completed) public restricted {
+
+```
+
+### <a name="NC-9"></a>[NC-9] Lack of checks in setters
+Be it sanity checks (like checks against `0`-values) or initial setting checks: it's best for Setter functions to have them
+
+*Instances (1)*:
+```solidity
+File: Migrations.sol
+
+17:     function setCompleted(uint completed) public restricted {
+            last_completed_migration = completed;
+
+```
+
+### <a name="NC-10"></a>[NC-10] Missing Event for critical parameters change
+Events help non-contract tools to track changes, and events prevent users from being surprised by changes.
+
+*Instances (2)*:
+```solidity
+File: Migrations.sol
+
+17:     function setCompleted(uint completed) public restricted {
+            last_completed_migration = completed;
+
+```
+
 ```solidity
 File: Most.sol
 
 260:     function setCommittee(
-             address[] memory _committee, // should check for duplicates?
+             address[] memory _committee,
              uint256 _signatureThreshold
-         ) external onlyOwner {  // maybe this should use whenPaused?
+         ) external onlyOwner {
              require(
                  _signatureThreshold > 0,
                  "Signature threshold must be greater than 0"
@@ -485,10 +539,19 @@ File: Most.sol
 
 ```
 
-### <a name="NC-9"></a>[NC-9] NatSpec is completely non-existent on functions that should have them
+### <a name="NC-11"></a>[NC-11] NatSpec is completely non-existent on functions that should have them
 Public and external functions that aren't view or pure should have NatSpec comments
 
-*Instances (9)*:
+*Instances (11)*:
+```solidity
+File: Migrations.sol
+
+17:     function setCompleted(uint completed) public restricted {
+
+21:     function upgrade(address new_address) public restricted {
+
+```
+
 ```solidity
 File: Most.sol
 
@@ -506,16 +569,23 @@ File: Most.sol
 
 260:     function setCommittee(
 
-285:     function addPair(bytes32 from, bytes32 to) external onlyOwner { // maybe this should use whenPaused?
+285:     function addPair(bytes32 from, bytes32 to) external onlyOwner {
 
-289:     function removePair(bytes32 from) external onlyOwner {  // maybe this should use whenPaused?
+289:     function removePair(bytes32 from) external onlyOwner {
 
 ```
 
-### <a name="NC-10"></a>[NC-10] Use a `modifier` instead of a `require/if` statement for a special `msg.sender` actor
+### <a name="NC-12"></a>[NC-12] Use a `modifier` instead of a `require/if` statement for a special `msg.sender` actor
 If a function is supposed to be access-controlled, a `modifier` should be used instead of a `require/if` statement for more readability.
 
-*Instances (1)*:
+*Instances (2)*:
+```solidity
+File: Migrations.sol
+
+10:         if (msg.sender == owner) _;
+
+```
+
 ```solidity
 File: Most.sol
 
@@ -523,7 +593,7 @@ File: Most.sol
 
 ```
 
-### <a name="NC-11"></a>[NC-11] Consider using named mappings
+### <a name="NC-13"></a>[NC-13] Consider using named mappings
 Consider moving to solidity version 0.8.18 or later, and using [named mappings](https://ethereum.stackexchange.com/questions/51629/how-to-name-the-arguments-in-mapping/145555#145555) to make it easier to understand the purpose of each mapping
 
 *Instances (7)*:
@@ -546,7 +616,7 @@ File: Most.sol
 
 ```
 
-### <a name="NC-12"></a>[NC-12] Owner can renounce while system is paused
+### <a name="NC-14"></a>[NC-14] Owner can renounce while system is paused
 The contract owner or single user with a role is not prevented from renouncing the role/ownership while the contract is paused, which would cause any user assets stored in the protocol, to be locked indefinitely.
 
 *Instances (2)*:
@@ -559,7 +629,7 @@ File: Most.sol
 
 ```
 
-### <a name="NC-13"></a>[NC-13] Contract does not follow the Solidity style guide's suggested layout ordering
+### <a name="NC-15"></a>[NC-15] Contract does not follow the Solidity style guide's suggested layout ordering
 The [style guide](https://docs.soliditylang.org/en/v0.8.16/style-guide.html#order-of-layout) says that, within a contract, the ordering should be:
 
 1) Type declarations
@@ -645,7 +715,7 @@ File: Most.sol
 
 ```
 
-### <a name="NC-14"></a>[NC-14] Internal and private variables and functions names should begin with an underscore
+### <a name="NC-16"></a>[NC-16] Internal and private variables and functions names should begin with an underscore
 According to the Solidity Style Guide, Non-`external` variable and function names should begin with an [underscore](https://docs.soliditylang.org/en/latest/style-guide.html#underscore-prefix-for-non-external-functions-and-variables)
 
 *Instances (3)*:
@@ -660,7 +730,7 @@ File: Most.sol
 
 ```
 
-### <a name="NC-15"></a>[NC-15] Event is missing `indexed` fields
+### <a name="NC-17"></a>[NC-17] Event is missing `indexed` fields
 Index event fields make the field more quickly accessible to off-chain tools that parse events. However, note that each index field costs extra gas during emission, so it's not necessarily best to index the maximum allowed per event (three fields). Each event should use three indexed fields if there are three or more fields, and gas usage is not particularly of concern for the events in question. If there are fewer than three fields, all of the fields should be indexed.
 
 *Instances (4)*:
@@ -677,9 +747,18 @@ File: Most.sol
 
 ```
 
-### <a name="NC-16"></a>[NC-16] `public` functions not called by the contract should be declared `external` instead
+### <a name="NC-18"></a>[NC-18] `public` functions not called by the contract should be declared `external` instead
 
-*Instances (1)*:
+*Instances (3)*:
+```solidity
+File: Migrations.sol
+
+17:     function setCompleted(uint completed) public restricted {
+
+21:     function upgrade(address new_address) public restricted {
+
+```
+
 ```solidity
 File: Most.sol
 
@@ -687,7 +766,7 @@ File: Most.sol
 
 ```
 
-### <a name="NC-17"></a>[NC-17] Variables need not be initialized to zero
+### <a name="NC-19"></a>[NC-19] Variables need not be initialized to zero
 The default value for variables is zero, so initializing them to zero is superfluous.
 
 *Instances (2)*:
@@ -715,8 +794,9 @@ File: Most.sol
 | [L-7](#L-7) | Solidity version 0.8.20+ may not work on other chains due to `PUSH0` | 1 |
 | [L-8](#L-8) | Consider using OpenZeppelin's SafeCast library to prevent unexpected overflows when downcasting | 1 |
 | [L-9](#L-9) | Unsafe ERC20 operation(s) | 2 |
-| [L-10](#L-10) | Upgradeable contract is missing a `__gap[50]` storage variable to allow for new storage variables in later versions | 7 |
-| [L-11](#L-11) | Upgradeable contract not initialized | 11 |
+| [L-10](#L-10) | Unspecific compiler version pragma | 1 |
+| [L-11](#L-11) | Upgradeable contract is missing a `__gap[50]` storage variable to allow for new storage variables in later versions | 7 |
+| [L-12](#L-12) | Upgradeable contract not initialized | 11 |
 ### <a name="L-1"></a>[L-1] Some tokens may revert when zero value transfers are made
 Example: https://github.com/d-xo/weird-erc20#revert-on-zero-value-transfers.
 
@@ -726,9 +806,9 @@ In spite of the fact that EIP-20 [states](https://github.com/ethereum/EIPs/blob/
 ```solidity
 File: Most.sol
 
-118:         token.transferFrom(sender, address(this), amount); // I'm always scared of reentrancy here, would it be ok to use ReentrancyGuard?
+118:         token.transferFrom(sender, address(this), amount);
 
-224:                 token.transfer(bytes32ToAddress(destReceiverAddress), amount); // I'm always scared of reentrancy here, would it be ok to use ReentrancyGuard?
+224:                 token.transfer(bytes32ToAddress(destReceiverAddress), amount);
 
 ```
 
@@ -826,13 +906,23 @@ File: Most.sol
 ```solidity
 File: Most.sol
 
-118:         token.transferFrom(sender, address(this), amount); // I'm always scared of reentrancy here, would it be ok to use ReentrancyGuard?
+118:         token.transferFrom(sender, address(this), amount);
 
-224:                 token.transfer(bytes32ToAddress(destReceiverAddress), amount); // I'm always scared of reentrancy here, would it be ok to use ReentrancyGuard?
+224:                 token.transfer(bytes32ToAddress(destReceiverAddress), amount);
 
 ```
 
-### <a name="L-10"></a>[L-10] Upgradeable contract is missing a `__gap[50]` storage variable to allow for new storage variables in later versions
+### <a name="L-10"></a>[L-10] Unspecific compiler version pragma
+
+*Instances (1)*:
+```solidity
+File: Migrations.sol
+
+3: pragma solidity >=0.4.22 <0.9.0;
+
+```
+
+### <a name="L-11"></a>[L-11] Upgradeable contract is missing a `__gap[50]` storage variable to allow for new storage variables in later versions
 See [this](https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps) link for a description of this storage variable. While some contracts may not currently be sub-classed, adding the variable now protects against forgetting to add it in the future.
 
 *Instances (7)*:
@@ -855,7 +945,7 @@ File: Most.sol
 
 ```
 
-### <a name="L-11"></a>[L-11] Upgradeable contract not initialized
+### <a name="L-12"></a>[L-12] Upgradeable contract not initialized
 Upgradeable contracts are initialized via an initializer function rather than by a constructor. Leaving such a contract uninitialized may lead to it being taken over by a malicious user
 
 *Instances (11)*:
@@ -906,7 +996,7 @@ Use the balance before and after the transfer to calculate the received amount i
 ```solidity
 File: Most.sol
 
-118:         token.transferFrom(sender, address(this), amount); // I'm always scared of reentrancy here, would it be ok to use ReentrancyGuard?
+118:         token.transferFrom(sender, address(this), amount);
 
 ```
 
@@ -927,11 +1017,11 @@ File: Most.sol
 
 234:     function unpause() external onlyOwner {
 
-263:     ) external onlyOwner {  // maybe this should use whenPaused?
+263:     ) external onlyOwner {
 
-285:     function addPair(bytes32 from, bytes32 to) external onlyOwner { // maybe this should use whenPaused?
+285:     function addPair(bytes32 from, bytes32 to) external onlyOwner {
 
-289:     function removePair(bytes32 from) external onlyOwner {  // maybe this should use whenPaused?
+289:     function removePair(bytes32 from) external onlyOwner {
 
 ```
 
@@ -942,9 +1032,9 @@ Not all `IERC20` implementations `revert()` when there's a failure in `transfer(
 ```solidity
 File: Most.sol
 
-118:         token.transferFrom(sender, address(this), amount); // I'm always scared of reentrancy here, would it be ok to use ReentrancyGuard?
+118:         token.transferFrom(sender, address(this), amount);
 
-224:                 token.transfer(bytes32ToAddress(destReceiverAddress), amount); // I'm always scared of reentrancy here, would it be ok to use ReentrancyGuard?
+224:                 token.transfer(bytes32ToAddress(destReceiverAddress), amount);
 
 ```
 
@@ -955,9 +1045,9 @@ Some tokens do not implement the ERC20 standard properly but are still accepted 
 ```solidity
 File: Most.sol
 
-118:         token.transferFrom(sender, address(this), amount); // I'm always scared of reentrancy here, would it be ok to use ReentrancyGuard?
+118:         token.transferFrom(sender, address(this), amount);
 
-224:                 token.transfer(bytes32ToAddress(destReceiverAddress), amount); // I'm always scared of reentrancy here, would it be ok to use ReentrancyGuard?
+224:                 token.transfer(bytes32ToAddress(destReceiverAddress), amount);
 
 ```
 
