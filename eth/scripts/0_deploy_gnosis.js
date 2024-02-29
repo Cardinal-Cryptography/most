@@ -131,9 +131,14 @@ async function main() {
 
       fs.writeFileSync("addresses.json", JSON.stringify(addresses));
       break;
+
+  case "sepolia":
+
+      break;
+
     default:
       console.log(
-        `On network ${network.name} you should use an==the existing GnosisSafe contracts to create a GnosisSafe instance`,
+        `On network ${network.name} you should use the existing GnosisSafe contracts to create a GnosisSafe instance`,
       );
       process.exit(-1);
   }
