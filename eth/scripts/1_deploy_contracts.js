@@ -48,12 +48,14 @@ async function main() {
   await migrations.setCompleted(1);
 
   // --- append addresses
-  const addresses = Object.assign({}, gnosis_contracts, {
+
+  const addresses = {
+    gnosis: gnosis_contracts,
     migrations: migrations.target,
     most: most.target,
     weth: weth.target,
     usdt: usdt.target,
-  });
+  };
 
   console.log(addresses);
   fs.writeFileSync("addresses.json", JSON.stringify(addresses));

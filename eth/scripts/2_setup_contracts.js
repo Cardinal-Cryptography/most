@@ -15,20 +15,20 @@ async function createSafeInstance(signer, contracts) {
   const chainId = await ethAdapter.getChainId();
   const contractNetworks = {
     [chainId]: {
-      safeSingletonAddress: contracts.safeSingletonAddress,
-      safeProxyFactoryAddress: contracts.safeProxyFactoryAddress,
-      multiSendAddress: contracts.multiSendAddress,
-      multiSendCallOnlyAddress: contracts.multiSendCallOnlyAddress,
-      fallbackHandlerAddress: contracts.fallbackHandlerAddress,
-      signMessageLibAddress: contracts.signMessageLibAddress,
-      createCallAddress: contracts.createCallAddress,
-      simulateTxAccessorAddress: contracts.simulateTxAccessorAddress,
+      safeSingletonAddress: contracts.gnosis.safeSingletonAddress,
+      safeProxyFactoryAddress: contracts.gnosis.safeProxyFactoryAddress,
+      multiSendAddress: contracts.gnosis.multiSendAddress,
+      multiSendCallOnlyAddress: contracts.gnosis.multiSendCallOnlyAddress,
+      fallbackHandlerAddress: contracts.gnosis.fallbackHandlerAddress,
+      signMessageLibAddress: contracts.gnosis.signMessageLibAddress,
+      createCallAddress: contracts.gnosis.createCallAddress,
+      simulateTxAccessorAddress: contracts.gnosis.simulateTxAccessorAddress,
     },
   };
 
   return await Safe.create({
     ethAdapter: ethAdapter,
-    safeAddress: contracts.safe,
+    safeAddress: contracts.gnosis.safe,
     contractNetworks,
   });
 }
