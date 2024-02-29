@@ -1,44 +1,48 @@
 const { ethers, artifacts } = require("hardhat");
 const { Keyring } = require("@polkadot/keyring");
 const { u8aToHex } = require("@polkadot/util");
+const Safe = require("@safe-global/protocol-kit").default;
+const { EthersAdapter } = require("@safe-global/protocol-kit");
 
 const contracts = require("../addresses.json");
 const azeroContracts = require("../../azero/addresses.json");
 
-async function transferOwnershipToGovernance(
-  fromContract,
-  governanceContract,
-  governanceSigners,
-) {
-  let iface = await new ethers.Interface(["function acceptOwnership()"]);
-  let calldata = await iface.encodeFunctionData("acceptOwnership", []);
-  let initialOwner = await fromContract.owner();
-  console.log(
-    "Transferring ownership: ",
-    initialOwner,
-    "=>",
-    governanceContract.target,
-  );
-  await fromContract.transferOwnership(governanceContract.target);
-  await governanceContract
-    .connect(governanceSigners[0])
-    .submitProposal(fromContract.target, calldata);
-  console.log("Proposal submitted");
-  console.log("Awaiting proposal ID...");
-  let proposalId = await new Promise((resolve) => {
-    governanceContract.on("ProposalSubmitted", (by, id) => {
-      console.log(`Proposal ID: ${id}`);
-      resolve(id);
-    });
+async function createSafeInstance(signer, contracts) {
+  const ethAdapter = new EthersAdapter({
+    ethers,
+    signerOrProvider: signer,
   });
-  console.log("Signing proposal...");
-  for (const member of governanceSigners.slice(1)) {
-    await governanceContract.connect(member).vote(proposalId);
-  }
-  await governanceContract
-    .connect(governanceSigners[0])
-    .executeProposal(proposalId);
-  console.log(`${initialOwner} ownership transferred successfully`);
+  const chainId = await ethAdapter.getChainId();
+  const contractNetworks = {
+    [chainId]: {
+      safeSingletonAddress: contracts.gnosis.safeSingletonAddress,
+      safeProxyFactoryAddress: contracts.gnosis.safeProxyFactoryAddress,
+      multiSendAddress: contracts.gnosis.multiSendAddress,
+      multiSendCallOnlyAddress: contracts.gnosis.multiSendCallOnlyAddress,
+      fallbackHandlerAddress: contracts.gnosis.fallbackHandlerAddress,
+      signMessageLibAddress: contracts.gnosis.signMessageLibAddress,
+      createCallAddress: contracts.gnosis.createCallAddress,
+      simulateTxAccessorAddress: contracts.gnosis.simulateTxAccessorAddress,
+    },
+  };
+
+  return await Safe.create({
+    ethAdapter: ethAdapter,
+    safeAddress: contracts.gnosis.safe,
+    contractNetworks,
+  });
+}
+
+// signing with on-chain signatures
+async function signSafeTransaction(safeInstance, txHash) {
+  const approveTxResponse = await safeInstance.approveTransactionHash(txHash);
+  await approveTxResponse.transactionResponse?.wait();
+}
+
+async function executeSafeTransaction(safeInstance, safeTransaction) {
+  const executeTxResponse =
+    await safeInstance.executeTransaction(safeTransaction);
+  await executeTxResponse.transactionResponse?.wait();
 }
 
 async function main() {
@@ -76,35 +80,58 @@ async function main() {
     azeroContracts.weth,
   );
 
-  await most.addPair(wethAddressBytes, wethAddressBytesAzero);
+  // IN-PROGRESS: add pair via a governance Safe action
+  // await most.addPair(wethAddressBytes, wethAddressBytesAzero);
+  const provider = new ethers.JsonRpcProvider(network.config.url);
 
-  // transfer governance ownership
-  // we need "contractInstance" to be able to switch the signer
-  const Governance = artifacts.require("Governance");
-  let governanceInstance = await new ethers.Contract(
-    contracts.governance,
-    Governance.abi,
-    signers[0],
+  const signer0 = signers[1];
+  const safeSdk0 = await createSafeInstance(signer0, contracts);
+
+  console.log("safe owners", await safeSdk0.getOwners());
+  console.log("signer0", signer0.address);
+
+  let iface = await new ethers.Interface([
+    "function addPair(bytes32 from, bytes32 to)",
+  ]);
+  let calldata = await iface.encodeFunctionData("addPair", [
+    wethAddressBytes,
+    wethAddressBytesAzero,
+  ]);
+
+  const safeTransactionData = {
+    to: contracts.most,
+    data: calldata,
+    value: 0,
+  };
+
+  console.log("creating a Safe transaction:", safeTransactionData);
+
+  const safeTransaction = await safeSdk0.createTransaction({
+    transactions: [safeTransactionData],
+  });
+  const safeTxHash = await safeSdk0.getTransactionHash(safeTransaction);
+
+  console.log("safeTxHash", safeTxHash);
+
+  // on chain signatures
+  await signSafeTransaction(safeSdk0, safeTxHash);
+
+  const signer1 = signers[2];
+  console.log("signer1", signer1.address);
+  const safeSdk1 = await createSafeInstance(signer1, contracts);
+  await signSafeTransaction(safeSdk1, safeTxHash);
+
+  // execute safe tx
+  await executeSafeTransaction(safeSdk1, safeTransaction);
+
+  console.log(
+    "Most now supports the token pair:",
+    wethAddressBytes,
+    "=>",
+    await most.supportedPairs(wethAddressBytes),
   );
 
-  await transferOwnershipToGovernance(
-    governanceInstance,
-    governanceInstance,
-    signers.slice(1, 4),
-  );
-
-  // transfer most ownership
-  let mostInstance = await new ethers.Contract(
-    contracts.most,
-    Most.abi,
-    signers[0],
-  );
-
-  await transferOwnershipToGovernance(
-    mostInstance,
-    governanceInstance,
-    signers.slice(1, 4),
-  );
+  // -- update migrations
 
   const Migrations = artifacts.require("Migrations");
   const migrations = await Migrations.at(contracts.migrations);

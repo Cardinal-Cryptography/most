@@ -8,6 +8,11 @@ async function main() {
 
   console.log("Using ", accounts[0], "as signer");
 
+  // read addresses
+  const gnosis_contracts = JSON.parse(
+    fs.readFileSync("addresses.json", { encoding: "utf8", flag: "r" }),
+  );
+
   const WETH = await ethers.getContractFactory("WETH9");
   console.log("Deploying WETH...");
   const weth = await WETH.deploy();
@@ -22,24 +27,11 @@ async function main() {
   );
   console.log("USDT deployed to:", usdt.target);
 
-  const Governance = await ethers.getContractFactory("Governance");
-  console.log("Deploying Governance...");
-  const governance = await upgrades.deployProxy(
-    Governance,
-    [config.governanceIds, config.governanceThreshold],
-    {
-      initializer: "initialize",
-      kind: "uups",
-    },
-  );
-  await governance.waitForDeployment();
-  console.log("Governance deployed to:", governance.target);
-
   const Most = await ethers.getContractFactory("Most");
   console.log("Deploying Most...");
   const most = await upgrades.deployProxy(
     Most,
-    [config.guardianIds, config.threshold, accounts[0], weth.target],
+    [config.guardianIds, config.threshold, gnosis_contracts.safe, weth.target],
     {
       initializer: "initialize",
       kind: "uups",
@@ -55,11 +47,11 @@ async function main() {
   console.log("Updating migrations...");
   await migrations.setCompleted(1);
 
-  // --- spit addresses
+  // --- append addresses
 
   const addresses = {
+    gnosis: gnosis_contracts,
     migrations: migrations.target,
-    governance: governance.target,
     most: most.target,
     weth: weth.target,
     usdt: usdt.target,

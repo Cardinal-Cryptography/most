@@ -18,6 +18,8 @@
         "@nomiclabs/hardhat-truffle5": "^2.0.7",
         "@openzeppelin/hardhat-upgrades": "^2.5.0",
         "@polkadot/api": "^10.11.2",
+        "@safe-global/protocol-kit": "^3.0.0",
+        "@safe-global/safe-core-sdk-types": "^4.0.0",
         "child_process": "^1.0.2",
         "dotenv": "^16.3.1",
         "gulp": "^4.0.2",
