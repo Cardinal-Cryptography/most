@@ -13,7 +13,10 @@ contract SimulateTxAccessor is Executor {
     }
 
     modifier onlyDelegateCall() {
-        require(address(this) != accessorSingleton, "SimulateTxAccessor should only be called via delegatecall");
+        require(
+            address(this) != accessorSingleton,
+            "SimulateTxAccessor should only be called via delegatecall"
+        );
         _;
     }
 
@@ -24,12 +27,8 @@ contract SimulateTxAccessor is Executor {
         Enum.Operation operation
     )
         external
-        onlyDelegateCall()
-        returns (
-            uint256 estimate,
-            bool success,
-            bytes memory returnData
-        )
+        onlyDelegateCall
+        returns (uint256 estimate, bool success, bytes memory returnData)
     {
         uint256 startGas = gasleft();
         success = execute(to, value, data, operation, gasleft());

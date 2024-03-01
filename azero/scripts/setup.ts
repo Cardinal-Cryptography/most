@@ -22,11 +22,7 @@ const envFile = process.env.AZERO_ENV || "dev";
 async function main(): Promise<void> {
   const config = await import_env(envFile);
 
-  const {
-    ws_node,
-    authority_seed,
-    authority,
-  } = config;
+  const { ws_node, authority_seed, authority } = config;
 
   const {
     most: most_azero,

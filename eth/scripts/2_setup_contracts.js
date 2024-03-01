@@ -97,10 +97,10 @@ async function main() {
   const most = await Most.at(contracts.most);
 
   // --- provide some wETH and USDT to most contract
-  if (network.name == 'development' || network.name == 'bridgenet') {
+  if (network.name == "development" || network.name == "bridgenet") {
     const WETH = artifacts.require("WETH9");
     const weth = await WETH.at(contracts.weth);
-  
+
     await weth.deposit({ value: 1000000000000000 });
     await weth.transfer(contracts.most, 1000000000000000);
 
@@ -122,17 +122,17 @@ async function main() {
   // wETH pair
   const wethAddressBytes = ethers.zeroPadValue(
     ethers.getBytes(contracts.weth),
-    32
+    32,
   );
   const wethAddressBytesAzero = u8aToHex(
-    new Keyring({ type: "sr25519" }).decodeAddress(azeroContracts.weth)
+    new Keyring({ type: "sr25519" }).decodeAddress(azeroContracts.weth),
   );
 
   console.log(
     "Adding wETH token pair to Most:",
     contracts.weth,
     "=>",
-    azeroContracts.weth
+    azeroContracts.weth,
   );
 
   await addTokenPair(wethAddressBytes, wethAddressBytesAzero, [
@@ -144,23 +144,23 @@ async function main() {
     "Most now supports the token pair:",
     wethAddressBytes,
     "=>",
-    await most.supportedPairs(wethAddressBytes)
+    await most.supportedPairs(wethAddressBytes),
   );
 
   // USDT pair
   const usdtAddressBytes = ethers.zeroPadValue(
     ethers.getBytes(contracts.usdt),
-    32
+    32,
   );
   const usdtAddressBytesAzero = u8aToHex(
-    new Keyring({ type: "sr25519" }).decodeAddress(azeroContracts.usdt)
+    new Keyring({ type: "sr25519" }).decodeAddress(azeroContracts.usdt),
   );
 
   console.log(
     "Adding USDT token pair to Most:",
     contracts.usdt,
     "=>",
-    azeroContracts.usdt
+    azeroContracts.usdt,
   );
 
   await addTokenPair(usdtAddressBytes, usdtAddressBytesAzero, [
@@ -172,7 +172,7 @@ async function main() {
     "Most now supports the token pair:",
     usdtAddressBytes,
     "=>",
-    await most.supportedPairs(usdtAddressBytes)
+    await most.supportedPairs(usdtAddressBytes),
   );
 
   // -- update migrations

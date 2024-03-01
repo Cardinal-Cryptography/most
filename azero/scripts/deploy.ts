@@ -19,7 +19,6 @@ import type BN from "bn.js";
 
 const envFile = process.env.AZERO_ENV || "dev";
 
-
 async function deployToken(
   initialSupply: string | number | BN,
   name: string,
@@ -27,13 +26,13 @@ async function deployToken(
   decimals: string | number | BN,
   minterBurner: AccountId,
   api: ApiPromise,
-  deployer: KeyringPair
+  deployer: KeyringPair,
 ) {
   const estimatedGasToken = await estimateContractInit(
     api,
     deployer,
     "token.contract",
-    [initialSupply, name, symbol, decimals, minterBurner]
+    [initialSupply, name, symbol, decimals, minterBurner],
   );
   const tokenConstructors = new TokenConstructors(api, deployer);
   return await tokenConstructors.new(
@@ -42,7 +41,7 @@ async function deployToken(
     symbol,
     decimals,
     minterBurner,
-    { gasLimit: estimatedGasToken }
+    { gasLimit: estimatedGasToken },
   );
 }
 
@@ -88,25 +87,25 @@ async function main(): Promise<void> {
     api,
     deployer,
     "advisory.contract",
-    [authority]
+    [authority],
   );
 
   const { address: advisoryAddress } = await advisoryConstructors.new(
     authority, // owner
-    { gasLimit: estimatedGasAdvisory }
+    { gasLimit: estimatedGasAdvisory },
   );
 
   let estimatedGasOracle = await estimateContractInit(
     api,
     deployer,
     "oracle.contract",
-    [authority, 10000000000]
+    [authority, 10000000000],
   );
 
   const { address: oracleAddress } = await oracleConstructors.new(
     authority, // owner
     10000000000, // initial value
-    { gasLimit: estimatedGasOracle }
+    { gasLimit: estimatedGasOracle },
   );
 
   const estimatedGasMost = await estimateContractInit(
@@ -122,7 +121,7 @@ async function main(): Promise<void> {
       max_fee!,
       default_fee!,
       oracleAddress,
-    ]
+    ],
   );
 
   const { address: mostAddress } = await mostConstructors.new(
@@ -134,7 +133,7 @@ async function main(): Promise<void> {
     max_fee!,
     default_fee!,
     oracleAddress,
-    { gasLimit: estimatedGasMost }
+    { gasLimit: estimatedGasMost },
   );
 
   console.log("most address:", mostAddress);
@@ -165,7 +164,7 @@ async function main(): Promise<void> {
     wethArgs.decimals,
     minterBurner,
     api,
-    deployer
+    deployer,
   );
   console.log("wETH address:", wethAddress);
 
@@ -176,7 +175,7 @@ async function main(): Promise<void> {
     usdtArgs.decimals,
     minterBurner,
     api,
-    deployer
+    deployer,
   );
   console.log("USDT address:", usdtAddress);
 
