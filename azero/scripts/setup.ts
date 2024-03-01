@@ -7,10 +7,6 @@ import Token from "../types/contracts/token";
 import OracleConstructors from "../types/constructors/oracle";
 import AdvisoryConstructors from "../types/constructors/advisory";
 import {
-  uploadCode,
-  Addresses,
-  storeAddresses,
-  estimateContractInit,
   import_env,
   import_azero_addresses,
   import_eth_addresses,

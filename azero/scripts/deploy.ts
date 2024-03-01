@@ -142,14 +142,14 @@ async function main(): Promise<void> {
   const wethArgs = {
     initialSupply: 0,
     symbol: "wETH",
-    name: "wETH",
+    name: "Wrapped Ether",
     decimals: 18,
   };
 
   const usdtArgs = {
     initialSupply: 0,
     symbol: "USDT",
-    name: "USDT",
+    name: "Tether",
     decimals: 6,
   };
 

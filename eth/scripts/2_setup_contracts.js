@@ -1,4 +1,4 @@
-const { ethers, artifacts } = require("hardhat");
+const { ethers, artifacts, network } = require("hardhat");
 const { Keyring } = require("@polkadot/keyring");
 const { u8aToHex } = require("@polkadot/util");
 const Safe = require("@safe-global/protocol-kit").default;
@@ -96,7 +96,20 @@ async function main() {
   const Most = artifacts.require("Most");
   const most = await Most.at(contracts.most);
 
-  // Add  pairs
+  // --- provide some wETH and USDT to most contract
+  if (network.name == 'development' || network.name == 'bridgenet') {
+    const WETH = artifacts.require("WETH9");
+    const weth = await WETH.at(contracts.weth);
+  
+    await weth.deposit({ value: 1000000000000000 });
+    await weth.transfer(contracts.most, 1000000000000000);
+
+    const Token = artifacts.require("Token");
+    const usdt = await Token.at(contracts.usdt);
+    await usdt.transfer(contracts.most, 1000000000000000);
+  }
+
+  // --- add  pairs
   const signer0 = signers[1];
   const signer1 = signers[2];
   const safeSdk0 = await createSafeInstance(signer0, contracts);
