@@ -33,6 +33,38 @@ async function createSafeInstance(signer, contracts) {
   });
 }
 
+async function addTokenPair(ethTokenAddress, azeroTokenAddress, safeInstances) {
+  let iface = await new ethers.Interface([
+    "function addPair(bytes32 from, bytes32 to)",
+  ]);
+  let calldata = await iface.encodeFunctionData("addPair", [
+    ethTokenAddress,
+    azeroTokenAddress,
+  ]);
+
+  const safeTransactionData = {
+    to: contracts.most,
+    data: calldata,
+    value: 0,
+  };
+
+  console.log("creating a Safe transaction:", safeTransactionData);
+
+  const safeTransaction = await safeInstances[0].createTransaction({
+    transactions: [safeTransactionData],
+  });
+  const safeTxHash = await safeInstances[0].getTransactionHash(safeTransaction);
+
+  console.log("safeTxHash", safeTxHash);
+
+  for (const safeInstance of safeInstances) {
+    await signSafeTransaction(safeInstance, safeTxHash);
+  }
+
+  // execute safe tx
+  await executeSafeTransaction(safeInstances[0], safeTransaction);
+}
+
 // signing with on-chain signatures
 async function signSafeTransaction(safeInstance, txHash) {
   const approveTxResponse = await safeInstance.approveTransactionHash(txHash);
@@ -64,71 +96,70 @@ async function main() {
   const Most = artifacts.require("Most");
   const most = await Most.at(contracts.most);
 
-  // Add a pair
+  // Add  pairs
+  const signer0 = signers[1];
+  const signer1 = signers[2];
+  const safeSdk0 = await createSafeInstance(signer0, contracts);
+  const safeSdk1 = await createSafeInstance(signer1, contracts);
+
+  console.log("safe owners", await safeSdk0.getOwners());
+  console.log("signer0", signer0.address);
+  console.log("signer1", signer1.address);
+
+  // wETH pair
   const wethAddressBytes = ethers.zeroPadValue(
     ethers.getBytes(contracts.weth),
-    32,
+    32
   );
   const wethAddressBytesAzero = u8aToHex(
-    new Keyring({ type: "sr25519" }).decodeAddress(azeroContracts.weth),
+    new Keyring({ type: "sr25519" }).decodeAddress(azeroContracts.weth)
   );
 
   console.log(
     "Adding wETH token pair to Most:",
     contracts.weth,
     "=>",
-    azeroContracts.weth,
+    azeroContracts.weth
   );
 
-  // IN-PROGRESS: add pair via a governance Safe action
-  // await most.addPair(wethAddressBytes, wethAddressBytesAzero);
-  const provider = new ethers.JsonRpcProvider(network.config.url);
-
-  const signer0 = signers[1];
-  const safeSdk0 = await createSafeInstance(signer0, contracts);
-
-  console.log("safe owners", await safeSdk0.getOwners());
-  console.log("signer0", signer0.address);
-
-  let iface = await new ethers.Interface([
-    "function addPair(bytes32 from, bytes32 to)",
+  await addTokenPair(wethAddressBytes, wethAddressBytesAzero, [
+    safeSdk0,
+    safeSdk1,
   ]);
-  let calldata = await iface.encodeFunctionData("addPair", [
-    wethAddressBytes,
-    wethAddressBytesAzero,
-  ]);
-
-  const safeTransactionData = {
-    to: contracts.most,
-    data: calldata,
-    value: 0,
-  };
-
-  console.log("creating a Safe transaction:", safeTransactionData);
-
-  const safeTransaction = await safeSdk0.createTransaction({
-    transactions: [safeTransactionData],
-  });
-  const safeTxHash = await safeSdk0.getTransactionHash(safeTransaction);
-
-  console.log("safeTxHash", safeTxHash);
-
-  // on chain signatures
-  await signSafeTransaction(safeSdk0, safeTxHash);
-
-  const signer1 = signers[2];
-  console.log("signer1", signer1.address);
-  const safeSdk1 = await createSafeInstance(signer1, contracts);
-  await signSafeTransaction(safeSdk1, safeTxHash);
-
-  // execute safe tx
-  await executeSafeTransaction(safeSdk1, safeTransaction);
 
   console.log(
     "Most now supports the token pair:",
     wethAddressBytes,
     "=>",
-    await most.supportedPairs(wethAddressBytes),
+    await most.supportedPairs(wethAddressBytes)
+  );
+
+  // USDT pair
+  const usdtAddressBytes = ethers.zeroPadValue(
+    ethers.getBytes(contracts.usdt),
+    32
+  );
+  const usdtAddressBytesAzero = u8aToHex(
+    new Keyring({ type: "sr25519" }).decodeAddress(azeroContracts.usdt)
+  );
+
+  console.log(
+    "Adding USDT token pair to Most:",
+    contracts.usdt,
+    "=>",
+    azeroContracts.usdt
+  );
+
+  await addTokenPair(usdtAddressBytes, usdtAddressBytesAzero, [
+    safeSdk0,
+    safeSdk1,
+  ]);
+
+  console.log(
+    "Most now supports the token pair:",
+    usdtAddressBytes,
+    "=>",
+    await most.supportedPairs(usdtAddressBytes)
   );
 
   // -- update migrations

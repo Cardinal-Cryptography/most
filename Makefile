@@ -158,9 +158,14 @@ deploy-azero: # Deploy azero contracts
 deploy-azero: compile-azero
 	cd azero && npm run deploy
 
+.PHONY: setup-azero
+setup-azero: # Setup azero contracts
+setup-azero: compile-azero
+	cd azero && npm run setup
+
 .PHONY: deploy
 deploy: # Deploy all contracts
-deploy: deploy-eth deploy-azero setup-eth
+deploy: deploy-eth deploy-azero setup-eth setup-azero
 
 .PHONY: watch-relayer
 watch-relayer:
