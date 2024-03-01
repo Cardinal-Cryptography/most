@@ -24,10 +24,7 @@ contract MultiSend {
     /// @notice This method is payable as delegatecalls keep the msg.value from the previous call
     ///         If the calling method (e.g. execTransaction) received ETH this would revert otherwise
     function multiSend(bytes memory transactions) public payable {
-        require(
-            address(this) != multisendSingleton,
-            "MultiSend should only be called via delegatecall"
-        );
+        require(address(this) != multisendSingleton, "MultiSend should only be called via delegatecall");
         // solhint-disable-next-line no-inline-assembly
         assembly {
             let length := mload(transactions)
@@ -52,12 +49,12 @@ contract MultiSend {
                 let data := add(transactions, add(i, 0x55))
                 let success := 0
                 switch operation
-                case 0 {
-                    success := call(gas(), to, value, data, dataLength, 0, 0)
-                }
-                case 1 {
-                    success := delegatecall(gas(), to, data, dataLength, 0, 0)
-                }
+                    case 0 {
+                        success := call(gas(), to, value, data, dataLength, 0, 0)
+                    }
+                    case 1 {
+                        success := delegatecall(gas(), to, data, dataLength, 0, 0)
+                    }
                 if eq(success, 0) {
                     revert(0, 0)
                 }

@@ -2,3 +2,4 @@ node_modules
 contracts/Migrations.sol
 contracts/WETH9.sol
 contracts/Token.sol
+contracts/gnosis-1.3.0/*.sol
