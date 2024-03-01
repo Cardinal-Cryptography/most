@@ -33,20 +33,25 @@ async function createSafeInstance(signer, contracts) {
   });
 }
 
-async function addTokenPair(ethTokenAddress, azeroTokenAddress, mostContract, safeInstances) {
+async function addTokenPair(
+  ethTokenAddress,
+  azeroTokenAddress,
+  mostContract,
+  safeInstances,
+) {
   console.log(
     "Adding token pair to Most:",
     ethTokenAddress,
     "=>",
     azeroTokenAddress,
-    );
-    const ethTokenAddressBytes = ethers.zeroPadValue(
-      ethers.getBytes(ethTokenAddress),
-      32,
-    );
-    const azeroTokenAddressBytes = u8aToHex(
-      new Keyring({ type: "sr25519" }).decodeAddress(azeroTokenAddress),
-    );
+  );
+  const ethTokenAddressBytes = ethers.zeroPadValue(
+    ethers.getBytes(ethTokenAddress),
+    32,
+  );
+  const azeroTokenAddressBytes = u8aToHex(
+    new Keyring({ type: "sr25519" }).decodeAddress(azeroTokenAddress),
+  );
   let iface = await new ethers.Interface([
     "function addPair(bytes32 from, bytes32 to)",
   ]);
@@ -133,16 +138,16 @@ async function main() {
     const signer1 = signers[2];
     const safeSdk0 = await createSafeInstance(signer0, contracts);
     const safeSdk1 = await createSafeInstance(signer1, contracts);
-  
+
     console.log("safe owners", await safeSdk0.getOwners());
     console.log("signer0", signer0.address);
     console.log("signer1", signer1.address);
-  
+
     await addTokenPair(contracts.weth, azeroContracts.weth, most, [
       safeSdk0,
       safeSdk1,
     ]);
-  
+
     await addTokenPair(contracts.usdt, azeroContracts.usdt, most, [
       safeSdk0,
       safeSdk1,
