@@ -204,6 +204,7 @@ contract Most is
 
         emit RequestSigned(requestHash, msg.sender);
 
+        /// why do we consider signatureThreshold of committeeId, when we process requrest for _committeeId (underscored)?
         if (request.signatureCount >= signatureThreshold[committeeId]) {
             processedRequests[requestHash] = true;
             delete pendingRequests[requestHash];
@@ -262,6 +263,9 @@ contract Most is
     function addressToBytes32(address addr) internal pure returns (bytes32) {
         return bytes32(uint256(uint160(addr)));
     }
+
+    // Some event like CommitteeUpdate might be Emitted here and in constructor
+    // For committee members to track their participation in comittee
 
     function setCommittee(
         address[] memory _committee,
