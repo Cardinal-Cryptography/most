@@ -117,6 +117,7 @@ impl MostInstance {
         ];
 
         let data = self.transcoder.encode("receive_request", args)?;
+        // [Audit] How about checking gas price also for Aleph Zero?
         signed_connection
             .call(
                 self.address.clone(),

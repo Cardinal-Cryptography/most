@@ -180,7 +180,7 @@ impl AlephZeroListener {
                         to_block,
                     )
                     .await?;
-
+                    // [Audit] Sort block_events by block number for improved bridging time
                     for (block_details, events) in block_events {
                         let filtered_events =
                             most_azero.filter_events(events, block_details.clone());
@@ -320,7 +320,8 @@ async fn handle_events(
             .clone()
             .acquire_owned()
             .await?;
-
+        // [Audit] How about checking advisors state there? The decision probably depends on the semaphore
+        // max level,but I assume the average waiting time for acquiring a permit will be non-negligible?
         // Spawn a new task for handling each event.
         event_tasks.spawn(handle_event(config, eth_connection, event, permit));
         if event_tasks.len() >= ALEPH_MAX_REQUESTS_PER_BLOCK {
@@ -411,6 +412,7 @@ async fn handle_event(
 
             // This shouldn't fail unless there is something wrong with our config.
             // NOTE: this does not check whether the actual tx reverted on-chain. Reverts are only checked on dry-run.
+            // [Audit] Maybe check if gas price <= config.max_gas_price (and add it to the config)
             let receipt = call
                 .gas(config.eth_gas_limit)
                 .nonce(eth_connection.inner().next())
@@ -497,6 +499,8 @@ pub async fn wait_for_eth_tx_finality(
                     }
                 }
             }
+            // [Audit] Potentially infinite loop in case of errors, and perhaps too
+            // aggresive panic! - maybe propagate errors similarly to EthContractReverted
             Err(err) => {
                 error!("Failed to get tx that should be present: {err}");
             }
@@ -517,7 +521,7 @@ async fn get_next_finalized_block_number_azero(
                         number_opt.expect("Finalized block has a number.");
                     if best_finalized_block_number >= not_older_than {
                         return best_finalized_block_number;
-                    }
+                    } // [Nit] Same debug! there - to catch infinite loops
                 }
                 Err(err) => {
                     warn!("Aleph Client error when getting best finalized block number: {err}");
@@ -525,6 +529,8 @@ async fn get_next_finalized_block_number_azero(
             },
             Err(err) => {
                 warn!("Aleph Client error when getting best finalized block hash: {err}");
+                // [Audit] Potentially infinite loop - consider returning and propagating errors,
+                // once failed, the call will likely fail again without recreating connection or something.
             }
         };
 

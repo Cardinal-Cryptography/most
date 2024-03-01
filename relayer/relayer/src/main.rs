@@ -171,6 +171,7 @@ async fn run_listeners(
     redis_connection: Arc<Mutex<RedisConnection>>,
 ) -> Result<()> {
     let mut tasks = JoinSet::new();
+    // [Audit] Emergency's default value should be either true or read from advisors before proceeding
     let emergency = Arc::new(AtomicBool::new(false));
 
     // run task only if address passed on CLI
