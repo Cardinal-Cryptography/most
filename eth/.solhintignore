@@ -1,3 +1,4 @@
 node_modules
 contracts/Migrations.sol
 contracts/WETH9.sol
+contracts/Token.sol

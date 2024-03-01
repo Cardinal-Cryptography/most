@@ -248,7 +248,7 @@ check-js-format:
 .PHONY: solidity-lint
 solidity-lint: # Lint solidity contracts
 solidity-lint: eth-deps
-	cd eth && npx prettier --check --plugin=prettier-plugin-solidity 'contracts/*.sol'
+	cd eth && npx solhint 'contracts/*.sol'
 
 .PHONY: relayer-lint
 relayer-lint: # Lint relayer
