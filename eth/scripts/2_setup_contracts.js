@@ -80,8 +80,6 @@ async function main() {
     azeroContracts.weth,
   );
 
-  // IN-PROGRESS: add pair via a governance Safe action
-  // await most.addPair(wethAddressBytes, wethAddressBytesAzero);
   const provider = new ethers.JsonRpcProvider(network.config.url);
 
   const signer0 = signers[1];
