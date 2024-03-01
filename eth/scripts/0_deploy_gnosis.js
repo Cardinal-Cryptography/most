@@ -158,9 +158,7 @@ async function main() {
       break;
 
     default:
-      console.log(
-        `Uknown network name ${network.name}`,
-      );
+      console.log(`Uknown network name ${network.name}`);
       process.exit(-1);
   }
 }

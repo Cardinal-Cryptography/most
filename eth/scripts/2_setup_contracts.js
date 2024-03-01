@@ -35,8 +35,8 @@ async function createSafeInstance(signer, contracts) {
 
 // signing with on-chain signatures
 async function signSafeTransaction(safeInstance, txHash) {
-    console.log("Signer", safeInstance, "is signing safe transaction", txHash);
-    const approveTxResponse = await safeInstance.approveTransactionHash(txHash);
+  console.log("Signer", safeInstance, "is signing safe transaction", txHash);
+  const approveTxResponse = await safeInstance.approveTransactionHash(txHash);
   await approveTxResponse.transactionResponse?.wait();
 }
 
@@ -48,62 +48,62 @@ async function executeSafeTransaction(safeInstance, safeTransaction) {
 }
 
 async function addPair(ethContracts, azeroContracts, signers, mostInstance) {
-    // Add a pair
-    const wethAddressBytes = ethers.zeroPadValue(
-        ethers.getBytes(contracts.weth),
-        32,
-    );
-    const wethAddressBytesAzero = u8aToHex(
-        new Keyring({ type: "sr25519" }).decodeAddress(azeroContracts.weth),
-    );
+  // Add a pair
+  const wethAddressBytes = ethers.zeroPadValue(
+    ethers.getBytes(contracts.weth),
+    32,
+  );
+  const wethAddressBytesAzero = u8aToHex(
+    new Keyring({ type: "sr25519" }).decodeAddress(azeroContracts.weth),
+  );
 
-    console.log(
-        "Adding wETH token pair to Most:",
-        contracts.weth,
-        "=>",
-        azeroContracts.weth,
-    );
+  console.log(
+    "Adding wETH token pair to Most:",
+    contracts.weth,
+    "=>",
+    azeroContracts.weth,
+  );
 
-    const safeSdk0 = await createSafeInstance(signers[1], contracts);
+  const safeSdk0 = await createSafeInstance(signers[1], contracts);
 
-    console.log("safe owners", await safeSdk0.getOwners());
+  console.log("safe owners", await safeSdk0.getOwners());
 
-    let iface = await new ethers.Interface([
-        "function addPair(bytes32 from, bytes32 to)",
-    ]);
-    let calldata = await iface.encodeFunctionData("addPair", [
-        wethAddressBytes,
-        wethAddressBytesAzero,
-    ]);
+  let iface = await new ethers.Interface([
+    "function addPair(bytes32 from, bytes32 to)",
+  ]);
+  let calldata = await iface.encodeFunctionData("addPair", [
+    wethAddressBytes,
+    wethAddressBytesAzero,
+  ]);
 
-    const safeTransactionData = {
-        to: contracts.most,
-        data: calldata,
-        value: 0,
-    };
+  const safeTransactionData = {
+    to: contracts.most,
+    data: calldata,
+    value: 0,
+  };
 
-    console.log("Creating a Safe transaction:", safeTransactionData);
+  console.log("Creating a Safe transaction:", safeTransactionData);
 
-    const safeTransaction = await safeSdk0.createTransaction({
-        transactions: [safeTransactionData],
-    });
-    const safeTxHash = await safeSdk0.getTransactionHash(safeTransaction);
+  const safeTransaction = await safeSdk0.createTransaction({
+    transactions: [safeTransactionData],
+  });
+  const safeTxHash = await safeSdk0.getTransactionHash(safeTransaction);
 
-    console.log("Safe transaction hash", safeTxHash);
+  console.log("Safe transaction hash", safeTxHash);
 
-    await signSafeTransaction(safeSdk0, safeTxHash);
+  await signSafeTransaction(safeSdk0, safeTxHash);
 
-    const safeSdk1 = await createSafeInstance(signers[2], contracts);
-    await signSafeTransaction(safeSdk1, safeTxHash);
+  const safeSdk1 = await createSafeInstance(signers[2], contracts);
+  await signSafeTransaction(safeSdk1, safeTxHash);
 
-    await executeSafeTransaction(safeSdk1, safeTransaction);
+  await executeSafeTransaction(safeSdk1, safeTransaction);
 
-    console.log(
-        "Most now supports the token pair:",
-        wethAddressBytes,
-        "=>",
-        await mostInstance.supportedPairs(wethAddressBytes),
-    );
+  console.log(
+    "Most now supports the token pair:",
+    wethAddressBytes,
+    "=>",
+    await mostInstance.supportedPairs(wethAddressBytes),
+  );
 }
 
 async function main() {
@@ -126,8 +126,9 @@ async function main() {
   const Most = artifacts.require("Most");
   const most = await Most.at(contracts.most);
 
+ // on other networks we do not have access to all of the governance keys
   if (["development", "bridgenet"].includes(network.name)) {
-      await addPair(contracts, azeroContracts, signers, most);
+    await addPair(contracts, azeroContracts, signers, most);
   }
   // -- update migrations
 
