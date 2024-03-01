@@ -126,7 +126,7 @@ async function main() {
   const Most = artifacts.require("Most");
   const most = await Most.at(contracts.most);
 
- // on other networks we do not have access to all of the governance keys
+  // on other networks we do not have access to all of the governance keys
   if (["development", "bridgenet"].includes(network.name)) {
     await addPair(contracts, azeroContracts, signers, most);
   }
