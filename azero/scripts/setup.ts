@@ -16,11 +16,11 @@ import type BN from "bn.js";
 
 const envFile = process.env.AZERO_ENV || "dev";
 
-async function addPairToMost(tokenEth: string, tokenAzero: string, most: Most) {
+async function addTokenPair(tokenEth: string, tokenAzero: string, mostContract: Most) {
   const tokenEthAddress = ethers.zeroPadValue(ethers.getBytes(tokenEth), 32);
   const tokenAzeroAddress = accountIdToHex(tokenAzero);
   console.log(`Adding token pair to Most: ${tokenAzeroAddress} => ${tokenEthAddress}`);
-  await most.tx.addPair(
+  await mostContract.tx.addPair(
     hexToBytes(tokenAzeroAddress),
     hexToBytes(tokenEthAddress),
   );
@@ -82,8 +82,8 @@ async function main(): Promise<void> {
 
   const most = new Most(most_azero, deployer, api);
 
-  await addPairToMost(weth_eth, weth_azero, most);
-  await addPairToMost(usdt_eth, usdt_azero, most);
+  await addTokenPair(weth_eth, weth_azero, most);
+  await addTokenPair(usdt_eth, usdt_azero, most);
 
   await api.disconnect();
 }
