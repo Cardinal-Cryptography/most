@@ -100,6 +100,12 @@ contract Most is
     //
     // Tx emits a CrosschainTransferRequest event that the relayers listen to
     // & forward to the destination chain.
+
+    // let's use modern standards.
+    // it would be great to support erc-2612 'permit' function, as it enriches ux a lot for tokens which implement the erc.
+    // it can be used in alternative method 'sendRequestPermit'
+    // https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/extensions/ERC20Permit.sol
+
     function sendRequest(
         bytes32 srcTokenAddress,
         uint256 amount,
