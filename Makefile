@@ -137,6 +137,7 @@ print-azero-codehashes: compile-azero-docker
 deploy-azero-docker: # Deploy azero contracts compiling in docker
 deploy-azero-docker: azero-deps compile-azero-docker
 	cd azero && npm run deploy
+	cd azero && npm run setup
 
 .PHONY: azero-deps
 azero-deps: # Install azero dependencies
