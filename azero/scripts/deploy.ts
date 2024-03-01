@@ -13,18 +13,21 @@ import {
 } from "./utils";
 import "dotenv/config";
 import "@polkadot/api-augment";
-import { ethers } from "ethers";
 import { AccountId } from "../types/types-arguments/token";
 import type BN from "bn.js";
 
 const envFile = process.env.AZERO_ENV || "dev";
 
-async function deployToken(
+type TokenArgs = [
   initialSupply: string | number | BN,
   name: string,
   symbol: string,
   decimals: string | number | BN,
   minterBurner: AccountId,
+];
+
+async function deployToken(
+  tokenArgs: TokenArgs,
   api: ApiPromise,
   deployer: KeyringPair,
 ) {
@@ -32,17 +35,12 @@ async function deployToken(
     api,
     deployer,
     "token.contract",
-    [initialSupply, name, symbol, decimals, minterBurner],
+    tokenArgs,
   );
   const tokenConstructors = new TokenConstructors(api, deployer);
-  return await tokenConstructors.new(
-    initialSupply,
-    name,
-    symbol,
-    decimals,
-    minterBurner,
-    { gasLimit: estimatedGasToken },
-  );
+  return await tokenConstructors.new(...tokenArgs, {
+    gasLimit: estimatedGasToken,
+  });
 }
 
 async function main(): Promise<void> {
@@ -138,45 +136,19 @@ async function main(): Promise<void> {
 
   console.log("most address:", mostAddress);
 
-  const wethArgs = {
-    initialSupply: 0,
-    symbol: "wETH",
-    name: "Wrapped Ether",
-    decimals: 18,
-  };
-
-  const usdtArgs = {
-    initialSupply: 0,
-    symbol: "USDT",
-    name: "Tether",
-    decimals: 6,
-  };
-
   const minterBurner =
     process.env.AZERO_ENV == "dev" || process.env.AZERO_ENV == "bridgenet"
       ? authority
       : mostAddress;
 
-  const { address: wethAddress } = await deployToken(
-    wethArgs.initialSupply,
-    wethArgs.name,
-    wethArgs.symbol,
-    wethArgs.decimals,
-    minterBurner,
-    api,
-    deployer,
-  );
+  const wethArgs: TokenArgs = [0, "wETH", "Wrapped Ether", 18, minterBurner];
+
+  const usdtArgs: TokenArgs = [0, "USDT", "Tether", 6, minterBurner];
+
+  const { address: wethAddress } = await deployToken(wethArgs, api, deployer);
   console.log("wETH address:", wethAddress);
 
-  const { address: usdtAddress } = await deployToken(
-    usdtArgs.initialSupply,
-    usdtArgs.name,
-    usdtArgs.symbol,
-    usdtArgs.decimals,
-    minterBurner,
-    api,
-    deployer,
-  );
+  const { address: usdtAddress } = await deployToken(usdtArgs, api, deployer);
   console.log("USDT address:", usdtAddress);
 
   const addresses: Addresses = {

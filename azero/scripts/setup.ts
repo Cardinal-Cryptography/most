@@ -11,8 +11,35 @@ import {
 import "dotenv/config";
 import "@polkadot/api-augment";
 import { ethers } from "ethers";
+import { KeyringPair } from "@polkadot/keyring/types";
+import type BN from "bn.js";
 
 const envFile = process.env.AZERO_ENV || "dev";
+
+async function addPairToMost(tokenEth: string, tokenAzero: string, most: Most) {
+  const tokenEthAddress = ethers.zeroPadValue(ethers.getBytes(tokenEth), 32);
+  const tokenAzeroAddress = accountIdToHex(tokenAzero);
+  console.log(`Adding ${tokenAzeroAddress} => ${tokenEthAddress} pair to most`);
+  await most.tx.addPair(
+    hexToBytes(tokenAzeroAddress),
+    hexToBytes(tokenEthAddress),
+  );
+}
+
+async function mintTokens(
+  tokenAddress: string,
+  amount: number | BN | string,
+  to: string,
+  signer: KeyringPair,
+  api: ApiPromise,
+  mostAddress?: string,
+) {
+  const weth = new Token(tokenAddress, signer, api);
+  await weth.tx.mint(to, amount);
+  if (mostAddress) {
+    await weth.tx.setMinterBurner(mostAddress);
+  }
+}
 
 async function main(): Promise<void> {
   const config = await import_env(envFile);
@@ -35,29 +62,28 @@ async function main(): Promise<void> {
 
   // premint some token for DEV
   if (process.env.AZERO_ENV == "dev" || process.env.AZERO_ENV == "bridgenet") {
-    const weth = new Token(weth_azero, deployer, api);
-    await weth.tx.mint(authority, 1000000000000000);
-    await weth.tx.setMinterBurner(most_azero);
-    const usdt = new Token(usdt_azero, deployer, api);
-    await usdt.tx.mint(authority, 1000000000000000);
-    await usdt.tx.setMinterBurner(most_azero);
+    await mintTokens(
+      weth_azero,
+      1000000000000000,
+      authority,
+      deployer,
+      api,
+      most_azero,
+    );
+    await mintTokens(
+      usdt_azero,
+      1000000000000000,
+      authority,
+      deployer,
+      api,
+      most_azero,
+    );
   }
 
   const most = new Most(most_azero, deployer, api);
 
-  const wethEthAddress = ethers.zeroPadValue(ethers.getBytes(weth_eth), 32);
-  console.log("weth eth address:", wethEthAddress);
-
-  const wethHex = accountIdToHex(weth_azero);
-  console.log("Adding weth pair to most:", wethHex, wethEthAddress);
-  await most.tx.addPair(hexToBytes(wethHex), hexToBytes(wethEthAddress));
-
-  const usdtEthAddress = ethers.zeroPadValue(ethers.getBytes(usdt_eth), 32);
-  console.log("usdt eth address:", usdtEthAddress);
-
-  const usdtHex = accountIdToHex(usdt_azero);
-  console.log("Adding weth pair to most:", usdtHex, usdtEthAddress);
-  await most.tx.addPair(hexToBytes(usdtHex), hexToBytes(usdtEthAddress));
+  await addPairToMost(weth_eth, weth_azero, most);
+  await addPairToMost(usdt_eth, usdt_azero, most);
 
   await api.disconnect();
 }
