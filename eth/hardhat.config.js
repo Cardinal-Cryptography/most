@@ -72,17 +72,6 @@ var config = {
         governanceThreshold: 2,
       },
     },
-
-    sepolia: {
-      url: "https://ethereum-sepolia-rpc.publicnode.com",
-      accounts: [SEPOLIA_KEY],
-      deploymentConfig: {
-        governanceIds: [
-          "0xc4E0B92Df2DE77C077D060e49ec63DC196980716", // sepolia account address corresponding to SEPOLIA_KEY
-        ],
-        governanceThreshold: 1,
-      },
-    },
   },
   solidity: {
     compilers: [
@@ -116,5 +105,18 @@ var config = {
     timeout: 40_000,
   },
 };
+
+if (SEPOLIA_KEY) {
+  config.networks.sepolia = {
+    url: "https://ethereum-sepolia-rpc.publicnode.com",
+    accounts: [SEPOLIA_KEY],
+    deploymentConfig: {
+      governanceIds: [
+        "0xc4E0B92Df2DE77C077D060e49ec63DC196980716", // sepolia account address corresponding to SEPOLIA_KEY
+      ],
+      governanceThreshold: 1,
+    },
+  };
+}
 
 module.exports = config;

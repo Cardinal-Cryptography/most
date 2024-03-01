@@ -42,7 +42,7 @@ async function main() {
 
   const Migrations = await ethers.getContractFactory("Migrations");
   const migrations = await Migrations.deploy();
-  console.log("migrations deployed to:", migrations.target);
+  console.log("Migrations deployed to:", migrations.target);
 
   console.log("Updating migrations...");
   await migrations.setCompleted(1);

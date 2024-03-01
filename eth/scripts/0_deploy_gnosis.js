@@ -159,7 +159,7 @@ async function main() {
 
     default:
       console.log(
-        `On network ${network.name} you should use the existing GnosisSafe contracts to create a GnosisSafe instance`,
+        `Uknown network name ${network.name}`,
       );
       process.exit(-1);
   }
