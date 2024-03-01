@@ -19,7 +19,7 @@ const envFile = process.env.AZERO_ENV || "dev";
 async function addPairToMost(tokenEth: string, tokenAzero: string, most: Most) {
   const tokenEthAddress = ethers.zeroPadValue(ethers.getBytes(tokenEth), 32);
   const tokenAzeroAddress = accountIdToHex(tokenAzero);
-  console.log(`Adding ${tokenAzeroAddress} => ${tokenEthAddress} pair to most`);
+  console.log(`Adding token pair to Most: ${tokenAzeroAddress} => ${tokenEthAddress}`);
   await most.tx.addPair(
     hexToBytes(tokenAzeroAddress),
     hexToBytes(tokenEthAddress),

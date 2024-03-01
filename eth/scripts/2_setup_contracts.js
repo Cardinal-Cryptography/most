@@ -33,17 +33,30 @@ async function createSafeInstance(signer, contracts) {
   });
 }
 
-async function addTokenPair(ethTokenAddress, azeroTokenAddress, safeInstances) {
+async function addTokenPair(ethTokenAddress, azeroTokenAddress, mostContract, safeInstances) {
+  console.log(
+    "Adding token pair to Most:",
+    ethTokenAddress,
+    "=>",
+    azeroTokenAddress,
+    );
+    const ethTokenAddressBytes = ethers.zeroPadValue(
+      ethers.getBytes(ethTokenAddress),
+      32,
+    );
+    const azeroTokenAddressBytes = u8aToHex(
+      new Keyring({ type: "sr25519" }).decodeAddress(azeroTokenAddress),
+    );
   let iface = await new ethers.Interface([
     "function addPair(bytes32 from, bytes32 to)",
   ]);
   let calldata = await iface.encodeFunctionData("addPair", [
-    ethTokenAddress,
-    azeroTokenAddress,
+    ethTokenAddressBytes,
+    azeroTokenAddressBytes,
   ]);
 
   const safeTransactionData = {
-    to: contracts.most,
+    to: mostContract.address,
     data: calldata,
     value: 0,
   };
@@ -63,6 +76,13 @@ async function addTokenPair(ethTokenAddress, azeroTokenAddress, safeInstances) {
 
   // execute safe tx
   await executeSafeTransaction(safeInstances[0], safeTransaction);
+
+  console.log(
+    "Most now supports the token pair:",
+    ethTokenAddressBytes,
+    "=>",
+    await mostContract.supportedPairs(ethTokenAddressBytes),
+  );
 }
 
 // signing with on-chain signatures
@@ -96,8 +116,8 @@ async function main() {
   const Most = artifacts.require("Most");
   const most = await Most.at(contracts.most);
 
-  // --- provide some wETH and USDT to most contract
   if (network.name == "development" || network.name == "bridgenet") {
+    // --- provide some wETH and USDT to most contract
     const WETH = artifacts.require("WETH9");
     const weth = await WETH.at(contracts.weth);
 
@@ -107,76 +127,29 @@ async function main() {
     const Token = artifacts.require("Token");
     const usdt = await Token.at(contracts.usdt);
     await usdt.transfer(contracts.most, 1000000000000000);
+
+    // --- add  pairs
+    const signer0 = signers[1];
+    const signer1 = signers[2];
+    const safeSdk0 = await createSafeInstance(signer0, contracts);
+    const safeSdk1 = await createSafeInstance(signer1, contracts);
+  
+    console.log("safe owners", await safeSdk0.getOwners());
+    console.log("signer0", signer0.address);
+    console.log("signer1", signer1.address);
+  
+    await addTokenPair(contracts.weth, azeroContracts.weth, most, [
+      safeSdk0,
+      safeSdk1,
+    ]);
+  
+    await addTokenPair(contracts.usdt, azeroContracts.usdt, most, [
+      safeSdk0,
+      safeSdk1,
+    ]);
   }
 
-  // --- add  pairs
-  const signer0 = signers[1];
-  const signer1 = signers[2];
-  const safeSdk0 = await createSafeInstance(signer0, contracts);
-  const safeSdk1 = await createSafeInstance(signer1, contracts);
-
-  console.log("safe owners", await safeSdk0.getOwners());
-  console.log("signer0", signer0.address);
-  console.log("signer1", signer1.address);
-
-  // wETH pair
-  const wethAddressBytes = ethers.zeroPadValue(
-    ethers.getBytes(contracts.weth),
-    32,
-  );
-  const wethAddressBytesAzero = u8aToHex(
-    new Keyring({ type: "sr25519" }).decodeAddress(azeroContracts.weth),
-  );
-
-  console.log(
-    "Adding wETH token pair to Most:",
-    contracts.weth,
-    "=>",
-    azeroContracts.weth,
-  );
-
-  await addTokenPair(wethAddressBytes, wethAddressBytesAzero, [
-    safeSdk0,
-    safeSdk1,
-  ]);
-
-  console.log(
-    "Most now supports the token pair:",
-    wethAddressBytes,
-    "=>",
-    await most.supportedPairs(wethAddressBytes),
-  );
-
-  // USDT pair
-  const usdtAddressBytes = ethers.zeroPadValue(
-    ethers.getBytes(contracts.usdt),
-    32,
-  );
-  const usdtAddressBytesAzero = u8aToHex(
-    new Keyring({ type: "sr25519" }).decodeAddress(azeroContracts.usdt),
-  );
-
-  console.log(
-    "Adding USDT token pair to Most:",
-    contracts.usdt,
-    "=>",
-    azeroContracts.usdt,
-  );
-
-  await addTokenPair(usdtAddressBytes, usdtAddressBytesAzero, [
-    safeSdk0,
-    safeSdk1,
-  ]);
-
-  console.log(
-    "Most now supports the token pair:",
-    usdtAddressBytes,
-    "=>",
-    await most.supportedPairs(usdtAddressBytes),
-  );
-
   // -- update migrations
-
   const Migrations = artifacts.require("Migrations");
   const migrations = await Migrations.at(contracts.migrations);
 
