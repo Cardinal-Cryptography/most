@@ -44,11 +44,10 @@ jobs:
             exit 1
           fi
 
-          # TODO: Replace below envs names when agreed with frontend devs
           if [[ \
             '${{ inputs.frontend-environment }}' != 'dev' && \
-            '${{ inputs.frontend-environment }}' != 'stg' && \
-            '${{ inputs.frontend-environment }}' != 'prd'
+            '${{ inputs.frontend-environment }}' != 'stage' && \
+            '${{ inputs.frontend-environment }}' != 'prod'
           ]]; then
             echo 'Invalid frontend environment'
             exit 1
@@ -159,7 +158,7 @@ jobs:
       - name: Login to Amazon ECR
         uses: docker/login-action@v3
         with:
-          registry: ${{ secrets.ECR_PRIVATE_HOST }}
+          registry: ${{ vars.ECR_PUBLIC_HOST }}
           username: ${{ secrets.AWS_MAINNET_ACCESS_KEY_ID }}
           password: ${{ secrets.AWS_MAINNET_SECRET_ACCESS_KEY }}
         env:
@@ -168,7 +167,7 @@ jobs:
       - name: Push docker image to ECR
         shell: bash
         run: |
-          docker_image='${{ secrets.ECR_PRIVATE_HOST }}/most-relayer:${{ steps.build.outputs.docker-tag }}'
+          docker_image='${{ vars.ECR_PUBLIC_REGISTRY }}most-relayer:${{ steps.build.outputs.docker-tag }}'
 
           docker tag '${{ steps.build.outputs.docker-name }}' "${docker_image}"
           docker push "${docker_image}"

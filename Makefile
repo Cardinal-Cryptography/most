@@ -104,6 +104,11 @@ setup-eth: compile-eth
 	cd eth && \
 	npx hardhat run --network $(NETWORK) scripts/2_setup_contracts.js
 
+.PHONY: decode-eth
+decode-eth: # Decode eth contract call
+decode-eth: eth-deps
+	cd eth && node scripts/decode.js
+
 .PHONY: most-builder
 most-builder: # Build an image in which contracts can be built
 most-builder:

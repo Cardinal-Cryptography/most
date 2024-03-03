@@ -175,3 +175,30 @@ and the address is `0xbd737D2061ed3b24C95FA88566Ad896c9Fcc84b0`, then you would 
 ETHERSCAN_API_KEY=[YOUR API KEY] npx hardhat --network sepolia verify "0xbd737D2061ed3b24C95FA88566Ad896c9Fcc84b0" \
   "12000000000000000000000000" "Tether" "USDT"
 ```
+
+## Decoding a contract call on ethereum
+
+Assuming a contract verified on etherscan, there's a convenience script to decode a call to that contract. Just call:
+
+```bash
+NETWORK=[NETWORK NAME] CALL=[CALL DATA] CONTRACT=[CONTRACT ADDRESS] make decode-eth
+```
+
+Valid values for `NETWORK` are `mainnet (default)`, `sepolia`, and `goerli`.
+
+For example:
+
+```bash
+NETWORK=sepolia  \
+  CALL=0x095ea7b30000000000000000000000005a344a8721d743393847c17613dd78c7776b271400000000000000000000000000000000000000000000000000000000000004d2 \
+  CONTRACT=0x5a344a8721d743393847C17613dd78C7776b2714 \
+  make decode-eth
+```
+
+gives:
+
+```
+Contract: Token
+Method: approve(address,uint256)
+Arguments: Result(2) [ '0x5a344a8721d743393847C17613dd78C7776b2714', 1234n ]
+```
