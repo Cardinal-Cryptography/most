@@ -2,6 +2,9 @@
 name: Master branch commit
 
 on:
+  pull_request:
+    branches:
+    - master
   push:
     branches:
       - master
