@@ -19,6 +19,11 @@ let result = {
             address: azero.weth
         },
 
+        azero_usdt: {
+            contract: "azero_token",
+            address: azero.usdt
+        },
+
         azero_oracle: {
             contract: "azero_oracle",
             address: azero.oracle

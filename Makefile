@@ -142,6 +142,7 @@ print-azero-codehashes: compile-azero-docker
 deploy-azero-docker: # Deploy azero contracts compiling in docker
 deploy-azero-docker: azero-deps compile-azero-docker
 	cd azero && npm run deploy
+	cd azero && npm run setup
 
 .PHONY: azero-deps
 azero-deps: # Install azero dependencies
@@ -163,9 +164,14 @@ deploy-azero: # Deploy azero contracts
 deploy-azero: compile-azero
 	cd azero && npm run deploy
 
+.PHONY: setup-azero
+setup-azero: # Setup azero contracts
+setup-azero: compile-azero
+	cd azero && npm run setup
+
 .PHONY: deploy
 deploy: # Deploy all contracts
-deploy: deploy-eth deploy-azero setup-eth
+deploy: deploy-eth deploy-azero setup-eth setup-azero
 
 .PHONY: watch-relayer
 watch-relayer:
@@ -248,7 +254,7 @@ check-js-format:
 .PHONY: solidity-lint
 solidity-lint: # Lint solidity contracts
 solidity-lint: eth-deps
-	cd eth && npx prettier --check --plugin=prettier-plugin-solidity 'contracts/*.sol'
+	cd eth && npx solhint 'contracts/*.sol'
 
 .PHONY: relayer-lint
 relayer-lint: # Lint relayer
@@ -273,7 +279,7 @@ contracts-lint: solidity-lint ink-lint
 .PHONY: solidity-format
 solidity-format: # Format solidity contracts
 solidity-format: eth-deps
-	cd eth && npx prettier --write --plugin=prettier-plugin-solidity 'contracts/**/*.sol'
+	cd eth && npx prettier --write --plugin=prettier-plugin-solidity 'contracts/*.sol'
 
 .PHONY: rust-format-check
 rust-format-check: # Check rust code formatting
