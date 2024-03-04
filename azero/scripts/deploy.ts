@@ -1,9 +1,7 @@
 import { ApiPromise, WsProvider, Keyring } from "@polkadot/api";
-import { hexToU8a, u8aToHex } from "@polkadot/util";
+import { KeyringPair } from "@polkadot/keyring/types";
 import MostConstructors from "../types/constructors/most";
 import TokenConstructors from "../types/constructors/token";
-import Most from "../types/contracts/most";
-import Token from "../types/contracts/token";
 import OracleConstructors from "../types/constructors/oracle";
 import AdvisoryConstructors from "../types/constructors/advisory";
 import {
@@ -11,31 +9,42 @@ import {
   Addresses,
   storeAddresses,
   estimateContractInit,
+  import_env,
 } from "./utils";
 import "dotenv/config";
 import "@polkadot/api-augment";
-import { ethers } from "ethers";
+import { AccountId } from "../types/types-arguments/token";
+import type BN from "bn.js";
 
 const envFile = process.env.AZERO_ENV || "dev";
-async function import_env() {
-  return await import(`../env/${envFile}.json`);
-}
 
-async function import_eth_addresses() {
-  return await import(`../../eth/addresses.json`);
-}
+type TokenArgs = [
+  initialSupply: string | number | BN,
+  name: string,
+  symbol: string,
+  decimals: string | number | BN,
+  minterBurner: AccountId,
+];
 
-function hexToBytes(hex: string): number[] {
-  let u8array = hexToU8a(hex);
-  return Array.from(u8array);
-}
-
-function accountIdToHex(accountId: string): string {
-  return u8aToHex(new Keyring({ type: "sr25519" }).decodeAddress(accountId));
+async function deployToken(
+  tokenArgs: TokenArgs,
+  api: ApiPromise,
+  deployer: KeyringPair,
+) {
+  const estimatedGasToken = await estimateContractInit(
+    api,
+    deployer,
+    "token.contract",
+    tokenArgs,
+  );
+  const tokenConstructors = new TokenConstructors(api, deployer);
+  return await tokenConstructors.new(...tokenArgs, {
+    gasLimit: estimatedGasToken,
+  });
 }
 
 async function main(): Promise<void> {
-  const config = await import_env();
+  const config = await import_env(envFile);
 
   const {
     ws_node,
@@ -49,10 +58,6 @@ async function main(): Promise<void> {
     default_fee,
     authority,
   } = config;
-
-  const { weth } = await import_eth_addresses();
-  const wethEthAddress = ethers.zeroPadValue(ethers.getBytes(weth), 32);
-  console.log("weth eth address:", wethEthAddress);
 
   const wsProvider = new WsProvider(ws_node);
   const keyring = new Keyring({ type: "sr25519" });
@@ -73,7 +78,6 @@ async function main(): Promise<void> {
   console.log("advisory code hash:", advisoryCodeHash);
 
   const mostConstructors = new MostConstructors(api, deployer);
-  const tokenConstructors = new TokenConstructors(api, deployer);
   const oracleConstructors = new OracleConstructors(api, deployer);
   const advisoryConstructors = new AdvisoryConstructors(api, deployer);
 
@@ -132,47 +136,25 @@ async function main(): Promise<void> {
 
   console.log("most address:", mostAddress);
 
-  const initialSupply = 0;
-  const symbol = "wETH";
-  const name = symbol;
-  const decimals = 18;
   const minterBurner =
     process.env.AZERO_ENV == "dev" || process.env.AZERO_ENV == "bridgenet"
       ? authority
       : mostAddress;
-  const estimatedGasToken = await estimateContractInit(
-    api,
-    deployer,
-    "token.contract",
-    [initialSupply, name, symbol, decimals, minterBurner],
-  );
 
-  const { address: wethAddress } = await tokenConstructors.new(
-    initialSupply,
-    name,
-    symbol,
-    decimals,
-    minterBurner,
-    { gasLimit: estimatedGasToken },
-  );
-  console.log("token address:", wethAddress);
+  const wethArgs: TokenArgs = [0, "wETH", "Wrapped Ether", 18, minterBurner];
 
-  // premint some token for DEV
-  if (process.env.AZERO_ENV == "dev" || process.env.AZERO_ENV == "bridgenet") {
-    const weth = new Token(wethAddress, deployer, api);
-    await weth.tx.mint(authority, 1000000000000000);
-    await weth.tx.setMinterBurner(mostAddress);
-  }
+  const usdtArgs: TokenArgs = [0, "USDT", "Tether", 6, minterBurner];
 
-  const most = new Most(mostAddress, deployer, api);
+  const { address: wethAddress } = await deployToken(wethArgs, api, deployer);
+  console.log("wETH address:", wethAddress);
 
-  const wethHex = accountIdToHex(wethAddress);
-  console.log("Adding weth pair to most:", wethHex, wethEthAddress);
-  await most.tx.addPair(hexToBytes(wethHex), hexToBytes(wethEthAddress));
+  const { address: usdtAddress } = await deployToken(usdtArgs, api, deployer);
+  console.log("USDT address:", usdtAddress);
 
   const addresses: Addresses = {
     most: mostAddress,
     weth: wethAddress,
+    usdt: usdtAddress,
     oracle: oracleAddress,
     advisory: advisoryAddress,
   };

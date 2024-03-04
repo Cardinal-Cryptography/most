@@ -13,25 +13,36 @@ async function main() {
     fs.readFileSync("addresses.json", { encoding: "utf8", flag: "r" }),
   );
 
-  const WETH = await ethers.getContractFactory("WETH9");
-  console.log("Deploying WETH...");
-  const weth = await WETH.deploy();
-  console.log("WETH deployed to:", weth.target);
+  let addresses = {}; // TODO: read pre-existing contracts addresses if other networks
 
-  const Token = await ethers.getContractFactory("Token");
-  console.log("Deploying USDT...");
-  const usdt = await Token.deploy(
-    "12000000000000000000000000",
-    "Tether",
-    "USDT",
-  );
-  console.log("USDT deployed to:", usdt.target);
+  if (network.name == "development" || network.name == "bridgenet") {
+    const WETH = await ethers.getContractFactory("WETH9");
+    console.log("Deploying WETH...");
+    const weth = await WETH.deploy();
+    console.log("WETH deployed to:", weth.target);
+    addresses.weth = weth.target;
+
+    const Token = await ethers.getContractFactory("Token");
+    console.log("Deploying USDT...");
+    const usdt = await Token.deploy(
+      "12000000000000000000000000",
+      "Tether",
+      "USDT",
+    );
+    console.log("USDT deployed to:", usdt.target);
+    addresses.usdt = usdt.target;
+  }
 
   const Most = await ethers.getContractFactory("Most");
   console.log("Deploying Most...");
   const most = await upgrades.deployProxy(
     Most,
-    [config.guardianIds, config.threshold, gnosis_contracts.safe, weth.target],
+    [
+      config.guardianIds,
+      config.threshold,
+      gnosis_contracts.safe,
+      addresses.weth,
+    ],
     {
       initializer: "initialize",
       kind: "uups",
@@ -49,12 +60,11 @@ async function main() {
 
   // --- append addresses
 
-  const addresses = {
+  addresses = {
+    ...addresses,
     gnosis: gnosis_contracts,
     migrations: migrations.target,
     most: most.target,
-    weth: weth.target,
-    usdt: usdt.target,
   };
 
   console.log(addresses);

@@ -1,4 +1,4 @@
-const { ethers, artifacts } = require("hardhat");
+const { ethers, artifacts, network } = require("hardhat");
 const { Keyring } = require("@polkadot/keyring");
 const { u8aToHex } = require("@polkadot/util");
 const Safe = require("@safe-global/protocol-kit").default;
@@ -33,105 +33,129 @@ async function createSafeInstance(signer, contracts) {
   });
 }
 
+async function addTokenPair(
+  ethTokenAddress,
+  azeroTokenAddress,
+  mostContract,
+  safeInstances,
+) {
+  console.log(
+    "Adding token pair to Most:",
+    ethTokenAddress,
+    "=>",
+    azeroTokenAddress,
+  );
+  const ethTokenAddressBytes = ethers.zeroPadValue(
+    ethers.getBytes(ethTokenAddress),
+    32,
+  );
+  const azeroTokenAddressBytes = u8aToHex(
+    new Keyring({ type: "sr25519" }).decodeAddress(azeroTokenAddress),
+  );
+  let iface = await new ethers.Interface([
+    "function addPair(bytes32 from, bytes32 to)",
+  ]);
+  let calldata = await iface.encodeFunctionData("addPair", [
+    ethTokenAddressBytes,
+    azeroTokenAddressBytes,
+  ]);
+
+  const safeTransactionData = {
+    to: mostContract.address,
+    data: calldata,
+    value: 0,
+  };
+
+  console.log("creating a Safe transaction:", safeTransactionData);
+
+  const safeTransaction = await safeInstances[0].createTransaction({
+    transactions: [safeTransactionData],
+  });
+  const safeTxHash = await safeInstances[0].getTransactionHash(safeTransaction);
+
+  console.log("safeTxHash", safeTxHash);
+
+  for (const safeInstance of safeInstances) {
+    await signSafeTransaction(safeInstance, safeTxHash);
+  }
+
+  // execute safe tx
+  await executeSafeTransaction(safeInstances[0], safeTransaction);
+
+  console.log(
+    "Most now supports the token pair:",
+    ethTokenAddressBytes,
+    "=>",
+    await mostContract.supportedPairs(ethTokenAddressBytes),
+  );
+}
+
 // signing with on-chain signatures
 async function signSafeTransaction(safeInstance, txHash) {
-  console.log("Signer", safeInstance, "is signing safe transaction", txHash);
   const approveTxResponse = await safeInstance.approveTransactionHash(txHash);
   await approveTxResponse.transactionResponse?.wait();
 }
 
-// executing safe tx (can be triggered by ANY account, not just one of the owners)
 async function executeSafeTransaction(safeInstance, safeTransaction) {
   const executeTxResponse =
     await safeInstance.executeTransaction(safeTransaction);
   await executeTxResponse.transactionResponse?.wait();
 }
 
-async function addPair(ethContracts, azeroContracts, signers, mostInstance) {
-  // Add a pair
-  const wethAddressBytes = ethers.zeroPadValue(
-    ethers.getBytes(contracts.weth),
-    32,
-  );
-  const wethAddressBytesAzero = u8aToHex(
-    new Keyring({ type: "sr25519" }).decodeAddress(azeroContracts.weth),
-  );
-
-  console.log(
-    "Adding wETH token pair to Most:",
-    contracts.weth,
-    "=>",
-    azeroContracts.weth,
-  );
-
-  const safeSdk0 = await createSafeInstance(signers[1], contracts);
-
-  console.log("safe owners", await safeSdk0.getOwners());
-
-  let iface = await new ethers.Interface([
-    "function addPair(bytes32 from, bytes32 to)",
-  ]);
-  let calldata = await iface.encodeFunctionData("addPair", [
-    wethAddressBytes,
-    wethAddressBytesAzero,
-  ]);
-
-  const safeTransactionData = {
-    to: contracts.most,
-    data: calldata,
-    value: 0,
-  };
-
-  console.log("Creating a Safe transaction:", safeTransactionData);
-
-  const safeTransaction = await safeSdk0.createTransaction({
-    transactions: [safeTransactionData],
-  });
-  const safeTxHash = await safeSdk0.getTransactionHash(safeTransaction);
-
-  console.log("Safe transaction hash", safeTxHash);
-
-  await signSafeTransaction(safeSdk0, safeTxHash);
-
-  const safeSdk1 = await createSafeInstance(signers[2], contracts);
-  await signSafeTransaction(safeSdk1, safeTxHash);
-
-  await executeSafeTransaction(safeSdk1, safeTransaction);
-
-  console.log(
-    "Most now supports the token pair:",
-    wethAddressBytes,
-    "=>",
-    await mostInstance.supportedPairs(wethAddressBytes),
-  );
-}
-
 async function main() {
   const signers = await ethers.getSigners();
-  const signer = signers[0];
   accounts = signers.map((s) => s.address);
 
-  console.log("Using ", signer.address, "for signing transactions");
-
-  // NOTE : TEMPorary before devnet is fixed and uses proper genesis that seeds these accounts with funds
-  for (const to of signers.slice(1, 4)) {
-    await signers[0].sendTransaction({
-      to: to.address,
-      value: ethers.parseEther("1.0"), // Send 1.0 ether
-    });
-  }
+  console.log("Using ", accounts[0], "as signer");
 
   // --- setup
 
   const Most = artifacts.require("Most");
   const most = await Most.at(contracts.most);
 
-  // on other networks we do not have access to all of the governance keys
-  if (["development", "bridgenet"].includes(network.name)) {
-    await addPair(contracts, azeroContracts, signers, most);
-  }
-  // -- update migrations
+  if (network.name == "development" || network.name == "bridgenet") {
 
+      // NOTE : TEMPorary before devnet is fixed and uses propere genesis that seeds these accounts with funds
+      for (const to of signers.slice(1, 4)) {
+          await signers[0].sendTransaction({
+              to: to.address,
+              value: ethers.parseEther("1.0"), // Send 1.0 ether
+          });
+      }
+
+    // --- provide some wETH and USDT to most contract
+    const WETH = artifacts.require("WETH9");
+    const weth = await WETH.at(contracts.weth);
+
+    await weth.deposit({ value: 1000000000000000 });
+    await weth.transfer(contracts.most, 1000000000000000);
+
+    const Token = artifacts.require("Token");
+    const usdt = await Token.at(contracts.usdt);
+    await usdt.transfer(contracts.most, 1000000000000000);
+
+    // --- add  pairs
+    const signer0 = signers[1];
+    const signer1 = signers[2];
+    const safeSdk0 = await createSafeInstance(signer0, contracts);
+    const safeSdk1 = await createSafeInstance(signer1, contracts);
+
+    console.log("safe owners", await safeSdk0.getOwners());
+    console.log("signer0", signer0.address);
+    console.log("signer1", signer1.address);
+
+    await addTokenPair(contracts.weth, azeroContracts.weth, most, [
+      safeSdk0,
+      safeSdk1,
+    ]);
+
+    await addTokenPair(contracts.usdt, azeroContracts.usdt, most, [
+      safeSdk0,
+      safeSdk1,
+    ]);
+  }
+
+  // -- update migrations
   const Migrations = artifacts.require("Migrations");
   const migrations = await Migrations.at(contracts.migrations);
 

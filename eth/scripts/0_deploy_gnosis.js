@@ -29,7 +29,9 @@ async function main() {
     address = null;
 
   switch (network.name) {
-    case "development" || "bridgenet":
+    case "development":
+    case "bridgenet":
+
       // deploy gnosis contracts
       const GnosisSafeProxyFactory = await ethers.getContractFactory(
         "GnosisSafeProxyFactory",
