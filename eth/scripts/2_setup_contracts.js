@@ -114,14 +114,13 @@ async function main() {
   const most = await Most.at(contracts.most);
 
   if (network.name == "development" || network.name == "bridgenet") {
-
-      // NOTE : TEMPorary before devnet is fixed and uses propere genesis that seeds these accounts with funds
-      for (const to of signers.slice(1, 4)) {
-          await signers[0].sendTransaction({
-              to: to.address,
-              value: ethers.parseEther("1.0"), // Send 1.0 ether
-          });
-      }
+    // NOTE : TEMPorary before devnet is fixed and uses propere genesis that seeds these accounts with funds
+    for (const to of signers.slice(1, 4)) {
+      await signers[0].sendTransaction({
+        to: to.address,
+        value: ethers.parseEther("1.0"), // Send 1.0 ether
+      });
+    }
 
     // --- provide some wETH and USDT to most contract
     const WETH = artifacts.require("WETH9");
