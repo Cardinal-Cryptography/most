@@ -6,15 +6,25 @@ async function main() {
   const accounts = signers.map((s) => s.address);
   const config = network.config.deploymentConfig;
 
-  console.log("Using ", accounts[0], "as signer");
+  console.log("Using ", accounts[0], "as the transaction signer");
 
   // read addresses
-  const gnosis_contracts = JSON.parse(
-    fs.readFileSync("addresses.json", { encoding: "utf8", flag: "r" }),
-  );
+    let addresses = JSON.parse(
+        fs.readFileSync("addresses.json", { encoding: "utf8", flag: "r" }),
+    );
+    
+  const Migrations = artifacts.require("Migrations");        
+    const migrations = await Migrations.at(addresses.migrations);
 
-  let addresses = {}; // TODO: read pre-existing contracts addresses if other networks
-
+    // check migratons
+    let lastCompletedMigration = await migrations.last_completed_migration ();
+    let lastCompletedMigration = lastCompletedMigration.toNumber();    
+    console.log("Last completed migration: ", lastCompletedMigration);
+    if (lastCompletedMigration != 1) {
+        console.error("Previous migration has not been completed");
+        process.exit (-1);
+    }
+    
   if (network.name == "development" || network.name == "bridgenet") {
     const WETH = await ethers.getContractFactory("WETH9");
     console.log("Deploying WETH...");
@@ -40,7 +50,7 @@ async function main() {
     [
       config.guardianIds,
       config.threshold,
-      gnosis_contracts.safe,
+      addresses..safe,
       addresses.weth,
     ],
     {
@@ -51,18 +61,14 @@ async function main() {
   await most.waitForDeployment();
   console.log("Most deployed to:", most.target);
 
-  const Migrations = await ethers.getContractFactory("Migrations");
-  const migrations = await Migrations.deploy();
-  console.log("Migrations deployed to:", migrations.target);
-
   console.log("Updating migrations...");
-  await migrations.setCompleted(1);
+  await migrations.setCompleted(2);
 
   // --- append addresses
 
   addresses = {
     ...addresses,
-    gnosis: gnosis_contracts,
+    addresses._contracts,
     migrations: migrations.target,
     most: most.target,
   };

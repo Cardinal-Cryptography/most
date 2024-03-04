@@ -95,14 +95,15 @@ compile-eth: eth-deps
 deploy-eth: # Deploy eth contracts
 deploy-eth: compile-eth
 	cd eth && \
-	npx hardhat run --network $(NETWORK) scripts/0_deploy_gnosis.js && \
-	npx hardhat run --network $(NETWORK) scripts/1_deploy_contracts.js
+	npx hardhat run --network $(NETWORK) scripts/0_deploy_migrations.js && \
+	npx hardhat run --network $(NETWORK) scripts/1_deploy_gnosis_safe.js && \
+	npx hardhat run --network $(NETWORK) scripts/2_deploy_bridge_contracts.js
 
 .PHONY: setup-eth
 setup-eth: # Setup eth contracts
 setup-eth: compile-eth
 	cd eth && \
-	npx hardhat run --network $(NETWORK) scripts/2_setup_contracts.js
+	npx hardhat run --network $(NETWORK) scripts/3_setup_bridge_contracts.js
 
 .PHONY: decode-eth
 decode-eth: # Decode eth contract call
