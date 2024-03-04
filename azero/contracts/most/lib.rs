@@ -278,6 +278,7 @@ pub mod most {
             dest_receiver_address: [u8; 32],
         ) -> Result<(), MostError> {
             self.check_halted()?;
+            // Probably good to explicitly disallow sending requests with 0 amount, this avoids many edge cases
 
             let mut data = self.data()?;
 
@@ -500,7 +501,7 @@ pub mod most {
                 build_call::<DefaultEnvironment>()
                     .delegate(Hash::from(code_hash))
                     // Given that there are so many gotchas with delegatecall, I would probably get rid ot the `callback` here
-                    // Instead, what you can do instead is send a tx batch (set_code, migrate) using `batch_all`.
+                    // Instead, you can send a tx batch (set_code, migrate) using `batch_all`.
                     .exec_input(ExecutionInput::new(ink::env::call::Selector::new(selector)))
                     .returns::<Result<(), MostError>>()
                     .invoke()?;

@@ -73,7 +73,7 @@ contract Most is
 
         committeeId = 0;
 
-        for (uint256 i = 0; i < _committee.length; i++) {
+        for (uint256 i = 0; i < _committee.length; ++i) {
             committee[
                 keccak256(abi.encodePacked(committeeId, _committee[i]))
             ] = true;
@@ -106,7 +106,7 @@ contract Most is
         bytes32 destReceiverAddress
     ) external whenNotPaused {
         address sender = msg.sender;
-
+        // Better to disallow amount = 0, to avoid edge cases
         IERC20 token = IERC20(bytes32ToAddress(srcTokenAddress));
 
         // check if the token is supported
@@ -125,7 +125,7 @@ contract Most is
             requestNonce
         );
 
-        requestNonce++;
+        ++requestNonce;
     }
 
     // Invoke this tx to transfer funds to the destination chain.
@@ -136,6 +136,7 @@ contract Most is
     // & forward to the destination chain.
     function sendRequestNative(bytes32 destReceiverAddress) external payable {
         uint256 amount = msg.value;
+        // Better to disallow amount = 0, to avoid edge cases
 
         // check if the token is supported
         bytes32 destTokenAddress = supportedPairs[
@@ -156,7 +157,7 @@ contract Most is
             requestNonce
         );
 
-        requestNonce++;
+        ++requestNonce;
     }
 
     // aggregates relayer signatures and returns the locked tokens
@@ -194,7 +195,7 @@ contract Most is
         require(_requestHash == requestHash, "Hash does not match the data");
 
         request.signatures[msg.sender] = true;
-        request.signatureCount++;
+        ++request.signatureCount;
 
         emit RequestSigned(requestHash, msg.sender);
 
@@ -219,7 +220,7 @@ contract Most is
                     "Failed to send the native ETH back to the user."
                 );
             } else {
-                IERC20 token = IERC20(bytes32ToAddress(destTokenAddress));
+                IERC20 token = IERC20(bytes32ToAddress(destTokenAddress)); //following the M-3/M-4 findings in the automated report, we might want to switch to SafeERC20
 
                 token.transfer(bytes32ToAddress(destReceiverAddress), amount); // I'm always scared of reentrancy here, would it be ok to use ReentrancyGuard?
             }
@@ -272,7 +273,7 @@ contract Most is
 
         committeeId += 1;
 
-        for (uint256 i = 0; i < _committee.length; i++) {
+        for (uint256 i = 0; i < _committee.length; ++i) {// gas optimization
             committee[
                 keccak256(abi.encodePacked(committeeId, _committee[i]))
             ] = true;
