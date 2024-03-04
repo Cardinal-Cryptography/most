@@ -65,7 +65,7 @@ async fn main() -> Result<()> {
     let config = Arc::new(Config::parse());
     env_logger::init();
 
-    info!("{:#?}", &config);
+    info!("{:#?}", &config); // not sure what eth_keystore_password is, but we are printing it here, probably not a good idea
 
     let client = RedisClient::open(config.redis_node.clone())?;
     let redis_connection = Arc::new(Mutex::new(client.get_async_connection().await?));
@@ -200,7 +200,12 @@ async fn run_listeners(
         redis_connection.clone(),
         emergency.clone(),
     );
-
+    // I feel like there are at least 2 cases when we should 1) abort all tasks, 2) wait in a loop until things are back to normal. The cases are:
+    // 1. When the advisory contract says there is emergency
+    // 2. When the bridge on either side has been halted. 
+    // Currently we treat 2. differently than 1. Maybe we should unify it -- this could be a simplification. 
+    // Importantly -- we don't have to detect halts by looking at transactions failing. We can have a separate task that checks whether the Ethereum contract has been halted.
+    // We could treat halt as just another "advisory".
     while let Some(result) = tasks.join_next().await {
         match result? {
             Ok(_) => {}

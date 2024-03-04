@@ -223,6 +223,9 @@ contract Most is
                 IERC20 token = IERC20(bytes32ToAddress(destTokenAddress)); //following the M-3/M-4 findings in the automated report, we might want to switch to SafeERC20
 
                 token.transfer(bytes32ToAddress(destReceiverAddress), amount); // I'm always scared of reentrancy here, would it be ok to use ReentrancyGuard?
+                // Slight concern is what if the destReceiverAddress is a contract that reverts on receiving tokens? There is no easy way to handle this though. Only
+                // via a governance action. Maybe there should be a governance action on AZERO to cancel a request? 
+                // On the other hand, in the frontned we require the user to connect their wallet, so it theoretically shouldn't happen. 
             }
             emit RequestProcessed(requestHash);
         }
@@ -291,5 +294,6 @@ contract Most is
         delete supportedPairs[from];
     }
 
-    receive() external payable {}
+    receive() external payable {} // we could disallow sending native ETH directly, but then people can send ERC20 directly anyway. But in the audit rules we should say
+    // that we don't care about this.
 }
