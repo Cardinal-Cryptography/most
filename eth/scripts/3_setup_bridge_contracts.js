@@ -1,3 +1,4 @@
+const fs = require("node:fs");
 const { ethers, artifacts, network } = require("hardhat");
 const { Keyring } = require("@polkadot/keyring");
 const { u8aToHex } = require("@polkadot/util");
@@ -108,23 +109,23 @@ async function main() {
 
   console.log("Using ", accounts[0], "as signer");
 
-    // read addresses
-    let addresses = JSON.parse(
-        fs.readFileSync("addresses.json", { encoding: "utf8", flag: "r" }),
-    );
+  // read addresses
+  let addresses = JSON.parse(
+    fs.readFileSync("addresses.json", { encoding: "utf8", flag: "r" }),
+  );
 
-    const Migrations = artifacts.require("Migrations");        
-    const migrations = await Migrations.at(addresses.migrations);
+  const Migrations = artifacts.require("Migrations");
+  const migrations = await Migrations.at(addresses.migrations);
 
-    // check migratons
-    let lastCompletedMigration = await migrations.last_completed_migration ();
-    let lastCompletedMigration = lastCompletedMigration.toNumber();    
-    console.log("Last completed migration: ", lastCompletedMigration);
-    if (lastCompletedMigration != 2) {
-        console.error("Previous migration has not been completed");
-        process.exit (-1);
-    }
-    
+  // check migratons
+  let lastCompletedMigration = await migrations.last_completed_migration();
+  lastCompletedMigration = lastCompletedMigration.toNumber();
+  console.log("Last completed migration: ", lastCompletedMigration);
+  if (lastCompletedMigration != 2) {
+    console.error("Previous migration has not been completed");
+    process.exit(-1);
+  }
+
   // --- setup
 
   const Most = artifacts.require("Most");

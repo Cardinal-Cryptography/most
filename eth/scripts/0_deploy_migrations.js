@@ -10,7 +10,7 @@ async function main() {
 
   const Migrations = await ethers.getContractFactory("Migrations");
   const migrations = await Migrations.deploy();
-  await migrations.deploymentTransaction().wait(1);    
+  await migrations.deploymentTransaction().wait(1);
   console.log("Migrations deployed to:", migrations.target);
 
   // --- write addresses

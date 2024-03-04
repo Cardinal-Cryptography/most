@@ -4,7 +4,6 @@ const { SafeFactory, EthersAdapter } = require("@safe-global/protocol-kit");
 const { network, ethers } = require("hardhat");
 
 async function main() {
-
   const provider = new ethers.JsonRpcProvider(network.config.url);
   console.log("Deploying GnosisSafe to:", network.name);
 
@@ -12,22 +11,22 @@ async function main() {
   const signer = signers[0];
   console.log("Using", signer.address, "as the transaction signer");
 
-    // read addresses
-    let addresses = JSON.parse(
-        fs.readFileSync("addresses.json", { encoding: "utf8", flag: "r" }),
-    );
+  // read addresses
+  let addresses = JSON.parse(
+    fs.readFileSync("addresses.json", { encoding: "utf8", flag: "r" }),
+  );
 
-  const Migrations = artifacts.require("Migrations");    
-    const migrations = await Migrations.at(addresses.migrations);
+  const Migrations = artifacts.require("Migrations");
+  const migrations = await Migrations.at(addresses.migrations);
 
-    // check migratons
-    let lastCompletedMigration = await migrations.last_completed_migration ();
-    let lastCompletedMigration = lastCompletedMigration.toNumber();
-    console.log("Last completed migration: ", lastCompletedMigration);
-    if (lastCompletedMigration != 0) {
-        console.error("Previous migration has not been completed");
-        process.exit (-1);
-    }
+  // check migratons
+  let lastCompletedMigration = await migrations.last_completed_migration();
+  lastCompletedMigration = lastCompletedMigration.toNumber();
+  console.log("Last completed migration: ", lastCompletedMigration);
+  if (lastCompletedMigration != 0) {
+    console.error("Previous migration has not been completed");
+    process.exit(-1);
+  }
 
   const ethAdapter = new EthersAdapter({
     ethers,
@@ -144,15 +143,17 @@ async function main() {
 
       addresses = {
         ...addresses,
-        safe: safeAddress,
-        safeSingletonAddress: gnosisSafe.target,
-        safeProxyFactoryAddress: gnosisSafeProxyFactory.target,
-        multiSendAddress: multiSend.target,
-        multiSendCallOnlyAddress: multiSendCallOnly.target,
-        fallbackHandlerAddress: fallbackManager.target,
-        signMessageLibAddress: signMessageLib.target,
-        createCallAddress: createCall.target,
-        simulateTxAccessorAddress: simulateTxAccessor.target,
+        gnosis: {
+          safe: safeAddress,
+          safeSingletonAddress: gnosisSafe.target,
+          safeProxyFactoryAddress: gnosisSafeProxyFactory.target,
+          multiSendAddress: multiSend.target,
+          multiSendCallOnlyAddress: multiSendCallOnly.target,
+          fallbackHandlerAddress: fallbackManager.target,
+          signMessageLibAddress: signMessageLib.target,
+          createCallAddress: createCall.target,
+          simulateTxAccessorAddress: simulateTxAccessor.target,
+        },
       };
 
       break;
@@ -171,7 +172,9 @@ async function main() {
 
       addresses = {
         ...addresses,
-        safe: safeAddress,
+        gnosis: {
+          safe: safeAddress,
+        },
       };
       break;
 
@@ -180,12 +183,15 @@ async function main() {
       process.exit(-1);
   }
 
-    console.log("Updating migrations...");
-    await migrations.setCompleted(1);
+  console.log("Updating migrations...");
+  await migrations.setCompleted(1);
 
-    console.log(addresses);
-    fs.writeFileSync("addresses.json", JSON.stringify(addresses));
-    console.log("Done");
+  console.log(addresses);
+  fs.writeFileSync("addresses.json", JSON.stringify(addresses));
+
+  console.log("Done");
+  // NOTE: neccessary because script hangs in CI
+  process.exit(0);
 }
 
 main().catch((error) => {

@@ -9,22 +9,22 @@ async function main() {
   console.log("Using ", accounts[0], "as the transaction signer");
 
   // read addresses
-    let addresses = JSON.parse(
-        fs.readFileSync("addresses.json", { encoding: "utf8", flag: "r" }),
-    );
-    
-  const Migrations = artifacts.require("Migrations");        
-    const migrations = await Migrations.at(addresses.migrations);
+  let addresses = JSON.parse(
+    fs.readFileSync("addresses.json", { encoding: "utf8", flag: "r" }),
+  );
 
-    // check migratons
-    let lastCompletedMigration = await migrations.last_completed_migration ();
-    let lastCompletedMigration = lastCompletedMigration.toNumber();    
-    console.log("Last completed migration: ", lastCompletedMigration);
-    if (lastCompletedMigration != 1) {
-        console.error("Previous migration has not been completed");
-        process.exit (-1);
-    }
-    
+  const Migrations = artifacts.require("Migrations");
+  const migrations = await Migrations.at(addresses.migrations);
+
+  // check migratons
+  let lastCompletedMigration = await migrations.last_completed_migration();
+  lastCompletedMigration = lastCompletedMigration.toNumber();
+  console.log("Last completed migration: ", lastCompletedMigration);
+  if (lastCompletedMigration != 1) {
+    console.error("Previous migration has not been completed");
+    process.exit(-1);
+  }
+
   if (network.name == "development" || network.name == "bridgenet") {
     const WETH = await ethers.getContractFactory("WETH9");
     console.log("Deploying WETH...");
@@ -50,7 +50,7 @@ async function main() {
     [
       config.guardianIds,
       config.threshold,
-      addresses..safe,
+      addresses.gnosis.safe,
       addresses.weth,
     ],
     {
@@ -68,13 +68,15 @@ async function main() {
 
   addresses = {
     ...addresses,
-    addresses._contracts,
-    migrations: migrations.target,
     most: most.target,
   };
 
   console.log(addresses);
   fs.writeFileSync("addresses.json", JSON.stringify(addresses));
+
+  console.log("Done");
+  // NOTE: neccessary because script hangs in CI
+  process.exit(0);
 }
 
 main().catch((error) => {
