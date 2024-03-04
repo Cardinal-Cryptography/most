@@ -84,12 +84,12 @@ async function main(): Promise<void> {
       api,
       most_azero,
     );
+
+    const most = new Most(most_azero, deployer, api);
+
+    await addTokenPair(weth_eth, weth_azero, most);
+    await addTokenPair(usdt_eth, usdt_azero, most);
   }
-
-  const most = new Most(most_azero, deployer, api);
-
-  await addTokenPair(weth_eth, weth_azero, most);
-  await addTokenPair(usdt_eth, usdt_azero, most);
 
   await api.disconnect();
 }
