@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract Token is ERC20 {
     uint8 private _decimals;
-    
+
     constructor(
         uint256 _totalSupply,
         uint8 decimals_,
