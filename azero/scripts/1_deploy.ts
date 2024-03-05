@@ -143,7 +143,7 @@ async function main(): Promise<void> {
       max_fee!,
       default_fee!,
       oracleAddress,
-      contracts_owner
+      contracts_owner,
     ],
   );
 
