@@ -26,6 +26,7 @@ async function main() {
     console.log("Deploying USDT...");
     const usdt = await Token.deploy(
       "12000000000000000000000000",
+      "6",
       "Tether",
       "USDT",
     );
