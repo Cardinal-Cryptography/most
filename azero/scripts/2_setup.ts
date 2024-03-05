@@ -51,7 +51,7 @@ async function mintTokens(
 async function main(): Promise<void> {
   const config = await import_env(envFile);
 
-  const { ws_node, authority_seed, authority } = config;
+  const { ws_node, deployer_seed } = config;
 
   const {
     most: most_azero,
@@ -66,7 +66,7 @@ async function main(): Promise<void> {
   const keyring = new Keyring({ type: "sr25519" });
 
   const api = await ApiPromise.create({ provider: wsProvider });
-  const deployer = keyring.addFromUri(authority_seed);
+  const deployer = keyring.addFromUri(deployer_seed);
 
   const migrations = new Migrations(migrations_azero, deployer, api);
 
@@ -84,7 +84,7 @@ async function main(): Promise<void> {
     await mintTokens(
       weth_azero,
       1000000000000000,
-      authority,
+      deployer.address,
       deployer,
       api,
       most_azero,
@@ -92,7 +92,7 @@ async function main(): Promise<void> {
     await mintTokens(
       usdt_azero,
       1000000000000000,
-      authority,
+      deployer.address,
       deployer,
       api,
       most_azero,

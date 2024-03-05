@@ -5,8 +5,7 @@
     "5Dfis6XL8J2P6JHUnUtArnFWndn62SydeP8ee8sG2ky9nfm9",
     "5F4H97f7nQovyrbiq4ZetaaviNwThSVcFobcA5aGab6167dK"
   ],
-  "authority": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
-  "authority_seed": "//Alice",
+  "deployer_seed": "//Alice",
   "signature_threshold": 2,
   "pocket_money": 1000000000000,
   "min_fee": 10000000000000,

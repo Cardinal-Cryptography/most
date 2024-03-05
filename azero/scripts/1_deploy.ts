@@ -51,21 +51,21 @@ async function main(): Promise<void> {
   const {
     ws_node,
     relayers_keys,
-    authority_seed,
+    deployer_seed,
     signature_threshold,
     pocket_money,
     relay_gas_usage,
     min_fee,
     max_fee,
     default_fee,
-    authority,
   } = config;
 
   const wsProvider = new WsProvider(ws_node);
   const keyring = new Keyring({ type: "sr25519" });
 
   const api = await ApiPromise.create({ provider: wsProvider });
-  const deployer = keyring.addFromUri(authority_seed);
+  const deployer = keyring.addFromUri(deployer_seed);
+  console.log("Using", deployer.address, "as the deployer");
 
   const migrationsCodeHash = await uploadCode(
     api,
@@ -95,11 +95,11 @@ async function main(): Promise<void> {
     api,
     deployer,
     "migrations.contract",
-    [authority],
+    [deployer.address],
   );
 
   const { address: migrationsAddress } = await migrationsConstructors.new(
-    authority, // owner
+    deployer.address, // owner
     { gasLimit: estimatedGasMigrations },
   );
 
@@ -107,11 +107,11 @@ async function main(): Promise<void> {
     api,
     deployer,
     "advisory.contract",
-    [authority],
+    [deployer.address],
   );
 
   const { address: advisoryAddress } = await advisoryConstructors.new(
-    authority, // owner
+    deployer.address, // owner
     { gasLimit: estimatedGasAdvisory },
   );
 
@@ -119,11 +119,11 @@ async function main(): Promise<void> {
     api,
     deployer,
     "oracle.contract",
-    [authority, 10000000000],
+    [deployer.address, 10000000000],
   );
 
   const { address: oracleAddress } = await oracleConstructors.new(
-    authority, // owner
+    deployer.address, // owner
     10000000000, // initial value
     { gasLimit: estimatedGasOracle },
   );
@@ -160,7 +160,7 @@ async function main(): Promise<void> {
 
   const minterBurner =
     process.env.AZERO_ENV == "dev" || process.env.AZERO_ENV == "bridgenet"
-      ? authority
+      ? deployer.address
       : mostAddress;
 
   const wethArgs: TokenArgs = [0, "wETH", "Wrapped Ether", 18, minterBurner];
