@@ -81,6 +81,7 @@ describe("Most", function () {
     const Token = await ethers.getContractFactory("Token");
     const token = await Token.deploy(
       "10000000000000000000000000",
+      "18",
       "TestToken",
       "TEST",
     );

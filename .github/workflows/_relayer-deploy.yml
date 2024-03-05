@@ -58,7 +58,7 @@ jobs:
 
       - name: Update relayer docker image for ${{ inputs.env }}
         env:
-          DEPLOY_IMAGE: ${{ secrets.ECR_PUBLIC_REGISTRY }}most-relayer:${{ inputs.docker-tag }}
+          DEPLOY_IMAGE: ${{ vars.ECR_PUBLIC_REGISTRY }}most-relayer:${{ inputs.docker-tag }}
         shell: bash
         run: |
           cd '${{ secrets.REPO_OPS_MOST_NAME }}'
