@@ -1,5 +1,7 @@
 import { ApiPromise, WsProvider, Keyring } from "@polkadot/api";
 import { KeyringPair } from "@polkadot/keyring/types";
+import Migrations from "../types/contracts/migrations";
+import MigrationsConstructors from "../types/constructors/migrations";
 import MostConstructors from "../types/constructors/most";
 import TokenConstructors from "../types/constructors/token";
 import OracleConstructors from "../types/constructors/oracle";
@@ -65,6 +67,13 @@ async function main(): Promise<void> {
   const api = await ApiPromise.create({ provider: wsProvider });
   const deployer = keyring.addFromUri(authority_seed);
 
+  const migrationsCodeHash = await uploadCode(
+    api,
+    deployer,
+    "migrations.contract",
+  );
+  console.log("migrations code hash:", migrationsCodeHash);
+
   const tokenCodeHash = await uploadCode(api, deployer, "token.contract");
   console.log("token code hash:", tokenCodeHash);
 
@@ -77,9 +86,22 @@ async function main(): Promise<void> {
   const advisoryCodeHash = await uploadCode(api, deployer, "advisory.contract");
   console.log("advisory code hash:", advisoryCodeHash);
 
+  const migrationsConstructors = new MigrationsConstructors(api, deployer);
   const mostConstructors = new MostConstructors(api, deployer);
   const oracleConstructors = new OracleConstructors(api, deployer);
   const advisoryConstructors = new AdvisoryConstructors(api, deployer);
+
+  let estimatedGasMigrations = await estimateContractInit(
+    api,
+    deployer,
+    "migrations.contract",
+    [authority],
+  );
+
+  const { address: migrationsAddress } = await migrationsConstructors.new(
+    authority, // owner
+    { gasLimit: estimatedGasMigrations },
+  );
 
   let estimatedGasAdvisory = await estimateContractInit(
     api,
@@ -151,7 +173,12 @@ async function main(): Promise<void> {
   const { address: usdtAddress } = await deployToken(usdtArgs, api, deployer);
   console.log("USDT address:", usdtAddress);
 
+  // update migrations
+  const migrations = new Migrations(migrationsAddress, deployer, api);
+  await migrations.tx.setCompleted(1);
+
   const addresses: Addresses = {
+    migrations: migrationsAddress,
     most: mostAddress,
     weth: wethAddress,
     usdt: usdtAddress,
@@ -163,6 +190,7 @@ async function main(): Promise<void> {
   storeAddresses(addresses);
 
   await api.disconnect();
+  console.log("Done");
 }
 
 main().catch((error) => {
