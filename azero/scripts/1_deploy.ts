@@ -50,7 +50,9 @@ async function main(): Promise<void> {
 
   const {
     ws_node,
-    relayers_keys,
+    relayers,
+    contracts_owner,
+    gas_price_oracle_owner,
     deployer_seed,
     signature_threshold,
     pocket_money,
@@ -107,11 +109,11 @@ async function main(): Promise<void> {
     api,
     deployer,
     "advisory.contract",
-    [deployer.address],
+    [contracts_owner],
   );
 
   const { address: advisoryAddress } = await advisoryConstructors.new(
-    deployer.address, // owner
+    contracts_owner, // owner
     { gasLimit: estimatedGasAdvisory },
   );
 
@@ -119,11 +121,11 @@ async function main(): Promise<void> {
     api,
     deployer,
     "oracle.contract",
-    [deployer.address, 10000000000],
+    [gas_price_oracle_owner, 10000000000],
   );
 
   const { address: oracleAddress } = await oracleConstructors.new(
-    deployer.address, // owner
+    gas_price_oracle_owner, // owner
     10000000000, // initial value
     { gasLimit: estimatedGasOracle },
   );
@@ -133,7 +135,7 @@ async function main(): Promise<void> {
     deployer,
     "most.contract",
     [
-      relayers_keys,
+      relayers,
       signature_threshold!,
       pocket_money!,
       relay_gas_usage!,
@@ -141,11 +143,12 @@ async function main(): Promise<void> {
       max_fee!,
       default_fee!,
       oracleAddress,
+      contracts_owner
     ],
   );
 
   const { address: mostAddress } = await mostConstructors.new(
-    relayers_keys,
+    relayers,
     signature_threshold!,
     pocket_money!,
     relay_gas_usage!,
@@ -153,6 +156,7 @@ async function main(): Promise<void> {
     max_fee!,
     default_fee!,
     oracleAddress,
+    contracts_owner,
     { gasLimit: estimatedGasMost },
   );
 
