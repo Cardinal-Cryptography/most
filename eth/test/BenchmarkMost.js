@@ -12,7 +12,7 @@ describe("MostBenchmark", function () {
     let threshold = 5;
 
     const Token = await hre.ethers.getContractFactory("Token");
-    const token = await Token.deploy("10000", "TestToken", "TEST");
+    const token = await Token.deploy("10000", "18", "TestToken", "TEST");
     const tokenAddress = await token.getAddress();
 
     const Weth = await hre.ethers.getContractFactory("WETH9");
