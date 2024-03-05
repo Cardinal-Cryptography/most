@@ -12,7 +12,10 @@ mod migrations {
     #[derive(Debug, PartialEq, Eq, Encode, Decode)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub enum MigrationsError {
+        /// Generic env error
         InkEnvError(String),
+        /// The caller didn't have the permissions to call a given method
+        CallerNotOwner(AccountId),
     }
 
     impl From<InkEnvError> for MigrationsError {
@@ -37,8 +40,10 @@ mod migrations {
         }
 
         #[ink(message)]
-        pub fn set_completed(&mut self, completed: u32) {
+        pub fn set_completed(&mut self, completed: u32) -> Result<(), MigrationsError> {
+            self.ensure_owner()?;
             self.last_completed_migration = completed;
+            Ok(())
         }
 
         #[ink(message)]
@@ -49,6 +54,15 @@ mod migrations {
         #[ink(message)]
         pub fn last_completed_migration(&self) -> u32 {
             self.last_completed_migration
+        }
+
+        pub fn ensure_owner(&self) -> Result<(), MigrationsError> {
+            let caller = self.env().caller();
+            if caller != self.owner {
+                Err(MigrationsError::CallerNotOwner(caller))
+            } else {
+                Ok(())
+            }
         }
     }
 }
