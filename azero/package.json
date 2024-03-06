@@ -7,8 +7,8 @@
     "scripts": {
         "watch": "gulp default",
         "compile": "typechain-compiler --release --toolchain nightly-2024-02-16",
-        "deploy": "npm config set script-shell \"/bin/bash\"; ts-node scripts/deploy.ts",
-        "setup": "npm config set script-shell \"/bin/bash\"; ts-node scripts/setup.ts"
+        "deploy": "npm config set script-shell \"/bin/bash\"; ts-node scripts/1_deploy.ts",
+        "setup": "npm config set script-shell \"/bin/bash\"; ts-node scripts/2_setup.ts"
     },
     "dependencies": {
         "@727-ventures/typechain-compiler": "^1.1.0",

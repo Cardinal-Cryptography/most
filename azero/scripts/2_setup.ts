@@ -1,4 +1,5 @@
 import { ApiPromise, WsProvider, Keyring } from "@polkadot/api";
+import Migrations from "../types/contracts/migrations";
 import Most from "../types/contracts/most";
 import Token from "../types/contracts/token";
 import {
@@ -50,12 +51,13 @@ async function mintTokens(
 async function main(): Promise<void> {
   const config = await import_env(envFile);
 
-  const { ws_node, authority_seed, authority } = config;
+  const { ws_node, deployer_seed } = config;
 
   const {
     most: most_azero,
     weth: weth_azero,
     usdt: usdt_azero,
+    migrations: migrations_azero,
   } = await import_azero_addresses();
 
   const { weth: weth_eth, usdt: usdt_eth } = await import_eth_addresses();
@@ -64,14 +66,25 @@ async function main(): Promise<void> {
   const keyring = new Keyring({ type: "sr25519" });
 
   const api = await ApiPromise.create({ provider: wsProvider });
-  const deployer = keyring.addFromUri(authority_seed);
+  const deployer = keyring.addFromUri(deployer_seed);
+
+  const migrations = new Migrations(migrations_azero, deployer, api);
+
+  // check migrations
+  let lastCompletedMigration = await migrations.query.lastCompletedMigration();
+  const number = lastCompletedMigration.value.ok;
+  console.log("Last completed migration: ", number);
+  if (number != 1) {
+    console.error("Previous migration has not been completed");
+    process.exit(-1);
+  }
 
   // premint some token for DEV
   if (process.env.AZERO_ENV == "dev" || process.env.AZERO_ENV == "bridgenet") {
     await mintTokens(
       weth_azero,
       1000000000000000,
-      authority,
+      deployer.address,
       deployer,
       api,
       most_azero,
@@ -79,7 +92,7 @@ async function main(): Promise<void> {
     await mintTokens(
       usdt_azero,
       1000000000000000,
-      authority,
+      deployer.address,
       deployer,
       api,
       most_azero,
@@ -91,7 +104,11 @@ async function main(): Promise<void> {
     await addTokenPair(usdt_eth, usdt_azero, most);
   }
 
+  // update migrations
+  await migrations.tx.setCompleted(2);
+
   await api.disconnect();
+  console.log("Done");
 }
 
 main().catch((error) => {

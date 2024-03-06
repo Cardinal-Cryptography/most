@@ -6,14 +6,24 @@ async function main() {
   const accounts = signers.map((s) => s.address);
   const config = network.config.deploymentConfig;
 
-  console.log("Using ", accounts[0], "as signer");
+  console.log("Using ", accounts[0], "as the transaction signer");
 
   // read addresses
-  const gnosis_contracts = JSON.parse(
+  let addresses = JSON.parse(
     fs.readFileSync("addresses.json", { encoding: "utf8", flag: "r" }),
   );
 
-  let addresses = {}; // TODO: read pre-existing contracts addresses if other networks
+  const Migrations = artifacts.require("Migrations");
+  const migrations = await Migrations.at(addresses.migrations);
+
+  // check migratons
+  let lastCompletedMigration = await migrations.last_completed_migration();
+  lastCompletedMigration = lastCompletedMigration.toNumber();
+  console.log("Last completed migration: ", lastCompletedMigration);
+  if (lastCompletedMigration != 1) {
+    console.error("Previous migration has not been completed");
+    process.exit(-1);
+  }
 
   if (network.name == "development" || network.name == "bridgenet") {
     const WETH = await ethers.getContractFactory("WETH9");
@@ -41,7 +51,7 @@ async function main() {
     [
       config.guardianIds,
       config.threshold,
-      gnosis_contracts.safe,
+      addresses.gnosis.safe,
       addresses.weth,
     ],
     {
@@ -52,24 +62,22 @@ async function main() {
   await most.waitForDeployment();
   console.log("Most deployed to:", most.target);
 
-  const Migrations = await ethers.getContractFactory("Migrations");
-  const migrations = await Migrations.deploy();
-  console.log("Migrations deployed to:", migrations.target);
-
   console.log("Updating migrations...");
-  await migrations.setCompleted(1);
+  await migrations.setCompleted(2);
 
   // --- append addresses
 
   addresses = {
     ...addresses,
-    gnosis: gnosis_contracts,
-    migrations: migrations.target,
     most: most.target,
   };
 
   console.log(addresses);
   fs.writeFileSync("addresses.json", JSON.stringify(addresses));
+
+  console.log("Done");
+  // NOTE: neccessary because script hangs in CI
+  process.exit(0);
 }
 
 main().catch((error) => {
