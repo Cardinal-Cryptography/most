@@ -77,7 +77,8 @@ impl AdvisoryListener {
                             break;
                         }
                     }
-                    Err(why) => return Err(AdvisoryListenerError::AzeroContract(why)),
+                    Err(why) => return Err(AdvisoryListenerError::AzeroContract(why)), // This is no good. We must do something here. Logging is a must,
+                    // but I would argue that if the advisory contract is not reachable, we should stop operation.
                 }
             }
 

@@ -135,7 +135,10 @@ impl EthListener {
                     for event in events {
                         // In case of the halt, we want to retry the event handling after the halt is resolved.
                         loop {
-                            match handle_event(&event, &config, &azero_connection).await {
+                            match handle_event(&event, &config, &azero_connection).await { //A note to not forget: On this side of the bridge this is done differently, and I get why -- 
+                                // because it's simpler, and we can afford doing this one-by-one. But I hope that we can unify this -- details in the meeting.
+                                // One important downside of the current version is that if there is one transfer that fails for some reason, then all the subsequent transfers will wait.
+                                // While in theory none should fail, in practice it might be much better to just skip it, and continue...
                                 Ok(_) => break,
                                 Err(EthListenerError::AzeroContract(e)) => {
                                     error!("Error when handling event {event:?}: {e}");
@@ -205,7 +208,7 @@ async fn handle_event(
         trace!("event concatenated bytes: {bytes:?}");
 
         let request_hash = keccak256(bytes);
-        debug!("hashed event encoding: {request_hash:?}");
+        debug!("hashed event encoding: {request_hash:?}");// Can we log the hex hash here? It might be useful if we ever need "live debugging".
 
         let contract = MostInstance::new(
             azero_contract_address,
@@ -219,7 +222,7 @@ async fn handle_event(
             .receive_request(
                 azero_connection,
                 request_hash,
-                committee_id.as_u128(),
+                committee_id.as_u128(), // Is this an intentional choice to never check if we are in the committee?
                 *dest_token_address,
                 amount.as_u128(),
                 *dest_receiver_address,

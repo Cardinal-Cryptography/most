@@ -183,7 +183,7 @@ impl AlephZeroListener {
 
                     for (block_details, events) in block_events {
                         let filtered_events =
-                            most_azero.filter_events(events, block_details.clone());
+                            most_azero.filter_events(events, block_details.clone()); //As mentioned in slack -- there is a bug in aleph_client, that might cause this to fail.
 
                         handle_events(
                             config.clone(),
@@ -323,7 +323,8 @@ async fn handle_events(
 
         // Spawn a new task for handling each event.
         event_tasks.spawn(handle_event(config, eth_connection, event, permit));
-        if event_tasks.len() >= ALEPH_MAX_REQUESTS_PER_BLOCK {
+        if event_tasks.len() >= ALEPH_MAX_REQUESTS_PER_BLOCK { // not sure what the benchmark was, but very likely the numbers will change because 
+            // there was a bug in gas charging (hotfix enters 05.03 on testnet)
             panic!("Too many send_request calls in one block: our benchmark is outdated.");
         }
     }
@@ -353,7 +354,8 @@ async fn handle_event(
         eth_tx_submission_retries,
         ..
     } = &*config;
-
+    // Not sure this is currently happening or not, but we should make sure that between the moment a request is made and the moment guardians sign it,
+    // there is enough time to update the advisory and for the guardians to read and react to advisory.
     if let Some(name) = &event.name {
         if name.eq("CrosschainTransferRequest") {
             let data = event.data;
@@ -408,6 +410,8 @@ async fn handle_event(
                 request_nonce,
                 eth_tx_min_confirmations
             );
+
+            // I think it's somewhere here when we should be checking advisory -- this is the last possible moment, so the best moment.
 
             // This shouldn't fail unless there is something wrong with our config.
             // NOTE: this does not check whether the actual tx reverted on-chain. Reverts are only checked on dry-run.
@@ -465,6 +469,8 @@ async fn seal_processed_block(
         .first()
         .expect("There always is a pending block in the set");
 
+    
+
     // Note: `earliest_still_pending` will never be 0
     write_last_processed_block(
         name.clone(),
@@ -473,7 +479,14 @@ async fn seal_processed_block(
         earliest_still_pending - 1,
     )
     .await?;
-
+    // The mutex guard pending_blocks is held till here, while we could have released it earlier. 
+    // When using mutexes it's best to create code blocks that are as small as possible, so that the lock is held for as short as possible.
+    // In this case:
+    // let earliest_still_pending = {
+    //     let pending_blocks = pending_blocks.lock().await;
+    //     ...
+    //};
+    
     Ok(())
 }
 
@@ -529,6 +542,6 @@ async fn get_next_finalized_block_number_azero(
         };
 
         // If we are up to date, we can sleep for a longer time.
-        sleep(Duration::from_secs(10 * ALEPH_BLOCK_PROD_TIME_SEC)).await;
+        sleep(Duration::from_secs(10 * ALEPH_BLOCK_PROD_TIME_SEC)).await; // What's the point of sleeping so long and not just 1sec or so?
     }
 }

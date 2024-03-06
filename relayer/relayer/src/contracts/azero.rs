@@ -131,6 +131,8 @@ impl MostInstance {
             )
             .await
             .map_err(AzeroContractError::AlephClient)
+        // Is the assumption that if the transaction is finalized, the request was successful?
+        // I would not give 100% guarantee on that. As discussed in slack -- I think a more reliable method is to just check if the state changed appropriately...
     }
 
     pub async fn is_halted(
@@ -193,7 +195,7 @@ impl MostInstance {
                 if let Ok(event) = event_res {
                     Some(event)
                 } else {
-                    trace!("Failed to translate event: {:?}", event_res);
+                    trace!("Failed to translate event: {:?}", event_res); // This is actually a problem. We should log this at warn, maybe even return an error.
                     None
                 }
             })

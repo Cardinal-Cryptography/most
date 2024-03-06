@@ -57,7 +57,7 @@ contract Most is
     }
 
     function initialize(
-        address[] calldata _committee,
+        address[] calldata _committee, // should check for duplicates?
         uint256 _signatureThreshold,
         address owner,
         address payable _wethAddress
@@ -73,7 +73,7 @@ contract Most is
 
         committeeId = 0;
 
-        for (uint256 i = 0; i < _committee.length; i++) {
+        for (uint256 i = 0; i < _committee.length; ++i) {
             committee[
                 keccak256(abi.encodePacked(committeeId, _committee[i]))
             ] = true;
@@ -106,7 +106,7 @@ contract Most is
         bytes32 destReceiverAddress
     ) external whenNotPaused {
         address sender = msg.sender;
-
+        // Better to disallow amount = 0, to avoid edge cases
         IERC20 token = IERC20(bytes32ToAddress(srcTokenAddress));
 
         // check if the token is supported
@@ -115,7 +115,7 @@ contract Most is
 
         // lock tokens in this contract
         // message sender needs to give approval else this tx will revert
-        token.transferFrom(sender, address(this), amount);
+        token.transferFrom(sender, address(this), amount); // I'm always scared of reentrancy here, would it be ok to use ReentrancyGuard?
 
         emit CrosschainTransferRequest(
             committeeId,
@@ -125,7 +125,7 @@ contract Most is
             requestNonce
         );
 
-        requestNonce++;
+        ++requestNonce;
     }
 
     // Invoke this tx to transfer funds to the destination chain.
@@ -136,6 +136,7 @@ contract Most is
     // & forward to the destination chain.
     function sendRequestNative(bytes32 destReceiverAddress) external payable {
         uint256 amount = msg.value;
+        // Better to disallow amount = 0, to avoid edge cases
 
         // check if the token is supported
         bytes32 destTokenAddress = supportedPairs[
@@ -156,7 +157,7 @@ contract Most is
             requestNonce
         );
 
-        requestNonce++;
+        ++requestNonce;
     }
 
     // aggregates relayer signatures and returns the locked tokens
@@ -194,7 +195,7 @@ contract Most is
         require(_requestHash == requestHash, "Hash does not match the data");
 
         request.signatures[msg.sender] = true;
-        request.signatureCount++;
+        ++request.signatureCount;
 
         emit RequestSigned(requestHash, msg.sender);
 
@@ -219,9 +220,12 @@ contract Most is
                     "Failed to send the native ETH back to the user."
                 );
             } else {
-                IERC20 token = IERC20(bytes32ToAddress(destTokenAddress));
+                IERC20 token = IERC20(bytes32ToAddress(destTokenAddress)); //following the M-3/M-4 findings in the automated report, we might want to switch to SafeERC20
 
-                token.transfer(bytes32ToAddress(destReceiverAddress), amount);
+                token.transfer(bytes32ToAddress(destReceiverAddress), amount); // I'm always scared of reentrancy here, would it be ok to use ReentrancyGuard?
+                // Slight concern is what if the destReceiverAddress is a contract that reverts on receiving tokens? There is no easy way to handle this though. Only
+                // via a governance action. Maybe there should be a governance action on AZERO to cancel a request? 
+                // On the other hand, in the frontned we require the user to connect their wallet, so it theoretically shouldn't happen. 
             }
             emit RequestProcessed(requestHash);
         }
@@ -258,9 +262,9 @@ contract Most is
     }
 
     function setCommittee(
-        address[] memory _committee,
+        address[] memory _committee, // should check for duplicates?
         uint256 _signatureThreshold
-    ) external onlyOwner {
+    ) external onlyOwner {  // maybe this should use whenPaused?
         require(
             _signatureThreshold > 0,
             "Signature threshold must be greater than 0"
@@ -272,7 +276,7 @@ contract Most is
 
         committeeId += 1;
 
-        for (uint256 i = 0; i < _committee.length; i++) {
+        for (uint256 i = 0; i < _committee.length; ++i) {// gas optimization
             committee[
                 keccak256(abi.encodePacked(committeeId, _committee[i]))
             ] = true;
@@ -282,13 +286,14 @@ contract Most is
         signatureThreshold[committeeId] = _signatureThreshold;
     }
 
-    function addPair(bytes32 from, bytes32 to) external onlyOwner {
+    function addPair(bytes32 from, bytes32 to) external onlyOwner { // maybe this should use whenPaused?
         supportedPairs[from] = to;
     }
 
-    function removePair(bytes32 from) external onlyOwner {
+    function removePair(bytes32 from) external onlyOwner {  // maybe this should use whenPaused?
         delete supportedPairs[from];
     }
 
-    receive() external payable {}
+    receive() external payable {} // we could disallow sending native ETH directly, but then people can send ERC20 directly anyway. But in the audit rules we should say
+    // that we don't care about this.
 }
