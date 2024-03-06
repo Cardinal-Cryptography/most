@@ -48,6 +48,8 @@ contract Most is
 
     event RequestAlreadySigned(bytes32 requestHash, address signer);
 
+    event CommitteeUpdated(uint256 newCommitteeId);
+
     modifier _onlyCommitteeMember(uint256 _committeeId) {
         require(
             isInCommittee(_committeeId, msg.sender),
@@ -86,6 +88,7 @@ contract Most is
         __Ownable_init(owner);
         // inititialize the PausableUpgradeable
         __Pausable_init();
+
     }
 
     // required by the OZ UUPS module
@@ -290,6 +293,11 @@ contract Most is
 
         committeeSize[committeeId] = _committee.length;
         signatureThreshold[committeeId] = _signatureThreshold;
+
+        emit CommitteeUpdated(
+            committeeId,
+        );
+
     }
 
     function addPair(bytes32 from, bytes32 to) external onlyOwner {
