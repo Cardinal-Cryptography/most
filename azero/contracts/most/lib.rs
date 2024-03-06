@@ -953,8 +953,8 @@ pub mod most {
 
         #[ink::test]
         fn new_sets_correct_guardians() {
-            let alice = default_accounts::<DefEnv>().alice;
-            set_caller::<DefEnv>(alice);
+            let accounts = default_accounts::<DefEnv>();
+            set_caller::<DefEnv>(accounts.alice);
 
             let most = Most::new(
                 guardian_accounts(),
@@ -965,7 +965,7 @@ pub mod most {
                 MAX_FEE,
                 DEFAULT_FEE,
                 None,
-                alice,
+                accounts.alice,
             )
             .expect("Threshold is valid.");
 
