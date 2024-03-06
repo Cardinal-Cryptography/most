@@ -70,6 +70,7 @@ mod e2e {
             MIN_FEE,
             MAX_FEE,
             DEFAULT_FEE,
+            account_id(AccountKeyring::Alice),
         )
         .await;
     }
@@ -988,6 +989,7 @@ mod e2e {
         min_fee: u128,
         max_fee: u128,
         default_fee: u128,
+        owner: AccountId,
     ) -> AccountId {
         let most_constructor = MostRef::new(
             guardians,
@@ -998,7 +1000,7 @@ mod e2e {
             max_fee,
             default_fee,
             None,
-            account_id(AccountKeyring::Alice),
+            owner,
         );
         client
             .instantiate("most", caller, most_constructor, 0, None)
@@ -1049,6 +1051,7 @@ mod e2e {
             MIN_FEE,
             MAX_FEE,
             DEFAULT_FEE,
+            account_id(AccountKeyring::Alice),
         )
         .await;
 
