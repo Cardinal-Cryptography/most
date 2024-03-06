@@ -43,7 +43,8 @@ jobs:
           docker_tag=${{ steps.get-ref-properties.outputs.sha }}
           docker_name=most-signer-${docker_tag}
 
-          make build-docker-signer
+          make build-docker-signer \
+            DOCKER_SIGNER_NAME=${docker_name}
 
           echo "docker-name=${docker_name}" >> $GITHUB_OUTPUT
           echo "docker-tag=${docker_tag}" >> $GITHUB_OUTPUT
