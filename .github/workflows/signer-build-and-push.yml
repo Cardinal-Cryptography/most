@@ -1,14 +1,11 @@
 name: Build and push signer
 
 on:
-#  workflow_call:
-#    outputs:
-#      docker-tag:
-#        description: Docker image tag
-#        value: ${{ jobs.build-and-push.outputs.docker-tag }}
-  push:
-    branches:
-      - A0-4138-fix-signer-docker
+  workflow_dispatch:
+    outputs:
+      docker-tag:
+        description: Docker image tag
+        value: ${{ jobs.build-and-push.outputs.docker-tag }}
 
 jobs:
   check-vars-and-secrets:
