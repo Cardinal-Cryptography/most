@@ -353,6 +353,6 @@ contract_spec.json: azero/addresses.json eth/addresses.json
 .PHONY: build-docker-signer
 build-docker-signer: # Build signer docker image
 build-docker-signer:
-	cd relayer && cargo build -p signer --release --target x86_64-unknown-linux-musl
-	cp relayer/target/x86_64-unknown-linux-musl/release/signer relayer/signer_docker
+	cd relayer && cargo build -p signer --release
+	cp relayer/target/release/signer relayer/signer_docker
 	cd relayer/signer_docker && docker build -t $(DOCKER_SIGNER_NAME) .
