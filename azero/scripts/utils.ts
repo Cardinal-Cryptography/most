@@ -16,6 +16,7 @@ export type Addresses = {
   usdt: string;
   oracle: string;
   advisory: string;
+  migrations: string;
 };
 
 /**

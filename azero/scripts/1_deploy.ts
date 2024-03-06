@@ -1,5 +1,7 @@
 import { ApiPromise, WsProvider, Keyring } from "@polkadot/api";
 import { KeyringPair } from "@polkadot/keyring/types";
+import Migrations from "../types/contracts/migrations";
+import MigrationsConstructors from "../types/constructors/migrations";
 import MostConstructors from "../types/constructors/most";
 import TokenConstructors from "../types/constructors/token";
 import OracleConstructors from "../types/constructors/oracle";
@@ -48,22 +50,31 @@ async function main(): Promise<void> {
 
   const {
     ws_node,
-    relayers_keys,
-    authority_seed,
+    relayers,
+    contracts_owner,
+    gas_price_oracle_owner,
+    deployer_seed,
     signature_threshold,
     pocket_money,
     relay_gas_usage,
     min_fee,
     max_fee,
     default_fee,
-    authority,
   } = config;
 
   const wsProvider = new WsProvider(ws_node);
   const keyring = new Keyring({ type: "sr25519" });
 
   const api = await ApiPromise.create({ provider: wsProvider });
-  const deployer = keyring.addFromUri(authority_seed);
+  const deployer = keyring.addFromUri(deployer_seed);
+  console.log("Using", deployer.address, "as the deployer");
+
+  const migrationsCodeHash = await uploadCode(
+    api,
+    deployer,
+    "migrations.contract",
+  );
+  console.log("migrations code hash:", migrationsCodeHash);
 
   const tokenCodeHash = await uploadCode(api, deployer, "token.contract");
   console.log("token code hash:", tokenCodeHash);
@@ -77,19 +88,32 @@ async function main(): Promise<void> {
   const advisoryCodeHash = await uploadCode(api, deployer, "advisory.contract");
   console.log("advisory code hash:", advisoryCodeHash);
 
+  const migrationsConstructors = new MigrationsConstructors(api, deployer);
   const mostConstructors = new MostConstructors(api, deployer);
   const oracleConstructors = new OracleConstructors(api, deployer);
   const advisoryConstructors = new AdvisoryConstructors(api, deployer);
+
+  let estimatedGasMigrations = await estimateContractInit(
+    api,
+    deployer,
+    "migrations.contract",
+    [deployer.address],
+  );
+
+  const { address: migrationsAddress } = await migrationsConstructors.new(
+    deployer.address, // owner
+    { gasLimit: estimatedGasMigrations },
+  );
 
   let estimatedGasAdvisory = await estimateContractInit(
     api,
     deployer,
     "advisory.contract",
-    [authority],
+    [contracts_owner],
   );
 
   const { address: advisoryAddress } = await advisoryConstructors.new(
-    authority, // owner
+    contracts_owner, // owner
     { gasLimit: estimatedGasAdvisory },
   );
 
@@ -97,11 +121,11 @@ async function main(): Promise<void> {
     api,
     deployer,
     "oracle.contract",
-    [authority, 10000000000],
+    [gas_price_oracle_owner, 10000000000],
   );
 
   const { address: oracleAddress } = await oracleConstructors.new(
-    authority, // owner
+    gas_price_oracle_owner, // owner
     10000000000, // initial value
     { gasLimit: estimatedGasOracle },
   );
@@ -111,7 +135,7 @@ async function main(): Promise<void> {
     deployer,
     "most.contract",
     [
-      relayers_keys,
+      relayers,
       signature_threshold!,
       pocket_money!,
       relay_gas_usage!,
@@ -119,11 +143,12 @@ async function main(): Promise<void> {
       max_fee!,
       default_fee!,
       oracleAddress,
+      contracts_owner,
     ],
   );
 
   const { address: mostAddress } = await mostConstructors.new(
-    relayers_keys,
+    relayers,
     signature_threshold!,
     pocket_money!,
     relay_gas_usage!,
@@ -131,6 +156,7 @@ async function main(): Promise<void> {
     max_fee!,
     default_fee!,
     oracleAddress,
+    contracts_owner,
     { gasLimit: estimatedGasMost },
   );
 
@@ -138,7 +164,7 @@ async function main(): Promise<void> {
 
   const minterBurner =
     process.env.AZERO_ENV == "dev" || process.env.AZERO_ENV == "bridgenet"
-      ? authority
+      ? deployer.address
       : mostAddress;
 
   const wethArgs: TokenArgs = [0, "wETH", "Wrapped Ether", 18, minterBurner];
@@ -151,7 +177,12 @@ async function main(): Promise<void> {
   const { address: usdtAddress } = await deployToken(usdtArgs, api, deployer);
   console.log("USDT address:", usdtAddress);
 
+  // update migrations
+  const migrations = new Migrations(migrationsAddress, deployer, api);
+  await migrations.tx.setCompleted(1);
+
   const addresses: Addresses = {
+    migrations: migrationsAddress,
     most: mostAddress,
     weth: wethAddress,
     usdt: usdtAddress,
@@ -163,6 +194,7 @@ async function main(): Promise<void> {
   storeAddresses(addresses);
 
   await api.disconnect();
+  console.log("Done");
 }
 
 main().catch((error) => {
