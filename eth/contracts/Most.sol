@@ -208,7 +208,7 @@ contract Most is
         emit RequestSigned(requestHash, msg.sender);
 
         /// why do we consider signatureThreshold of committeeId, when we process requrest for _committeeId (underscored)?
-        if (request.signatureCount >= signatureThreshold[committeeId]) {
+        if (request.signatureCount >= signatureThreshold[_committeeId]) {
             processedRequests[requestHash] = true;
             delete pendingRequests[requestHash];
 
