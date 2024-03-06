@@ -1,12 +1,13 @@
 {
   "ws_node": "wss://ws-fe-bridgenet.dev.azero.dev",
-  "relayers_keys": [
+  "relayers": [
     "5GBNeWRhZc2jXu7D55rBimKYDk8PGk8itRYFTPfC8RJLKG5o",
     "5Dfis6XL8J2P6JHUnUtArnFWndn62SydeP8ee8sG2ky9nfm9",
     "5F4H97f7nQovyrbiq4ZetaaviNwThSVcFobcA5aGab6167dK"
   ],
-  "authority": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
-  "authority_seed": "//Alice",
+  "contracts_owner": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+  "gas_price_oracle_owner": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+  "deployer_seed": "//Alice",
   "signature_threshold": 2,
   "commission_per_dix_mille": 300,
   "pocket_money": 1000000000000,

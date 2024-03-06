@@ -95,14 +95,20 @@ compile-eth: eth-deps
 deploy-eth: # Deploy eth contracts
 deploy-eth: compile-eth
 	cd eth && \
-	npx hardhat run --network $(NETWORK) scripts/0_deploy_gnosis.js && \
-	npx hardhat run --network $(NETWORK) scripts/1_deploy_contracts.js
+	npx hardhat run --network $(NETWORK) scripts/0_deploy_migrations.js && \
+	npx hardhat run --network $(NETWORK) scripts/1_deploy_gnosis_safe.js && \
+	npx hardhat run --network $(NETWORK) scripts/2_deploy_bridge_contracts.js
 
 .PHONY: setup-eth
 setup-eth: # Setup eth contracts
 setup-eth: compile-eth
 	cd eth && \
-	npx hardhat run --network $(NETWORK) scripts/2_setup_contracts.js
+	npx hardhat run --network $(NETWORK) scripts/3_setup_bridge_contracts.js
+
+.PHONY: decode-eth
+decode-eth: # Decode eth contract call
+decode-eth: eth-deps
+	cd eth && node scripts/decode.js
 
 .PHONY: most-builder
 most-builder: # Build an image in which contracts can be built
@@ -137,6 +143,7 @@ print-azero-codehashes: compile-azero-docker
 deploy-azero-docker: # Deploy azero contracts compiling in docker
 deploy-azero-docker: azero-deps compile-azero-docker
 	cd azero && npm run deploy
+	cd azero && npm run setup
 
 .PHONY: azero-deps
 azero-deps: # Install azero dependencies
@@ -158,9 +165,14 @@ deploy-azero: # Deploy azero contracts
 deploy-azero: compile-azero
 	cd azero && npm run deploy
 
+.PHONY: setup-azero
+setup-azero: # Setup azero contracts
+setup-azero: compile-azero
+	cd azero && npm run setup
+
 .PHONY: deploy
 deploy: # Deploy all contracts
-deploy: deploy-eth deploy-azero setup-eth
+deploy: deploy-eth deploy-azero setup-eth setup-azero
 
 .PHONY: watch-relayer
 watch-relayer:
@@ -243,7 +255,7 @@ check-js-format:
 .PHONY: solidity-lint
 solidity-lint: # Lint solidity contracts
 solidity-lint: eth-deps
-	cd eth && npx prettier --check --plugin=prettier-plugin-solidity 'contracts/*.sol'
+	cd eth && npx solhint 'contracts/*.sol'
 
 .PHONY: relayer-lint
 relayer-lint: # Lint relayer
@@ -268,7 +280,7 @@ contracts-lint: solidity-lint ink-lint
 .PHONY: solidity-format
 solidity-format: # Format solidity contracts
 solidity-format: eth-deps
-	cd eth && npx prettier --write --plugin=prettier-plugin-solidity 'contracts/**/*.sol'
+	cd eth && npx prettier --write --plugin=prettier-plugin-solidity 'contracts/*.sol'
 
 .PHONY: rust-format-check
 rust-format-check: # Check rust code formatting

@@ -4,16 +4,50 @@ const { SafeFactory, EthersAdapter } = require("@safe-global/protocol-kit");
 const { network, ethers } = require("hardhat");
 
 async function main() {
+  const provider = new ethers.JsonRpcProvider(network.config.url);
+  console.log("Deploying GnosisSafe to:", network.name);
+
+  const signers = await ethers.getSigners();
+  const signer = signers[0];
+  console.log("Using", signer.address, "as the transaction signer");
+
+  // read addresses
+  let addresses = JSON.parse(
+    fs.readFileSync("addresses.json", { encoding: "utf8", flag: "r" }),
+  );
+
+  const Migrations = artifacts.require("Migrations");
+  const migrations = await Migrations.at(addresses.migrations);
+
+  // check migratons
+  let lastCompletedMigration = await migrations.last_completed_migration();
+  lastCompletedMigration = lastCompletedMigration.toNumber();
+  console.log("Last completed migration: ", lastCompletedMigration);
+  if (lastCompletedMigration != 0) {
+    console.error("Previous migration has not been completed");
+    process.exit(-1);
+  }
+
+  const ethAdapter = new EthersAdapter({
+    ethers,
+    signerOrProvider: signer,
+  });
+
+  const safeAccountConfig = {
+    owners: network.config.deploymentConfig.governanceIds,
+    threshold: network.config.deploymentConfig.governanceThreshold,
+  };
+
+  console.log("GnosisSafe deployment config:", safeAccountConfig);
+
+  let safeFactory,
+    safe,
+    safeAddress,
+    address = null;
+
   switch (network.name) {
-    case "development" || "bridgenet":
-      const provider = new ethers.JsonRpcProvider(network.config.url);
-
-      // const signer0 = await provider.getSigner(0);
-      const ethAdapter = new EthersAdapter({
-        ethers,
-        signerOrProvider: await provider.getSigner(0),
-      });
-
+    case "development":
+    case "bridgenet":
       // deploy gnosis contracts
       const GnosisSafeProxyFactory = await ethers.getContractFactory(
         "GnosisSafeProxyFactory",
@@ -95,48 +129,69 @@ async function main() {
 
       console.log("Gnosis Safe contracts", contractNetworks);
 
-      const safeFactory = await SafeFactory.create({
+      safeFactory = await SafeFactory.create({
         ethAdapter,
         contractNetworks,
         isL1SafeSingleton: false, // forces the use of SafeL2.sol contract that emits events but consumes more more gas
       });
 
-      // deploy new Safe
-      const safeAccountConfig = {
-        owners: network.config.deploymentConfig.governanceIds,
-        threshold: network.config.deploymentConfig.threshold,
-      };
-
-      console.log("GnosisSafe config:", safeAccountConfig);
-
-      const safe = await safeFactory.deploySafe({ safeAccountConfig });
-
-      const safeAddress = await safe.getAddress();
-
+      safe = await safeFactory.deploySafe({ safeAccountConfig });
+      safeAddress = await safe.getAddress();
       console.log("GnosisSafe address:", safeAddress);
 
       // --- spit addresses
 
-      const addresses = {
-        safe: safeAddress,
-        safeSingletonAddress: gnosisSafe.target,
-        safeProxyFactoryAddress: gnosisSafeProxyFactory.target,
-        multiSendAddress: multiSend.target,
-        multiSendCallOnlyAddress: multiSendCallOnly.target,
-        fallbackHandlerAddress: fallbackManager.target,
-        signMessageLibAddress: signMessageLib.target,
-        createCallAddress: createCall.target,
-        simulateTxAccessorAddress: simulateTxAccessor.target,
+      addresses = {
+        ...addresses,
+        gnosis: {
+          safe: safeAddress,
+          safeSingletonAddress: gnosisSafe.target,
+          safeProxyFactoryAddress: gnosisSafeProxyFactory.target,
+          multiSendAddress: multiSend.target,
+          multiSendCallOnlyAddress: multiSendCallOnly.target,
+          fallbackHandlerAddress: fallbackManager.target,
+          signMessageLibAddress: signMessageLib.target,
+          createCallAddress: createCall.target,
+          simulateTxAccessorAddress: simulateTxAccessor.target,
+        },
       };
 
-      fs.writeFileSync("addresses.json", JSON.stringify(addresses));
       break;
+
+    case "sepolia":
+      safeFactory = await SafeFactory.create({
+        ethAdapter: ethAdapter,
+        isL1SafeSingleton: false,
+      });
+
+      safe = await safeFactory.deploySafe({ safeAccountConfig });
+      safeAddress = await safe.getAddress();
+      console.log("GnosisSafe address:", safeAddress);
+
+      // --- spit addresses
+
+      addresses = {
+        ...addresses,
+        gnosis: {
+          safe: safeAddress,
+        },
+      };
+      break;
+
     default:
-      console.log(
-        `On network ${network.name} you should use an==the existing GnosisSafe contracts to create a GnosisSafe instance`,
-      );
+      console.log(`Uknown network name ${network.name}`);
       process.exit(-1);
   }
+
+  console.log("Updating migrations...");
+  await migrations.setCompleted(1);
+
+  console.log(addresses);
+  fs.writeFileSync("addresses.json", JSON.stringify(addresses));
+
+  console.log("Done");
+  // NOTE: neccessary because script hangs in CI
+  process.exit(0);
 }
 
 main().catch((error) => {

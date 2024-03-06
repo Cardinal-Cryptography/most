@@ -1,9 +1,10 @@
 import fs from "fs";
 
-import { ApiPromise } from "@polkadot/api";
+import { ApiPromise, Keyring } from "@polkadot/api";
 import { Abi } from "@polkadot/api-contract";
 import { KeyringPair } from "@polkadot/keyring/types";
 import { HexString } from "@polkadot/util/types";
+import { hexToU8a, u8aToHex } from "@polkadot/util";
 import {
   ContractInstantiateResult,
   WeightV2,
@@ -12,8 +13,10 @@ import {
 export type Addresses = {
   most: string;
   weth: string;
+  usdt: string;
   oracle: string;
   advisory: string;
+  migrations: string;
 };
 
 /**
@@ -58,6 +61,27 @@ export function storeAddresses(addresses: Addresses): void {
     __dirname + "/../addresses.json",
     JSON.stringify(addresses, null, 2),
   );
+}
+
+export async function import_env(envFile: string) {
+  return await import(`../env/${envFile}.json`);
+}
+
+export async function import_eth_addresses() {
+  return await import(`../../eth/addresses.json`);
+}
+
+export async function import_azero_addresses() {
+  return await import(__dirname + "/../addresses.json");
+}
+
+export function hexToBytes(hex: string): number[] {
+  let u8array = hexToU8a(hex);
+  return Array.from(u8array);
+}
+
+export function accountIdToHex(accountId: string): string {
+  return u8aToHex(new Keyring({ type: "sr25519" }).decodeAddress(accountId));
 }
 
 /**
