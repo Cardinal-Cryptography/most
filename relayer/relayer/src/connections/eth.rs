@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::fmt::Debug;
 
 use ethers::{
     abi::Address,
@@ -15,7 +15,7 @@ use ethers::{
     },
 };
 use thiserror::Error;
-use tokio::task::spawn_blocking;
+use tokio::sync::Mutex;
 
 pub type EthConnection = Provider<Http>;
 pub type SignedEthConnection =
@@ -124,21 +124,26 @@ impl Signer for EthereumSigner {
     }
 }
 
-#[derive(Debug)]
 pub struct EthVsockSigner {
-    client: Arc<Mutex<signer_client::Client>>,
+    client: Mutex<signer_client::Client>,
     chain_id: u64,
     address: Address,
 }
 
+impl Debug for EthVsockSigner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("EthVsockSigner")
+            .field("chain_id", &self.chain_id)
+            .field("address", &self.address)
+            .finish()
+    }
+}
+
 impl EthVsockSigner {
     async fn sign_hash(&self, hash: H256) -> Result<Signature, EthVsockSignerError> {
-        let client = self.client.clone();
-        let signature = spawn_blocking(move || {
-            let client = client.lock().unwrap();
-            client.sign_eth_hash(hash)
-        })
-        .await??;
+        let mut client = self.client.lock().await;
+        let signature = client.sign_eth_hash(hash).await?;
+
         Ok(signature)
     }
 }
@@ -158,13 +163,10 @@ impl Signer for EthVsockSigner {
     }
 
     async fn sign_transaction(&self, tx: &TypedTransaction) -> Result<Signature, Self::Error> {
-        let client = self.client.clone();
+        let mut client = self.client.lock().await;
         let tx = tx.clone();
-        let signature = spawn_blocking(move || {
-            let client = client.lock().unwrap();
-            client.sign_eth_tx(&tx)
-        })
-        .await??;
+        let signature = client.sign_eth_tx(&tx).await?;
+
         Ok(signature)
     }
 
@@ -212,14 +214,9 @@ pub async fn with_signer(
     cid: u32,
     port: u32,
 ) -> Result<SignedEthConnection, EthConnectionError> {
-    let client = signer_client::Client::new(cid, port)?;
-    let client = Arc::new(Mutex::new(client));
-    let client_rc = client.clone();
-    let address = spawn_blocking(move || {
-        let client = client_rc.lock().unwrap();
-        client.eth_address()
-    })
-    .await??;
+    let mut client = signer_client::Client::new(cid, port).await?;
+    let address = client.eth_address().await?;
+    let client = Mutex::new(client);
     let nonce_manager = with_nonce_manager(connection, address).await?;
 
     let signer = EthVsockSigner {

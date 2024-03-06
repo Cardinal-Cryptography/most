@@ -113,6 +113,14 @@ pub mod most {
         signature_count: u128,
     }
 
+    #[derive(Debug, Encode, Decode, Clone, Copy)]
+    #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
+    pub enum RequestStatus {
+        Pending { collected_signatures: u32 },
+        Processed,
+        RequestHashNotKnown,
+    }
+
     #[derive(Debug)]
     #[ink::storage_item]
     pub struct Data {
@@ -212,6 +220,7 @@ pub mod most {
             max_fee: Balance,
             default_fee: Balance,
             gas_price_oracle: Option<AccountId>,
+            owner: AccountId,
         ) -> Result<Self, MostError> {
             if signature_threshold == 0 || committee.len().lt(&(signature_threshold as usize)) {
                 return Err(MostError::InvalidThreshold);
@@ -245,7 +254,7 @@ pub mod most {
             });
 
             let mut ownable_data = Lazy::new();
-            ownable_data.set(&Ownable2StepData::new(Self::env().caller()));
+            ownable_data.set(&Ownable2StepData::new(owner));
 
             Ok(Self {
                 data,
@@ -747,6 +756,22 @@ pub mod most {
             Ok(self.data()?.is_halted)
         }
 
+        /// Returns the status of a given cross-chain transfer request
+        #[ink(message)]
+        pub fn request_status(&self, hashed_request: HashedRequest) -> RequestStatus {
+            if self.processed_requests.contains(hashed_request) {
+                RequestStatus::Processed
+            } else if let Some(Request { signature_count }) =
+                self.pending_requests.get(hashed_request)
+            {
+                RequestStatus::Pending {
+                    collected_signatures: signature_count as u32,
+                }
+            } else {
+                RequestStatus::RequestHashNotKnown
+            }
+        }
+
         // ---  helper functions
 
         fn check_halted(&self) -> Result<(), MostError> {
@@ -858,7 +883,9 @@ pub mod most {
 
         #[ink::test]
         fn new_fails_on_zero_threshold() {
-            set_caller::<DefEnv>(default_accounts::<DefEnv>().alice);
+            let alice = default_accounts::<DefEnv>().alice;
+            set_caller::<DefEnv>(alice);
+
             assert_eq!(
                 Most::new(
                     guardian_accounts(),
@@ -869,6 +896,7 @@ pub mod most {
                     MAX_FEE,
                     DEFAULT_FEE,
                     None,
+                    alice
                 )
                 .expect_err("Threshold is zero, instantiation should fail."),
                 MostError::InvalidThreshold
@@ -877,7 +905,9 @@ pub mod most {
 
         #[ink::test]
         fn new_fails_on_threshold_large_than_guardians() {
-            set_caller::<DefEnv>(default_accounts::<DefEnv>().alice);
+            let alice = default_accounts::<DefEnv>().alice;
+            set_caller::<DefEnv>(alice);
+
             assert_eq!(
                 Most::new(
                     guardian_accounts(),
@@ -888,6 +918,7 @@ pub mod most {
                     MAX_FEE,
                     DEFAULT_FEE,
                     None,
+                    alice
                 )
                 .expect_err("Threshold is larger than guardians, instantiation should fail."),
                 MostError::InvalidThreshold
@@ -896,7 +927,9 @@ pub mod most {
 
         #[ink::test]
         fn new_sets_caller_as_owner() {
-            set_caller::<DefEnv>(default_accounts::<DefEnv>().alice);
+            let alice = default_accounts::<DefEnv>().alice;
+            set_caller::<DefEnv>(alice);
+
             let most = Most::new(
                 guardian_accounts(),
                 THRESHOLD,
@@ -906,6 +939,7 @@ pub mod most {
                 MAX_FEE,
                 DEFAULT_FEE,
                 None,
+                alice,
             )
             .expect("Threshold is valid.");
 
@@ -921,6 +955,7 @@ pub mod most {
         fn new_sets_correct_guardians() {
             let accounts = default_accounts::<DefEnv>();
             set_caller::<DefEnv>(accounts.alice);
+
             let most = Most::new(
                 guardian_accounts(),
                 THRESHOLD,
@@ -930,6 +965,7 @@ pub mod most {
                 MAX_FEE,
                 DEFAULT_FEE,
                 None,
+                accounts.alice,
             )
             .expect("Threshold is valid.");
 
@@ -943,6 +979,7 @@ pub mod most {
         fn set_owner_works() {
             let accounts = default_accounts::<DefEnv>();
             set_caller::<DefEnv>(accounts.alice);
+
             let mut most = Most::new(
                 guardian_accounts(),
                 THRESHOLD,
@@ -952,6 +989,7 @@ pub mod most {
                 MAX_FEE,
                 DEFAULT_FEE,
                 None,
+                accounts.alice,
             )
             .expect("Threshold is valid.");
             set_caller::<DefEnv>(accounts.bob);
@@ -992,6 +1030,7 @@ pub mod most {
                 MAX_FEE,
                 DEFAULT_FEE,
                 None,
+                accounts.alice,
             )
             .expect("Threshold is valid.");
 
@@ -1013,6 +1052,7 @@ pub mod most {
                 MAX_FEE,
                 DEFAULT_FEE,
                 None,
+                accounts.alice,
             )
             .expect("Threshold is valid.");
 

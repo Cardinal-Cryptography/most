@@ -12,7 +12,6 @@ Bring your assets to Aleph Zero and benefit from its scalable privacy-enhancing 
 
 * `azero` - Aleph Zero contracts
   * `azero/contracts/most` - the main bridge contract
-  * `azero/contracts/governance` - a contract for making governance decisions about the bridge contracts on Aleph Zero
   * `azero/contracts/gas-price-oracle` - a contract for informing the guardians about Ethereum gas prices
   * `azero/contracts/token` - a PSP22 token implementation for the tokens created by the bridge
 * `eth` - Ethereum contracts
@@ -150,3 +149,56 @@ produced from a certain version of the source code in this repo (say a given com
 
 The contracts will be deployed using the same docker image as the one used for this procedure, which smooths out
 indeterminism in ink! contract compilation.
+
+## Verifying deployed contracts on etherscan
+
+Given a deployed Ethereum contract address it's possible to post verified sources to etherscan and sourcify. You will
+need an API key for etherscan - can be obtained at https://etherscan.io/myapikey if you have an account. To do so:
+
+1. `git checkout $COMMIT` - where `$COMMIT` is the commit from which the contract has been deployed
+2. `cd eth`
+3. `ETHERSCAN_API_KEY=[YOUR API KEY] npx hardhat verify [CONTRACT ADDRESS] [CONSTRUCTOR ARGS]`
+
+For example, if you deploy `Token.sol` to the sepolia testnet like so:
+
+```js
+const usdt = await Token.deploy(
+  "12000000000000000000000000",
+  "Tether",
+  "USDT",
+);
+```
+
+and the address is `0xbd737D2061ed3b24C95FA88566Ad896c9Fcc84b0`, then you would post verified sources like so:
+
+```bash
+ETHERSCAN_API_KEY=[YOUR API KEY] npx hardhat --network sepolia verify "0xbd737D2061ed3b24C95FA88566Ad896c9Fcc84b0" \
+  "12000000000000000000000000" "Tether" "USDT"
+```
+
+## Decoding a contract call on ethereum
+
+Assuming a contract verified on etherscan, there's a convenience script to decode a call to that contract. Just call:
+
+```bash
+NETWORK=[NETWORK NAME] CALL=[CALL DATA] CONTRACT=[CONTRACT ADDRESS] make decode-eth
+```
+
+Valid values for `NETWORK` are `mainnet (default)`, `sepolia`, and `goerli`.
+
+For example:
+
+```bash
+NETWORK=sepolia  \
+  CALL=0x095ea7b30000000000000000000000005a344a8721d743393847c17613dd78c7776b271400000000000000000000000000000000000000000000000000000000000004d2 \
+  CONTRACT=0x5a344a8721d743393847C17613dd78C7776b2714 \
+  make decode-eth
+```
+
+gives:
+
+```
+Contract: Token
+Method: approve(address,uint256)
+Arguments: Result(2) [ '0x5a344a8721d743393847C17613dd78C7776b2714', 1234n ]
+```

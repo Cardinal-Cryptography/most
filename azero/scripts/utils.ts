@@ -1,24 +1,22 @@
 import fs from "fs";
 
-import { ApiPromise } from "@polkadot/api";
+import { ApiPromise, Keyring } from "@polkadot/api";
 import { Abi } from "@polkadot/api-contract";
 import { KeyringPair } from "@polkadot/keyring/types";
 import { HexString } from "@polkadot/util/types";
+import { hexToU8a, u8aToHex } from "@polkadot/util";
 import {
   ContractInstantiateResult,
   WeightV2,
 } from "@polkadot/types/interfaces";
-import Governance from "../types/contracts/governance";
-import Most from "../types/contracts/most";
-import Token from "../types/contracts/token";
-import Oracle from "../types/contracts/oracle";
 
 export type Addresses = {
-  governance: string;
   most: string;
   weth: string;
+  usdt: string;
   oracle: string;
   advisory: string;
+  migrations: string;
 };
 
 /**
@@ -37,7 +35,7 @@ export async function uploadCode(
     fs.readFileSync(__dirname + `/../artifacts/` + contractName, "utf8"),
   );
   const tokenAbi = new Abi(tokenContractRaw);
-  const _txHash = await new Promise(async (resolve, reject) => {
+  await new Promise(async (resolve, reject) => {
     const unsub = await api.tx.contracts
       .uploadCode(tokenAbi.info.source.wasm, null, 0)
       .signAndSend(deployer, (result) => {
@@ -65,6 +63,27 @@ export function storeAddresses(addresses: Addresses): void {
   );
 }
 
+export async function import_env(envFile: string) {
+  return await import(`../env/${envFile}.json`);
+}
+
+export async function import_eth_addresses() {
+  return await import(`../../eth/addresses.json`);
+}
+
+export async function import_azero_addresses() {
+  return await import(__dirname + "/../addresses.json");
+}
+
+export function hexToBytes(hex: string): number[] {
+  let u8array = hexToU8a(hex);
+  return Array.from(u8array);
+}
+
+export function accountIdToHex(accountId: string): string {
+  return u8aToHex(new Keyring({ type: "sr25519" }).decodeAddress(accountId));
+}
+
 /**
  * Estimates gas required to create a new instance of the contract.
  *
@@ -90,56 +109,6 @@ export async function estimateContractInit(
     "",
   )) as unknown as ContractInstantiateResult;
   return gasRequired;
-}
-
-interface IOwnable2Step {
-  address: string;
-  tx: any;
-  contractAbi: Abi;
-}
-
-/**
- * Transfers `fromContract` ownership to new owner.
- * @param fromContract - Contract which ownership is changed
- * @param governanceContract - Governance contract
- * @param governanceKeyringPairs - List of governance members KeyringPairs needed to create and sign proposal
- * NOTE: At least one governance member is required.
- */
-export async function transferOwnershipToGovernance<
-  Contract extends IOwnable2Step,
->(
-  fromContract: Contract,
-  governanceContract: Governance,
-  governanceKeyringPairs: KeyringPair[],
-) {
-  console.log(
-    `Transferring ownership of ${fromContract.address} to governance (${governanceContract.address})...`,
-  );
-  let poroposalId = 0;
-  governanceContract.events.subscribeOnProposalSubmittedEvent((event) => {
-    poroposalId = event.id.toNumber();
-    console.log(`Proposal ID: ${poroposalId}`);
-  });
-  await fromContract.tx.transferOwnership(governanceContract.address);
-  console.log(
-    `Accepting ownership of ${fromContract.address} by governance (${governanceContract.address})...`,
-  );
-  console.log("Creating proposal...");
-  await governanceContract
-    .withSigner(governanceKeyringPairs[0])
-    .tx.submitProposal(
-      fromContract.address,
-      fromContract.contractAbi.findMessage("Ownable2Step::accept_ownership")
-        .selector as any,
-      [],
-      true,
-    );
-  console.log("Members signing proposal...");
-  for (const member of governanceKeyringPairs.slice(1)) {
-    await governanceContract.withSigner(member).tx.vote(poroposalId);
-  }
-  console.log("Executing proposal...");
-  await governanceContract.tx.executeProposal(poroposalId);
 }
 
 /**

@@ -5202,6 +5202,8 @@ dependencies = [
  "signer_client",
  "subxt",
  "thiserror",
+ "tokio",
+ "tokio-vsock",
  "vsock",
 ]
 
@@ -5211,10 +5213,14 @@ version = "0.1.0"
 dependencies = [
  "aleph_client",
  "ethers",
+ "futures",
  "serde",
  "serde_json",
  "subxt",
  "thiserror",
+ "tokio",
+ "tokio-util",
+ "tokio-vsock",
  "vsock",
 ]
 
@@ -5224,6 +5230,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "signer_client",
+ "tokio",
 ]
 
 [[package]]
@@ -6685,6 +6692,19 @@ dependencies = [
  "pin-project-lite",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "tokio-vsock"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e336ac4b36df625d5429a735dd5847732fe5f62010e3ce0c50f3705d44730f8"
+dependencies = [
+ "bytes",
+ "futures",
+ "libc",
+ "tokio",
+ "vsock",
 ]
 
 [[package]]
