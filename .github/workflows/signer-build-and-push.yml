@@ -2,10 +2,6 @@ name: Build and push signer
 
 on:
   workflow_dispatch:
-    outputs:
-      docker-tag:
-        description: Docker image tag
-        value: ${{ jobs.build-and-push.outputs.docker-tag }}
 
 jobs:
   check-vars-and-secrets:
