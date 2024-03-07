@@ -11,10 +11,7 @@ pub mod most {
     use ink::{
         codegen::TraitCallBuilder,
         contract_ref,
-        env::{
-            call::{build_call, ExecutionInput},
-            set_code_hash, DefaultEnvironment, Error as InkEnvError,
-        },
+        env::{set_code_hash, Error as InkEnvError},
         prelude::{format, string::String, vec, vec::Vec},
         storage::{traits::ManualKey, Lazy, Mapping},
     };
@@ -22,7 +19,7 @@ pub mod most {
     use psp22::PSP22Error;
     use psp22_traits::{Burnable, Mintable};
     use scale::{Decode, Encode};
-    use shared::{concat_u8_arrays, keccak256, Keccak256HashOutput as HashedRequest, Selector};
+    use shared::{concat_u8_arrays, keccak256, Keccak256HashOutput as HashedRequest};
 
     type CommitteeId = u128;
 
@@ -487,28 +484,9 @@ pub mod most {
 
         /// Upgrades contract code
         #[ink(message)]
-        pub fn set_code(
-            &mut self,
-            code_hash: [u8; 32],
-            callback: Option<Selector>,
-        ) -> Result<(), MostError> {
+        pub fn set_code(&mut self, code_hash: [u8; 32]) -> Result<(), MostError> {
             self.ensure_owner()?;
             set_code_hash(&code_hash)?;
-
-            // Optionally call a callback function in the new contract that performs the storage data migration.
-            // By convention this function should be called `migrate`, it should take no arguments
-            // and be call-able only by `this` contract's instance address.
-            // To ensure the latter the `migrate` in the updated contract can e.g. check if it has an Admin role on self.
-            //
-            // `delegatecall` ensures that the target contract is called within the caller contracts context.
-            if let Some(selector) = callback {
-                build_call::<DefaultEnvironment>()
-                    .delegate(Hash::from(code_hash))
-                    .exec_input(ExecutionInput::new(ink::env::call::Selector::new(selector)))
-                    .returns::<Result<(), MostError>>()
-                    .invoke()?;
-            }
-
             Ok(())
         }
 
@@ -788,7 +766,7 @@ pub mod most {
                         return Err(MostError::DuplicateCommitteeMember);
                     }
                 }
-            }            
+            }
             Ok(())
         }
 
