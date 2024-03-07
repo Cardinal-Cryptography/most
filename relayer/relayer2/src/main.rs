@@ -32,9 +32,9 @@ enum CircuitBreakerEvent {
 #[tokio::main]
 async fn main() {
     // Create channels
-    let (eth_sender, eth_receiver) = bounded::<String>(10);
-    let (azero_sender, azero_receiver) = bounded::<String>(10);
-    let (circuit_breaker_sender, circuit_breaker_receiver) = bounded::<CircuitBreakerEvent>(1); //mpsc::channel::<CircuitBreakerEvent>(1);
+    let (eth_sender, eth_receiver) = unbounded::<String>();
+    let (azero_sender, azero_receiver) = unbounded::<String>();
+    let (circuit_breaker_sender, circuit_breaker_receiver) = unbounded::<CircuitBreakerEvent>();
 
     // Spawn tasks for listening to channels
     let task1 = tokio::spawn(listen_channel(
@@ -52,13 +52,13 @@ async fn main() {
         test_handler,
     ));
 
-    // Wait for tasks to complete
     tokio::try_join!(task1, task2).unwrap();
+    std::process::exit(1);
 }
 
 async fn listen_channel<F>(
     name: &'static str,
-    mut event_receiver: CrossbeamReceiver<String>,
+    event_receiver: CrossbeamReceiver<String>,
     circuit_breaker_receiver: CrossbeamReceiver<CircuitBreakerEvent>,
     circuit_breaker_sender: CrossbeamSender<CircuitBreakerEvent>,
     handle_event: F,
