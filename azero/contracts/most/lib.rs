@@ -634,7 +634,7 @@ pub mod most {
             }
         }
 
-        /// Returns an error (reverts) if account is not in the committee with `committee_id`
+        /// Returns whether an account is in the committee with `committee_id`
         #[ink(message)]
         pub fn is_in_committee(&self, committee_id: CommitteeId, account: AccountId) -> bool {
             self.committees.contains((committee_id, account))
