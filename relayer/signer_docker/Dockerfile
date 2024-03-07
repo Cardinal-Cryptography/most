@@ -1,6 +1,5 @@
-FROM alpine:latest
+FROM ubuntu:jammy-20231211.1
 
-RUN apk update && apk add bash
 COPY signer /signer/signer
 COPY entrypoint.sh /signer/entrypoint.sh
 
