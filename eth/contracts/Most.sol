@@ -3,10 +3,12 @@
 pragma solidity ^0.8.20;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import {IWETH9} from "./IWETH9.sol";
 
 contract Most is
     Initializable,
@@ -14,6 +16,8 @@ contract Most is
     Ownable2StepUpgradeable,
     PausableUpgradeable
 {
+    using SafeERC20 for IERC20;
+
     uint256 public requestNonce;
     uint256 public committeeId;
     address payable public wethAddress;
@@ -63,6 +67,7 @@ contract Most is
     error UnwrappingEth();
     error DataHashMismatch();
     error EthTransfer();
+    error ZeroAmount();
 
     function initialize(
         address[] calldata _committee,
@@ -76,7 +81,7 @@ contract Most is
 
         committeeId = 0;
 
-        for (uint256 i = 0; i < _committee.length; ++i) {
+        for (uint256 i; i < _committee.length; ++i) {
             committee[
                 keccak256(abi.encodePacked(committeeId, _committee[i]))
             ] = true;
@@ -108,6 +113,7 @@ contract Most is
         uint256 amount,
         bytes32 destReceiverAddress
     ) external whenNotPaused {
+        if (amount == 0) revert ZeroAmount();
         address sender = msg.sender;
 
         IERC20 token = IERC20(bytes32ToAddress(srcTokenAddress));
@@ -118,7 +124,7 @@ contract Most is
 
         // lock tokens in this contract
         // message sender needs to give approval else this tx will revert
-        token.transferFrom(sender, address(this), amount);
+        token.safeTransferFrom(sender, address(this), amount);
 
         emit CrosschainTransferRequest(
             committeeId,
@@ -139,15 +145,17 @@ contract Most is
     // & forward to the destination chain.
     function sendRequestNative(bytes32 destReceiverAddress) external payable {
         uint256 amount = msg.value;
+        if (amount == 0) revert ZeroAmount();
 
         // check if the token is supported
         bytes32 destTokenAddress = supportedPairs[
             addressToBytes32(wethAddress)
         ];
+
         if (destTokenAddress == 0x0) revert UnsupportedPair();
 
         (bool success, ) = wethAddress.call{value: amount}(
-            abi.encodeWithSignature("deposit()")
+            abi.encodeCall(IWETH9.deposit, ())
         );
         if (!success) revert WrappingEth();
 
@@ -206,9 +214,10 @@ contract Most is
             delete pendingRequests[requestHash];
 
             // return the locked tokens
-            if (bytes32ToAddress(destTokenAddress) == wethAddress) {
+            address _destTokenAddress = bytes32ToAddress(destTokenAddress);
+            if (_destTokenAddress == wethAddress) {
                 (bool unwrapSuccess, ) = wethAddress.call(
-                    abi.encodeWithSignature("withdraw(uint256)", amount)
+                    abi.encodeCall(IWETH9.withdraw, (amount))
                 );
                 if (!unwrapSuccess) revert UnwrappingEth();
                 address _destReceiverAddress = bytes32ToAddress(
@@ -227,9 +236,9 @@ contract Most is
                     }
                 }
             } else {
-                IERC20 token = IERC20(bytes32ToAddress(destTokenAddress));
+                IERC20 token = IERC20(_destTokenAddress);
 
-                token.transfer(bytes32ToAddress(destReceiverAddress), amount);
+                token.safeTransfer(bytes32ToAddress(destReceiverAddress), amount);
             }
             emit RequestProcessed(requestHash);
         }
@@ -270,7 +279,7 @@ contract Most is
     }
 
     function setCommittee(
-        address[] memory _committee,
+        address[] calldata _committee,
         uint256 _signatureThreshold
     ) external onlyOwner {
         if (_signatureThreshold == 0) revert ZeroSignatureTreshold();
@@ -279,7 +288,7 @@ contract Most is
 
         ++committeeId;
 
-        for (uint256 i = 0; i < _committee.length; ++i) {
+        for (uint256 i; i < _committee.length; ++i) {
             committee[
                 keccak256(abi.encodePacked(committeeId, _committee[i]))
             ] = true;
