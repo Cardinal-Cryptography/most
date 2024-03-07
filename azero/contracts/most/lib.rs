@@ -765,7 +765,7 @@ pub mod most {
             }
         }
 
-        fn check_committee(committee: &Vec<AccountId>, threshold: u128) -> Result<(), MostError> {
+        fn check_committee(committee: &[AccountId], threshold: u128) -> Result<(), MostError> {
             if threshold == 0 || committee.len().lt(&(threshold as usize)) {
                 return Err(MostError::InvalidThreshold);
             }

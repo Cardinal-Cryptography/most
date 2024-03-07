@@ -647,10 +647,15 @@ mod e2e {
             .await
             .expect("non_guardian_balance_before");
 
+        let non_guardian_payout_res = most_request_payout(
+            &mut client,
+            &alice(),
+            most_address,
+            committee_id,
+            non_guardian,
+        )
+        .await;
 
-        let non_guardian_payout_res = most_request_payout(&mut client, &alice(), most_address, committee_id, non_guardian)
-            .await;
-        
         assert_eq!(
             non_guardian_payout_res.expect_err("Payout should fail for non-guardian"),
             MostError::NotInCommittee
@@ -661,10 +666,7 @@ mod e2e {
             .await
             .expect("non_guardian_balance_after");
 
-        assert_eq!(
-            non_guardian_balance_before,
-            non_guardian_balance_after
-        );
+        assert_eq!(non_guardian_balance_before, non_guardian_balance_after);
     }
 
     #[ink_e2e::test]
