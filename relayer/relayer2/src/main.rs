@@ -26,6 +26,7 @@ enum CircuitBreakerEvent {
     BridgeHaltAzero,
     BridgeHaltEth,
     AdvisoryEmergency,
+    Other(String),
 }
 
 #[tokio::main]
@@ -84,10 +85,10 @@ async fn listen_channel<F>(
                     CircuitBreakerEvent::BridgeHaltAzero => todo!(),
                     CircuitBreakerEvent::BridgeHaltEth => todo!(),
                     CircuitBreakerEvent::AdvisoryEmergency => todo!(),
+                    CircuitBreakerEvent::Other (why) => todo!(),
                 },
                 Err(why) => {
-                    error!("{name} fatal error: {why}");
-                    std::process::exit(1);
+                    circuit_breaker_sender.send (CircuitBreakerEvent::Other (format! ("{why}"))).expect ("{name} can send to the circuit breaker channel")
                 },
             }
         }
