@@ -48,13 +48,21 @@ contract Most is
 
     event RequestAlreadySigned(bytes32 requestHash, address signer);
 
+    event EthTransferFailed(bytes32 requestHash);
+
     modifier _onlyCommitteeMember(uint256 _committeeId) {
-        require(
-            isInCommittee(_committeeId, msg.sender),
-            "Not a member of the guardian committee"
-        );
+        if (!isInCommittee(_committeeId, msg.sender)) revert NotInCommittee();
         _;
     }
+
+    error NotInCommittee();
+    error ZeroSignatureTreshold();
+    error NotEnoughGuardians();
+    error UnsupportedPair();
+    error WrappingEth();
+    error UnwrappingEth();
+    error DataHashMismatch();
+    error EthTransfer();
 
     function initialize(
         address[] calldata _committee,
@@ -62,18 +70,13 @@ contract Most is
         address owner,
         address payable _wethAddress
     ) public initializer {
-        require(
-            _signatureThreshold > 0,
-            "Signature threshold must be greater than 0"
-        );
-        require(
-            _committee.length >= _signatureThreshold,
-            "Not enough guardians specified"
-        );
+        if (_signatureThreshold == 0) revert ZeroSignatureTreshold();
+        if (_committee.length < _signatureThreshold)
+            revert NotEnoughGuardians();
 
         committeeId = 0;
 
-        for (uint256 i = 0; i < _committee.length; i++) {
+        for (uint256 i = 0; i < _committee.length; ++i) {
             committee[
                 keccak256(abi.encodePacked(committeeId, _committee[i]))
             ] = true;
@@ -82,17 +85,17 @@ contract Most is
         committeeSize[committeeId] = _committee.length;
         signatureThreshold[committeeId] = _signatureThreshold;
         wethAddress = _wethAddress;
-        // inititialize the OwnableUpgradeable
         __Ownable_init(owner);
-        // inititialize the PausableUpgradeable
         __Pausable_init();
     }
 
-    // required by the OZ UUPS module
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address) internal override onlyOwner {
+        // required by the OZ UUPS module
+    }
 
-    // Disable possibility to renounce ownership
-    function renounceOwnership() public virtual override onlyOwner {}
+    function renounceOwnership() public virtual override onlyOwner {
+        // Disable possibility to renounce ownership
+    }
 
     // Invoke this tx to transfer funds to the destination chain.
     // Account needs to approve the Most contract to spend the `srcTokenAmount`
@@ -111,7 +114,7 @@ contract Most is
 
         // check if the token is supported
         bytes32 destTokenAddress = supportedPairs[srcTokenAddress];
-        require(destTokenAddress != 0x0, "Unsupported pair");
+        if (destTokenAddress == 0x0) revert UnsupportedPair();
 
         // lock tokens in this contract
         // message sender needs to give approval else this tx will revert
@@ -125,7 +128,7 @@ contract Most is
             requestNonce
         );
 
-        requestNonce++;
+        ++requestNonce;
     }
 
     // Invoke this tx to transfer funds to the destination chain.
@@ -141,12 +144,12 @@ contract Most is
         bytes32 destTokenAddress = supportedPairs[
             addressToBytes32(wethAddress)
         ];
-        require(destTokenAddress != 0x0, "Unsupported pair");
+        if (destTokenAddress == 0x0) revert UnsupportedPair();
 
         (bool success, ) = wethAddress.call{value: amount}(
             abi.encodeWithSignature("deposit()")
         );
-        require(success, "Failed deposit native ETH.");
+        if (!success) revert WrappingEth();
 
         emit CrosschainTransferRequest(
             committeeId,
@@ -191,14 +194,14 @@ contract Most is
             return;
         }
 
-        require(_requestHash == requestHash, "Hash does not match the data");
+        if (_requestHash != requestHash) revert DataHashMismatch();
 
         request.signatures[msg.sender] = true;
-        request.signatureCount++;
+        ++request.signatureCount;
 
         emit RequestSigned(requestHash, msg.sender);
 
-        if (request.signatureCount >= signatureThreshold[committeeId]) {
+        if (request.signatureCount >= signatureThreshold[_committeeId]) {
             processedRequests[requestHash] = true;
             delete pendingRequests[requestHash];
 
@@ -207,17 +210,22 @@ contract Most is
                 (bool unwrapSuccess, ) = wethAddress.call(
                     abi.encodeWithSignature("withdraw(uint256)", amount)
                 );
-                require(
-                    unwrapSuccess,
-                    "Failed to uwrap wrapped ETH to native ETH."
-                );
-                (bool sendNativeEthSuccess, ) = bytes32ToAddress(
+                if (!unwrapSuccess) revert UnwrappingEth();
+                address _destReceiverAddress = bytes32ToAddress(
                     destReceiverAddress
-                ).call{value: amount}("");
-                require(
-                    sendNativeEthSuccess,
-                    "Failed to send the native ETH back to the user."
                 );
+                (bool sendNativeEthSuccess, ) = _destReceiverAddress.call{
+                    value: amount,
+                    gas: 3500
+                }("");
+                if (!sendNativeEthSuccess) {
+                    if (isContract(_destReceiverAddress)) {
+                        // fail without revert
+                        emit EthTransferFailed(requestHash);
+                    } else {
+                        revert EthTransfer();
+                    }
+                }
             } else {
                 IERC20 token = IERC20(bytes32ToAddress(destTokenAddress));
 
@@ -257,22 +265,21 @@ contract Most is
         return bytes32(uint256(uint160(addr)));
     }
 
+    function isContract(address _addr) internal view returns (bool) {
+        return _addr.code.length != 0;
+    }
+
     function setCommittee(
         address[] memory _committee,
         uint256 _signatureThreshold
     ) external onlyOwner {
-        require(
-            _signatureThreshold > 0,
-            "Signature threshold must be greater than 0"
-        );
-        require(
-            _committee.length >= _signatureThreshold,
-            "Not enough guardians specified"
-        );
+        if (_signatureThreshold == 0) revert ZeroSignatureTreshold();
+        if (_committee.length < _signatureThreshold)
+            revert NotEnoughGuardians();
 
-        committeeId += 1;
+        ++committeeId;
 
-        for (uint256 i = 0; i < _committee.length; i++) {
+        for (uint256 i = 0; i < _committee.length; ++i) {
             committee[
                 keccak256(abi.encodePacked(committeeId, _committee[i]))
             ] = true;
@@ -290,5 +297,8 @@ contract Most is
         delete supportedPairs[from];
     }
 
-    receive() external payable {}
+    // accept payments only from weth or through payable methods
+    receive() external payable {
+        require(msg.sender == wethAddress);
+    }
 }
