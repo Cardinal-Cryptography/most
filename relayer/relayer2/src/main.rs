@@ -23,9 +23,9 @@ use tokio::{
 enum CircuitBreakerEvent {
     Success,
     Failure,
-    TestRequest(bool), // bool indicates success or failure of the test request
-    Timeout,
 }
+
+const MAX_ATTEMPTS: usize = 3;
 
 #[tokio::main]
 async fn main() {
@@ -40,37 +40,56 @@ async fn main() {
         eth_receiver,
         circuit_breaker_receiver.clone(),
         circuit_breaker_sender.clone(),
+        test_handler,
     ));
     let task2 = tokio::spawn(listen_channel(
         "AzeroEventHandler",
         azero_receiver,
         circuit_breaker_receiver.clone(),
         circuit_breaker_sender.clone(),
+        test_handler,
     ));
 
     // Wait for tasks to complete
     tokio::try_join!(task1, task2).unwrap();
 }
 
-async fn listen_channel(
+async fn listen_channel<F>(
     name: &'static str,
     mut event_receiver: CrossbeamReceiver<String>,
     circuit_breaker_receiver: CrossbeamReceiver<CircuitBreakerEvent>,
     circuit_breaker_sender: CrossbeamSender<CircuitBreakerEvent>,
-) {
+    handle_event: F,
+) where
+    F: Fn(String) -> bool + Send + 'static,
+{
     let mut consecutive_failures = 0;
-    let mut restart_attempts = 0;
-    let max_restart_attempts = 3;
 
     loop {
         select! {
-            recv(event_receiver) -> msg => println!("TODO"),
+            recv(event_receiver) -> event => match event {
+                Ok(evt) => match handle_event (evt) {
+                    true => circuit_breaker_sender.send (CircuitBreakerEvent::Success).expect ("{name} can send to the circuit breaker channel"),
+                    false => circuit_breaker_sender.send (CircuitBreakerEvent::Failure).expect ("{name} can send to the circuit breaker channel")
+                },
+                Err(why) => {
+                    error!("{name} fatal error: {why}");
+                    std::process::exit(1);
+                }
+            },
+
             recv(circuit_breaker_receiver) -> msg => match msg {
                 Ok(circuit_breaker_event) => match circuit_breaker_event {
-                    CircuitBreakerEvent::Success => todo!(),
-                    CircuitBreakerEvent::Failure => todo!(),
-                    CircuitBreakerEvent::TestRequest(_) => todo!(),
-                    CircuitBreakerEvent::Timeout => todo!(),
+                    CircuitBreakerEvent::Success => {
+                        consecutive_failures = 0
+                    },
+                    CircuitBreakerEvent::Failure => {
+                        consecutive_failures +=1;
+                        if consecutive_failures >= MAX_ATTEMPTS {
+                            error!("{name} max attempt reached, shutting down");
+                            std::process::exit(1);
+                        }
+                    },
                 },
                 Err(why) => {
                     error!("{name} fatal error: {why}");
@@ -79,4 +98,8 @@ async fn listen_channel(
             }
         }
     }
+}
+
+fn test_handler(msg: String) -> bool {
+    true
 }
