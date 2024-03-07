@@ -21,11 +21,12 @@ use tokio::{
 
 #[derive(Debug)]
 enum CircuitBreakerEvent {
-    Success,
-    Failure,
+    EventHandlerSuccess,
+    EventHandlerFailure,
+    BridgeHaltAzero,
+    BridgeHaltEth,
+    AdvisoryEmergency,
 }
-
-const MAX_ATTEMPTS: usize = 3;
 
 #[tokio::main]
 async fn main() {
@@ -63,14 +64,12 @@ async fn listen_channel<F>(
 ) where
     F: Fn(String) -> bool + Send + 'static,
 {
-    let mut consecutive_failures = 0;
-
     loop {
         select! {
             recv(event_receiver) -> event => match event {
                 Ok(evt) => match handle_event (evt) {
-                    true => circuit_breaker_sender.send (CircuitBreakerEvent::Success).expect ("{name} can send to the circuit breaker channel"),
-                    false => circuit_breaker_sender.send (CircuitBreakerEvent::Failure).expect ("{name} can send to the circuit breaker channel")
+                    true => circuit_breaker_sender.send (CircuitBreakerEvent::EventHandlerSuccess).expect ("{name} can send to the circuit breaker channel"),
+                    false => circuit_breaker_sender.send (CircuitBreakerEvent::EventHandlerFailure).expect ("{name} can send to the circuit breaker channel")
                 },
                 Err(why) => {
                     error!("{name} fatal error: {why}");
@@ -80,16 +79,11 @@ async fn listen_channel<F>(
 
             recv(circuit_breaker_receiver) -> msg => match msg {
                 Ok(circuit_breaker_event) => match circuit_breaker_event {
-                    CircuitBreakerEvent::Success => {
-                        consecutive_failures = 0
-                    },
-                    CircuitBreakerEvent::Failure => {
-                        consecutive_failures +=1;
-                        if consecutive_failures >= MAX_ATTEMPTS {
-                            error!("{name} max attempt reached, shutting down");
-                            std::process::exit(1);
-                        }
-                    },
+                    CircuitBreakerEvent::EventHandlerSuccess => todo!(),
+                    CircuitBreakerEvent::EventHandlerFailure => todo!(),
+                    CircuitBreakerEvent::BridgeHaltAzero => todo!(),
+                    CircuitBreakerEvent::BridgeHaltEth => todo!(),
+                    CircuitBreakerEvent::AdvisoryEmergency => todo!(),
                 },
                 Err(why) => {
                     error!("{name} fatal error: {why}");
