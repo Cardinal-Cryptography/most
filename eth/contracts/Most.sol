@@ -48,6 +48,8 @@ contract Most is
 
     event RequestAlreadySigned(bytes32 requestHash, address signer);
 
+    event CommitteeUpdated(uint256 newCommitteeId);
+
     modifier _onlyCommitteeMember(uint256 _committeeId) {
         require(
             isInCommittee(_committeeId, msg.sender),
@@ -86,6 +88,7 @@ contract Most is
         __Ownable_init(owner);
         // inititialize the PausableUpgradeable
         __Pausable_init();
+
     }
 
     // required by the OZ UUPS module
@@ -100,6 +103,12 @@ contract Most is
     //
     // Tx emits a CrosschainTransferRequest event that the relayers listen to
     // & forward to the destination chain.
+
+    // let's use modern standards.
+    // it would be great to support erc-2612 'permit' function, as it enriches ux a lot for tokens which implement the erc.
+    // it can be used in alternative method 'sendRequestPermit'
+    // https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/extensions/ERC20Permit.sol
+
     function sendRequest(
         bytes32 srcTokenAddress,
         uint256 amount,
@@ -198,7 +207,8 @@ contract Most is
 
         emit RequestSigned(requestHash, msg.sender);
 
-        if (request.signatureCount >= signatureThreshold[committeeId]) {
+        /// why do we consider signatureThreshold of committeeId, when we process requrest for _committeeId (underscored)?
+        if (request.signatureCount >= signatureThreshold[_committeeId]) {
             processedRequests[requestHash] = true;
             delete pendingRequests[requestHash];
 
@@ -257,6 +267,9 @@ contract Most is
         return bytes32(uint256(uint160(addr)));
     }
 
+    // Some event like CommitteeUpdate might be Emitted here and in constructor
+    // For committee members to track their participation in comittee
+
     function setCommittee(
         address[] memory _committee,
         uint256 _signatureThreshold
@@ -280,6 +293,11 @@ contract Most is
 
         committeeSize[committeeId] = _committee.length;
         signatureThreshold[committeeId] = _signatureThreshold;
+
+        emit CommitteeUpdated(
+            committeeId,
+        );
+
     }
 
     function addPair(bytes32 from, bytes32 to) external onlyOwner {
