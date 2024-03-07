@@ -1132,6 +1132,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "crossbeam-channel"
+version = "0.5.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab3db02a9c5b5121e1e42fbdb1aeb65f5e02624cc58c43f2884c6ccac0b82f95"
+dependencies = [
+ "crossbeam-utils",
+]
+
+[[package]]
 name = "crossbeam-deque"
 version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3407,9 +3416,9 @@ dependencies = [
 
 [[package]]
 name = "mio"
-version = "0.8.11"
+version = "0.8.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4a650543ca06a924e8b371db273b2756685faae30f8487da1b56505a8f78b0c"
+checksum = "8f3d0b296e374a4e6f3c7b0a1f5a51d748a0d34c85e7dc48fc3fa9a87657fe09"
 dependencies = [
  "libc",
  "wasi 0.11.0+wasi-snapshot-preview1",
@@ -4343,6 +4352,32 @@ dependencies = [
  "anyhow",
  "async-trait",
  "clap",
+ "env_logger",
+ "ethers",
+ "eyre",
+ "futures",
+ "hex",
+ "log",
+ "parity-scale-codec",
+ "redis",
+ "rustc-hex",
+ "serde",
+ "serde_json",
+ "signer_client",
+ "subxt",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "relayer2"
+version = "0.1.0"
+dependencies = [
+ "aleph_client",
+ "anyhow",
+ "async-trait",
+ "clap",
+ "crossbeam-channel",
  "env_logger",
  "ethers",
  "eyre",

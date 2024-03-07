@@ -1,5 +1,5 @@
 [workspace]
-members = ["relayer", "signer_client", "signer", "signer_tester"]
+members = ["relayer", "relayer2", "signer_client", "signer", "signer_tester"]
 resolver = "2"
 
 [workspace.dependencies]
