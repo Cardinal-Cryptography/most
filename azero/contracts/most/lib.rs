@@ -177,6 +177,7 @@ pub mod most {
     pub enum MostError {
         Constructor,
         InvalidThreshold,
+        DuplicateCommitteeMember,
         NotInCommittee,
         HashDoesNotMatchData,
         PSP22(PSP22Error),
@@ -222,9 +223,7 @@ pub mod most {
             gas_price_oracle: Option<AccountId>,
             owner: AccountId,
         ) -> Result<Self, MostError> {
-            if signature_threshold == 0 || committee.len().lt(&(signature_threshold as usize)) {
-                return Err(MostError::InvalidThreshold);
-            }
+            Self::check_committee(&committee, signature_threshold)?;
 
             let committee_id = 0;
 
@@ -284,7 +283,7 @@ pub mod most {
             amount: u128,
             dest_receiver_address: [u8; 32],
         ) -> Result<(), MostError> {
-            self.check_halted()?;
+            self.ensure_not_halted()?;
 
             let mut data = self.data()?;
 
@@ -351,7 +350,7 @@ pub mod most {
             dest_receiver_address: [u8; 32],
             request_nonce: u128,
         ) -> Result<(), MostError> {
-            self.check_halted()?;
+            self.ensure_not_halted()?;
 
             let caller = self.env().caller();
             self.only_committee_member(committee_id, caller)?;
@@ -452,7 +451,7 @@ pub mod most {
             committee_id: CommitteeId,
             member_id: AccountId,
         ) -> Result<(), MostError> {
-            self.check_halted()?;
+            self.ensure_not_halted()?;
 
             let paid_out_rewards = self.get_paid_out_member_rewards(committee_id, member_id);
 
@@ -702,12 +701,9 @@ pub mod most {
             signature_threshold: u128,
         ) -> Result<(), MostError> {
             self.ensure_owner()?;
+            Self::check_committee(&committee, signature_threshold)?;
 
             let mut data = self.data()?;
-
-            if signature_threshold == 0 || committee.len().lt(&(signature_threshold as usize)) {
-                return Err(MostError::InvalidThreshold);
-            }
 
             let committee_id = data.committee_id + 1;
             let mut committee_set = Mapping::new();
@@ -774,11 +770,26 @@ pub mod most {
 
         // ---  helper functions
 
-        fn check_halted(&self) -> Result<(), MostError> {
+        fn ensure_not_halted(&self) -> Result<(), MostError> {
             match self.is_halted()? {
                 true => Err(MostError::IsHalted),
                 false => Ok(()),
             }
+        }
+
+        fn check_committee(committee: &Vec<AccountId>, threshold: u128) -> Result<(), MostError> {
+            if threshold == 0 || committee.len().lt(&(threshold as usize)) {
+                return Err(MostError::InvalidThreshold);
+            }
+
+            for i in 0..committee.len() {
+                for j in i + 1..committee.len() {
+                    if committee[i] == committee[j] {
+                        return Err(MostError::DuplicateCommitteeMember);
+                    }
+                }
+            }            
+            Ok(())
         }
 
         /// Mints the specified amount of token to the designated account
