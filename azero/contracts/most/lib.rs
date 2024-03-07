@@ -177,6 +177,7 @@ pub mod most {
         DuplicateCommitteeMember,
         ZeroTransferAmount,
         NotInCommittee,
+        NoSuchCommittee,
         HashDoesNotMatchData,
         PSP22(PSP22Error),
         Ownable(Ownable2StepError),
@@ -564,12 +565,14 @@ pub mod most {
             committee_id: CommitteeId,
             member_id: AccountId,
         ) -> Result<u128, MostError> {
+            self.only_committee_member(committee_id, member_id)?;
+
             let total_amount = self
                 .get_collected_committee_rewards(committee_id)
                 .checked_div(
                     self.committee_sizes
                         .get(committee_id)
-                        .ok_or(MostError::NotInCommittee)?,
+                        .ok_or(MostError::NoSuchCommittee)?,
                 )
                 .ok_or(MostError::Arithmetic)?;
 

@@ -605,6 +605,69 @@ mod e2e {
     }
 
     #[ink_e2e::test]
+    fn only_guardians_get_rewards(mut client: ink_e2e::Client<C, E>) {
+        let (most_address, token_address) = setup_default_most_and_token(&mut client, true).await;
+
+        let amount = 1000;
+        let base_fee = most_base_fee(&mut client, most_address)
+            .await
+            .expect("should return base fee");
+
+        psp22_approve(&mut client, &alice(), token_address, most_address, amount)
+            .await
+            .expect("approval should succeed");
+
+        most_send_request(
+            &mut client,
+            &alice(),
+            most_address,
+            token_address,
+            amount,
+            REMOTE_RECEIVER,
+            base_fee,
+        )
+        .await
+        .expect("send request should succeed");
+
+        let committee_id = most_committee_id(&mut client, most_address)
+            .await
+            .expect("committe id");
+
+        let total_rewards = most_committee_rewards(&mut client, most_address, committee_id)
+            .await
+            .expect("committee rewards");
+
+        assert_eq!(total_rewards, base_fee);
+
+        // Trying to request payout for non-guardian
+        let non_guardian = account_id(AccountKeyring::One);
+        assert!(!guardian_ids().contains(&non_guardian));
+        let non_guardian_balance_before = client
+            .balance(non_guardian)
+            .await
+            .expect("non_guardian_balance_before");
+
+
+        let non_guardian_payout_res = most_request_payout(&mut client, &alice(), most_address, committee_id, non_guardian)
+            .await;
+        
+        assert_eq!(
+            non_guardian_payout_res.expect_err("Payout should fail for non-guardian"),
+            MostError::NotInCommittee
+        );
+
+        let non_guardian_balance_after = client
+            .balance(non_guardian)
+            .await
+            .expect("non_guardian_balance_after");
+
+        assert_eq!(
+            non_guardian_balance_before,
+            non_guardian_balance_after
+        );
+    }
+
+    #[ink_e2e::test]
     fn committee_rewards(mut client: ink_e2e::Client<C, E>) {
         let (most_address, token_address) = setup_default_most_and_token(&mut client, true).await;
 
