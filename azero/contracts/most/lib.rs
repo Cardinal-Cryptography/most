@@ -175,6 +175,7 @@ pub mod most {
         Constructor,
         InvalidThreshold,
         DuplicateCommitteeMember,
+        ZeroTransferAmount,
         NotInCommittee,
         HashDoesNotMatchData,
         PSP22(PSP22Error),
@@ -282,6 +283,10 @@ pub mod most {
         ) -> Result<(), MostError> {
             self.ensure_not_halted()?;
 
+            if amount == 0 {
+                return Err(MostError::ZeroTransferAmount);
+            }
+
             let mut data = self.data()?;
 
             let dest_token_address = self
@@ -322,7 +327,9 @@ pub mod most {
 
             // return surplus if any
             if let Some(surplus) = transferred_fee.checked_sub(current_base_fee) {
-                self.env().transfer(sender, surplus)?;
+                if surplus > 0 {
+                    self.env().transfer(sender, surplus)?;
+                }
             };
 
             self.env().emit_event(CrosschainTransferRequest {
@@ -386,7 +393,7 @@ pub mod most {
                 return Err(MostError::HashDoesNotMatchData);
             }
 
-            let mut request = self.pending_requests.get(request_hash).unwrap_or_default(); //  {
+            let mut request = self.pending_requests.get(request_hash).unwrap_or_default();
 
             // record vote
             request.signature_count = request
