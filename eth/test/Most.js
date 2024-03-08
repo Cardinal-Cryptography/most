@@ -36,7 +36,7 @@ describe("Most", function () {
             kind: "uups",
           },
         ),
-      ).to.be.revertedWith("Signature threshold must be greater than 0");
+      ).to.be.revertedWithCustomError(Most, "ZeroSignatureTreshold");
     });
     it("Reverts if threshold is greater than number of guardians", async () => {
       const signers = await ethers.getSigners();
@@ -55,7 +55,7 @@ describe("Most", function () {
             kind: "uups",
           },
         ),
-      ).to.be.revertedWith("Not enough guardians specified");
+      ).to.be.revertedWithCustomError(Most, "NotEnoughGuardians");
     });
   });
 
@@ -105,7 +105,7 @@ describe("Most", function () {
       await token.approve(mostAddress, TOKEN_AMOUNT);
       await expect(
         most.sendRequest(tokenAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT),
-      ).to.be.revertedWith("Unsupported pair");
+      ).to.be.revertedWithCustomError(most, "UnsupportedPair");
     });
 
     it("Reverts if token transfer is not approved", async () => {
@@ -150,7 +150,7 @@ describe("Most", function () {
 
       await expect(
         most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
-      ).to.be.revertedWith("Unsupported pair");
+      ).to.be.revertedWithCustomError(most, "UnsupportedPair");
     });
 
     it("Transfers tokens to Most", async () => {
@@ -201,7 +201,7 @@ describe("Most", function () {
             ethAddress,
             0,
           ),
-      ).to.be.revertedWith("Not a member of the guardian committee");
+      ).to.be.revertedWithCustomError(most, "NotInCommittee");
     });
 
     it("Ignores consecutive signatures", async () => {
@@ -341,7 +341,7 @@ describe("Most", function () {
             ethAddress,
             0,
           ),
-      ).to.be.revertedWith("Hash does not match the data");
+      ).to.be.revertedWithCustomError(most, "DataHashMismatch");
     });
 
     it("Committee rotation", async () => {
@@ -398,7 +398,7 @@ describe("Most", function () {
             ethAddress,
             0,
           ),
-      ).to.be.revertedWith("Not a member of the guardian committee");
+      ).to.be.revertedWithCustomError(most, "NotInCommittee");
 
       await expect(
         most
@@ -411,7 +411,7 @@ describe("Most", function () {
             ethAddress,
             0,
           ),
-      ).to.be.revertedWith("Not a member of the guardian committee");
+      ).to.be.revertedWithCustomError(most, "NotInCommittee");
     });
   });
 
