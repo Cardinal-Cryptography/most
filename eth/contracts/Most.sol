@@ -21,7 +21,7 @@ contract Most is
     using SafeERC20 for IERC20;
 
     /// @dev This amount of gas should be sufficient for ether transfers
-    /// and simple fallback function execution, yet still protecting against re-entrancy attack.
+    /// and simple fallback function execution, yet still protecting against reentrancy attack.
     uint256 constant GAS_LIMIT = 3500;
 
     uint256 public requestNonce;
@@ -81,9 +81,27 @@ contract Most is
         address owner,
         address payable _wethAddress
     ) public initializer {
-        if (_signatureThreshold == 0) revert ZeroSignatureTreshold();
-
         committeeId = 0;
+        _setCommittee(_committee, _signatureThreshold);
+
+        wethAddress = _wethAddress;
+        __Ownable_init(owner);
+        __Pausable_init();
+    }
+
+    function _authorizeUpgrade(address) internal override onlyOwner {
+        // required by the OZ UUPS module
+    }
+
+    function renounceOwnership() public virtual override onlyOwner {
+        // disable possibility to renounce ownership
+    }
+
+    function _setCommittee(
+        address[] calldata _committee,
+        uint256 _signatureThreshold
+    ) internal {
+        if (_signatureThreshold == 0) revert ZeroSignatureTreshold();
         uint256 committeeCount;
 
         for (uint256 i; i < _committee.length; ++i) {
@@ -101,17 +119,6 @@ contract Most is
 
         committeeSize[committeeId] = committeeCount;
         signatureThreshold[committeeId] = _signatureThreshold;
-        wethAddress = _wethAddress;
-        __Ownable_init(owner);
-        __Pausable_init();
-    }
-
-    function _authorizeUpgrade(address) internal override onlyOwner whenPaused {
-        // required by the OZ UUPS module
-    }
-
-    function renounceOwnership() public virtual override onlyOwner {
-        // disable possibility to renounce ownership
     }
 
     /// @notice Invoke this tx to transfer funds to the destination chain.
@@ -186,8 +193,8 @@ contract Most is
     /// @notice Aggregates relayer signatures and returns the locked tokens.
     /// @dev When the ether is being bridged and the receiver is a contract
     /// that does not accept ether or fallback function consumes more than `GAS_LIMIT` gas units,
-    /// the request is being processed without revert and the ether is being locked
-    /// in this contract. Governance action must be taken to retrieve tokens.
+    /// the request is processed without revert and the ether is locked
+    /// in this contract. Governance action must be taken to retrieve the tokens.
     function receiveRequest(
         bytes32 _requestHash,
         uint256 _committeeId,
@@ -292,26 +299,8 @@ contract Most is
         address[] calldata _committee,
         uint256 _signatureThreshold
     ) external onlyOwner {
-        if (_signatureThreshold == 0) revert ZeroSignatureTreshold();
-
         ++committeeId;
-        uint256 committeeCount;
-
-        for (uint256 i; i < _committee.length; ++i) {
-            bytes32 committeeMemberId = keccak256(
-                abi.encodePacked(committeeId, _committee[i])
-            );
-            // avoid duplicates
-            if (!committee[committeeMemberId]) {
-                ++committeeCount;
-                committee[committeeMemberId] = true;
-            }
-        }
-
-        if (committeeCount < _signatureThreshold) revert NotEnoughGuardians();
-
-        committeeSize[committeeId] = committeeCount;
-        signatureThreshold[committeeId] = _signatureThreshold;
+        _setCommittee(_committee, _signatureThreshold);
     }
 
     function addPair(bytes32 from, bytes32 to) external onlyOwner whenPaused {
