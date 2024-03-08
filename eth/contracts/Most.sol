@@ -10,6 +10,7 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/acces
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {IWETH9} from "./IWETH9.sol";
 
+
 /// @title Most
 /// @author Cardinal Cryptography
 contract Most is
@@ -19,6 +20,10 @@ contract Most is
     PausableUpgradeable
 {
     using SafeERC20 for IERC20;
+
+    /// @dev This amount of gas should be sufficient for ether transfers
+    /// and simple fallback function execution, yet still protecting against re-entrancy attack.
+    uint256 constant GAS_LIMIT = 3500;
 
     uint256 public requestNonce;
     uint256 public committeeId;
@@ -165,6 +170,7 @@ contract Most is
         (bool success, ) = wethAddress.call{value: amount}(
             abi.encodeCall(IWETH9.deposit, ())
         );
+
         if (!success) revert WrappingEth();
 
         emit CrosschainTransferRequest(
@@ -180,7 +186,7 @@ contract Most is
 
     /// @notice Aggregates relayer signatures and returns the locked tokens.
     /// @dev When the ether is being bridged and the receiver is a contract
-    /// that does not accept ether or fallback function consumes more than 3500 gas,
+    /// that does not accept ether or fallback function consumes more than `GAS_LIMIT` gas units,
     /// the request is being processed without revert and the ether is being locked
     /// in this contract. Governance action must be taken to retrieve tokens.
     function receiveRequest(
@@ -237,7 +243,7 @@ contract Most is
                 );
                 (bool sendNativeEthSuccess, ) = _destReceiverAddress.call{
                     value: amount,
-                    gas: 3500
+                    gas: GAS_LIMIT
                 }("");
                 if (!sendNativeEthSuccess) {
                     if (isContract(_destReceiverAddress)) {
@@ -267,6 +273,15 @@ contract Most is
         _unpause();
     }
 
+    function recover(address token, address to, uint256 amount) external onlyOwner {
+        IERC20(token).safeTransfer(to, amount);
+    }
+
+    function recoverNative(address payable to, uint256 amount) external onlyOwner {
+        (bool success, ) = to.call{value: amount, gas: GAS_LIMIT}("");
+        if (!success) revert EthTransfer();
+    }
+
     function hasSignedRequest(
         address guardian,
         bytes32 hash
@@ -294,7 +309,7 @@ contract Most is
     }
 
     function setCommittee(
-        address[] calldata _committee,
+        address[] calldata _committee, 
         uint256 _signatureThreshold
     ) external onlyOwner {
         if (_signatureThreshold == 0) revert ZeroSignatureTreshold();
