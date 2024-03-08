@@ -10,6 +10,8 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/acces
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {IWETH9} from "./IWETH9.sol";
 
+/// @title Most
+/// @author Cardinal Cryptography
 contract Most is
     Initializable,
     UUPSUpgradeable,
@@ -27,13 +29,13 @@ contract Most is
         mapping(address => bool) signatures;
     }
 
-    // from -> to mapping
-    mapping(bytes32 => bytes32) public supportedPairs;
-    mapping(bytes32 => Request) public pendingRequests;
-    mapping(bytes32 => bool) public processedRequests;
-    mapping(bytes32 => bool) private committee;
-    mapping(uint256 => uint256) public committeeSize;
-    mapping(uint256 => uint256) public signatureThreshold;
+    mapping(bytes32 from => bytes32 to) public supportedPairs;
+    mapping(bytes32 requestHash => Request) public pendingRequests;
+    mapping(bytes32 requestHash => bool) public processedRequests;
+    /// @dev committeeMemberId = keccak256(abi.encodePacked(committeeId, comitteeMemeberAddress))
+    mapping(bytes32 committeeMemberId => bool) private committee;
+    mapping(uint256 committeeId => uint256) public committeeSize;
+    mapping(uint256 committeeId => uint256) public signatureThreshold;
 
     event CrosschainTransferRequest(
         uint256 indexed committeeId,
@@ -47,7 +49,7 @@ contract Most is
 
     event RequestProcessed(bytes32 requestHash);
 
-    // Emitted when guardian signs a request that has already been processed
+    /// @notice Emitted when guardian signs a request that has already been processed
     event ProcessedRequestSigned(bytes32 requestHash, address signer);
 
     event RequestAlreadySigned(bytes32 requestHash, address signer);
@@ -63,11 +65,11 @@ contract Most is
     error ZeroSignatureTreshold();
     error NotEnoughGuardians();
     error UnsupportedPair();
+    error DataHashMismatch();
+    error ZeroAmount();
     error WrappingEth();
     error UnwrappingEth();
-    error DataHashMismatch();
     error EthTransfer();
-    error ZeroAmount();
 
     function initialize(
         address[] calldata _committee,
@@ -76,18 +78,24 @@ contract Most is
         address payable _wethAddress
     ) public initializer {
         if (_signatureThreshold == 0) revert ZeroSignatureTreshold();
-        if (_committee.length < _signatureThreshold)
-            revert NotEnoughGuardians();
 
         committeeId = 0;
+        uint256 committeeCount;
 
         for (uint256 i; i < _committee.length; ++i) {
-            committee[
-                keccak256(abi.encodePacked(committeeId, _committee[i]))
-            ] = true;
+            bytes32 committeeMemberId = keccak256(
+                abi.encodePacked(committeeId, _committee[i])
+            );
+            // avoid duplicates
+            if (!committee[committeeMemberId]) {
+                ++committeeCount;
+                committee[committeeMemberId] = true;
+            }
         }
 
-        committeeSize[committeeId] = _committee.length;
+        if (committeeCount < _signatureThreshold) revert NotEnoughGuardians();
+
+        committeeSize[committeeId] = committeeCount;
         signatureThreshold[committeeId] = _signatureThreshold;
         wethAddress = _wethAddress;
         __Ownable_init(owner);
@@ -99,29 +107,28 @@ contract Most is
     }
 
     function renounceOwnership() public virtual override onlyOwner {
-        // Disable possibility to renounce ownership
+        // disable possibility to renounce ownership
     }
 
-    // Invoke this tx to transfer funds to the destination chain.
-    // Account needs to approve the Most contract to spend the `srcTokenAmount`
-    // of `srcTokenAddress` tokens on their behalf before executing the tx.
-    //
-    // Tx emits a CrosschainTransferRequest event that the relayers listen to
-    // & forward to the destination chain.
+    /// @notice Invoke this tx to transfer funds to the destination chain.
+    /// Account needs to approve the Most contract to spend the `srcTokenAmount`
+    /// of `srcTokenAddress` tokens on their behalf before executing the tx.
+    ///
+    /// @dev Tx emits a CrosschainTransferRequest event that the relayers listen to
+    /// & forward to the destination chain.
     function sendRequest(
         bytes32 srcTokenAddress,
         uint256 amount,
         bytes32 destReceiverAddress
     ) external whenNotPaused {
         if (amount == 0) revert ZeroAmount();
-        address sender = msg.sender;
 
         IERC20 token = IERC20(bytes32ToAddress(srcTokenAddress));
 
-        // check if the token is supported
         bytes32 destTokenAddress = supportedPairs[srcTokenAddress];
         if (destTokenAddress == 0x0) revert UnsupportedPair();
 
+        address sender = msg.sender;
         // lock tokens in this contract
         // message sender needs to give approval else this tx will revert
         token.safeTransferFrom(sender, address(this), amount);
@@ -137,17 +144,18 @@ contract Most is
         ++requestNonce;
     }
 
-    // Invoke this tx to transfer funds to the destination chain.
-    // Account needs to send native ETH which are wrapped to wETH
-    // tokens.
-    //
-    // Tx emits a CrosschainTransferRequest event that the relayers listen to
-    // & forward to the destination chain.
-    function sendRequestNative(bytes32 destReceiverAddress) external payable {
+    /// @notice Invoke this tx to transfer funds to the destination chain.
+    /// Account needs to send native ETH which are wrapped to wETH
+    /// tokens.
+    ///
+    /// @dev Tx emits a CrosschainTransferRequest event that the relayers listen to
+    /// & forward to the destination chain.
+    function sendRequestNative(
+        bytes32 destReceiverAddress
+    ) external payable whenNotPaused {
         uint256 amount = msg.value;
         if (amount == 0) revert ZeroAmount();
 
-        // check if the token is supported
         bytes32 destTokenAddress = supportedPairs[
             addressToBytes32(wethAddress)
         ];
@@ -167,10 +175,14 @@ contract Most is
             requestNonce
         );
 
-        requestNonce++;
+        ++requestNonce;
     }
 
-    // aggregates relayer signatures and returns the locked tokens
+    /// @notice Aggregates relayer signatures and returns the locked tokens.
+    /// @dev When the ether is being bridged and the receiver is a contract
+    /// that does not accept ether or fallback function consumes more than 3500 gas,
+    /// the request is being processed without revert and the ether is being locked
+    /// in this contract. Governance action must be taken to retrieve tokens.
     function receiveRequest(
         bytes32 _requestHash,
         uint256 _committeeId,
@@ -213,8 +225,8 @@ contract Most is
             processedRequests[requestHash] = true;
             delete pendingRequests[requestHash];
 
-            // return the locked tokens
             address _destTokenAddress = bytes32ToAddress(destTokenAddress);
+            // return the locked tokens
             if (_destTokenAddress == wethAddress) {
                 (bool unwrapSuccess, ) = wethAddress.call(
                     abi.encodeCall(IWETH9.withdraw, (amount))
@@ -238,7 +250,10 @@ contract Most is
             } else {
                 IERC20 token = IERC20(_destTokenAddress);
 
-                token.safeTransfer(bytes32ToAddress(destReceiverAddress), amount);
+                token.safeTransfer(
+                    bytes32ToAddress(destReceiverAddress),
+                    amount
+                );
             }
             emit RequestProcessed(requestHash);
         }
@@ -283,18 +298,24 @@ contract Most is
         uint256 _signatureThreshold
     ) external onlyOwner {
         if (_signatureThreshold == 0) revert ZeroSignatureTreshold();
-        if (_committee.length < _signatureThreshold)
-            revert NotEnoughGuardians();
 
         ++committeeId;
+        uint256 committeeCount;
 
         for (uint256 i; i < _committee.length; ++i) {
-            committee[
-                keccak256(abi.encodePacked(committeeId, _committee[i]))
-            ] = true;
+            bytes32 committeeMemberId = keccak256(
+                abi.encodePacked(committeeId, _committee[i])
+            );
+            // avoid duplicates
+            if (!committee[committeeMemberId]) {
+                ++committeeCount;
+                committee[committeeMemberId] = true;
+            }
         }
 
-        committeeSize[committeeId] = _committee.length;
+        if (committeeCount < _signatureThreshold) revert NotEnoughGuardians();
+
+        committeeSize[committeeId] = committeeCount;
         signatureThreshold[committeeId] = _signatureThreshold;
     }
 
@@ -306,7 +327,7 @@ contract Most is
         delete supportedPairs[from];
     }
 
-    // accept payments only from weth or through payable methods
+    /// @dev Accept ether only from weth contract or through payable methods
     receive() external payable {
         require(msg.sender == wethAddress);
     }
