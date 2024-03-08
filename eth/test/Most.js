@@ -467,13 +467,13 @@ describe("Most", function () {
       expect(balanceAfter - balanceBefore).to.equal(token_amount);
     });
 
-    it("Emits correct event when ether transfer to a contract address fails", async () => {
+    it("Unsuccessful transfer to a contract fails with event", async () => {
       const { most, weth, wethAddress, mostAddress, token } = await loadFixture(
         deployEightGuardianMostFixture,
       );
       const token_amount = ethToWei(TOKEN_AMOUNT);
       const accounts = await ethers.getSigners();
-      // token contract doesn't accept ether so it will fail
+      // token contract doesn't accept ether so any native ether transfer to it will fail
       const ethAddress = token.target;
       const requestHash = ethers.solidityPackedKeccak256(
         ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
@@ -533,7 +533,7 @@ describe("Most", function () {
       expect(await weth.balanceOf(ethAddress)).to.equal(0);
       expect(await weth.balanceOf(mostAddress)).to.equal(0);
 
-      // we predict that native ether is locked in the most contract
+      // we expect that native ether is locked in the most contract
       expect(balanceAfterMost - balanceBeforeMost).to.equal(token_amount);
       expect(balanceAfter - balanceBefore).to.equal(0);
     });
