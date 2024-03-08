@@ -458,6 +458,75 @@ describe("Most", function () {
       expect(balanceAfterMost - balanceBeforeMost).to.equal(0);
       expect(balanceAfter - balanceBefore).to.equal(token_amount);
     });
+
+    it("Emits correct event when ether transfer to a contract address fails", async () => {
+      const { most, weth, wethAddress, mostAddress, token } = await loadFixture(
+        deployEightGuardianMostFixture,
+      );
+      const token_amount = ethToWei(TOKEN_AMOUNT);
+      const accounts = await ethers.getSigners();
+      // token contract doesn't accept ether so it will fail
+      const ethAddress = token.target;
+      const requestHash = ethers.solidityPackedKeccak256(
+        ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
+        [
+          0,
+          addressToBytes32(wethAddress),
+          token_amount,
+          addressToBytes32(ethAddress),
+          0,
+        ],
+      );
+      await most.addPair(addressToBytes32(wethAddress), WRAPPED_TOKEN_ADDRESS);
+      const provider = await hre.ethers.provider;
+      // Provide funds for Most
+      await weth.deposit({ value: token_amount });
+      expect(await weth.balanceOf(accounts[0].address)).to.equal(token_amount);
+      await weth.transfer(mostAddress, token_amount);
+      expect(await weth.balanceOf(mostAddress)).to.equal(token_amount);
+
+      const balanceBefore = await provider.getBalance(ethAddress);
+      const balanceBeforeMost = await provider.getBalance(mostAddress);
+
+      for (const signer of accounts.slice(1, 5)) {
+        await most
+          .connect(signer)
+          .receiveRequest(
+            requestHash,
+            0,
+            addressToBytes32(wethAddress),
+            token_amount,
+            addressToBytes32(ethAddress),
+            0,
+          );
+      }
+
+      const res = expect(
+        most
+          .connect(accounts[5])
+          .receiveRequest(
+            requestHash,
+            0,
+            addressToBytes32(wethAddress),
+            token_amount,
+            addressToBytes32(ethAddress),
+            0,
+          ),
+      );
+      await res.to.emit(most, "EthTransferFailed").withArgs(requestHash);
+
+      await res.to.emit(most, "RequestProcessed").withArgs(requestHash);
+
+      const balanceAfter = await provider.getBalance(ethAddress);
+      const balanceAfterMost = await provider.getBalance(mostAddress);
+
+      expect(await weth.balanceOf(ethAddress)).to.equal(0);
+      expect(await weth.balanceOf(mostAddress)).to.equal(0);
+
+      // we predict that native ether is locked in the most contract
+      expect(balanceAfterMost - balanceBeforeMost).to.equal(token_amount);
+      expect(balanceAfter - balanceBefore).to.equal(0);
+    });
   });
 
   describe("Upgrade", function () {
