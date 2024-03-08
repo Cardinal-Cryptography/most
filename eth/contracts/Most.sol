@@ -35,6 +35,8 @@ contract Most is
     mapping(bytes32 committeeMemberId => bool) private committee;
     mapping(uint256 committeeId => uint256) public committeeSize;
     mapping(uint256 committeeId => uint256) public signatureThreshold;
+    // @dev storage gap for future contract updates compatibility
+    uint256[50] __gap;
 
     struct Request {
         uint256 signatureCount;
@@ -240,15 +242,15 @@ contract Most is
             delete pendingRequests[requestHash];
 
             address _destTokenAddress = bytes32ToAddress(destTokenAddress);
+            address _destReceiverAddress = bytes32ToAddress(
+                destReceiverAddress
+            );
             // return the locked tokens
             if (_destTokenAddress == wethAddress) {
                 (bool unwrapSuccess, ) = wethAddress.call(
                     abi.encodeCall(IWETH9.withdraw, (amount))
                 );
                 if (!unwrapSuccess) revert UnwrappingEth();
-                address _destReceiverAddress = bytes32ToAddress(
-                    destReceiverAddress
-                );
                 (bool sendNativeEthSuccess, ) = _destReceiverAddress.call{
                     value: amount,
                     gas: GAS_LIMIT
@@ -263,11 +265,7 @@ contract Most is
                 }
             } else {
                 IERC20 token = IERC20(_destTokenAddress);
-
-                token.safeTransfer(
-                    bytes32ToAddress(destReceiverAddress),
-                    amount
-                );
+                token.safeTransfer(_destReceiverAddress, amount);
             }
             emit RequestProcessed(requestHash);
         }
