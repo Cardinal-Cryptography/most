@@ -113,7 +113,9 @@ describe("Most", function () {
         deployEightGuardianMostFixture,
       );
 
+      await most.pause();
       await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
+      await most.unpause();
       await expect(
         most.sendRequest(tokenAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT),
       ).to.be.reverted;
@@ -124,7 +126,9 @@ describe("Most", function () {
         await loadFixture(deployEightGuardianMostFixture);
 
       await token.approve(mostAddress, TOKEN_AMOUNT);
+      await most.pause();
       await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
+      await most.unpause();
       await most.sendRequest(tokenAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT);
 
       expect(await token.balanceOf(mostAddress)).to.equal(TOKEN_AMOUNT);
@@ -135,7 +139,9 @@ describe("Most", function () {
         await loadFixture(deployEightGuardianMostFixture);
 
       await token.approve(mostAddress, TOKEN_AMOUNT);
+      await most.pause();
       await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
+      await most.unpause();
       await expect(
         most.sendRequest(tokenAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT),
       )
@@ -157,8 +163,9 @@ describe("Most", function () {
       const { most, token, mostAddress, wethAddress, weth } = await loadFixture(
         deployEightGuardianMostFixture,
       );
-
+      await most.pause();
       await most.addPair(addressToBytes32(wethAddress), WRAPPED_TOKEN_ADDRESS);
+      await most.unpause();
       await most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT });
 
       expect(await weth.balanceOf(mostAddress)).to.equal(TOKEN_AMOUNT);
@@ -168,8 +175,9 @@ describe("Most", function () {
       const { most, token, mostAddress, wethAddress } = await loadFixture(
         deployEightGuardianMostFixture,
       );
-
+      await most.pause();
       await most.addPair(addressToBytes32(wethAddress), WRAPPED_TOKEN_ADDRESS);
+      await most.unpause();
       await expect(
         most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
       )
@@ -477,7 +485,9 @@ describe("Most", function () {
           0,
         ],
       );
+      await most.pause();
       await most.addPair(addressToBytes32(wethAddress), WRAPPED_TOKEN_ADDRESS);
+      await most.unpause();
       const provider = await hre.ethers.provider;
       // Provide funds for Most
       await weth.deposit({ value: token_amount });
