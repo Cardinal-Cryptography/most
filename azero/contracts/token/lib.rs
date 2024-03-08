@@ -232,6 +232,11 @@ pub mod token {
             self.emit_events(events);
             Ok(())
         }
+
+        #[ink(message)]
+        fn minter(&self) -> AccountId {
+            self.minter_burner
+        }
     }
 
     impl Burnable for Token {
@@ -253,6 +258,11 @@ pub mod token {
             self.data.decrease_allowance(from, caller, value)?;
             self.emit_events(events);
             Ok(())
+        }
+
+        #[ink(message)]
+        fn burner(&self) -> AccountId {
+            self.minter_burner
         }
     }
 
