@@ -314,11 +314,11 @@ contract Most is
         signatureThreshold[committeeId] = _signatureThreshold;
     }
 
-    function addPair(bytes32 from, bytes32 to) external onlyOwner {
+    function addPair(bytes32 from, bytes32 to) external onlyOwner whenPaused {
         supportedPairs[from] = to;
     }
 
-    function removePair(bytes32 from) external onlyOwner {
+    function removePair(bytes32 from) external onlyOwner whenPaused {
         delete supportedPairs[from];
     }
 
