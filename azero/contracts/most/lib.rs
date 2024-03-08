@@ -16,7 +16,7 @@ pub mod most {
         storage::{traits::ManualKey, Lazy, Mapping},
     };
     use ownable2step::*;
-    use psp22::PSP22Error;
+    use psp22::{PSP22Error, PSP22};
     use psp22_traits::{Burnable, Mintable};
     use scale::{Decode, Encode};
     use shared::{concat_u8_arrays, keccak256, Keccak256HashOutput as HashedRequest};
@@ -815,8 +815,11 @@ pub mod most {
             from: AccountId,
             amount: u128,
         ) -> Result<(), PSP22Error> {
-            let mut psp22: ink::contract_ref!(Burnable) = token.into();
-            psp22.burn_from(from, amount)
+            let mut psp22: ink::contract_ref!(PSP22) = token.into();
+            psp22.transfer_from(from, self.env().account_id(), amount, vec![])?;
+
+            let mut psp22_burnable: ink::contract_ref!(Burnable) = token.into();
+            psp22_burnable.burn(amount)
         }
 
         fn data(&self) -> Result<Data, MostError> {

@@ -248,8 +248,7 @@ mod e2e {
 
         match send_request_res {
             Ok(call_res) => {
-                // 1 PSP22Event::Transfer event for burn and 1 `CrosschainTransferRequest`
-                assert_eq!(call_res.events.len(), 2);
+                assert_eq!(call_res.events.len(), 4);
 
                 let request_events =
                     filter_decode_events_as::<CrosschainTransferRequest>(call_res.events);

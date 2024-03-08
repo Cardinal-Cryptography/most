@@ -53,7 +53,7 @@ pub mod token {
         symbol: Option<String>,
         decimals: u8,
         admin: AccountId,
-        minter_burner: AccountId,
+        minter: AccountId,
     }
 
     impl Token {
@@ -63,7 +63,7 @@ pub mod token {
             name: Option<String>,
             symbol: Option<String>,
             decimals: u8,
-            minter_burner: AccountId,
+            minter: AccountId,
         ) -> Self {
             let caller = Self::env().caller();
             let data = PSP22Data::new(total_supply, caller);
@@ -76,22 +76,14 @@ pub mod token {
                 symbol,
                 decimals,
                 admin: caller,
-                minter_burner,
+                minter,
             }
         }
 
         #[ink(message)]
-        pub fn minter_burner(&self) -> AccountId {
-            self.minter_burner
-        }
-
-        #[ink(message)]
-        pub fn set_minter_burner(
-            &mut self,
-            new_minter_burner: AccountId,
-        ) -> Result<(), PSP22Error> {
+        pub fn set_minter(&mut self, new_minter: AccountId) -> Result<(), PSP22Error> {
             self.ensure_owner()?;
-            self.minter_burner = new_minter_burner;
+            self.minter = new_minter;
             Ok(())
         }
 
@@ -100,10 +92,10 @@ pub mod token {
                 .map_err(|_| PSP22Error::Custom(String::from("Caller has to be the admin.")))
         }
 
-        fn ensure_minter_burner(&self) -> Result<(), PSP22Error> {
-            if self.env().caller() != self.minter_burner {
+        fn ensure_minter(&self) -> Result<(), PSP22Error> {
+            if self.env().caller() != self.minter {
                 Err(PSP22Error::Custom(String::from(
-                    "Caller has to be the minter/burner.",
+                    "Caller has to be the minter.",
                 )))
             } else {
                 Ok(())
@@ -227,7 +219,7 @@ pub mod token {
     impl Mintable for Token {
         #[ink(message)]
         fn mint(&mut self, to: AccountId, value: u128) -> Result<(), PSP22Error> {
-            self.ensure_minter_burner()?;
+            self.ensure_minter()?;
             let events = self.data.mint(to, value)?;
             self.emit_events(events);
             Ok(())
@@ -235,7 +227,7 @@ pub mod token {
 
         #[ink(message)]
         fn minter(&self) -> AccountId {
-            self.minter_burner
+            self.minter
         }
     }
 
@@ -245,24 +237,6 @@ pub mod token {
             let events = self.data.burn(self.env().caller(), value)?;
             self.emit_events(events);
             Ok(())
-        }
-
-        #[ink(message)]
-        fn burn_from(&mut self, from: AccountId, value: u128) -> Result<(), PSP22Error> {
-            self.ensure_minter_burner()?;
-            let caller = self.env().caller();
-            if self.data.allowance(from, caller) < value {
-                return Err(PSP22Error::InsufficientAllowance);
-            }
-            let events = self.data.burn(from, value)?;
-            self.data.decrease_allowance(from, caller, value)?;
-            self.emit_events(events);
-            Ok(())
-        }
-
-        #[ink(message)]
-        fn burner(&self) -> AccountId {
-            self.minter_burner
         }
     }
 
@@ -340,24 +314,24 @@ pub mod token {
         }
 
         #[ink::test]
-        fn admin_can_set_minter_burner() {
+        fn admin_can_set_minter() {
             let mut token = init_contract(INIT_SUPPLY_TEST);
             let alice = default_accounts::<E>().alice;
             let bob = default_accounts::<E>().bob;
 
             set_caller::<E>(alice);
-            assert!(token.set_minter_burner(bob).is_ok());
-            assert_eq!(token.minter_burner(), bob);
+            assert!(token.set_minter(bob).is_ok());
+            assert_eq!(token.minter(), bob);
         }
 
         #[ink::test]
-        fn non_admin_cannot_set_minter_burner() {
+        fn non_admin_cannot_set_minter() {
             let mut token = init_contract(INIT_SUPPLY_TEST);
             let bob = default_accounts::<E>().bob;
 
             set_caller::<E>(bob);
             assert_eq!(
-                token.set_minter_burner(bob),
+                token.set_minter(bob),
                 Err(PSP22Error::Custom(String::from(
                     "Caller has to be the admin.",
                 )))
@@ -365,7 +339,7 @@ pub mod token {
         }
 
         #[ink::test]
-        fn minter_burner_can_mint() {
+        fn minter_can_mint() {
             let mut token = init_contract(INIT_SUPPLY_TEST);
             let bob = default_accounts::<E>().bob;
             let charlie = default_accounts::<E>().charlie;
@@ -377,7 +351,7 @@ pub mod token {
         }
 
         #[ink::test]
-        fn non_minter_burner_cannot_mint() {
+        fn non_minter_cannot_mint() {
             let mut token = init_contract(INIT_SUPPLY_TEST);
             let alice = default_accounts::<E>().alice;
             let bob = default_accounts::<E>().bob;
@@ -386,39 +360,24 @@ pub mod token {
             assert_eq!(
                 token.mint(alice, 100),
                 Err(PSP22Error::Custom(String::from(
-                    "Caller has to be the minter/burner."
+                    "Caller has to be the minter."
                 )))
             );
         }
 
         #[ink::test]
-        fn minter_burner_can_burn() {
+        fn user_can_burn_own_tokens() {
             let mut token = init_contract(INIT_SUPPLY_TEST);
             let alice = default_accounts::<E>().alice;
             let charlie = default_accounts::<E>().charlie;
             let alice_balance_before = token.balance_of(alice);
 
             set_caller::<E>(alice);
-            assert!(token.approve(charlie, 100).is_ok());
+            assert!(token.burn(100).is_ok());
+            assert_eq!(token.balance_of(alice), alice_balance_before - 100);
 
             set_caller::<E>(charlie);
-            assert!(token.burn_from(alice, 100).is_ok());
-            assert_eq!(token.balance_of(alice), alice_balance_before - 100);
-        }
-
-        #[ink::test]
-        fn non_minter_burner_cannot_burn() {
-            let mut token = init_contract(INIT_SUPPLY_TEST);
-            let alice = default_accounts::<E>().alice;
-            let bob = default_accounts::<E>().bob;
-
-            set_caller::<E>(bob);
-            assert_eq!(
-                token.burn_from(alice, 100),
-                Err(PSP22Error::Custom(String::from(
-                    "Caller has to be the minter/burner."
-                )))
-            );
+            assert!(token.burn(100).is_err());
         }
 
         fn init_contract(init_supply: u128) -> Token {
