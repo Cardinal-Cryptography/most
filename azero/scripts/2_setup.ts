@@ -102,6 +102,9 @@ async function main(): Promise<void> {
 
     await addTokenPair(weth_eth, weth_azero, most);
     await addTokenPair(usdt_eth, usdt_azero, most);
+
+    // Activate Most if we are in dev environment
+    await most.tx.setHalted(false);
   }
 
   // update migrations

@@ -81,6 +81,11 @@ mod e2e {
     fn owner_can_add_a_new_pair(mut client: ink_e2e::Client<C, E>) {
         let (most_address, token_address) = setup_default_most_and_token(&mut client, false).await;
 
+        // Bridge needs to be halted to add a new pair
+        most_set_halted(&mut client, &alice(), most_address, true)
+            .await
+            .expect("set_halted should succeed");
+
         let add_pair_res = most_add_pair(
             &mut client,
             &alice(),
@@ -1159,6 +1164,11 @@ mod e2e {
                 .expect("Add pair should succeed");
         }
 
+        // Activate the most contract
+        most_set_halted(client, &alice(), most_address, false)
+            .await
+            .expect("Set halt should succeed");
+
         (most_address, token_address)
     }
 
@@ -1207,6 +1217,22 @@ mod e2e {
             caller,
             most,
             |most| most.set_committee(members.to_vec(), threshold),
+            None,
+        )
+        .await
+    }
+
+    async fn most_set_halted(
+        client: &mut E2EClient,
+        caller: &Keypair,
+        most: AccountId,
+        halt: bool,
+    ) -> CallResult<(), MostError> {
+        call_message::<MostRef, _, _, _, _>(
+            client,
+            caller,
+            most,
+            |most| most.set_halted(halt),
             None,
         )
         .await

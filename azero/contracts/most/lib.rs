@@ -188,6 +188,7 @@ pub mod most {
         Arithmetic,
         CorruptedStorage,
         IsHalted,
+        HaltRequired,
     }
 
     impl From<InkEnvError> for MostError {
@@ -248,7 +249,7 @@ pub mod most {
                 max_gas_price,
                 default_gas_price,
                 gas_price_oracle,
-                is_halted: false,
+                is_halted: true,
             });
 
             let mut ownable_data = Lazy::new();
@@ -648,6 +649,7 @@ pub mod most {
         #[ink(message)]
         pub fn remove_pair(&mut self, from: [u8; 32]) -> Result<(), MostError> {
             self.ensure_owner()?;
+            self.ensure_halted()?;
             self.supported_pairs.remove(from);
             Ok(())
         }
@@ -658,6 +660,7 @@ pub mod most {
         #[ink(message)]
         pub fn add_pair(&mut self, from: [u8; 32], to: [u8; 32]) -> Result<(), MostError> {
             self.ensure_owner()?;
+            self.ensure_halted()?;
             self.supported_pairs.insert(from, &to);
             Ok(())
         }
@@ -756,6 +759,13 @@ pub mod most {
         }
 
         // ---  helper functions
+
+        fn ensure_halted(&self) -> Result<(), MostError> {
+            match self.is_halted()? {
+                true => Ok(()),
+                false => Err(MostError::HaltRequired),
+            }
+        }
 
         fn ensure_not_halted(&self) -> Result<(), MostError> {
             match self.is_halted()? {
