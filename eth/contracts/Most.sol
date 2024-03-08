@@ -60,6 +60,8 @@ contract Most is
 
     event EthTransferFailed(bytes32 requestHash);
 
+    event CommitteeUpdated(uint256 newCommitteeId);
+
     modifier _onlyCommitteeMember(uint256 _committeeId) {
         if (!isInCommittee(_committeeId, msg.sender)) revert NotInCommittee();
         _;
@@ -301,6 +303,7 @@ contract Most is
     ) external onlyOwner {
         ++committeeId;
         _setCommittee(_committee, _signatureThreshold);
+        emit CommitteeUpdated(committeeId);
     }
 
     function addPair(bytes32 from, bytes32 to) external onlyOwner whenPaused {
