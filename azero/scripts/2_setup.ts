@@ -15,7 +15,7 @@ import { ethers } from "ethers";
 import { KeyringPair } from "@polkadot/keyring/types";
 import type BN from "bn.js";
 
-const envFile = process.env.AZERO_ENV || "dev";
+const envFile = process.env.AZERO_ENV;
 
 async function addTokenPair(
   tokenEth: string,
