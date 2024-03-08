@@ -50,9 +50,9 @@ mod e2e {
     const REMOTE_TOKEN: [u8; 32] = [0x1; 32];
     const REMOTE_RECEIVER: [u8; 32] = [0x2; 32];
 
-    const MIN_FEE: u128 = 10000000000000;
-    const MAX_FEE: u128 = 100000000000000;
-    const DEFAULT_FEE: u128 = 30000000000000;
+    const MIN_GAS_PRICE: u128 = 10000000000000;
+    const MAX_GAS_PRICE: u128 = 100000000000000;
+    const DEFAULT_GAS_PRICE: u128 = 30000000000000;
     const DEFAULT_POCKET_MONEY: u128 = 1000000000000;
     const DEFAULT_RELAY_GAS_USAGE: u128 = 50000;
 
@@ -67,9 +67,9 @@ mod e2e {
             DEFAULT_THRESHOLD,
             DEFAULT_POCKET_MONEY,
             DEFAULT_RELAY_GAS_USAGE,
-            MIN_FEE,
-            MAX_FEE,
-            DEFAULT_FEE,
+            MIN_GAS_PRICE,
+            MAX_GAS_PRICE,
+            DEFAULT_GAS_PRICE,
             account_id(AccountKeyring::Alice),
         )
         .await;
@@ -835,15 +835,13 @@ mod e2e {
             .await
             .expect("should return base fee");
 
-        assert_eq!(base_fee, DEFAULT_FEE);
+        assert_eq!(
+            base_fee,
+            DEFAULT_GAS_PRICE * DEFAULT_RELAY_GAS_USAGE * 120 / 100
+        );
 
         // Oracle returning price withing the range
-        let oracle_address = instantiate_oracle(
-            &mut client,
-            &alice(),
-            2 * DEFAULT_FEE / DEFAULT_RELAY_GAS_USAGE,
-        )
-        .await;
+        let oracle_address = instantiate_oracle(&mut client, &alice(), 2 * DEFAULT_GAS_PRICE).await;
         most_set_gas_oracle(&mut client, &alice(), most_address, oracle_address)
             .await
             .expect("can set gas oracle");
@@ -852,11 +850,13 @@ mod e2e {
             .await
             .expect("should return base fee");
 
-        assert_eq!(oracle_fee, 2 * DEFAULT_FEE * 120 / 100);
+        assert_eq!(
+            oracle_fee,
+            2 * DEFAULT_GAS_PRICE * DEFAULT_RELAY_GAS_USAGE * 120 / 100
+        );
 
         // Oracle returning price larger than the maximum allowed price
-        let oracle_address =
-            instantiate_oracle(&mut client, &alice(), 2 * MAX_FEE / DEFAULT_RELAY_GAS_USAGE).await;
+        let oracle_address = instantiate_oracle(&mut client, &alice(), 2 * MAX_GAS_PRICE).await;
 
         most_set_gas_oracle(&mut client, &alice(), most_address, oracle_address)
             .await
@@ -866,15 +866,13 @@ mod e2e {
             .await
             .expect("should return base fee");
 
-        assert_eq!(oracle_fee, MAX_FEE);
+        assert_eq!(
+            oracle_fee,
+            MAX_GAS_PRICE * DEFAULT_RELAY_GAS_USAGE * 120 / 100
+        );
 
         // Oracle returning price smaller than the minimum allowed price
-        let oracle_address = instantiate_oracle(
-            &mut client,
-            &alice(),
-            MIN_FEE / (2 * DEFAULT_RELAY_GAS_USAGE),
-        )
-        .await;
+        let oracle_address = instantiate_oracle(&mut client, &alice(), MIN_GAS_PRICE / 2).await;
 
         most_set_gas_oracle(&mut client, &alice(), most_address, oracle_address)
             .await
@@ -884,7 +882,31 @@ mod e2e {
             .await
             .expect("should return base fee");
 
-        assert_eq!(oracle_fee, MIN_FEE);
+        assert_eq!(
+            oracle_fee,
+            MIN_GAS_PRICE * DEFAULT_RELAY_GAS_USAGE * 120 / 100
+        );
+    }
+
+    #[ink_e2e::test]
+    fn gas_oracle_tries_to_cause_overflow(mut client: ink_e2e::Client<C, E>) {
+        let (most_address, _token_address) = setup_default_most_and_token(&mut client, true).await;
+
+        // Oracle returning price withing the range
+        let oracle_address = instantiate_oracle(&mut client, &alice(), u128::MAX).await;
+
+        most_set_gas_oracle(&mut client, &alice(), most_address, oracle_address)
+            .await
+            .expect("can set gas oracle");
+
+        let oracle_fee = most_base_fee(&mut client, most_address)
+            .await
+            .expect("should return base fee");
+
+        assert_eq!(
+            oracle_fee,
+            MAX_GAS_PRICE * DEFAULT_RELAY_GAS_USAGE * 120 / 100
+        );
     }
 
     #[ink_e2e::test]
@@ -1113,9 +1135,9 @@ mod e2e {
             DEFAULT_THRESHOLD,
             DEFAULT_POCKET_MONEY,
             DEFAULT_RELAY_GAS_USAGE,
-            MIN_FEE,
-            MAX_FEE,
-            DEFAULT_FEE,
+            MIN_GAS_PRICE,
+            MAX_GAS_PRICE,
+            DEFAULT_GAS_PRICE,
             account_id(AccountKeyring::Alice),
         )
         .await;
