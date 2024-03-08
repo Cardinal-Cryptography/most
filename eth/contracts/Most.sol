@@ -10,7 +10,6 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/acces
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {IWETH9} from "./IWETH9.sol";
 
-
 /// @title Most
 /// @author Cardinal Cryptography
 contract Most is
@@ -29,11 +28,6 @@ contract Most is
     uint256 public committeeId;
     address payable public wethAddress;
 
-    struct Request {
-        uint256 signatureCount;
-        mapping(address => bool) signatures;
-    }
-
     mapping(bytes32 from => bytes32 to) public supportedPairs;
     mapping(bytes32 requestHash => Request) public pendingRequests;
     mapping(bytes32 requestHash => bool) public processedRequests;
@@ -41,6 +35,11 @@ contract Most is
     mapping(bytes32 committeeMemberId => bool) private committee;
     mapping(uint256 committeeId => uint256) public committeeSize;
     mapping(uint256 committeeId => uint256) public signatureThreshold;
+
+    struct Request {
+        uint256 signatureCount;
+        mapping(address => bool) signatures;
+    }
 
     event CrosschainTransferRequest(
         uint256 indexed committeeId,
@@ -107,7 +106,7 @@ contract Most is
         __Pausable_init();
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {
+    function _authorizeUpgrade(address) internal override onlyOwner whenPaused {
         // required by the OZ UUPS module
     }
 
@@ -273,43 +272,24 @@ contract Most is
         _unpause();
     }
 
-    function recover(address token, address to, uint256 amount) external onlyOwner {
+    function recoverERC20(
+        address token,
+        address to,
+        uint256 amount
+    ) external onlyOwner {
         IERC20(token).safeTransfer(to, amount);
     }
 
-    function recoverNative(address payable to, uint256 amount) external onlyOwner {
+    function recoverNative(
+        address payable to,
+        uint256 amount
+    ) external onlyOwner {
         (bool success, ) = to.call{value: amount, gas: GAS_LIMIT}("");
         if (!success) revert EthTransfer();
     }
 
-    function hasSignedRequest(
-        address guardian,
-        bytes32 hash
-    ) external view returns (bool) {
-        return pendingRequests[hash].signatures[guardian];
-    }
-
-    function isInCommittee(
-        uint256 _committeeId,
-        address account
-    ) public view returns (bool) {
-        return committee[keccak256(abi.encodePacked(_committeeId, account))];
-    }
-
-    function bytes32ToAddress(bytes32 data) internal pure returns (address) {
-        return address(uint160(uint256(data)));
-    }
-
-    function addressToBytes32(address addr) internal pure returns (bytes32) {
-        return bytes32(uint256(uint160(addr)));
-    }
-
-    function isContract(address _addr) internal view returns (bool) {
-        return _addr.code.length != 0;
-    }
-
     function setCommittee(
-        address[] calldata _committee, 
+        address[] calldata _committee,
         uint256 _signatureThreshold
     ) external onlyOwner {
         if (_signatureThreshold == 0) revert ZeroSignatureTreshold();
@@ -340,6 +320,32 @@ contract Most is
 
     function removePair(bytes32 from) external onlyOwner {
         delete supportedPairs[from];
+    }
+
+    function hasSignedRequest(
+        address guardian,
+        bytes32 hash
+    ) external view returns (bool) {
+        return pendingRequests[hash].signatures[guardian];
+    }
+
+    function isInCommittee(
+        uint256 _committeeId,
+        address account
+    ) public view returns (bool) {
+        return committee[keccak256(abi.encodePacked(_committeeId, account))];
+    }
+
+    function bytes32ToAddress(bytes32 data) internal pure returns (address) {
+        return address(uint160(uint256(data)));
+    }
+
+    function addressToBytes32(address addr) internal pure returns (bytes32) {
+        return bytes32(uint256(uint160(addr)));
+    }
+
+    function isContract(address _addr) internal view returns (bool) {
+        return _addr.code.length != 0;
     }
 
     /// @dev Accept ether only from weth contract or through payable methods
