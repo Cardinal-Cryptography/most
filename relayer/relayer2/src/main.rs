@@ -24,7 +24,11 @@ use tokio::{
     time::{sleep, Duration},
 };
 
-use crate::{connections::azero, contracts::MostEvents};
+use crate::{
+    connections::{azero, eth},
+    contracts::MostEvents,
+    listeners::EthListener,
+};
 
 mod config;
 mod connections;
@@ -32,6 +36,9 @@ mod contracts;
 mod handlers;
 mod helpers;
 mod listeners;
+
+const DEV_MNEMONIC: &str =
+    "harsh master island dirt equip search awesome double turn crush wool grant";
 
 #[derive(Debug)]
 enum CircuitBreakerEvent {
@@ -49,6 +56,9 @@ async fn main() -> Result<()> {
     env_logger::init();
 
     info!("{:#?}", &config);
+
+    let client = RedisClient::open(config.redis_node.clone())?;
+    let redis_connection = Arc::new(Mutex::new(client.get_async_connection().await?));
 
     let azero_connection = Arc::new(azero::init(&config.azero_node_wss_url).await);
     let azero_signed_connection = if let Some(cid) = config.signer_cid {
@@ -69,7 +79,41 @@ async fn main() -> Result<()> {
         panic!("Use dev mode or connect to a signer");
     };
 
+    let azero_signed_connection = Arc::new(azero_signed_connection);
+
     debug!("Established connection to Aleph Zero node");
+
+    let wallet = if config.dev {
+        // If no keystore path is provided, we use the default development mnemonic
+        MnemonicBuilder::<English>::default()
+            .phrase(DEV_MNEMONIC)
+            .index(config.dev_account_index)?
+            .build()?
+    } else {
+        info!(
+            "Creating wallet from a keystore path: {}",
+            config.eth_keystore_path
+        );
+        LocalWallet::decrypt_keystore(&config.eth_keystore_path, &config.eth_keystore_password)?
+    };
+
+    info!("Wallet address: {}", wallet.address());
+
+    let eth_signed_connection = if let Some(cid) = config.signer_cid {
+        eth::with_signer(
+            eth::connect(&config.eth_node_http_url).await,
+            cid,
+            config.signer_port,
+        )
+        .await?
+    } else {
+        eth::with_local_wallet(eth::connect(&config.eth_node_http_url).await, wallet).await?
+    };
+    let eth_signed_connection = Arc::new(eth_signed_connection);
+
+    let eth_connection = Arc::new(eth::connect(&config.eth_node_http_url).await);
+
+    debug!("Established connection to Ethereum node");
 
     // Create channels
     let (eth_sender, eth_receiver) = mpsc::channel::<MostEvents>(1);
@@ -77,7 +121,7 @@ async fn main() -> Result<()> {
         mpsc::channel::<CircuitBreakerEvent>(1);
 
     // TODO : advisory listener task
-    // TODO : halted listener task
+    // TODO : halted listener tasks
     // TODO : azero event handling tasks (publisher and consumer)
 
     let process_message =
@@ -92,11 +136,20 @@ async fn main() -> Result<()> {
         circuit_breaker_receiver,
         circuit_breaker_sender.clone(),
         Arc::clone(&config),
-        Arc::new(azero_signed_connection),
+        Arc::clone(&azero_signed_connection),
         process_message,
     ));
 
-    tokio::try_join!(task1).expect("Listener task should never finish");
+    let task2 = tokio::spawn(EthListener::run(
+        config,
+        // Arc::clone(&azero_signed_connection),
+        eth_connection,
+        redis_connection,
+        eth_sender,
+    ));
+
+    tokio::try_join!(task1, task2).expect("Listener task should never finish");
+    // TODO: handle restart, or crash and rely on k8s
     std::process::exit(1);
 }
 

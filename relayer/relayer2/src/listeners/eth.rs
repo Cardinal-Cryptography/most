@@ -15,7 +15,7 @@ use log::{debug, error, info, trace, warn};
 use redis::{aio::Connection as RedisConnection, RedisError};
 use thiserror::Error;
 use tokio::{
-    sync::Mutex,
+    sync::{mpsc, Mutex},
     time::{sleep, Duration},
 };
 
@@ -47,8 +47,8 @@ pub enum EthListenerError {
     FromHex(#[from] rustc_hex::FromHexError),
     #[error("contract error")]
     Contract(#[from] ContractError<Provider<Http>>),
-    #[error("azero contract error")]
-    AzeroContract(#[from] AzeroContractError),
+    // #[error("azero contract error")]
+    // AzeroContract(#[from] AzeroContractError),
     // #[error("error when creating an ABI data encoding")]
     // AbiEncode(#[from] EncodePackedError),
     #[error("redis connection error")]
@@ -58,17 +58,17 @@ pub enum EthListenerError {
 impl EthListener {
     pub async fn run(
         config: Arc<Config>,
-        azero_connection: AzeroConnectionWithSigner,
+        // azero_connection: Arc<AzeroConnectionWithSigner>,
         eth_connection: Arc<EthConnection>,
         redis_connection: Arc<Mutex<RedisConnection>>,
-        emergency: Arc<AtomicBool>,
+        eth_event_sender: mpsc::Sender<MostEvents>,
     ) -> Result<(), EthListenerError> {
         let Config {
             eth_contract_address,
-            azero_contract_address,
-            azero_contract_metadata,
-            azero_proof_size_limit,
-            azero_ref_time_limit,
+            // azero_contract_address,
+            // azero_contract_metadata,
+            // azero_proof_size_limit,
+            // azero_ref_time_limit,
             name,
             default_sync_from_block_eth,
             sync_step,
@@ -77,12 +77,12 @@ impl EthListener {
 
         let address = eth_contract_address.parse::<Address>()?;
         let most_eth = Most::new(address, Arc::clone(&eth_connection));
-        let most_azero = MostInstance::new(
-            azero_contract_address,
-            azero_contract_metadata,
-            *azero_ref_time_limit,
-            *azero_proof_size_limit,
-        )?;
+        // let most_azero = MostInstance::new(
+        //     azero_contract_address,
+        //     azero_contract_metadata,
+        //     *azero_ref_time_limit,
+        //     *azero_proof_size_limit,
+        // )?;
 
         let mut first_unprocessed_block_number = read_first_unprocessed_block_number(
             name.clone(),
@@ -101,68 +101,66 @@ impl EthListener {
             )
             .await;
 
-            match emergency.load(Ordering::Relaxed) {
-                true => {
-                    warn!("Event handling paused due to an emergency state in one of the Advisory contracts");
-                    sleep(Duration::from_secs(20)).await;
-                }
-                false => {
-                    // Don't query for more than `sync_step` blocks at one time.
-                    let to_block = std::cmp::min(
-                        next_finalized_block_number,
-                        first_unprocessed_block_number + sync_step - 1,
-                    );
+            // Don't query for more than `sync_step` blocks at one time.
+            let to_block = std::cmp::min(
+                next_finalized_block_number,
+                first_unprocessed_block_number + sync_step - 1,
+            );
 
-                    info!(
-                        "Processing events from blocks {} - {}",
-                        first_unprocessed_block_number, to_block
-                    );
+            info!(
+                "Processing events from blocks {} - {}",
+                first_unprocessed_block_number, to_block
+            );
 
-                    // Query for events
-                    let events = most_eth
-                        .events()
-                        .from_block(first_unprocessed_block_number)
-                        .to_block(to_block)
-                        .query()
-                        .await?;
+            // Query for events
+            let events = most_eth
+                .events()
+                .from_block(first_unprocessed_block_number)
+                .to_block(to_block)
+                .query()
+                .await?;
 
-                    for event in events {
-                        // In case of the halt, we want to retry the event handling after the halt is resolved.
-                        // TODO: publish events on the channel
+            for event in events {
+                // publish event on the channel
+                eth_event_sender
+                    .send(event)
+                    .await
+                    .expect("Cannot publish an event to the eth event channel ");
 
-                        // loop {
-                        //     match handle_event(&event, &config, &azero_connection).await {
-                        //         Ok(_) => break,
-                        //         Err(EthListenerError::AzeroContract(e)) => {
-                        //             error!("Error when handling event {event:?}: {e}");
-                        //             if most_azero.is_halted(&azero_connection).await? {
-                        //                 warn!("Most contract on Aleph Zero is halted, stopping event handling");
-                        //                 wait_until_not_halted(&most_azero, &azero_connection)
-                        //                     .await?;
-                        //             } else {
-                        //                 return Err(EthListenerError::AzeroContract(e));
-                        //             }
-                        //         }
-                        //         Err(e) => return Err(e),
-                        //     }
-                        // }
-                    }
-
-                    // Update the last block number.
-                    first_unprocessed_block_number = to_block + 1;
-
-                    // Cache the last processed block number.
-                    write_last_processed_block(
-                        name.clone(),
-                        ETH_LAST_BLOCK_KEY.to_string(),
-                        redis_connection.clone(),
-                        to_block,
-                    )
-                    .await?;
-
-                    // END TODO
-                }
+                // In case of the halt, we want to retry the event handling after the halt is resolved.
+                // loop {
+                //     match handle_event(&event, &config, &azero_connection).await {
+                //         Ok(_) => break,
+                //         Err(EthListenerError::AzeroContract(e)) => {
+                //             error!("Error when handling event {event:?}: {e}");
+                //             if most_azero.is_halted(&azero_connection).await? {
+                //                 warn!("Most contract on Aleph Zero is halted, stopping event handling");
+                //                 wait_until_not_halted(&most_azero, &azero_connection)
+                //                     .await?;
+                //             } else {
+                //                 return Err(EthListenerError::AzeroContract(e));
+                //             }
+                //         }
+                //         Err(e) => return Err(e),
+                //     }
+                // }
             }
+
+            // Update the last block number
+            // NOTE: we do not wait for an ack from all of the event handlers
+            // but this is fine because events are published to a channel of capacity 1
+            first_unprocessed_block_number = to_block + 1;
+
+            // Cache the last processed block number.
+            write_last_processed_block(
+                name.clone(),
+                ETH_LAST_BLOCK_KEY.to_string(),
+                redis_connection.clone(),
+                to_block,
+            )
+            .await?;
+
+            // END TODO
         }
     }
 }
@@ -196,14 +194,14 @@ pub async fn get_next_finalized_block_number_eth(
     }
 }
 
-async fn wait_until_not_halted(
-    most_azero: &MostInstance,
-    azero_connection: &AzeroConnectionWithSigner,
-) -> Result<(), EthListenerError> {
-    loop {
-        if !most_azero.is_halted(azero_connection).await? {
-            return Ok(());
-        }
-        sleep(Duration::from_secs(10)).await;
-    }
-}
+// async fn wait_until_not_halted(
+//     most_azero: &MostInstance,
+//     azero_connection: &AzeroConnectionWithSigner,
+// ) -> Result<(), EthListenerError> {
+//     loop {
+//         if !most_azero.is_halted(azero_connection).await? {
+//             return Ok(());
+//         }
+//         sleep(Duration::from_secs(10)).await;
+//     }
+// }
