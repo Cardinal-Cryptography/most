@@ -44,7 +44,7 @@ async function mintTokens(
   const weth = new Token(tokenAddress, signer, api);
   await weth.tx.mint(to, amount);
   if (mostAddress) {
-    await weth.tx.setMinter(mostAddress);
+    await weth.tx.setMinterBurner(mostAddress);
   }
 }
 

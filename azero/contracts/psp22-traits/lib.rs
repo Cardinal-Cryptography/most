@@ -21,4 +21,7 @@ pub trait Mintable {
 pub trait Burnable {
     #[ink(message)]
     fn burn(&mut self, amount: Balance) -> Result<(), PSP22Error>;
+
+    #[ink(message)]
+    fn burner(&self) -> AccountId;
 }
