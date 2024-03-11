@@ -68,12 +68,12 @@ async function addTokenPair(
   const transactions = [
     {
       to: mostContract.address,
-      data: addPaircalldata,
+      data: await iface.encodeFunctionData("pause", []),
       value: 0,
     },
     {
       to: mostContract.address,
-      data: await iface.encodeFunctionData("pause", []),
+      data: addPaircalldata,
       value: 0,
     },
     {
