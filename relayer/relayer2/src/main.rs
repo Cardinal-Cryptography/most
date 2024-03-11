@@ -31,7 +31,7 @@ mod connections;
 mod contracts;
 mod handlers;
 mod helpers;
-// mod listeners;
+mod listeners;
 
 #[derive(Debug)]
 enum CircuitBreakerEvent {
@@ -72,24 +72,19 @@ async fn main() -> Result<()> {
     debug!("Established connection to Aleph Zero node");
 
     // Create channels
-    let (eth_sender, eth_receiver) = mpsc::channel::<MostEvents>(10);
-    // let (eth_sender, eth_receiver) = bounded::<MostEvents>(1);
-    // // let (azero_sender, azero_receiver) = bounded::<String>(1);
-    // let (circuit_breaker_sender, circuit_breaker_receiver) = bounded::<CircuitBreakerEvent>(1);
+    let (eth_sender, eth_receiver) = mpsc::channel::<MostEvents>(1);
     let (circuit_breaker_sender, circuit_breaker_receiver) =
         mpsc::channel::<CircuitBreakerEvent>(1);
 
-    // Spawn tasks for listening to channels
+    // TODO : advisory listener task
+    // TODO : halted listener task
+    // TODO : azero event handling tasks (publisher and consumer)
 
     let process_message =
         |event: MostEvents,
          config: Arc<Config>,
          azero_connection: Arc<AzeroConnectionWithSigner>| {
-            tokio::spawn(async move {
-                // Simulate some asynchronous processing
-                handle_eth_event(&event, &config, &azero_connection).await;
-                Ok(()) // Return success
-            })
+            tokio::spawn(async move { handle_eth_event(&event, &config, &azero_connection).await })
         };
 
     let task1 = tokio::spawn(listen_channel(
@@ -105,6 +100,7 @@ async fn main() -> Result<()> {
     std::process::exit(1);
 }
 
+// TODO: select between all event channels
 async fn listen_channel<F>(
     mut event_receiver: mpsc::Receiver<MostEvents>,
     mut circuit_breaker_receiver: mpsc::Receiver<CircuitBreakerEvent>,
