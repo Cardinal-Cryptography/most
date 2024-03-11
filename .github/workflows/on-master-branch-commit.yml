@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - master
-      - kz/internal-fixes-azero
 
 jobs:
   check-vars-and-secrets:
