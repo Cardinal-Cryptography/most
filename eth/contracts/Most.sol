@@ -35,8 +35,6 @@ contract Most is
     mapping(bytes32 committeeMemberId => bool) private committee;
     mapping(uint256 committeeId => uint256) public committeeSize;
     mapping(uint256 committeeId => uint256) public signatureThreshold;
-    // @dev storage gap for future contract upgrades compatibility
-    uint256[50] __gap;
 
     struct Request {
         uint256 signatureCount;
@@ -86,20 +84,19 @@ contract Most is
         address payable _wethAddress
     ) public initializer {
         committeeId = 0;
+        wethAddress = _wethAddress;
+
         _setCommittee(_committee, _signatureThreshold);
 
-        wethAddress = _wethAddress;
         __Ownable_init(owner);
         __Pausable_init();
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {
-        // required by the OZ UUPS module
-    }
+    /// @dev required by the OZ UUPS module
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 
-    function renounceOwnership() public virtual override onlyOwner {
-        // disable possibility to renounce ownership
-    }
+    /// @dev disable possibility to renounce ownership
+    function renounceOwnership() public virtual override onlyOwner {}
 
     function _setCommittee(
         address[] calldata _committee,
@@ -143,10 +140,9 @@ contract Most is
         bytes32 destTokenAddress = supportedPairs[srcTokenAddress];
         if (destTokenAddress == 0x0) revert UnsupportedPair();
 
-        address sender = msg.sender;
         // lock tokens in this contract
         // message sender needs to give approval else this tx will revert
-        token.safeTransferFrom(sender, address(this), amount);
+        token.safeTransferFrom(msg.sender, address(this), amount);
 
         emit CrosschainTransferRequest(
             committeeId,
