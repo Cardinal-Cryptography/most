@@ -16,6 +16,7 @@ use redis::{aio::Connection as RedisConnection, RedisError};
 use thiserror::Error;
 use tokio::{
     sync::Mutex,
+    task::JoinHandle,
     time::{sleep, Duration},
 };
 
@@ -111,6 +112,13 @@ pub async fn handle_event(
             )
             .await?;
     }
+
+    // tokio::spawn(async move {
+    //     // Simulate some asynchronous processing
+    //     tokio::time::sleep(Duration::from_secs(2)).await;
+    //     // Ok(()) // Return success
+    //     true
+    // })
 
     Ok(())
 }

@@ -7,18 +7,20 @@ use aleph_client::Connection;
 use clap::Parser;
 use config::Config;
 use connections::azero::AzeroConnectionWithSigner;
-use crossbeam_channel::{
-    bounded, select, unbounded, Receiver as CrossbeamReceiver, Sender as CrossbeamSender,
-};
+// use crossbeam_channel::{
+//     bounded, select, unbounded, Receiver as CrossbeamReceiver, Sender as CrossbeamSender,
+// };
 use ethers::signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, Signer, WalletError};
 use eyre::Result;
-use handlers::handle_event as handle_eth_event;
+use futures::Future;
+use handlers::{handle_event as handle_eth_event, EthHandlerError};
 use log::{debug, error, info, warn};
 use redis::{aio::Connection as RedisConnection, Client as RedisClient, RedisError};
 use thiserror::Error;
 use tokio::{
     sync::{mpsc, Mutex},
-    task::JoinSet,
+    task,
+    task::{JoinHandle, JoinSet},
     time::{sleep, Duration},
 };
 
@@ -42,7 +44,7 @@ enum CircuitBreakerEvent {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     let config = Arc::new(Config::parse());
     env_logger::init();
 
@@ -70,71 +72,71 @@ async fn main() {
     debug!("Established connection to Aleph Zero node");
 
     // Create channels
-    let (eth_sender, eth_receiver) = unbounded::<MostEvents>();
-    // let (azero_sender, azero_receiver) = unbounded::<String>();
-    let (circuit_breaker_sender, circuit_breaker_receiver) = unbounded::<CircuitBreakerEvent>();
+    let (eth_sender, eth_receiver) = mpsc::channel::<MostEvents>(10);
+    // let (eth_sender, eth_receiver) = bounded::<MostEvents>(1);
+    // // let (azero_sender, azero_receiver) = bounded::<String>(1);
+    // let (circuit_breaker_sender, circuit_breaker_receiver) = bounded::<CircuitBreakerEvent>(1);
+    let (circuit_breaker_sender, circuit_breaker_receiver) =
+        mpsc::channel::<CircuitBreakerEvent>(1);
 
     // Spawn tasks for listening to channels
 
-    let task1 = tokio::spawn(listen_eth_channel(
-        "EthEventHandler",
+    let process_message =
+        |event: MostEvents,
+         config: Arc<Config>,
+         azero_connection: Arc<AzeroConnectionWithSigner>| {
+            tokio::spawn(async move {
+                // Simulate some asynchronous processing
+                handle_eth_event(&event, &config, &azero_connection).await;
+                Ok(()) // Return success
+            })
+        };
+
+    let task1 = tokio::spawn(listen_channel(
         eth_receiver,
-        circuit_breaker_receiver.clone(),
+        circuit_breaker_receiver,
         circuit_breaker_sender.clone(),
-        &config,
-        &azero_signed_connection,
+        Arc::clone(&config),
+        Arc::new(azero_signed_connection),
+        process_message,
     ));
 
-    tokio::try_join!(task1).unwrap();
+    tokio::try_join!(task1).expect("Listener task should never finish");
     std::process::exit(1);
 }
 
-async fn listen_eth_channel<F>(
-    name: &'static str,
-    event_receiver: CrossbeamReceiver<MostEvents>,
-    circuit_breaker_receiver: CrossbeamReceiver<CircuitBreakerEvent>,
-    circuit_breaker_sender: CrossbeamSender<CircuitBreakerEvent>,
-    config: &Config,
-    azero_connection: &AzeroConnectionWithSigner,
-    // handle_event: F,
-)
-// where
-//     F: Fn(MostEvents, Config) -> bool + Send + 'static,
+async fn listen_channel<F>(
+    mut event_receiver: mpsc::Receiver<MostEvents>,
+    mut circuit_breaker_receiver: mpsc::Receiver<CircuitBreakerEvent>,
+    circuit_breaker_sender: mpsc::Sender<CircuitBreakerEvent>,
+    config: Arc<Config>,
+    azero_connection: Arc<AzeroConnectionWithSigner>,
+    process_message: F,
+) where
+    F: Fn(
+            MostEvents,
+            Arc<Config>,
+            Arc<AzeroConnectionWithSigner>,
+        ) -> JoinHandle<Result<(), EthHandlerError>>
+        + Send,
 {
     loop {
-        select! {
-            recv(event_receiver) -> event => match event {
-                Ok(evt) => match handle_eth_event (&evt, config, azero_connection) {
-                    true => circuit_breaker_sender.send (CircuitBreakerEvent::EventHandlerSuccess).expect ("{name} can send to the circuit breaker channel"),
-                    false => circuit_breaker_sender.send (CircuitBreakerEvent::EventHandlerFailure).expect ("{name} can send to the circuit breaker channel")
-                },
-                Err(why) => {
-                    error!("{name} fatal error: {why}");
-                    std::process::exit(1);
+        tokio::select! {
+            Some(event) = event_receiver.recv() => {
+                if let Ok(CircuitBreakerEvent::EventHandlerFailure) = circuit_breaker_receiver.try_recv() {
+                    // println!("{} Circuit breaker fired. Dropping task and restarting.", name);
+                    return; // Drop the task and restart
                 }
-            },
 
-            recv(circuit_breaker_receiver) -> msg => match msg {
-                Ok(circuit_breaker_event) => match circuit_breaker_event {
-                    CircuitBreakerEvent::EventHandlerSuccess => todo!(), // nothing to do?
-                    CircuitBreakerEvent::EventHandlerFailure => todo!(), // try 3 times and give up?
-                    CircuitBreakerEvent::BridgeHaltAzero => todo!(), // go into a query loop
-                    CircuitBreakerEvent::BridgeHaltEth => todo!(), // go into a query loop
-                    CircuitBreakerEvent::AdvisoryEmergency => todo!(), // go into a query loop
-                    CircuitBreakerEvent::Other (why) => todo!(), // try 3 times and give up?
-                },
-                Err(why) => {
-                    circuit_breaker_sender.send (CircuitBreakerEvent::Other (format! ("{why}"))).expect ("{name} can send to the circuit breaker channel")
-                },
+                // println!("{} received message: {}", name, msg);
+                // Call the custom processing function and wait for its completion
+                let processing_result = process_message(event, Arc::clone (&config), Arc::clone (&azero_connection)).await;
+                // if processing_result {
+                    circuit_breaker_sender.send(CircuitBreakerEvent::EventHandlerSuccess).await.unwrap();
+                // } else {
+                //     circuit_breaker_tx.send(CircuitBreakerEvent::Failure).await.unwrap();
+                // }
             }
         }
     }
-}
-
-fn test_handler(
-    event: &MostEvents,
-    config: &Config,
-    azero_connection: &AzeroConnectionWithSigner,
-) -> bool {
-    true
 }
