@@ -31,11 +31,11 @@ contract Most is
     mapping(bytes32 from => bytes32 to) public supportedPairs;
     mapping(bytes32 requestHash => Request) public pendingRequests;
     mapping(bytes32 requestHash => bool) public processedRequests;
-    /// @dev committeeMemberId = keccak256(abi.encodePacked(committeeId, comitteeMemeberAddress))
+    /// @dev committeeMemberId = keccak256(abi.encodePacked(committeeId, comitteeMemberAddress))
     mapping(bytes32 committeeMemberId => bool) private committee;
     mapping(uint256 committeeId => uint256) public committeeSize;
     mapping(uint256 committeeId => uint256) public signatureThreshold;
-    // @dev storage gap for future contract updates compatibility
+    // @dev storage gap for future contract upgrades compatibility
     uint256[50] __gap;
 
     struct Request {
