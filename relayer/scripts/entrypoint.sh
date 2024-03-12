@@ -29,6 +29,9 @@ ADVISORY_ADDRESSES=${ADVISORY_ADDRESSES:-""}
 AZERO_MOST_ADDRESS=${AZERO_MOST_ADDDRESS:-""}
 ETH_MOST_ADDRESS=${ETH_MOST_ADDRESS:-""}
 
+# --- Signer's CID
+SIGNER_CID=${SIGNER_CID:-""}
+
 # --- RELAYER ID from MY_POD_NAME coming from statefulset's pod, such as
 # --- relayer-0, relayer-1 etc.
 if [[ "${MY_POD_NAME}" =~ ^relayer-[0-9]+$ && "${RELAYER_ID}" == 0 ]]; then
@@ -108,6 +111,10 @@ fi
 
 if [[ -n "${ETH_START_BLOCK}" ]]; then
   ARGS+=(--default-sync-from-block-eth=${ETH_START_BLOCK})
+fi
+
+if [[ -n "${SIGNER_CID}" ]]; then
+  ARGS+=(--signer-cid=${SIGNER_CID})
 fi
 
 # --- RUN
