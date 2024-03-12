@@ -12,6 +12,9 @@ pub type Balance = <DefaultEnvironment as Environment>::Balance;
 pub trait Mintable {
     #[ink(message)]
     fn mint(&mut self, to: AccountId, amount: Balance) -> Result<(), PSP22Error>;
+
+    #[ink(message)]
+    fn minter(&self) -> AccountId;
 }
 
 #[ink::trait_definition]
@@ -20,5 +23,5 @@ pub trait Burnable {
     fn burn(&mut self, amount: Balance) -> Result<(), PSP22Error>;
 
     #[ink(message)]
-    fn burn_from(&mut self, from: AccountId, amount: Balance) -> Result<(), PSP22Error>;
+    fn burner(&self) -> AccountId;
 }

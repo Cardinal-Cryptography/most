@@ -11,18 +11,15 @@ pub mod most {
     use ink::{
         codegen::TraitCallBuilder,
         contract_ref,
-        env::{
-            call::{build_call, ExecutionInput},
-            set_code_hash, DefaultEnvironment, Error as InkEnvError,
-        },
+        env::{set_code_hash, Error as InkEnvError},
         prelude::{format, string::String, vec, vec::Vec},
         storage::{traits::ManualKey, Lazy, Mapping},
     };
     use ownable2step::*;
-    use psp22::PSP22Error;
+    use psp22::{PSP22Error, PSP22};
     use psp22_traits::{Burnable, Mintable};
     use scale::{Decode, Encode};
-    use shared::{concat_u8_arrays, keccak256, Keccak256HashOutput as HashedRequest, Selector};
+    use shared::{concat_u8_arrays, keccak256, Keccak256HashOutput as HashedRequest};
 
     type CommitteeId = u128;
 
@@ -135,12 +132,12 @@ pub mod most {
         /// How much gas does a single confirmation of a cross-chain transfer request use on the destination chain on average.
         /// This value is calculated by summing the total gas usage of *all* the transactions it takes to relay a single request and dividing it by the current committee size and multiplying by 1.2
         relay_gas_usage: u128,
-        /// minimum fee that can be charged for a cross-chain transfer request
-        min_fee: u128,
-        /// maximum fee that can be charged for a cross-chain transfer request
-        max_fee: u128,
-        /// default fee that is charged for a cross-chain transfer request if the gas price oracle is not available/malfunctioning
-        default_fee: u128,
+        /// minimum gas price used to calculate the fee that can be charged for a cross-chain transfer request
+        min_gas_price: u128,
+        /// maximum gas price used to calculate the fee that can be charged for a cross-chain transfer request
+        max_gas_price: u128,
+        /// default gas price used to calculate the fee that is charged for a cross-chain transfer request if the gas price oracle is not available/malfunctioning
+        default_gas_price: u128,
         /// gas price oracle that is used to calculate the fee for a cross-chain transfer request
         gas_price_oracle: Option<AccountId>,
         /// Is the bridge in a halted state
@@ -177,7 +174,10 @@ pub mod most {
     pub enum MostError {
         Constructor,
         InvalidThreshold,
+        DuplicateCommitteeMember,
+        ZeroTransferAmount,
         NotInCommittee,
+        NoSuchCommittee,
         HashDoesNotMatchData,
         PSP22(PSP22Error),
         Ownable(Ownable2StepError),
@@ -188,6 +188,8 @@ pub mod most {
         Arithmetic,
         CorruptedStorage,
         IsHalted,
+        HaltRequired,
+        NoMintPermission,
     }
 
     impl From<InkEnvError> for MostError {
@@ -216,15 +218,13 @@ pub mod most {
             signature_threshold: u128,
             pocket_money: Balance,
             relay_gas_usage: u128,
-            min_fee: Balance,
-            max_fee: Balance,
-            default_fee: Balance,
+            min_gas_price: Balance,
+            max_gas_price: Balance,
+            default_gas_price: Balance,
             gas_price_oracle: Option<AccountId>,
             owner: AccountId,
         ) -> Result<Self, MostError> {
-            if signature_threshold == 0 || committee.len().lt(&(signature_threshold as usize)) {
-                return Err(MostError::InvalidThreshold);
-            }
+            Self::check_committee(&committee, signature_threshold)?;
 
             let committee_id = 0;
 
@@ -246,11 +246,11 @@ pub mod most {
                 pocket_money,
                 pocket_money_balance: 0,
                 relay_gas_usage,
-                min_fee,
-                max_fee,
-                default_fee,
+                min_gas_price,
+                max_gas_price,
+                default_gas_price,
                 gas_price_oracle,
-                is_halted: false,
+                is_halted: true,
             });
 
             let mut ownable_data = Lazy::new();
@@ -284,7 +284,11 @@ pub mod most {
             amount: u128,
             dest_receiver_address: [u8; 32],
         ) -> Result<(), MostError> {
-            self.check_halted()?;
+            self.ensure_not_halted()?;
+
+            if amount == 0 {
+                return Err(MostError::ZeroTransferAmount);
+            }
 
             let mut data = self.data()?;
 
@@ -326,7 +330,9 @@ pub mod most {
 
             // return surplus if any
             if let Some(surplus) = transferred_fee.checked_sub(current_base_fee) {
-                self.env().transfer(sender, surplus)?;
+                if surplus > 0 {
+                    self.env().transfer(sender, surplus)?;
+                }
             };
 
             self.env().emit_event(CrosschainTransferRequest {
@@ -351,7 +357,7 @@ pub mod most {
             dest_receiver_address: [u8; 32],
             request_nonce: u128,
         ) -> Result<(), MostError> {
-            self.check_halted()?;
+            self.ensure_not_halted()?;
 
             let caller = self.env().caller();
             self.only_committee_member(committee_id, caller)?;
@@ -390,7 +396,7 @@ pub mod most {
                 return Err(MostError::HashDoesNotMatchData);
             }
 
-            let mut request = self.pending_requests.get(request_hash).unwrap_or_default(); //  {
+            let mut request = self.pending_requests.get(request_hash).unwrap_or_default();
 
             // record vote
             request.signature_count = request
@@ -452,7 +458,7 @@ pub mod most {
             committee_id: CommitteeId,
             member_id: AccountId,
         ) -> Result<(), MostError> {
-            self.check_halted()?;
+            self.ensure_not_halted()?;
 
             let paid_out_rewards = self.get_paid_out_member_rewards(committee_id, member_id);
 
@@ -488,28 +494,9 @@ pub mod most {
 
         /// Upgrades contract code
         #[ink(message)]
-        pub fn set_code(
-            &mut self,
-            code_hash: [u8; 32],
-            callback: Option<Selector>,
-        ) -> Result<(), MostError> {
+        pub fn set_code(&mut self, code_hash: [u8; 32]) -> Result<(), MostError> {
             self.ensure_owner()?;
             set_code_hash(&code_hash)?;
-
-            // Optionally call a callback function in the new contract that performs the storage data migration.
-            // By convention this function should be called `migrate`, it should take no arguments
-            // and be call-able only by `this` contract's instance address.
-            // To ensure the latter the `migrate` in the updated contract can e.g. check if it has an Admin role on self.
-            //
-            // `delegatecall` ensures that the target contract is called within the caller contracts context.
-            if let Some(selector) = callback {
-                build_call::<DefaultEnvironment>()
-                    .delegate(Hash::from(code_hash))
-                    .exec_input(ExecutionInput::new(ink::env::call::Selector::new(selector)))
-                    .returns::<Result<(), MostError>>()
-                    .invoke()?;
-            }
-
             Ok(())
         }
 
@@ -580,12 +567,14 @@ pub mod most {
             committee_id: CommitteeId,
             member_id: AccountId,
         ) -> Result<u128, MostError> {
+            self.only_committee_member(committee_id, member_id)?;
+
             let total_amount = self
                 .get_collected_committee_rewards(committee_id)
                 .checked_div(
                     self.committee_sizes
                         .get(committee_id)
-                        .ok_or(MostError::NotInCommittee)?,
+                        .ok_or(MostError::NoSuchCommittee)?,
                 )
                 .ok_or(MostError::Arithmetic)?;
 
@@ -597,45 +586,44 @@ pub mod most {
         /// Queries a gas price oracle and returns the current base_fee charged per cross chain transfer denominated in AZERO
         #[ink(message)]
         pub fn get_base_fee(&self) -> Result<Balance, MostError> {
-            if let Some(gas_price_oracle_address) = self.data()?.gas_price_oracle {
+            let gas_price = if let Some(gas_price_oracle_address) = self.data()?.gas_price_oracle {
                 let gas_price_oracle: contract_ref!(EthGasPriceOracle) =
                     gas_price_oracle_address.into();
 
-                let (gas_price, timestamp) = match gas_price_oracle
+                match gas_price_oracle
                     .call()
                     .get_price()
                     .gas_limit(ORACLE_CALL_GAS_LIMIT)
                     .try_invoke()
                 {
-                    Ok(Ok((gas_price, timestamp))) => (gas_price, timestamp),
-                    _ => return Ok(self.data()?.default_fee),
-                };
-
-                if timestamp + GAS_ORACLE_MAX_AGE < self.env().block_timestamp() {
-                    return Ok(self.data()?.default_fee);
-                }
-
-                let base_fee = gas_price
-                    .checked_mul(self.data()?.relay_gas_usage)
-                    .ok_or(MostError::Arithmetic)?
-                    .checked_mul(100u128 + BASE_FEE_BUFFER_PERCENTAGE)
-                    .ok_or(MostError::Arithmetic)?
-                    .checked_div(100u128)
-                    .ok_or(MostError::Arithmetic)?;
-
-                if base_fee < self.data()?.min_fee {
-                    Ok(self.data()?.min_fee)
-                } else if base_fee > self.data()?.max_fee {
-                    Ok(self.data()?.max_fee)
-                } else {
-                    Ok(base_fee)
+                    Ok(Ok((gas_price, timestamp))) => {
+                        if timestamp + GAS_ORACLE_MAX_AGE < self.env().block_timestamp() {
+                            self.data()?.default_gas_price
+                        } else if gas_price < self.data()?.min_gas_price {
+                            self.data()?.min_gas_price
+                        } else if gas_price > self.data()?.max_gas_price {
+                            self.data()?.max_gas_price
+                        } else {
+                            gas_price
+                        }
+                    }
+                    _ => self.data()?.default_gas_price,
                 }
             } else {
-                Ok(self.data()?.default_fee)
-            }
+                self.data()?.default_gas_price
+            };
+
+            let base_fee = gas_price
+                .checked_mul(self.data()?.relay_gas_usage)
+                .ok_or(MostError::Arithmetic)?
+                .checked_mul(100u128 + BASE_FEE_BUFFER_PERCENTAGE)
+                .ok_or(MostError::Arithmetic)?
+                .checked_div(100u128)
+                .ok_or(MostError::Arithmetic)?;
+            Ok(base_fee)
         }
 
-        /// Returns an error (reverts) if account is not in the committee with `committee_id`
+        /// Returns whether an account is in the committee with `committee_id`
         #[ink(message)]
         pub fn is_in_committee(&self, committee_id: CommitteeId, account: AccountId) -> bool {
             self.committees.contains((committee_id, account))
@@ -662,6 +650,7 @@ pub mod most {
         #[ink(message)]
         pub fn remove_pair(&mut self, from: [u8; 32]) -> Result<(), MostError> {
             self.ensure_owner()?;
+            self.ensure_halted()?;
             self.supported_pairs.remove(from);
             Ok(())
         }
@@ -672,6 +661,15 @@ pub mod most {
         #[ink(message)]
         pub fn add_pair(&mut self, from: [u8; 32], to: [u8; 32]) -> Result<(), MostError> {
             self.ensure_owner()?;
+            self.ensure_halted()?;
+
+            // Check if MOST has mint permission to the PSP22 token
+            let psp22_address: AccountId = from.into();
+            let psp22: ink::contract_ref!(Mintable) = psp22_address.into();
+            if psp22.minter() != self.env().account_id() {
+                return Err(MostError::NoMintPermission);
+            }
+
             self.supported_pairs.insert(from, &to);
             Ok(())
         }
@@ -702,12 +700,9 @@ pub mod most {
             signature_threshold: u128,
         ) -> Result<(), MostError> {
             self.ensure_owner()?;
+            Self::check_committee(&committee, signature_threshold)?;
 
             let mut data = self.data()?;
-
-            if signature_threshold == 0 || committee.len().lt(&(signature_threshold as usize)) {
-                return Err(MostError::InvalidThreshold);
-            }
 
             let committee_id = data.committee_id + 1;
             let mut committee_set = Mapping::new();
@@ -774,11 +769,33 @@ pub mod most {
 
         // ---  helper functions
 
-        fn check_halted(&self) -> Result<(), MostError> {
+        fn ensure_halted(&self) -> Result<(), MostError> {
+            match self.is_halted()? {
+                true => Ok(()),
+                false => Err(MostError::HaltRequired),
+            }
+        }
+
+        fn ensure_not_halted(&self) -> Result<(), MostError> {
             match self.is_halted()? {
                 true => Err(MostError::IsHalted),
                 false => Ok(()),
             }
+        }
+
+        fn check_committee(committee: &[AccountId], threshold: u128) -> Result<(), MostError> {
+            if threshold == 0 || committee.len().lt(&(threshold as usize)) {
+                return Err(MostError::InvalidThreshold);
+            }
+
+            for i in 0..committee.len() {
+                for j in i + 1..committee.len() {
+                    if committee[i] == committee[j] {
+                        return Err(MostError::DuplicateCommitteeMember);
+                    }
+                }
+            }
+            Ok(())
         }
 
         /// Mints the specified amount of token to the designated account
@@ -798,8 +815,11 @@ pub mod most {
             from: AccountId,
             amount: u128,
         ) -> Result<(), PSP22Error> {
-            let mut psp22: ink::contract_ref!(Burnable) = token.into();
-            psp22.burn_from(from, amount)
+            let mut psp22: ink::contract_ref!(PSP22) = token.into();
+            psp22.transfer_from(from, self.env().account_id(), amount, vec![])?;
+
+            let mut psp22_burnable: ink::contract_ref!(Burnable) = token.into();
+            psp22_burnable.burn(amount)
         }
 
         fn data(&self) -> Result<Data, MostError> {

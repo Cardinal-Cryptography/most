@@ -16,7 +16,6 @@ use serde_json::Value;
 
 #[derive(Deserialize, Serialize)]
 pub struct EthContractAddresses {
-    pub governance: String,
     pub migrations: String,
     pub most: String,
     pub usdt: String,
