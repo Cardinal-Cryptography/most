@@ -52,7 +52,6 @@ pub mod token {
         name: Option<String>,
         symbol: Option<String>,
         decimals: u8,
-        admin: AccountId,
         minter_burner: AccountId,
     }
 
@@ -75,14 +74,8 @@ pub mod token {
                 name,
                 symbol,
                 decimals,
-                admin: caller,
                 minter_burner,
             }
-        }
-
-        #[ink(message)]
-        pub fn minter_burner(&self) -> AccountId {
-            self.minter_burner
         }
 
         #[ink(message)]
@@ -97,13 +90,23 @@ pub mod token {
 
         fn ensure_owner(&self) -> Result<(), PSP22Error> {
             <Self as Ownable2Step>::ensure_owner(self)
-                .map_err(|_| PSP22Error::Custom(String::from("Caller has to be the admin.")))
+                .map_err(|_| PSP22Error::Custom(String::from("Caller has to be the owner.")))
         }
 
-        fn ensure_minter_burner(&self) -> Result<(), PSP22Error> {
-            if self.env().caller() != self.minter_burner {
+        fn ensure_minter(&self) -> Result<(), PSP22Error> {
+            if self.env().caller() != self.minter() {
                 Err(PSP22Error::Custom(String::from(
-                    "Caller has to be the minter/burner.",
+                    "Caller has to be the minter.",
+                )))
+            } else {
+                Ok(())
+            }
+        }
+
+        fn ensure_burner(&self) -> Result<(), PSP22Error> {
+            if self.env().caller() != self.burner() {
+                Err(PSP22Error::Custom(String::from(
+                    "Caller has to be the burner.",
                 )))
             } else {
                 Ok(())
@@ -227,32 +230,30 @@ pub mod token {
     impl Mintable for Token {
         #[ink(message)]
         fn mint(&mut self, to: AccountId, value: u128) -> Result<(), PSP22Error> {
-            self.ensure_minter_burner()?;
+            self.ensure_minter()?;
             let events = self.data.mint(to, value)?;
             self.emit_events(events);
             Ok(())
+        }
+
+        #[ink(message)]
+        fn minter(&self) -> AccountId {
+            self.minter_burner
         }
     }
 
     impl Burnable for Token {
         #[ink(message)]
         fn burn(&mut self, value: u128) -> Result<(), PSP22Error> {
+            self.ensure_burner()?;
             let events = self.data.burn(self.env().caller(), value)?;
             self.emit_events(events);
             Ok(())
         }
 
         #[ink(message)]
-        fn burn_from(&mut self, from: AccountId, value: u128) -> Result<(), PSP22Error> {
-            self.ensure_minter_burner()?;
-            let caller = self.env().caller();
-            if self.data.allowance(from, caller) < value {
-                return Err(PSP22Error::InsufficientAllowance);
-            }
-            let events = self.data.burn(from, value)?;
-            self.data.decrease_allowance(from, caller, value)?;
-            self.emit_events(events);
-            Ok(())
+        fn burner(&self) -> AccountId {
+            self.minter_burner
         }
     }
 
@@ -303,7 +304,7 @@ pub mod token {
         psp22::tests!(Token, crate::token::tests::init_contract);
 
         #[ink::test]
-        fn set_admin_works() {
+        fn setting_owner_works() {
             let mut token = init_contract(INIT_SUPPLY_TEST);
             let alice = default_accounts::<E>().alice;
             let bob = default_accounts::<E>().bob;
@@ -317,7 +318,7 @@ pub mod token {
         }
 
         #[ink::test]
-        fn non_admin_cannot_set_admin() {
+        fn non_owner_cannot_change_owner() {
             let mut token = init_contract(INIT_SUPPLY_TEST);
             let alice = default_accounts::<E>().alice;
             let bob = default_accounts::<E>().bob;
@@ -330,18 +331,18 @@ pub mod token {
         }
 
         #[ink::test]
-        fn admin_can_set_minter_burner() {
+        fn owner_can_set_minter_burner() {
             let mut token = init_contract(INIT_SUPPLY_TEST);
             let alice = default_accounts::<E>().alice;
             let bob = default_accounts::<E>().bob;
 
             set_caller::<E>(alice);
             assert!(token.set_minter_burner(bob).is_ok());
-            assert_eq!(token.minter_burner(), bob);
+            assert_eq!(token.minter(), bob);
         }
 
         #[ink::test]
-        fn non_admin_cannot_set_minter_burner() {
+        fn non_owner_cannot_set_minter_burner() {
             let mut token = init_contract(INIT_SUPPLY_TEST);
             let bob = default_accounts::<E>().bob;
 
@@ -349,13 +350,13 @@ pub mod token {
             assert_eq!(
                 token.set_minter_burner(bob),
                 Err(PSP22Error::Custom(String::from(
-                    "Caller has to be the admin.",
+                    "Caller has to be the owner.",
                 )))
             );
         }
 
         #[ink::test]
-        fn minter_burner_can_mint() {
+        fn minter_can_mint() {
             let mut token = init_contract(INIT_SUPPLY_TEST);
             let bob = default_accounts::<E>().bob;
             let charlie = default_accounts::<E>().charlie;
@@ -367,7 +368,7 @@ pub mod token {
         }
 
         #[ink::test]
-        fn non_minter_burner_cannot_mint() {
+        fn non_minter_cannot_mint() {
             let mut token = init_contract(INIT_SUPPLY_TEST);
             let alice = default_accounts::<E>().alice;
             let bob = default_accounts::<E>().bob;
@@ -376,37 +377,36 @@ pub mod token {
             assert_eq!(
                 token.mint(alice, 100),
                 Err(PSP22Error::Custom(String::from(
-                    "Caller has to be the minter/burner."
+                    "Caller has to be the minter."
                 )))
             );
         }
 
         #[ink::test]
-        fn minter_burner_can_burn() {
+        fn burner_can_burn() {
             let mut token = init_contract(INIT_SUPPLY_TEST);
             let alice = default_accounts::<E>().alice;
             let charlie = default_accounts::<E>().charlie;
-            let alice_balance_before = token.balance_of(alice);
 
             set_caller::<E>(alice);
-            assert!(token.approve(charlie, 100).is_ok());
+            token.transfer(charlie, 100, vec![]).unwrap();
 
+            let charlie_balance_before = token.balance_of(charlie);
             set_caller::<E>(charlie);
-            assert!(token.burn_from(alice, 100).is_ok());
-            assert_eq!(token.balance_of(alice), alice_balance_before - 100);
+            assert!(token.burn(100).is_ok());
+            assert_eq!(token.balance_of(charlie), charlie_balance_before - 100);
         }
 
         #[ink::test]
-        fn non_minter_burner_cannot_burn() {
+        fn non_burner_cannot_burn() {
             let mut token = init_contract(INIT_SUPPLY_TEST);
-            let alice = default_accounts::<E>().alice;
             let bob = default_accounts::<E>().bob;
 
             set_caller::<E>(bob);
             assert_eq!(
-                token.burn_from(alice, 100),
+                token.burn(100),
                 Err(PSP22Error::Custom(String::from(
-                    "Caller has to be the minter/burner."
+                    "Caller has to be the burner."
                 )))
             );
         }

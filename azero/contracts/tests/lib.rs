@@ -50,9 +50,11 @@ mod e2e {
     const REMOTE_TOKEN: [u8; 32] = [0x1; 32];
     const REMOTE_RECEIVER: [u8; 32] = [0x2; 32];
 
-    const MIN_FEE: u128 = 10000000000000;
-    const MAX_FEE: u128 = 100000000000000;
-    const DEFAULT_FEE: u128 = 30000000000000;
+    const APPROX_GWEI_PRICE: u128 = 3000000;
+
+    const MIN_GAS_PRICE: u128 = 20 * APPROX_GWEI_PRICE;
+    const MAX_GAS_PRICE: u128 = 150 * APPROX_GWEI_PRICE;
+    const DEFAULT_GAS_PRICE: u128 = 60 * APPROX_GWEI_PRICE;
     const DEFAULT_POCKET_MONEY: u128 = 1000000000000;
     const DEFAULT_RELAY_GAS_USAGE: u128 = 50000;
 
@@ -67,9 +69,9 @@ mod e2e {
             DEFAULT_THRESHOLD,
             DEFAULT_POCKET_MONEY,
             DEFAULT_RELAY_GAS_USAGE,
-            MIN_FEE,
-            MAX_FEE,
-            DEFAULT_FEE,
+            MIN_GAS_PRICE,
+            MAX_GAS_PRICE,
+            DEFAULT_GAS_PRICE,
             account_id(AccountKeyring::Alice),
         )
         .await;
@@ -78,6 +80,11 @@ mod e2e {
     #[ink_e2e::test]
     fn owner_can_add_a_new_pair(mut client: ink_e2e::Client<C, E>) {
         let (most_address, token_address) = setup_default_most_and_token(&mut client, false).await;
+
+        // Bridge needs to be halted to add a new pair
+        most_set_halted(&mut client, &alice(), most_address, true)
+            .await
+            .expect("set_halted should succeed");
 
         let add_pair_res = most_add_pair(
             &mut client,
@@ -241,8 +248,7 @@ mod e2e {
 
         match send_request_res {
             Ok(call_res) => {
-                // 1 PSP22Event::Transfer event for burn and 1 `CrosschainTransferRequest`
-                assert_eq!(call_res.events.len(), 2);
+                assert_eq!(call_res.events.len(), 4);
 
                 let request_events =
                     filter_decode_events_as::<CrosschainTransferRequest>(call_res.events);
@@ -605,6 +611,71 @@ mod e2e {
     }
 
     #[ink_e2e::test]
+    fn only_guardians_get_rewards(mut client: ink_e2e::Client<C, E>) {
+        let (most_address, token_address) = setup_default_most_and_token(&mut client, true).await;
+
+        let amount = 1000;
+        let base_fee = most_base_fee(&mut client, most_address)
+            .await
+            .expect("should return base fee");
+
+        psp22_approve(&mut client, &alice(), token_address, most_address, amount)
+            .await
+            .expect("approval should succeed");
+
+        most_send_request(
+            &mut client,
+            &alice(),
+            most_address,
+            token_address,
+            amount,
+            REMOTE_RECEIVER,
+            base_fee,
+        )
+        .await
+        .expect("send request should succeed");
+
+        let committee_id = most_committee_id(&mut client, most_address)
+            .await
+            .expect("committe id");
+
+        let total_rewards = most_committee_rewards(&mut client, most_address, committee_id)
+            .await
+            .expect("committee rewards");
+
+        assert_eq!(total_rewards, base_fee);
+
+        // Trying to request payout for non-guardian
+        let non_guardian = account_id(AccountKeyring::One);
+        assert!(!guardian_ids().contains(&non_guardian));
+        let non_guardian_balance_before = client
+            .balance(non_guardian)
+            .await
+            .expect("non_guardian_balance_before");
+
+        let non_guardian_payout_res = most_request_payout(
+            &mut client,
+            &alice(),
+            most_address,
+            committee_id,
+            non_guardian,
+        )
+        .await;
+
+        assert_eq!(
+            non_guardian_payout_res.expect_err("Payout should fail for non-guardian"),
+            MostError::NotInCommittee
+        );
+
+        let non_guardian_balance_after = client
+            .balance(non_guardian)
+            .await
+            .expect("non_guardian_balance_after");
+
+        assert_eq!(non_guardian_balance_before, non_guardian_balance_after);
+    }
+
+    #[ink_e2e::test]
     fn committee_rewards(mut client: ink_e2e::Client<C, E>) {
         let (most_address, token_address) = setup_default_most_and_token(&mut client, true).await;
 
@@ -770,15 +841,13 @@ mod e2e {
             .await
             .expect("should return base fee");
 
-        assert_eq!(base_fee, DEFAULT_FEE);
+        assert_eq!(
+            base_fee,
+            DEFAULT_GAS_PRICE * DEFAULT_RELAY_GAS_USAGE * 120 / 100
+        );
 
         // Oracle returning price withing the range
-        let oracle_address = instantiate_oracle(
-            &mut client,
-            &alice(),
-            2 * DEFAULT_FEE / DEFAULT_RELAY_GAS_USAGE,
-        )
-        .await;
+        let oracle_address = instantiate_oracle(&mut client, &alice(), 2 * DEFAULT_GAS_PRICE).await;
         most_set_gas_oracle(&mut client, &alice(), most_address, oracle_address)
             .await
             .expect("can set gas oracle");
@@ -787,11 +856,13 @@ mod e2e {
             .await
             .expect("should return base fee");
 
-        assert_eq!(oracle_fee, 2 * DEFAULT_FEE * 120 / 100);
+        assert_eq!(
+            oracle_fee,
+            2 * DEFAULT_GAS_PRICE * DEFAULT_RELAY_GAS_USAGE * 120 / 100
+        );
 
         // Oracle returning price larger than the maximum allowed price
-        let oracle_address =
-            instantiate_oracle(&mut client, &alice(), 2 * MAX_FEE / DEFAULT_RELAY_GAS_USAGE).await;
+        let oracle_address = instantiate_oracle(&mut client, &alice(), 2 * MAX_GAS_PRICE).await;
 
         most_set_gas_oracle(&mut client, &alice(), most_address, oracle_address)
             .await
@@ -801,15 +872,13 @@ mod e2e {
             .await
             .expect("should return base fee");
 
-        assert_eq!(oracle_fee, MAX_FEE);
+        assert_eq!(
+            oracle_fee,
+            MAX_GAS_PRICE * DEFAULT_RELAY_GAS_USAGE * 120 / 100
+        );
 
         // Oracle returning price smaller than the minimum allowed price
-        let oracle_address = instantiate_oracle(
-            &mut client,
-            &alice(),
-            MIN_FEE / (2 * DEFAULT_RELAY_GAS_USAGE),
-        )
-        .await;
+        let oracle_address = instantiate_oracle(&mut client, &alice(), MIN_GAS_PRICE / 2).await;
 
         most_set_gas_oracle(&mut client, &alice(), most_address, oracle_address)
             .await
@@ -819,7 +888,31 @@ mod e2e {
             .await
             .expect("should return base fee");
 
-        assert_eq!(oracle_fee, MIN_FEE);
+        assert_eq!(
+            oracle_fee,
+            MIN_GAS_PRICE * DEFAULT_RELAY_GAS_USAGE * 120 / 100
+        );
+    }
+
+    #[ink_e2e::test]
+    fn gas_oracle_tries_to_cause_overflow(mut client: ink_e2e::Client<C, E>) {
+        let (most_address, _token_address) = setup_default_most_and_token(&mut client, true).await;
+
+        // Oracle returning price withing the range
+        let oracle_address = instantiate_oracle(&mut client, &alice(), u128::MAX).await;
+
+        most_set_gas_oracle(&mut client, &alice(), most_address, oracle_address)
+            .await
+            .expect("can set gas oracle");
+
+        let oracle_fee = most_base_fee(&mut client, most_address)
+            .await
+            .expect("should return base fee");
+
+        assert_eq!(
+            oracle_fee,
+            MAX_GAS_PRICE * DEFAULT_RELAY_GAS_USAGE * 120 / 100
+        );
     }
 
     #[ink_e2e::test]
@@ -1048,9 +1141,9 @@ mod e2e {
             DEFAULT_THRESHOLD,
             DEFAULT_POCKET_MONEY,
             DEFAULT_RELAY_GAS_USAGE,
-            MIN_FEE,
-            MAX_FEE,
-            DEFAULT_FEE,
+            MIN_GAS_PRICE,
+            MAX_GAS_PRICE,
+            DEFAULT_GAS_PRICE,
             account_id(AccountKeyring::Alice),
         )
         .await;
@@ -1069,6 +1162,11 @@ mod e2e {
                 .await
                 .expect("Add pair should succeed");
         }
+
+        // Activate the most contract
+        most_set_halted(client, &alice(), most_address, false)
+            .await
+            .expect("Set halt should succeed");
 
         (most_address, token_address)
     }
@@ -1118,6 +1216,22 @@ mod e2e {
             caller,
             most,
             |most| most.set_committee(members.to_vec(), threshold),
+            None,
+        )
+        .await
+    }
+
+    async fn most_set_halted(
+        client: &mut E2EClient,
+        caller: &Keypair,
+        most: AccountId,
+        halt: bool,
+    ) -> CallResult<(), MostError> {
+        call_message::<MostRef, _, _, _, _>(
+            client,
+            caller,
+            most,
+            |most| most.set_halted(halt),
             None,
         )
         .await
