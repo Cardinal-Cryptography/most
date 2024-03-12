@@ -25,6 +25,7 @@ use tokio::{
 use crate::{
     connections::{azero, eth},
     contracts::MostEvents,
+    handlers::EthHandler,
     listeners::{EthListener, Message},
     redis::RedisManager,
 };
@@ -123,10 +124,10 @@ async fn main() -> Result<()> {
     // TODO : halted listener tasks
     // TODO : azero event handling tasks (publisher and consumer)
 
-    let process_message =
-        |events: Message, config: Arc<Config>, azero_connection: Arc<AzeroConnectionWithSigner>| {
-            tokio::spawn(async move { handle_eth_events(events, &config, &azero_connection).await })
-        };
+    // let process_message =
+    //     |events: Message, config: Arc<Config>, azero_connection: Arc<AzeroConnectionWithSigner>| {
+    //         tokio::spawn(async move { handle_eth_events(events, &config, &azero_connection).await })
+    //     };
 
     let eth_listener = tokio::spawn(EthListener::run(
         Arc::clone(&config),
@@ -142,13 +143,12 @@ async fn main() -> Result<()> {
         eth_block_number_receiver2,
     ));
 
-    let task3 = tokio::spawn(handle_requests(
+    let eth_handler = tokio::spawn(EthHandler::run(
         eth_receiver,
         circuit_breaker_receiver,
         circuit_breaker_sender.clone(),
         Arc::clone(&config),
         Arc::clone(&azero_signed_connection),
-        process_message,
     ));
 
     // tokio::try_join!(task1, task2).expect("Listener task should never finish");
@@ -157,36 +157,36 @@ async fn main() -> Result<()> {
 }
 
 // TODO: select between all event channels
-async fn handle_requests<F>(
-    mut eth_event_receiver: mpsc::Receiver<Message>,
-    mut circuit_breaker_receiver: mpsc::Receiver<CircuitBreakerEvent>,
-    circuit_breaker_sender: mpsc::Sender<CircuitBreakerEvent>,
-    config: Arc<Config>,
-    azero_connection: Arc<AzeroConnectionWithSigner>,
-    process_eth_message: F,
-) where
-    F: Fn(
-            Message,
-            Arc<Config>,
-            Arc<AzeroConnectionWithSigner>,
-        ) -> JoinHandle<Result<(), EthHandlerError>>
-        + Send,
-{
-    loop {
-        tokio::select! {
-            Some(eth_events) = eth_event_receiver.recv() => {
-                if let Ok(CircuitBreakerEvent::EventHandlerFailure) = circuit_breaker_receiver.try_recv() {
-                    // println!("{} Circuit breaker fired. Dropping task and restarting.", name);
-                    return; // Drop the task and restart
-                }
+// async fn handle_requests<F>(
+//     mut eth_event_receiver: mpsc::Receiver<Message>,
+//     mut circuit_breaker_receiver: mpsc::Receiver<CircuitBreakerEvent>,
+//     circuit_breaker_sender: mpsc::Sender<CircuitBreakerEvent>,
+//     config: Arc<Config>,
+//     azero_connection: Arc<AzeroConnectionWithSigner>,
+//     process_eth_message: F,
+// ) where
+//     F: Fn(
+//             Message,
+//             Arc<Config>,
+//             Arc<AzeroConnectionWithSigner>,
+//         ) -> JoinHandle<Result<(), EthHandlerError>>
+//         + Send,
+// {
+//     loop {
+//         tokio::select! {
+//             Some(eth_events) = eth_event_receiver.recv() => {
+//                 if let Ok(CircuitBreakerEvent::EventHandlerFailure) = circuit_breaker_receiver.try_recv() {
+//                     // println!("{} Circuit breaker fired. Dropping task and restarting.", name);
+//                     return; // Drop the task and restart
+//                 }
 
-                let processing_result = process_eth_message(eth_events, Arc::clone (&config), Arc::clone (&azero_connection)).await;
-                // if processing_result {
-                    circuit_breaker_sender.send(CircuitBreakerEvent::EventHandlerSuccess).await.unwrap();
-                // } else {
-                //     circuit_breaker_tx.send(CircuitBreakerEvent::Failure).await.unwrap();
-                // }
-            }
-        }
-    }
-}
+//                 let processing_result = process_eth_message(eth_events, Arc::clone (&config), Arc::clone (&azero_connection)).await;
+//                 // if processing_result {
+//                     circuit_breaker_sender.send(CircuitBreakerEvent::EventHandlerSuccess).await.unwrap();
+//                 // } else {
+//                 //     circuit_breaker_tx.send(CircuitBreakerEvent::Failure).await.unwrap();
+//                 // }
+//             }
+//         }
+//     }
+// }
