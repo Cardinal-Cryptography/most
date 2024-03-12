@@ -34,6 +34,8 @@ impl AzeroSignerClient {
     async fn new(cid: u32, port: u32) -> Result<Self, Error> {
         let mut client = Client::new(cid, port).await?;
         let account_id = client.azero_account_id().await?;
+        debug!("Azero account id: {:?}", account_id);
+
         let client = Mutex::new(client);
 
         Ok(Self { client, account_id })
