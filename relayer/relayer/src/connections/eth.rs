@@ -14,6 +14,7 @@ use ethers::{
         Signature,
     },
 };
+use log::debug;
 use thiserror::Error;
 use tokio::sync::Mutex;
 
@@ -216,6 +217,9 @@ pub async fn with_signer(
 ) -> Result<SignedEthConnection, EthConnectionError> {
     let mut client = signer_client::Client::new(cid, port).await?;
     let address = client.eth_address().await?;
+
+    debug!("Connected ETH signer for to {}", address);
+
     let client = Mutex::new(client);
     let nonce_manager = with_nonce_manager(connection, address).await?;
 
