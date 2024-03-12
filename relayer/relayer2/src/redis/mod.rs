@@ -1,9 +1,6 @@
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::sync::{Arc, Mutex};
 
-use redis::{
-    aio::Connection as RedisConnection, AsyncCommands, Client as RedisClient, Commands, Connection,
-    RedisError,
-};
+use redis::{Client as RedisClient, Commands, Connection, RedisError};
 use thiserror::Error;
 use tokio::sync::{
     broadcast,
@@ -41,19 +38,12 @@ impl RedisManager {
     ) -> Result<(), RedisManagerError> {
         let Config {
             redis_node,
-            eth_contract_address,
-            // azero_contract_address,
-            // azero_contract_metadata,
-            // azero_proof_size_limit,
-            // azero_ref_time_limit,
             name,
             default_sync_from_block_eth,
-            sync_step,
             ..
         } = &*config;
 
         let client = RedisClient::open(redis_node.clone())?;
-        // let redis_connection = Arc::new(Mutex::new(client.get_async_connection().await?));
         let redis_connection = Arc::new(Mutex::new(client.get_connection()?));
 
         let first_unprocessed_block_number = read_first_unprocessed_block_number(
