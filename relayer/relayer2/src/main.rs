@@ -13,14 +13,12 @@ use connections::azero::AzeroConnectionWithSigner;
 use ethers::signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, Signer, WalletError};
 use eyre::Result;
 use futures::Future;
-use handlers::{handle_event as handle_eth_event, EthHandlerError};
+use handlers::{handle_events as handle_eth_events, EthHandlerError};
 use log::{debug, error, info, warn};
-use redis::{aio::Connection as RedisConnection, Client as RedisClient, RedisError};
 use thiserror::Error;
 use tokio::{
-    sync::{mpsc, Mutex},
-    task,
-    task::{JoinHandle, JoinSet},
+    sync::{mpsc, oneshot, Mutex},
+    task::{self, JoinHandle, JoinSet},
     time::{sleep, Duration},
 };
 
@@ -28,6 +26,7 @@ use crate::{
     connections::{azero, eth},
     contracts::MostEvents,
     listeners::EthListener,
+    redis::RedisManager,
 };
 
 mod config;
@@ -36,6 +35,7 @@ mod contracts;
 mod handlers;
 mod helpers;
 mod listeners;
+mod redis;
 
 const DEV_MNEMONIC: &str =
     "harsh master island dirt equip search awesome double turn crush wool grant";
@@ -57,8 +57,7 @@ async fn main() -> Result<()> {
 
     info!("{:#?}", &config);
 
-    let client = RedisClient::open(config.redis_node.clone())?;
-    let redis_connection = Arc::new(Mutex::new(client.get_async_connection().await?));
+    let redis_connection = RedisManager::create_connection(Arc::clone(&config)).await?;
 
     let azero_connection = Arc::new(azero::init(&config.azero_node_wss_url).await);
     let azero_signed_connection = if let Some(cid) = config.signer_cid {
@@ -109,6 +108,7 @@ async fn main() -> Result<()> {
     } else {
         eth::with_local_wallet(eth::connect(&config.eth_node_http_url).await, wallet).await?
     };
+
     let eth_signed_connection = Arc::new(eth_signed_connection);
 
     let eth_connection = Arc::new(eth::connect(&config.eth_node_http_url).await);
@@ -116,22 +116,31 @@ async fn main() -> Result<()> {
     debug!("Established connection to Ethereum node");
 
     // Create channels
-    let (eth_sender, eth_receiver) = mpsc::channel::<MostEvents>(1);
+    let (eth_sender, eth_receiver) = mpsc::channel::<Vec<MostEvents>>(1);
+    // let (eth_next_block_sender, eth_next_block_receiver) = mpsc::channel::<u32>(1);
     let (circuit_breaker_sender, circuit_breaker_receiver) =
         mpsc::channel::<CircuitBreakerEvent>(1);
 
     // TODO : advisory listener task
     // TODO : halted listener tasks
     // TODO : azero event handling tasks (publisher and consumer)
+    // TODO : redis command oneshot channel
 
     let process_message =
-        |event: MostEvents,
+        |events: Vec<MostEvents>,
          config: Arc<Config>,
          azero_connection: Arc<AzeroConnectionWithSigner>| {
-            tokio::spawn(async move { handle_eth_event(&event, &config, &azero_connection).await })
+            tokio::spawn(async move { handle_eth_events(events, &config, &azero_connection).await })
         };
 
-    let task1 = tokio::spawn(listen_channel(
+    let task1 = tokio::spawn(EthListener::run(
+        Arc::clone(&config),
+        eth_connection,
+        // redis_connection,
+        eth_sender,
+    ));
+
+    let task2 = tokio::spawn(handle_requests(
         eth_receiver,
         circuit_breaker_receiver,
         circuit_breaker_sender.clone(),
@@ -140,30 +149,22 @@ async fn main() -> Result<()> {
         process_message,
     ));
 
-    let task2 = tokio::spawn(EthListener::run(
-        config,
-        // Arc::clone(&azero_signed_connection),
-        eth_connection,
-        redis_connection,
-        eth_sender,
-    ));
-
     tokio::try_join!(task1, task2).expect("Listener task should never finish");
     // TODO: handle restart, or crash and rely on k8s
     std::process::exit(1);
 }
 
 // TODO: select between all event channels
-async fn listen_channel<F>(
-    mut event_receiver: mpsc::Receiver<MostEvents>,
+async fn handle_requests<F>(
+    mut eth_event_receiver: mpsc::Receiver<Vec<MostEvents>>,
     mut circuit_breaker_receiver: mpsc::Receiver<CircuitBreakerEvent>,
     circuit_breaker_sender: mpsc::Sender<CircuitBreakerEvent>,
     config: Arc<Config>,
     azero_connection: Arc<AzeroConnectionWithSigner>,
-    process_message: F,
+    process_eth_message: F,
 ) where
     F: Fn(
-            MostEvents,
+            Vec<MostEvents>,
             Arc<Config>,
             Arc<AzeroConnectionWithSigner>,
         ) -> JoinHandle<Result<(), EthHandlerError>>
@@ -171,15 +172,13 @@ async fn listen_channel<F>(
 {
     loop {
         tokio::select! {
-            Some(event) = event_receiver.recv() => {
+            Some(eth_events) = eth_event_receiver.recv() => {
                 if let Ok(CircuitBreakerEvent::EventHandlerFailure) = circuit_breaker_receiver.try_recv() {
                     // println!("{} Circuit breaker fired. Dropping task and restarting.", name);
                     return; // Drop the task and restart
                 }
 
-                // println!("{} received message: {}", name, msg);
-                // Call the custom processing function and wait for its completion
-                let processing_result = process_message(event, Arc::clone (&config), Arc::clone (&azero_connection)).await;
+                let processing_result = process_eth_message(eth_events, Arc::clone (&config), Arc::clone (&azero_connection)).await;
                 // if processing_result {
                     circuit_breaker_sender.send(CircuitBreakerEvent::EventHandlerSuccess).await.unwrap();
                 // } else {

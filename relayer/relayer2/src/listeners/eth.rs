@@ -15,17 +15,16 @@ use log::{debug, error, info, trace, warn};
 use redis::{aio::Connection as RedisConnection, RedisError};
 use thiserror::Error;
 use tokio::{
-    sync::{mpsc, Mutex},
+    sync::{
+        mpsc::{self, error::SendError},
+        oneshot, Mutex,
+    },
     time::{sleep, Duration},
 };
 
 use crate::{
     config::Config,
-    connections::{
-        azero::AzeroConnectionWithSigner,
-        eth::EthConnection,
-        redis_helpers::{read_first_unprocessed_block_number, write_last_processed_block},
-    },
+    connections::{azero::AzeroConnectionWithSigner, eth::EthConnection},
     contracts::{
         AzeroContractError, CrosschainTransferRequestFilter, Most, MostEvents, MostInstance,
     },
@@ -33,7 +32,15 @@ use crate::{
 };
 
 pub const ETH_BLOCK_PROD_TIME_SEC: u64 = 15;
-pub const ETH_LAST_BLOCK_KEY: &str = "ethereum_last_known_block_number";
+// pub const ETH_LAST_BLOCK_KEY: &str = "ethereum_last_known_block_number";
+
+#[derive(Debug)]
+enum Message {
+    EthBlockEvents {
+        events: Vec<MostEvents>,
+        ack_sender: oneshot::Sender<()>,
+    },
+}
 
 pub struct EthListener;
 
@@ -41,18 +48,17 @@ pub struct EthListener;
 #[error(transparent)]
 #[non_exhaustive]
 pub enum EthListenerError {
-    // #[error("provider error")]
-    // Provider(#[from] ProviderError),
     #[error("error when parsing ethereum address")]
     FromHex(#[from] rustc_hex::FromHexError),
+
     #[error("contract error")]
     Contract(#[from] ContractError<Provider<Http>>),
-    // #[error("azero contract error")]
-    // AzeroContract(#[from] AzeroContractError),
-    // #[error("error when creating an ABI data encoding")]
-    // AbiEncode(#[from] EncodePackedError),
+
     #[error("redis connection error")]
     Redis(#[from] RedisError),
+
+    #[error("channel send error")]
+    Send(#[from] SendError<u32>),
 }
 
 impl EthListener {
@@ -60,8 +66,11 @@ impl EthListener {
         config: Arc<Config>,
         // azero_connection: Arc<AzeroConnectionWithSigner>,
         eth_connection: Arc<EthConnection>,
-        redis_connection: Arc<Mutex<RedisConnection>>,
-        eth_event_sender: mpsc::Sender<MostEvents>,
+        // redis_connection: Arc<Mutex<RedisConnection>>,
+        eth_events_sender: mpsc::Sender<Message>,
+
+        mut next_unprocessed_block_number: mpsc::Receiver<u32>,
+        last_processed_block_number: mpsc::Sender<u32>,
     ) -> Result<(), EthListenerError> {
         let Config {
             eth_contract_address,
@@ -77,6 +86,54 @@ impl EthListener {
 
         let address = eth_contract_address.parse::<Address>()?;
         let most_eth = Most::new(address, Arc::clone(&eth_connection));
+
+        while let Some(unprocessed_block_number) = next_unprocessed_block_number.recv().await {
+            // Query for the next unknowns finalized block number, if not present we wait for it.
+            let next_finalized_block_number = get_next_finalized_block_number_eth(
+                eth_connection.clone(),
+                unprocessed_block_number,
+            )
+            .await;
+
+            // don't query for more than `sync_step` blocks at one time.
+            let to_block = std::cmp::min(
+                next_finalized_block_number,
+                unprocessed_block_number + sync_step,
+            );
+
+            info!(
+                "Processing events from blocks {} - {}",
+                unprocessed_block_number, to_block
+            );
+
+            // Query for events
+            let events = most_eth
+                .events()
+                .from_block(unprocessed_block_number)
+                .to_block(to_block)
+                .query()
+                .await?;
+
+            let (ack_sender, ack_receiver) = oneshot::channel();
+
+            let cmd = Message::EthBlockEvents { events, ack_sender };
+
+            eth_events_sender
+                .send(cmd)
+                .await
+                .expect("Cannot publish an event to the eth event channel ");
+
+            // wait for ack before moving on to the next block
+            _ = ack_receiver.await;
+
+            // pubish this block number as processed
+            last_processed_block_number
+                .send(unprocessed_block_number)
+                .await?;
+        }
+
+        Ok(())
+
         // let most_azero = MostInstance::new(
         //     azero_contract_address,
         //     azero_contract_metadata,
@@ -84,84 +141,88 @@ impl EthListener {
         //     *azero_proof_size_limit,
         // )?;
 
-        let mut first_unprocessed_block_number = read_first_unprocessed_block_number(
-            name.clone(),
-            ETH_LAST_BLOCK_KEY.to_string(),
-            redis_connection.clone(),
-            **default_sync_from_block_eth,
-        )
-        .await;
+        // let mut first_unprocessed_block_number = read_first_unprocessed_block_number(
+        //     name.clone(),
+        //     ETH_LAST_BLOCK_KEY.to_string(),
+        //     redis_connection.clone(),
+        //     **default_sync_from_block_eth,
+        // )
+        // .await;
 
         // Main Ethereum event loop.
-        loop {
-            // Query for the next unknowns finalized block number, if not present we wait for it.
-            let next_finalized_block_number = get_next_finalized_block_number_eth(
-                eth_connection.clone(),
-                first_unprocessed_block_number,
-            )
-            .await;
+        // loop {
+        //     // Query for the next unknowns finalized block number, if not present we wait for it.
+        //     let next_finalized_block_number = get_next_finalized_block_number_eth(
+        //         eth_connection.clone(),
+        //         first_unprocessed_block_number,
+        //     )
+        //     .await;
 
-            // Don't query for more than `sync_step` blocks at one time.
-            let to_block = std::cmp::min(
-                next_finalized_block_number,
-                first_unprocessed_block_number + sync_step - 1,
-            );
+        //     // Don't query for more than `sync_step` blocks at one time.
+        //     let to_block = std::cmp::min(
+        //         next_finalized_block_number,
+        //         first_unprocessed_block_number + sync_step - 1,
+        //     );
 
-            info!(
-                "Processing events from blocks {} - {}",
-                first_unprocessed_block_number, to_block
-            );
+        //     info!(
+        //         "Processing events from blocks {} - {}",
+        //         first_unprocessed_block_number, to_block
+        //     );
 
-            // Query for events
-            let events = most_eth
-                .events()
-                .from_block(first_unprocessed_block_number)
-                .to_block(to_block)
-                .query()
-                .await?;
+        //     // Query for events
+        //     let events = most_eth
+        //         .events()
+        //         .from_block(first_unprocessed_block_number)
+        //         .to_block(to_block)
+        //         .query()
+        //         .await?;
 
-            for event in events {
-                // publish event on the channel
-                eth_event_sender
-                    .send(event)
-                    .await
-                    .expect("Cannot publish an event to the eth event channel ");
+        //     eth_events_sender
+        //         .send(events)
+        //         .await
+        //         .expect("Cannot publish an event to the eth event channel ");
 
-                // In case of the halt, we want to retry the event handling after the halt is resolved.
-                // loop {
-                //     match handle_event(&event, &config, &azero_connection).await {
-                //         Ok(_) => break,
-                //         Err(EthListenerError::AzeroContract(e)) => {
-                //             error!("Error when handling event {event:?}: {e}");
-                //             if most_azero.is_halted(&azero_connection).await? {
-                //                 warn!("Most contract on Aleph Zero is halted, stopping event handling");
-                //                 wait_until_not_halted(&most_azero, &azero_connection)
-                //                     .await?;
-                //             } else {
-                //                 return Err(EthListenerError::AzeroContract(e));
-                //             }
-                //         }
-                //         Err(e) => return Err(e),
-                //     }
-                // }
-            }
+        //     // for event in events {
+        //     //     // publish event on the channel
+        //     //     eth_events_sender
+        //     //         .send(event)
+        //     //         .await
+        //     //         .expect("Cannot publish an event to the eth event channel ");
 
-            // Update the last block number
-            // NOTE: we do not wait for an ack from all of the event handlers
-            // but this is fine because events are published to a channel of capacity 1
-            first_unprocessed_block_number = to_block + 1;
+        //     //     // In case of the halt, we want to retry the event handling after the halt is resolved.
+        //     //     // loop {
+        //     //     //     match handle_event(&event, &config, &azero_connection).await {
+        //     //     //         Ok(_) => break,
+        //     //     //         Err(EthListenerError::AzeroContract(e)) => {
+        //     //     //             error!("Error when handling event {event:?}: {e}");
+        //     //     //             if most_azero.is_halted(&azero_connection).await? {
+        //     //     //                 warn!("Most contract on Aleph Zero is halted, stopping event handling");
+        //     //     //                 wait_until_not_halted(&most_azero, &azero_connection)
+        //     //     //                     .await?;
+        //     //     //             } else {
+        //     //     //                 return Err(EthListenerError::AzeroContract(e));
+        //     //     //             }
+        //     //     //         }
+        //     //     //         Err(e) => return Err(e),
+        //     //     //     }
+        //     //     // }
+        //     // }
 
-            // Cache the last processed block number.
-            write_last_processed_block(
-                name.clone(),
-                ETH_LAST_BLOCK_KEY.to_string(),
-                redis_connection.clone(),
-                to_block,
-            )
-            .await?;
+        //     // Update the last block number
+        //     // TODO: wait on a oneshot channel untill ALL events from this block are processes
+        //     // first_unprocessed_block_number = to_block + 1;
 
-            // END TODO
-        }
+        //     // // Cache the last processed block number.
+        //     // write_last_processed_block(
+        //     //     name.clone(),
+        //     //     ETH_LAST_BLOCK_KEY.to_string(),
+        //     //     redis_connection.clone(),
+        //     //     to_block,
+        //     // )
+        //     // .await?;
+
+        //     // END TODO
+        // }
     }
 }
 
