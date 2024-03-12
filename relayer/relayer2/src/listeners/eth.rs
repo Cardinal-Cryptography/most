@@ -22,6 +22,7 @@ use tokio::{
     time::{sleep, Duration},
 };
 
+use super::Message;
 use crate::{
     config::Config,
     connections::{azero::AzeroConnectionWithSigner, eth::EthConnection},
@@ -33,14 +34,6 @@ use crate::{
 
 pub const ETH_BLOCK_PROD_TIME_SEC: u64 = 15;
 // pub const ETH_LAST_BLOCK_KEY: &str = "ethereum_last_known_block_number";
-
-#[derive(Debug)]
-enum Message {
-    EthBlockEvents {
-        events: Vec<MostEvents>,
-        ack_sender: oneshot::Sender<()>,
-    },
-}
 
 pub struct EthListener;
 
@@ -68,7 +61,6 @@ impl EthListener {
         eth_connection: Arc<EthConnection>,
         // redis_connection: Arc<Mutex<RedisConnection>>,
         eth_events_sender: mpsc::Sender<Message>,
-
         mut next_unprocessed_block_number: mpsc::Receiver<u32>,
         last_processed_block_number: mpsc::Sender<u32>,
     ) -> Result<(), EthListenerError> {

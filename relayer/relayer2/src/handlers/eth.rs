@@ -15,22 +15,19 @@ use log::{debug, error, info, trace, warn};
 use redis::{aio::Connection as RedisConnection, RedisError};
 use thiserror::Error;
 use tokio::{
-    sync::Mutex,
+    sync::{mpsc::error::SendError, Mutex},
     task::JoinHandle,
     time::{sleep, Duration},
 };
 
 use crate::{
     config::Config,
-    connections::{
-        azero::AzeroConnectionWithSigner,
-        eth::EthConnection,
-        redis_helpers::{read_first_unprocessed_block_number, write_last_processed_block},
-    },
+    connections::{azero::AzeroConnectionWithSigner, eth::EthConnection},
     contracts::{
         AzeroContractError, CrosschainTransferRequestFilter, Most, MostEvents, MostInstance,
     },
     helpers::concat_u8_arrays,
+    listeners::Message,
 };
 
 #[derive(Debug, Error)]
@@ -52,13 +49,17 @@ pub enum EthHandlerError {
 
     // #[error("redis connection error")]
     // Redis(#[from] RedisError),
+    #[error("channel send error")]
+    Send(#[from] SendError<u32>),
 }
 
 pub async fn handle_events(
-    events: Vec<MostEvents>,
+    message: Message,
     config: &Config,
     azero_connection: &AzeroConnectionWithSigner,
 ) -> Result<(), EthHandlerError> {
+    let Message::EthBlockEvents { events, ack_sender } = message;
+
     for event in events {
         if let MostEvents::CrosschainTransferRequestFilter(
             crosschain_transfer_event @ CrosschainTransferRequestFilter {
@@ -114,6 +115,9 @@ pub async fn handle_events(
                 .await?;
         }
     }
+
+    // we processed all the events in this block
+    _ = ack_sender.send(());
 
     Ok(())
 }

@@ -25,7 +25,7 @@ use tokio::{
 use crate::{
     connections::{azero, eth},
     contracts::MostEvents,
-    listeners::EthListener,
+    listeners::{EthListener, Message},
     redis::RedisManager,
 };
 
@@ -116,28 +116,27 @@ async fn main() -> Result<()> {
     debug!("Established connection to Ethereum node");
 
     // Create channels
-    let (eth_sender, eth_receiver) = mpsc::channel::<Vec<MostEvents>>(1);
-    // let (eth_next_block_sender, eth_next_block_receiver) = mpsc::channel::<u32>(1);
+    let (eth_sender, eth_receiver) = mpsc::channel::<Message>(1);
+    let (eth_last_processed_block_number, eth_next_unprocessed_block_number) =
+        mpsc::channel::<u32>(1);
     let (circuit_breaker_sender, circuit_breaker_receiver) =
         mpsc::channel::<CircuitBreakerEvent>(1);
 
     // TODO : advisory listener task
     // TODO : halted listener tasks
     // TODO : azero event handling tasks (publisher and consumer)
-    // TODO : redis command oneshot channel
 
     let process_message =
-        |events: Vec<MostEvents>,
-         config: Arc<Config>,
-         azero_connection: Arc<AzeroConnectionWithSigner>| {
+        |events: Message, config: Arc<Config>, azero_connection: Arc<AzeroConnectionWithSigner>| {
             tokio::spawn(async move { handle_eth_events(events, &config, &azero_connection).await })
         };
 
     let task1 = tokio::spawn(EthListener::run(
         Arc::clone(&config),
         eth_connection,
-        // redis_connection,
         eth_sender,
+        eth_next_unprocessed_block_number,
+        eth_last_processed_block_number,
     ));
 
     let task2 = tokio::spawn(handle_requests(
@@ -156,7 +155,7 @@ async fn main() -> Result<()> {
 
 // TODO: select between all event channels
 async fn handle_requests<F>(
-    mut eth_event_receiver: mpsc::Receiver<Vec<MostEvents>>,
+    mut eth_event_receiver: mpsc::Receiver<Message>,
     mut circuit_breaker_receiver: mpsc::Receiver<CircuitBreakerEvent>,
     circuit_breaker_sender: mpsc::Sender<CircuitBreakerEvent>,
     config: Arc<Config>,
@@ -164,7 +163,7 @@ async fn handle_requests<F>(
     process_eth_message: F,
 ) where
     F: Fn(
-            Vec<MostEvents>,
+            Message,
             Arc<Config>,
             Arc<AzeroConnectionWithSigner>,
         ) -> JoinHandle<Result<(), EthHandlerError>>
