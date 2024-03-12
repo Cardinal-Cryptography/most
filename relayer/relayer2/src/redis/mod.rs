@@ -34,7 +34,6 @@ impl RedisManager {
         Ok(Arc::new(Mutex::new(client.get_async_connection().await?)))
     }
 
-    // TODO
     pub async fn run(
         config: Arc<Config>,
         redis_connection: RedisConnection,

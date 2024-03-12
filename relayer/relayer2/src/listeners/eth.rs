@@ -61,8 +61,8 @@ impl EthListener {
         eth_connection: Arc<EthConnection>,
         // redis_connection: Arc<Mutex<RedisConnection>>,
         eth_events_sender: mpsc::Sender<Message>,
-        mut next_unprocessed_block_number: mpsc::Receiver<u32>,
         last_processed_block_number: mpsc::Sender<u32>,
+        mut next_unprocessed_block_number: mpsc::Receiver<u32>,
     ) -> Result<(), EthListenerError> {
         let Config {
             eth_contract_address,

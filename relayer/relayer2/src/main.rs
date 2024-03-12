@@ -117,8 +117,7 @@ async fn main() -> Result<()> {
 
     // Create channels
     let (eth_sender, eth_receiver) = mpsc::channel::<Message>(1);
-    let (eth_last_processed_block_number, eth_next_unprocessed_block_number) =
-        mpsc::channel::<u32>(1);
+    let (eth_block_number_sender, eth_block_number_receiver) = mpsc::channel::<u32>(1);
     let (circuit_breaker_sender, circuit_breaker_receiver) =
         mpsc::channel::<CircuitBreakerEvent>(1);
 
@@ -135,11 +134,13 @@ async fn main() -> Result<()> {
         Arc::clone(&config),
         eth_connection,
         eth_sender,
-        eth_next_unprocessed_block_number,
-        eth_last_processed_block_number,
+        eth_block_number_sender,
+        eth_block_number_receiver,
     ));
 
-    let task2 = tokio::spawn(handle_requests(
+    // let task2 = tokio::spawn(RedisManager::run(Arc::clone(&config), redis_connection));
+
+    let task3 = tokio::spawn(handle_requests(
         eth_receiver,
         circuit_breaker_receiver,
         circuit_breaker_sender.clone(),
@@ -148,7 +149,7 @@ async fn main() -> Result<()> {
         process_message,
     ));
 
-    tokio::try_join!(task1, task2).expect("Listener task should never finish");
+    // tokio::try_join!(task1, task2).expect("Listener task should never finish");
     // TODO: handle restart, or crash and rely on k8s
     std::process::exit(1);
 }
