@@ -33,6 +33,7 @@ tokio = { workspace = true, features = [
     "rt-multi-thread",
     "macros",
     "test-util",
+    "sync"
 ] }
 signer_client = { path = "../signer_client" }
 async-trait = "0.1.77"

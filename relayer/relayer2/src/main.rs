@@ -17,7 +17,7 @@ use handlers::{handle_events as handle_eth_events, EthHandlerError};
 use log::{debug, error, info, warn};
 use thiserror::Error;
 use tokio::{
-    sync::{mpsc, oneshot, Mutex},
+    sync::{broadcast, mpsc, oneshot, Mutex},
     task::{self, JoinHandle, JoinSet},
     time::{sleep, Duration},
 };
@@ -57,8 +57,6 @@ async fn main() -> Result<()> {
 
     info!("{:#?}", &config);
 
-    let redis_connection = RedisManager::create_connection(Arc::clone(&config)).await?;
-
     let azero_connection = Arc::new(azero::init(&config.azero_node_wss_url).await);
     let azero_signed_connection = if let Some(cid) = config.signer_cid {
         AzeroConnectionWithSigner::with_signer(
@@ -77,7 +75,6 @@ async fn main() -> Result<()> {
     } else {
         panic!("Use dev mode or connect to a signer");
     };
-
     let azero_signed_connection = Arc::new(azero_signed_connection);
 
     debug!("Established connection to Aleph Zero node");
@@ -117,7 +114,8 @@ async fn main() -> Result<()> {
 
     // Create channels
     let (eth_sender, eth_receiver) = mpsc::channel::<Message>(1);
-    let (eth_block_number_sender, eth_block_number_receiver) = mpsc::channel::<u32>(1);
+    let (eth_block_number_sender, mut eth_block_number_receiver1) = broadcast::channel(1);
+    let mut eth_block_number_receiver2 = eth_block_number_sender.subscribe();
     let (circuit_breaker_sender, circuit_breaker_receiver) =
         mpsc::channel::<CircuitBreakerEvent>(1);
 
@@ -130,15 +128,19 @@ async fn main() -> Result<()> {
             tokio::spawn(async move { handle_eth_events(events, &config, &azero_connection).await })
         };
 
-    let task1 = tokio::spawn(EthListener::run(
+    let eth_listener = tokio::spawn(EthListener::run(
         Arc::clone(&config),
         eth_connection,
         eth_sender,
-        eth_block_number_sender,
-        eth_block_number_receiver,
+        eth_block_number_sender.clone(),
+        eth_block_number_receiver1,
     ));
 
-    // let task2 = tokio::spawn(RedisManager::run(Arc::clone(&config), redis_connection));
+    let redis_manager = tokio::spawn(RedisManager::run(
+        Arc::clone(&config),
+        eth_block_number_sender.clone(),
+        eth_block_number_receiver2,
+    ));
 
     let task3 = tokio::spawn(handle_requests(
         eth_receiver,

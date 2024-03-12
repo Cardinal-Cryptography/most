@@ -1,17 +1,18 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
-use redis::{aio::Connection, Client, RedisError};
+use redis::{
+    aio::Connection as RedisConnection, AsyncCommands, Client as RedisClient, Commands, Connection,
+    RedisError,
+};
 use thiserror::Error;
-use tokio::sync::mpsc::{self, error::SendError};
+use tokio::sync::{
+    broadcast,
+    mpsc::{self},
+};
 
-use self::helpers::{read_first_unprocessed_block_number, write_last_processed_block};
 use crate::config::Config;
 
-mod helpers;
-
 pub const ETH_LAST_BLOCK_KEY: &str = "ethereum_last_known_block_number";
-
-pub type RedisConnection = Arc<Mutex<Connection>>;
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -21,26 +22,25 @@ pub enum RedisManagerError {
     Redis(#[from] RedisError),
 
     #[error("channel send error")]
-    Send(#[from] SendError<u32>),
+    Send(#[from] mpsc::error::SendError<u32>),
+
+    #[error("channel broadcast error")]
+    Broadcast(#[from] broadcast::error::SendError<u32>),
+
+    #[error("channel receive error")]
+    Receive(#[from] broadcast::error::RecvError),
 }
 
 pub struct RedisManager;
 
 impl RedisManager {
-    pub async fn create_connection(
-        config: Arc<Config>,
-    ) -> Result<RedisConnection, RedisManagerError> {
-        let client = Client::open(config.redis_node.clone())?;
-        Ok(Arc::new(Mutex::new(client.get_async_connection().await?)))
-    }
-
     pub async fn run(
         config: Arc<Config>,
-        redis_connection: RedisConnection,
-        next_unprocessed_block_number: mpsc::Sender<u32>,
-        mut last_processed_block_number: mpsc::Receiver<u32>,
+        next_unprocessed_block_number: broadcast::Sender<u32>,
+        mut last_processed_block_number: broadcast::Receiver<u32>,
     ) -> Result<(), RedisManagerError> {
         let Config {
+            redis_node,
             eth_contract_address,
             // azero_contract_address,
             // azero_contract_metadata,
@@ -52,29 +52,59 @@ impl RedisManager {
             ..
         } = &*config;
 
+        let client = RedisClient::open(redis_node.clone())?;
+        // let redis_connection = Arc::new(Mutex::new(client.get_async_connection().await?));
+        let redis_connection = Arc::new(Mutex::new(client.get_connection()?));
+
         let first_unprocessed_block_number = read_first_unprocessed_block_number(
             name.clone(),
             ETH_LAST_BLOCK_KEY.to_string(),
-            redis_connection.clone(),
+            Arc::clone(&redis_connection),
             **default_sync_from_block_eth,
-        )
-        .await;
+        );
 
-        next_unprocessed_block_number
-            .send(first_unprocessed_block_number)
-            .await?;
+        _ = next_unprocessed_block_number.send(first_unprocessed_block_number)?;
 
-        while let Some(last_processed_block_number) = last_processed_block_number.recv().await {
-            // Cache the last processed block number.
+        loop {
+            let last_processed_block_number = last_processed_block_number.recv().await?;
+
+            // Cache the last processed block number
             write_last_processed_block(
                 name.clone(),
                 ETH_LAST_BLOCK_KEY.to_string(),
-                redis_connection.clone(),
+                Arc::clone(&redis_connection),
                 last_processed_block_number,
-            )
-            .await?;
+            )?;
         }
 
-        Ok(())
+        // Ok(())
     }
+}
+
+pub fn read_first_unprocessed_block_number(
+    name: String,
+    key: String,
+    redis_connection: Arc<Mutex<Connection>>,
+    default_block: u32,
+) -> u32 {
+    let mut locked_connection = redis_connection.lock().expect("mutex lock");
+
+    match locked_connection.get::<_, u32>(format!("{name}:{key}")) {
+        Ok(value) => value + 1,
+        Err(why) => {
+            log::warn!("Redis connection error {why:?}");
+            default_block
+        }
+    }
+}
+
+pub fn write_last_processed_block(
+    name: String,
+    key: String,
+    redis_connection: Arc<Mutex<Connection>>,
+    last_block_number: u32,
+) -> Result<(), RedisError> {
+    let mut locked_connection = redis_connection.lock().expect("mutex lock");
+    locked_connection.set(format!("{name}:{key}"), last_block_number)?;
+    Ok(())
 }

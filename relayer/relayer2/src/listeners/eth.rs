@@ -16,7 +16,8 @@ use redis::{aio::Connection as RedisConnection, RedisError};
 use thiserror::Error;
 use tokio::{
     sync::{
-        mpsc::{self, error::SendError},
+        broadcast,
+        mpsc::{self},
         oneshot, Mutex,
     },
     time::{sleep, Duration},
@@ -51,7 +52,13 @@ pub enum EthListenerError {
     Redis(#[from] RedisError),
 
     #[error("channel send error")]
-    Send(#[from] SendError<u32>),
+    Send(#[from] mpsc::error::SendError<u32>),
+
+    #[error("channel broadcast error")]
+    Broadcast(#[from] broadcast::error::SendError<u32>),
+
+    #[error("channel receive error")]
+    Receive(#[from] broadcast::error::RecvError),
 }
 
 impl EthListener {
@@ -61,15 +68,11 @@ impl EthListener {
         eth_connection: Arc<EthConnection>,
         // redis_connection: Arc<Mutex<RedisConnection>>,
         eth_events_sender: mpsc::Sender<Message>,
-        last_processed_block_number: mpsc::Sender<u32>,
-        mut next_unprocessed_block_number: mpsc::Receiver<u32>,
+        last_processed_block_number: broadcast::Sender<u32>,
+        mut next_unprocessed_block_number: broadcast::Receiver<u32>,
     ) -> Result<(), EthListenerError> {
         let Config {
             eth_contract_address,
-            // azero_contract_address,
-            // azero_contract_metadata,
-            // azero_proof_size_limit,
-            // azero_ref_time_limit,
             name,
             default_sync_from_block_eth,
             sync_step,
@@ -79,7 +82,9 @@ impl EthListener {
         let address = eth_contract_address.parse::<Address>()?;
         let most_eth = Most::new(address, Arc::clone(&eth_connection));
 
-        while let Some(unprocessed_block_number) = next_unprocessed_block_number.recv().await {
+        loop {
+            let unprocessed_block_number = next_unprocessed_block_number.recv().await?;
+
             // Query for the next unknowns finalized block number, if not present we wait for it.
             let next_finalized_block_number = get_next_finalized_block_number_eth(
                 eth_connection.clone(),
@@ -119,102 +124,10 @@ impl EthListener {
             _ = ack_receiver.await;
 
             // pubish this block number as processed
-            last_processed_block_number
-                .send(unprocessed_block_number)
-                .await?;
+            last_processed_block_number.send(unprocessed_block_number)?;
         }
 
         Ok(())
-
-        // let most_azero = MostInstance::new(
-        //     azero_contract_address,
-        //     azero_contract_metadata,
-        //     *azero_ref_time_limit,
-        //     *azero_proof_size_limit,
-        // )?;
-
-        // let mut first_unprocessed_block_number = read_first_unprocessed_block_number(
-        //     name.clone(),
-        //     ETH_LAST_BLOCK_KEY.to_string(),
-        //     redis_connection.clone(),
-        //     **default_sync_from_block_eth,
-        // )
-        // .await;
-
-        // Main Ethereum event loop.
-        // loop {
-        //     // Query for the next unknowns finalized block number, if not present we wait for it.
-        //     let next_finalized_block_number = get_next_finalized_block_number_eth(
-        //         eth_connection.clone(),
-        //         first_unprocessed_block_number,
-        //     )
-        //     .await;
-
-        //     // Don't query for more than `sync_step` blocks at one time.
-        //     let to_block = std::cmp::min(
-        //         next_finalized_block_number,
-        //         first_unprocessed_block_number + sync_step - 1,
-        //     );
-
-        //     info!(
-        //         "Processing events from blocks {} - {}",
-        //         first_unprocessed_block_number, to_block
-        //     );
-
-        //     // Query for events
-        //     let events = most_eth
-        //         .events()
-        //         .from_block(first_unprocessed_block_number)
-        //         .to_block(to_block)
-        //         .query()
-        //         .await?;
-
-        //     eth_events_sender
-        //         .send(events)
-        //         .await
-        //         .expect("Cannot publish an event to the eth event channel ");
-
-        //     // for event in events {
-        //     //     // publish event on the channel
-        //     //     eth_events_sender
-        //     //         .send(event)
-        //     //         .await
-        //     //         .expect("Cannot publish an event to the eth event channel ");
-
-        //     //     // In case of the halt, we want to retry the event handling after the halt is resolved.
-        //     //     // loop {
-        //     //     //     match handle_event(&event, &config, &azero_connection).await {
-        //     //     //         Ok(_) => break,
-        //     //     //         Err(EthListenerError::AzeroContract(e)) => {
-        //     //     //             error!("Error when handling event {event:?}: {e}");
-        //     //     //             if most_azero.is_halted(&azero_connection).await? {
-        //     //     //                 warn!("Most contract on Aleph Zero is halted, stopping event handling");
-        //     //     //                 wait_until_not_halted(&most_azero, &azero_connection)
-        //     //     //                     .await?;
-        //     //     //             } else {
-        //     //     //                 return Err(EthListenerError::AzeroContract(e));
-        //     //     //             }
-        //     //     //         }
-        //     //     //         Err(e) => return Err(e),
-        //     //     //     }
-        //     //     // }
-        //     // }
-
-        //     // Update the last block number
-        //     // TODO: wait on a oneshot channel untill ALL events from this block are processes
-        //     // first_unprocessed_block_number = to_block + 1;
-
-        //     // // Cache the last processed block number.
-        //     // write_last_processed_block(
-        //     //     name.clone(),
-        //     //     ETH_LAST_BLOCK_KEY.to_string(),
-        //     //     redis_connection.clone(),
-        //     //     to_block,
-        //     // )
-        //     // .await?;
-
-        //     // END TODO
-        // }
     }
 }
 
