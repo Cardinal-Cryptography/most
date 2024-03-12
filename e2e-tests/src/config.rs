@@ -21,8 +21,6 @@ static GLOBAL_CONFIG: Lazy<Config> = Lazy::new(|| Config {
         azero_oracle: get_env("AZERO_ORACLE")
             .unwrap_or("../azero/artifacts/oracle.json".to_string()),
         azero_token: get_env("AZERO_TOKEN").unwrap_or("../azero/artifacts/token.json".to_string()),
-        eth_governance: get_env("")
-            .unwrap_or("../eth/artifacts/contracts/Governance.sol/Governance.json".to_string()),
         eth_migrations: get_env("ETH_MIGRATIONS")
             .unwrap_or("../eth/artifacts/contracts/Migrations.sol/Migrations.json".to_string()),
         eth_most: get_env("ETH_MOST")
@@ -74,7 +72,6 @@ pub struct ContractMetadataPaths {
     pub azero_most: String,
     pub azero_oracle: String,
     pub azero_token: String,
-    pub eth_governance: String,
     pub eth_migrations: String,
     pub eth_most: String,
     pub eth_weth: String,

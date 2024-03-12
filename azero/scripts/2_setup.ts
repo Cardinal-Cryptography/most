@@ -15,7 +15,7 @@ import { ethers } from "ethers";
 import { KeyringPair } from "@polkadot/keyring/types";
 import type BN from "bn.js";
 
-const envFile = process.env.AZERO_ENV || "dev";
+const envFile = process.env.AZERO_ENV;
 
 async function addTokenPair(
   tokenEth: string,
@@ -102,6 +102,9 @@ async function main(): Promise<void> {
 
     await addTokenPair(weth_eth, weth_azero, most);
     await addTokenPair(usdt_eth, usdt_azero, most);
+
+    // Activate Most if we are in dev environment
+    await most.tx.setHalted(false);
   }
 
   // update migrations
