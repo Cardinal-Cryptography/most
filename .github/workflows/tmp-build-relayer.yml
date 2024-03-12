@@ -1,0 +1,22 @@
+---
+name: tmp build relayer to test on nitro
+
+on:
+  push:
+    branches:
+      - obrok/debug-eth-address
+
+jobs:
+  check-vars-and-secrets:
+    name: Check vars and secrets
+    uses: ./.github/workflows/_check-vars-and-secrets.yml
+    secrets: inherit
+
+  build-and-push:
+    needs: [check-vars-and-secrets]
+    name: Build and push
+    uses: ./.github/workflows/_relayer-build-and-push.yml
+    secrets: inherit
+    with:
+      environment: bridgenet
+      frontend-environment: dev
