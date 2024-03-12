@@ -8,9 +8,9 @@ readonly SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null 
 
 declare -a CONTRACTS=(
     "advisory"
-    "governance"
     "most"
     "token"
+    "migrations"
 )
 
 
