@@ -85,7 +85,7 @@ impl EthListener {
         loop {
             let unprocessed_block_number = next_unprocessed_block_number.recv().await?;
 
-            // Query for the next unknowns finalized block number, if not present we wait for it.
+            // Query for the next unknown finalized block number, if not present we wait for it.
             let next_finalized_block_number = get_next_finalized_block_number_eth(
                 eth_connection.clone(),
                 unprocessed_block_number,
@@ -118,9 +118,10 @@ impl EthListener {
             eth_events_sender
                 .send(events)
                 .await
-                .expect("Cannot publish an event to the eth event channel ");
+                .expect("Cannot publish a batch of events to the eth events channel ");
 
-            // wait for ack before moving on to the next block
+            // wait for ack before moving on to the next batch
+            info!("Awaiting acknowledgement");
             _ = ack_receiver.await;
 
             // publish this block number as processed

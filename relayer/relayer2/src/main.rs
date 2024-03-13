@@ -1,9 +1,9 @@
 use std::{
     process,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{atomic::AtomicBool, mpsc::Receiver, Arc},
 };
 
-use aleph_client::Connection;
+use aleph_client::{AccountId, Connection};
 use clap::Parser;
 use config::Config;
 use connections::azero::AzeroConnectionWithSigner;
@@ -13,7 +13,7 @@ use connections::azero::AzeroConnectionWithSigner;
 use ethers::signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, Signer, WalletError};
 use eyre::Result;
 use futures::Future;
-use handlers::{handle_events as handle_eth_events, EthHandlerError};
+use handlers::EthHandlerError;
 use log::{debug, error, info, warn};
 use thiserror::Error;
 use tokio::{
@@ -27,7 +27,7 @@ use crate::{
     connections::{azero, eth},
     contracts::MostEvents,
     handlers::EthHandler,
-    listeners::{EthListener, EthMostEvents},
+    listeners::{EthListener, EthMostEvent, EthMostEvents},
     redis::RedisManager,
 };
 
@@ -44,11 +44,11 @@ const DEV_MNEMONIC: &str =
 
 #[derive(Debug, Clone)]
 enum CircuitBreakerEvent {
-    EventHandlerSuccess,
-    EventHandlerFailure,
+    // EventHandlerSuccess,
+    EthEventHandlerFailure,
     BridgeHaltAzero,
     BridgeHaltEth,
-    AdvisoryEmergency,
+    AdvisoryEmergency(AccountId),
     Other(String),
 }
 
@@ -116,6 +116,7 @@ async fn main() -> Result<()> {
 
     // Create channels
     let (eth_events_sender, eth_events_receiver) = mpsc::channel::<EthMostEvents>(1);
+    let (eth_event_sender, eth_event_receiver) = mpsc::channel::<EthMostEvent>(1);
     let (eth_block_number_sender, eth_block_number_receiver1) = broadcast::channel(1);
     let mut eth_block_number_receiver2 = eth_block_number_sender.subscribe();
     let (circuit_breaker_sender, circuit_breaker_receiver) =
@@ -123,12 +124,10 @@ async fn main() -> Result<()> {
 
     // TODO : advisory listener task
     // TODO : halted listener tasks
+    // TODO : circuit breaker
     // TODO : azero event handling tasks (publisher and consumer)
 
-    // let process_message =
-    //     |events: Message, config: Arc<Config>, azero_connection: Arc<AzeroConnectionWithSigner>| {
-    //         tokio::spawn(async move { handle_eth_events(events, &config, &azero_connection).await })
-    //     };
+    let is_circuit_open = Arc::new(AtomicBool::new(true));
 
     let eth_listener = tokio::spawn(EthListener::run(
         Arc::clone(&config),
@@ -144,64 +143,71 @@ async fn main() -> Result<()> {
         eth_block_number_receiver2,
     ));
 
-    let eth_handler = tokio::spawn(EthHandler::run(
-        eth_events_receiver,
-        circuit_breaker_receiver,
-        // circuit_breaker_sender.clone(),
-        Arc::clone(&config),
-        Arc::clone(&azero_signed_connection),
-    ));
+    // let eth_handler = tokio::spawn(EthHandler::run(
+    //     eth_events_receiver,
+    //     Arc::clone(&config),
+    //     Arc::clone(&azero_signed_connection),
+    //     Arc::clone(&is_circuit_open),
+    // ));
 
     // tokio::try_join!(task1, task2).expect("Listener task should never finish");
     // TODO: handle restart, or crash and rely on k8s
     std::process::exit(1);
 }
 
-// pub struct RequestHandler;
+pub struct Relayer;
 
-// impl RequestHandler {
-//     pub async fn run(config: Arc<Config>) {
-//         loop {
-//             select! {
+impl Relayer {
+    pub async fn run(
+        config: Arc<Config>,
+        mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
+        mut eth_events_receiver: mpsc::Receiver<EthMostEvents>,
+        mut eth_event_receiver: mpsc::Receiver<EthMostEvent>,
+        eth_event_sender: mpsc::Sender<EthMostEvent>,
+        azero_connection: Arc<AzeroConnectionWithSigner>,
+        circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
+    ) {
+        loop {
+            select! {
+                circuit_breaker_event = circuit_breaker_receiver.recv () => {
+                    todo!("")
+                },
 
-//                 todo!("")
+                Some(eth_events) = eth_events_receiver.recv() => {
+                    // TODO: new batch received: send each event to a handler channel
 
-//             }
-//         }
-//     }
-// }
+                    let EthMostEvents { events, events_ack_sender } = eth_events;
+                    info!("Received a batch {} of Eth events", events.len ());
 
-// TODO: select between all event channels
-// async fn handle_requests<F>(
-//     mut eth_event_receiver: mpsc::Receiver<Message>,
-//     mut circuit_breaker_receiver: mpsc::Receiver<CircuitBreakerEvent>,
-//     circuit_breaker_sender: mpsc::Sender<CircuitBreakerEvent>,
-//     config: Arc<Config>,
-//     azero_connection: Arc<AzeroConnectionWithSigner>,
-//     process_eth_message: F,
-// ) where
-//     F: Fn(
-//             Message,
-//             Arc<Config>,
-//             Arc<AzeroConnectionWithSigner>,
-//         ) -> JoinHandle<Result<(), EthHandlerError>>
-//         + Send,
-// {
-//     loop {
-//         tokio::select! {
-//             Some(eth_events) = eth_event_receiver.recv() => {
-//                 if let Ok(CircuitBreakerEvent::EventHandlerFailure) = circuit_breaker_receiver.try_recv() {
-//                     // println!("{} Circuit breaker fired. Dropping task and restarting.", name);
-//                     return; // Drop the task and restart
-//                 }
+                    for event in events {
+                        let (event_ack_sender, event_ack_receiver) = oneshot::channel::<()>();
+                        info!("Sending Eth event {event:?}");
+                        eth_event_sender.send(EthMostEvent {event, event_ack_sender});
+                        info!("Awaiting event ack");
+                        _ = event_ack_receiver.await;
+                        info!("Event ack received");
+                    }
 
-//                 let processing_result = process_eth_message(eth_events, Arc::clone (&config), Arc::clone (&azero_connection)).await;
-//                 // if processing_result {
-//                     circuit_breaker_sender.send(CircuitBreakerEvent::EventHandlerSuccess).await.unwrap();
-//                 // } else {
-//                 //     circuit_breaker_tx.send(CircuitBreakerEvent::Failure).await.unwrap();
-//                 // }
-//             }
-//         }
-//     }
-// }
+                    info!("Acknowledging Eth events batch receipt");
+                    events_ack_sender.send(());
+                },
+
+                Some (eth_event) = eth_event_receiver.recv() => {
+                    let EthMostEvent { event, event_ack_sender } = eth_event;
+                    info!("Received an Eth event {event:?}");
+
+                    // TODO: match error
+                    if let Err(why) = EthHandler::handle_event (event,  &config, &azero_connection).await {
+                        // TODO logic here
+                        warn!("Eth event handler failure {why:?}");
+                        circuit_breaker_sender.send (CircuitBreakerEvent::EthEventHandlerFailure);
+                    }
+                    info!("Acknowledging Eth event receipt");
+                    event_ack_sender.send(());
+
+                }
+
+            }
+        }
+    }
+}

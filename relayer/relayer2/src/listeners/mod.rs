@@ -1,3 +1,5 @@
+use tokio::sync::oneshot;
+
 use crate::{
     config::Config,
     connections::{azero::AzeroConnectionWithSigner, eth::EthConnection},
@@ -11,10 +13,15 @@ mod advisory;
 mod eth;
 
 #[derive(Debug)]
+pub struct EthMostEvent {
+    pub event: MostEvents,
+    pub event_ack_sender: oneshot::Sender<()>,
+}
+
+#[derive(Debug)]
 pub struct EthMostEvents {
     pub events: Vec<MostEvents>,
-    pub ack_sender: oneshot::Sender<()>,
+    pub events_ack_sender: oneshot::Sender<()>,
 }
 
 pub use eth::*;
-use tokio::sync::oneshot;
