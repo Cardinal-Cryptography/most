@@ -23,7 +23,7 @@ use tokio::{
     time::{sleep, Duration},
 };
 
-use super::Message;
+use super::EthMostEvents;
 use crate::{
     config::Config,
     connections::{azero::AzeroConnectionWithSigner, eth::EthConnection},
@@ -67,7 +67,7 @@ impl EthListener {
         // azero_connection: Arc<AzeroConnectionWithSigner>,
         eth_connection: Arc<EthConnection>,
         // redis_connection: Arc<Mutex<RedisConnection>>,
-        eth_events_sender: mpsc::Sender<Message>,
+        eth_events_sender: mpsc::Sender<EthMostEvents>,
         last_processed_block_number: broadcast::Sender<u32>,
         mut next_unprocessed_block_number: broadcast::Receiver<u32>,
     ) -> Result<(), EthListenerError> {
@@ -113,21 +113,21 @@ impl EthListener {
 
             let (ack_sender, ack_receiver) = oneshot::channel();
 
-            let cmd = Message::EthBlockEvents { events, ack_sender };
+            let events = EthMostEvents { events, ack_sender };
 
             eth_events_sender
-                .send(cmd)
+                .send(events)
                 .await
                 .expect("Cannot publish an event to the eth event channel ");
 
             // wait for ack before moving on to the next block
             _ = ack_receiver.await;
 
-            // pubish this block number as processed
+            // publish this block number as processed
             last_processed_block_number.send(unprocessed_block_number)?;
         }
 
-        Ok(())
+        // Ok(())
     }
 }
 

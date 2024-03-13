@@ -16,6 +16,7 @@ use redis::{aio::Connection as RedisConnection, RedisError};
 use thiserror::Error;
 use tokio::{
     sync::{
+        broadcast,
         mpsc::{self, error::SendError},
         Mutex,
     },
@@ -30,7 +31,7 @@ use crate::{
         AzeroContractError, CrosschainTransferRequestFilter, Most, MostEvents, MostInstance,
     },
     helpers::concat_u8_arrays,
-    listeners::Message,
+    listeners::EthMostEvents,
     CircuitBreakerEvent,
 };
 
@@ -59,89 +60,110 @@ pub enum EthHandlerError {
 
 pub struct EthHandler;
 
+// TODO: handle circuit breaker events
+
 impl EthHandler {
     pub async fn run(
-        mut eth_event_receiver: mpsc::Receiver<Message>,
-        mut circuit_breaker_receiver: mpsc::Receiver<CircuitBreakerEvent>,
-        circuit_breaker_sender: mpsc::Sender<CircuitBreakerEvent>,
+        mut eth_events_receiver: mpsc::Receiver<EthMostEvents>,
+        mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
+        // circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
         config: Arc<Config>,
         azero_connection: Arc<AzeroConnectionWithSigner>,
     ) -> Result<(), EthHandlerError> {
-        loop {
-            tokio::select! {
-                Some(eth_events) = eth_event_receiver.recv() => {
-                    handle_events(eth_events,  &config, Arc::clone (&azero_connection)).await?;
-                }
-            }
+        // TODO
+
+        while let Some(eth_events) = eth_events_receiver.recv().await {
+            // handle each block in a separate task
+            tokio::spawn(handle_events(
+                eth_events,
+                Arc::clone(&config),
+                Arc::clone(&azero_connection),
+            ));
         }
+
+        Ok(())
     }
 }
 
 pub async fn handle_events(
-    message: Message,
-    config: &Config,
+    events: EthMostEvents,
+    config: Arc<Config>,
     azero_connection: Arc<AzeroConnectionWithSigner>,
 ) -> Result<(), EthHandlerError> {
-    let Message::EthBlockEvents { events, ack_sender } = message;
+    let EthMostEvents { events, ack_sender } = events;
+
+    // TODO: handle circuit breaker events
+    // TODO: publish circuit breaker events
+    // TODO: select!
 
     for event in events {
-        if let MostEvents::CrosschainTransferRequestFilter(
-            crosschain_transfer_event @ CrosschainTransferRequestFilter {
-                committee_id,
-                dest_token_address,
-                amount,
-                dest_receiver_address,
-                request_nonce,
-                ..
-            },
-        ) = event
-        {
-            let Config {
-                azero_contract_address,
-                azero_contract_metadata,
-                ..
-            } = config;
-
-            info!("handling eth contract event: {crosschain_transfer_event:?}");
-
-            // concat bytes
-            let bytes = concat_u8_arrays(vec![
-                &committee_id.as_u128().to_le_bytes(),
-                &dest_token_address,
-                &amount.as_u128().to_le_bytes(),
-                &dest_receiver_address,
-                &request_nonce.as_u128().to_le_bytes(),
-            ]);
-
-            trace!("event concatenated bytes: {bytes:?}");
-
-            let request_hash = keccak256(bytes);
-            debug!("hashed event encoding: {request_hash:?}");
-
-            let contract = MostInstance::new(
-                &azero_contract_address,
-                &azero_contract_metadata,
-                config.azero_ref_time_limit,
-                config.azero_proof_size_limit,
-            )?;
-
-            // send vote
-            contract
-                .receive_request(
-                    &azero_connection,
-                    request_hash,
-                    committee_id.as_u128(),
-                    dest_token_address,
-                    amount.as_u128(),
-                    dest_receiver_address,
-                    request_nonce.as_u128(),
-                )
-                .await?;
-        }
+        handle_event(event, &config, &azero_connection).await?;
     }
 
     // we processed all the events in this block
     _ = ack_sender.send(());
+
+    Ok(())
+}
+
+pub async fn handle_event(
+    event: MostEvents,
+    config: &Config,
+    azero_connection: &AzeroConnectionWithSigner,
+) -> Result<(), EthHandlerError> {
+    let Config {
+        azero_contract_address,
+        azero_contract_metadata,
+        ..
+    } = config;
+
+    if let MostEvents::CrosschainTransferRequestFilter(
+        crosschain_transfer_event @ CrosschainTransferRequestFilter {
+            committee_id,
+            dest_token_address,
+            amount,
+            dest_receiver_address,
+            request_nonce,
+            ..
+        },
+    ) = event
+    {
+        info!("handling eth contract event: {crosschain_transfer_event:?}");
+
+        // concat bytes
+        let bytes = concat_u8_arrays(vec![
+            &committee_id.as_u128().to_le_bytes(),
+            &dest_token_address,
+            &amount.as_u128().to_le_bytes(),
+            &dest_receiver_address,
+            &request_nonce.as_u128().to_le_bytes(),
+        ]);
+
+        trace!("event concatenated bytes: {bytes:?}");
+
+        let request_hash = keccak256(bytes);
+        debug!("hashed event encoding: {request_hash:?}");
+
+        let contract = MostInstance::new(
+            azero_contract_address,
+            azero_contract_metadata,
+            config.azero_ref_time_limit,
+            config.azero_proof_size_limit,
+        )?;
+
+        // send vote
+        contract
+            .receive_request(
+                azero_connection,
+                request_hash,
+                committee_id.as_u128(),
+                dest_token_address,
+                amount.as_u128(),
+                dest_receiver_address,
+                request_nonce.as_u128(),
+            )
+            .await?;
+    }
 
     Ok(())
 }

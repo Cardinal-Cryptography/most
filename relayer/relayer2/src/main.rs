@@ -17,6 +17,7 @@ use handlers::{handle_events as handle_eth_events, EthHandlerError};
 use log::{debug, error, info, warn};
 use thiserror::Error;
 use tokio::{
+    select,
     sync::{broadcast, mpsc, oneshot, Mutex},
     task::{self, JoinHandle, JoinSet},
     time::{sleep, Duration},
@@ -26,7 +27,7 @@ use crate::{
     connections::{azero, eth},
     contracts::MostEvents,
     handlers::EthHandler,
-    listeners::{EthListener, Message},
+    listeners::{EthListener, EthMostEvents},
     redis::RedisManager,
 };
 
@@ -41,7 +42,7 @@ mod redis;
 const DEV_MNEMONIC: &str =
     "harsh master island dirt equip search awesome double turn crush wool grant";
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum CircuitBreakerEvent {
     EventHandlerSuccess,
     EventHandlerFailure,
@@ -114,11 +115,11 @@ async fn main() -> Result<()> {
     debug!("Established connection to Ethereum node");
 
     // Create channels
-    let (eth_sender, eth_receiver) = mpsc::channel::<Message>(1);
-    let (eth_block_number_sender, mut eth_block_number_receiver1) = broadcast::channel(1);
+    let (eth_events_sender, eth_events_receiver) = mpsc::channel::<EthMostEvents>(1);
+    let (eth_block_number_sender, eth_block_number_receiver1) = broadcast::channel(1);
     let mut eth_block_number_receiver2 = eth_block_number_sender.subscribe();
     let (circuit_breaker_sender, circuit_breaker_receiver) =
-        mpsc::channel::<CircuitBreakerEvent>(1);
+        broadcast::channel::<CircuitBreakerEvent>(1);
 
     // TODO : advisory listener task
     // TODO : halted listener tasks
@@ -132,7 +133,7 @@ async fn main() -> Result<()> {
     let eth_listener = tokio::spawn(EthListener::run(
         Arc::clone(&config),
         eth_connection,
-        eth_sender,
+        eth_events_sender,
         eth_block_number_sender.clone(),
         eth_block_number_receiver1,
     ));
@@ -144,9 +145,9 @@ async fn main() -> Result<()> {
     ));
 
     let eth_handler = tokio::spawn(EthHandler::run(
-        eth_receiver,
+        eth_events_receiver,
         circuit_breaker_receiver,
-        circuit_breaker_sender.clone(),
+        // circuit_breaker_sender.clone(),
         Arc::clone(&config),
         Arc::clone(&azero_signed_connection),
     ));
@@ -155,6 +156,20 @@ async fn main() -> Result<()> {
     // TODO: handle restart, or crash and rely on k8s
     std::process::exit(1);
 }
+
+// pub struct RequestHandler;
+
+// impl RequestHandler {
+//     pub async fn run(config: Arc<Config>) {
+//         loop {
+//             select! {
+
+//                 todo!("")
+
+//             }
+//         }
+//     }
+// }
 
 // TODO: select between all event channels
 // async fn handle_requests<F>(

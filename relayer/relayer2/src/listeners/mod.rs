@@ -7,14 +7,13 @@ use crate::{
     helpers::concat_u8_arrays,
 };
 
+mod advisory;
 mod eth;
 
 #[derive(Debug)]
-pub enum Message {
-    EthBlockEvents {
-        events: Vec<MostEvents>,
-        ack_sender: oneshot::Sender<()>,
-    },
+pub struct EthMostEvents {
+    pub events: Vec<MostEvents>,
+    pub ack_sender: oneshot::Sender<()>,
 }
 
 pub use eth::*;
