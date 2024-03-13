@@ -24,4 +24,5 @@ pub struct EthMostEvents {
     pub events_ack_sender: oneshot::Sender<()>,
 }
 
+pub use advisory::*;
 pub use eth::*;

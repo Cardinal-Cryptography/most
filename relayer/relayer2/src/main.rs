@@ -27,7 +27,7 @@ use crate::{
     connections::{azero, eth},
     contracts::MostEvents,
     handlers::EthHandler,
-    listeners::{EthListener, EthMostEvent, EthMostEvents},
+    listeners::{AdvisoryListener, EthListener, EthMostEvent, EthMostEvents},
     redis::RedisManager,
 };
 
@@ -122,12 +122,17 @@ async fn main() -> Result<()> {
     let (circuit_breaker_sender, circuit_breaker_receiver) =
         broadcast::channel::<CircuitBreakerEvent>(1);
 
-    // TODO : advisory listener task
     // TODO : halted listener tasks
     // TODO : circuit breaker
     // TODO : azero event handling tasks (publisher and consumer)
 
     let is_circuit_open = Arc::new(AtomicBool::new(true));
+
+    let advisory = tokio::spawn(AdvisoryListener::run(
+        Arc::clone(&config),
+        Arc::clone(&azero_connection),
+        circuit_breaker_sender.clone(),
+    ));
 
     let eth_listener = tokio::spawn(EthListener::run(
         Arc::clone(&config),
