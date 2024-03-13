@@ -170,43 +170,41 @@ impl Relayer {
         loop {
             select! {
                 circuit_breaker_event = circuit_breaker_receiver.recv () => {
-                    todo!("")
+                    // TODO: close circuit
+                    // todo!("")
+                    // return;
                 },
 
                 Some(eth_events) = eth_events_receiver.recv() => {
-                    // TODO: new batch received: send each event to a handler channel
-
                     let EthMostEvents { events, events_ack_sender } = eth_events;
                     info!("Received a batch {} of Eth events", events.len ());
 
                     for event in events {
                         let (event_ack_sender, event_ack_receiver) = oneshot::channel::<()>();
                         info!("Sending Eth event {event:?}");
-                        eth_event_sender.send(EthMostEvent {event, event_ack_sender});
+                        eth_event_sender.send(EthMostEvent {event, event_ack_sender}).await.unwrap ();
                         info!("Awaiting event ack");
-                        _ = event_ack_receiver.await;
+                        event_ack_receiver.await.unwrap ();
                         info!("Event ack received");
                     }
 
                     info!("Acknowledging Eth events batch receipt");
-                    events_ack_sender.send(());
+                    events_ack_sender.send(()).unwrap ();
                 },
 
                 Some (eth_event) = eth_event_receiver.recv() => {
                     let EthMostEvent { event, event_ack_sender } = eth_event;
                     info!("Received an Eth event {event:?}");
 
-                    // TODO: match error
                     if let Err(why) = EthHandler::handle_event (event,  &config, &azero_connection).await {
-                        // TODO logic here
                         warn!("Eth event handler failure {why:?}");
-                        circuit_breaker_sender.send (CircuitBreakerEvent::EthEventHandlerFailure);
+                        circuit_breaker_sender.send (CircuitBreakerEvent::EthEventHandlerFailure).unwrap ();
                     }
                     info!("Acknowledging Eth event receipt");
-                    event_ack_sender.send(());
-
+                    event_ack_sender.send(()).unwrap ();
                 }
 
+                else => break
             }
         }
     }

@@ -49,23 +49,23 @@ pub enum EthHandlerError {
 pub struct EthHandler;
 
 impl EthHandler {
-    pub async fn run(
-        mut eth_events_receiver: mpsc::Receiver<EthMostEvents>,
-        config: Arc<Config>,
-        azero_connection: Arc<AzeroConnectionWithSigner>,
-        // is_circuit_open: Arc<AtomicBool>,
-    ) -> Result<(), EthHandlerError> {
-        loop {
-            if let Some(eth_events) = eth_events_receiver.recv().await {
-                // handle each block in a separate task
-                tokio::spawn(handle_events(
-                    eth_events,
-                    Arc::clone(&config),
-                    Arc::clone(&azero_connection),
-                ));
-            }
-        }
-    }
+    // pub async fn run(
+    //     mut eth_events_receiver: mpsc::Receiver<EthMostEvents>,
+    //     config: Arc<Config>,
+    //     azero_connection: Arc<AzeroConnectionWithSigner>,
+    //     // is_circuit_open: Arc<AtomicBool>,
+    // ) -> Result<(), EthHandlerError> {
+    //     loop {
+    //         if let Some(eth_events) = eth_events_receiver.recv().await {
+    //             // handle each block in a separate task
+    //             tokio::spawn(handle_events(
+    //                 eth_events,
+    //                 Arc::clone(&config),
+    //                 Arc::clone(&azero_connection),
+    //             ));
+    //         }
+    //     }
+    // }
 
     // pub async fn handle_events(
     //     events: EthMostEvents,

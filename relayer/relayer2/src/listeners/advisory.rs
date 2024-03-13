@@ -42,7 +42,6 @@ impl AdvisoryListener {
     pub async fn run(
         config: Arc<Config>,
         azero_connection: Arc<AzeroWsConnection>,
-        // emergency: Arc<AtomicBool>,
         circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
     ) -> Result<(), AdvisoryListenerError> {
         let Config {
@@ -64,9 +63,6 @@ impl AdvisoryListener {
             )?;
 
         loop {
-            // let previous_emergency_state = emergency.load(Ordering::Relaxed);
-            // let mut current_emergency_state = false;
-
             let all: Vec<_> = contracts
                 .iter()
                 .map(|advisory| advisory.is_emergency(&azero_connection))
@@ -80,28 +76,12 @@ impl AdvisoryListener {
                                 .send(CircuitBreakerEvent::AdvisoryEmergency(address))?;
                             break;
                         }
-
-                        // if is_emergency {
-                        //     current_emergency_state = true;
-                        //     if current_emergency_state != previous_emergency_state {
-                        //         let current_block_number =
-                        //             azero_connection.get_block_number_opt(None).await?;
-                        //         warn!("Detected an emergency state at block {current_block_number:?} in an Advisory contract {address}");
-                        //     }
-                        //     break;
-                        // }
                     }
                     Err(why) => return Err(AdvisoryListenerError::AzeroContract(why)),
                 }
             }
 
-            // if previous_emergency_state && !current_emergency_state {
-            //     info!("Previously set emergency state has been lifted");
-            // }
-
-            // emergency.store(current_emergency_state, Ordering::Relaxed);
-
-            // we sleep for about half a block production time before making another round of queries
+            // sleep for about half a block production time before making another round of queries
             sleep(Duration::from_millis(500)).await;
         }
     }

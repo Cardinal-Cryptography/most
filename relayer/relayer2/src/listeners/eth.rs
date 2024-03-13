@@ -64,9 +64,7 @@ pub enum EthListenerError {
 impl EthListener {
     pub async fn run(
         config: Arc<Config>,
-        // azero_connection: Arc<AzeroConnectionWithSigner>,
         eth_connection: Arc<EthConnection>,
-        // redis_connection: Arc<Mutex<RedisConnection>>,
         eth_events_sender: mpsc::Sender<EthMostEvents>,
         last_processed_block_number: broadcast::Sender<u32>,
         mut next_unprocessed_block_number: broadcast::Receiver<u32>,
@@ -99,7 +97,7 @@ impl EthListener {
             );
 
             info!(
-                "Processing events from blocks {} - {}",
+                "Processing a batch of eth events from blocks {} - {}",
                 unprocessed_block_number, to_block
             );
 
@@ -111,24 +109,25 @@ impl EthListener {
                 .query()
                 .await?;
 
-            let (ack_sender, ack_receiver) = oneshot::channel();
+            let (events_ack_sender, events_ack_receiver) = oneshot::channel();
 
-            let events = EthMostEvents { events, ack_sender };
+            info!("Sending a batch of {} Eth events", events.len());
 
             eth_events_sender
-                .send(events)
+                .send(EthMostEvents {
+                    events,
+                    events_ack_sender,
+                })
                 .await
                 .expect("Cannot publish a batch of events to the eth events channel ");
 
             // wait for ack before moving on to the next batch
-            info!("Awaiting acknowledgement");
-            _ = ack_receiver.await;
+            info!("Awaiting ack for the published events batch");
+            _ = events_ack_receiver.await;
 
             // publish this block number as processed
             last_processed_block_number.send(unprocessed_block_number)?;
         }
-
-        // Ok(())
     }
 }
 
