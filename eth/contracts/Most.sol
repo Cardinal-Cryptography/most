@@ -69,6 +69,7 @@ contract Most is
 
     error NotInCommittee();
     error ZeroSignatureTreshold();
+    error DuplicateCommitteeMember();
     error NotEnoughGuardians();
     error UnsupportedPair();
     error DataHashMismatch();
@@ -103,22 +104,21 @@ contract Most is
         uint256 _signatureThreshold
     ) internal {
         if (_signatureThreshold == 0) revert ZeroSignatureTreshold();
-        uint256 committeeCount;
+        if (_committee.length < _signatureThreshold)
+            revert NotEnoughGuardians();
 
         for (uint256 i; i < _committee.length; ++i) {
             bytes32 committeeMemberId = keccak256(
                 abi.encodePacked(committeeId, _committee[i])
             );
             // avoid duplicates
-            if (!committee[committeeMemberId]) {
-                ++committeeCount;
-                committee[committeeMemberId] = true;
+            if (committee[committeeMemberId]) {
+                revert DuplicateCommitteeMember();
             }
+            committee[committeeMemberId] = true;
         }
 
-        if (committeeCount < _signatureThreshold) revert NotEnoughGuardians();
-
-        committeeSize[committeeId] = committeeCount;
+        committeeSize[committeeId] = _committee.length;
         signatureThreshold[committeeId] = _signatureThreshold;
     }
 
