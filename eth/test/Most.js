@@ -57,6 +57,30 @@ describe("Most", function () {
         ),
       ).to.be.revertedWithCustomError(Most, "NotEnoughGuardians");
     });
+    it("Reverts if duplicate guardians", async () => {
+      const signers = await ethers.getSigners();
+      const accounts = signers.map((s) => s.address);
+
+      const WETH = await ethers.getContractFactory("WETH9");
+      const weth = await WETH.deploy();
+
+      const Most = await ethers.getContractFactory("Most");
+      await expect(
+        upgrades.deployProxy(
+          Most,
+          [
+            [accounts[0], accounts[1], accounts[2], accounts[0]],
+            2,
+            accounts[0],
+            await weth.getAddress(),
+          ],
+          {
+            initializer: "initialize",
+            kind: "uups",
+          },
+        ),
+      ).to.be.revertedWithCustomError(Most, "DuplicateCommitteeMember");
+    });
   });
 
   async function deployEightGuardianMostFixture() {
