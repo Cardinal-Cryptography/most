@@ -53,24 +53,40 @@ async function addTokenPair(
   const azeroTokenAddressBytes = u8aToHex(
     new Keyring({ type: "sr25519" }).decodeAddress(azeroTokenAddress),
   );
-  let iface = await new ethers.Interface([
+
+  const iface = await new ethers.Interface([
+    "function pause()",
+    "function unpause()",
     "function addPair(bytes32 from, bytes32 to)",
   ]);
-  let calldata = await iface.encodeFunctionData("addPair", [
+
+  const addPaircalldata = await iface.encodeFunctionData("addPair", [
     ethTokenAddressBytes,
     azeroTokenAddressBytes,
   ]);
 
-  const safeTransactionData = {
-    to: mostContract.address,
-    data: calldata,
-    value: 0,
-  };
+  const transactions = [
+    {
+      to: mostContract.address,
+      data: await iface.encodeFunctionData("pause", []),
+      value: 0,
+    },
+    {
+      to: mostContract.address,
+      data: addPaircalldata,
+      value: 0,
+    },
+    {
+      to: mostContract.address,
+      data: await iface.encodeFunctionData("unpause", []),
+      value: 0,
+    },
+  ];
 
-  console.log("creating a Safe transaction:", safeTransactionData);
+  console.log("creating a Safe transactions:", transactions);
 
   const safeTransaction = await safeInstances[0].createTransaction({
-    transactions: [safeTransactionData],
+    transactions,
   });
   const safeTxHash = await safeInstances[0].getTransactionHash(safeTransaction);
 

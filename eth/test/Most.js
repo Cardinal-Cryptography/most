@@ -36,7 +36,7 @@ describe("Most", function () {
             kind: "uups",
           },
         ),
-      ).to.be.revertedWith("Signature threshold must be greater than 0");
+      ).to.be.revertedWithCustomError(Most, "ZeroSignatureTreshold");
     });
     it("Reverts if threshold is greater than number of guardians", async () => {
       const signers = await ethers.getSigners();
@@ -55,7 +55,31 @@ describe("Most", function () {
             kind: "uups",
           },
         ),
-      ).to.be.revertedWith("Not enough guardians specified");
+      ).to.be.revertedWithCustomError(Most, "NotEnoughGuardians");
+    });
+    it("Reverts if duplicate guardians", async () => {
+      const signers = await ethers.getSigners();
+      const accounts = signers.map((s) => s.address);
+
+      const WETH = await ethers.getContractFactory("WETH9");
+      const weth = await WETH.deploy();
+
+      const Most = await ethers.getContractFactory("Most");
+      await expect(
+        upgrades.deployProxy(
+          Most,
+          [
+            [accounts[0], accounts[1], accounts[2], accounts[0]],
+            2,
+            accounts[0],
+            await weth.getAddress(),
+          ],
+          {
+            initializer: "initialize",
+            kind: "uups",
+          },
+        ),
+      ).to.be.revertedWithCustomError(Most, "DuplicateCommitteeMember");
     });
   });
 
@@ -105,7 +129,7 @@ describe("Most", function () {
       await token.approve(mostAddress, TOKEN_AMOUNT);
       await expect(
         most.sendRequest(tokenAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT),
-      ).to.be.revertedWith("Unsupported pair");
+      ).to.be.revertedWithCustomError(most, "UnsupportedPair");
     });
 
     it("Reverts if token transfer is not approved", async () => {
@@ -113,7 +137,9 @@ describe("Most", function () {
         deployEightGuardianMostFixture,
       );
 
+      await most.pause();
       await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
+      await most.unpause();
       await expect(
         most.sendRequest(tokenAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT),
       ).to.be.reverted;
@@ -124,7 +150,9 @@ describe("Most", function () {
         await loadFixture(deployEightGuardianMostFixture);
 
       await token.approve(mostAddress, TOKEN_AMOUNT);
+      await most.pause();
       await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
+      await most.unpause();
       await most.sendRequest(tokenAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT);
 
       expect(await token.balanceOf(mostAddress)).to.equal(TOKEN_AMOUNT);
@@ -135,7 +163,9 @@ describe("Most", function () {
         await loadFixture(deployEightGuardianMostFixture);
 
       await token.approve(mostAddress, TOKEN_AMOUNT);
+      await most.pause();
       await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
+      await most.unpause();
       await expect(
         most.sendRequest(tokenAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT),
       )
@@ -150,15 +180,16 @@ describe("Most", function () {
 
       await expect(
         most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
-      ).to.be.revertedWith("Unsupported pair");
+      ).to.be.revertedWithCustomError(most, "UnsupportedPair");
     });
 
     it("Transfers tokens to Most", async () => {
       const { most, token, mostAddress, wethAddress, weth } = await loadFixture(
         deployEightGuardianMostFixture,
       );
-
+      await most.pause();
       await most.addPair(addressToBytes32(wethAddress), WRAPPED_TOKEN_ADDRESS);
+      await most.unpause();
       await most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT });
 
       expect(await weth.balanceOf(mostAddress)).to.equal(TOKEN_AMOUNT);
@@ -168,8 +199,9 @@ describe("Most", function () {
       const { most, token, mostAddress, wethAddress } = await loadFixture(
         deployEightGuardianMostFixture,
       );
-
+      await most.pause();
       await most.addPair(addressToBytes32(wethAddress), WRAPPED_TOKEN_ADDRESS);
+      await most.unpause();
       await expect(
         most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
       )
@@ -201,7 +233,7 @@ describe("Most", function () {
             ethAddress,
             0,
           ),
-      ).to.be.revertedWith("Not a member of the guardian committee");
+      ).to.be.revertedWithCustomError(most, "NotInCommittee");
     });
 
     it("Ignores consecutive signatures", async () => {
@@ -341,7 +373,7 @@ describe("Most", function () {
             ethAddress,
             0,
           ),
-      ).to.be.revertedWith("Hash does not match the data");
+      ).to.be.revertedWithCustomError(most, "DataHashMismatch");
     });
 
     it("Committee rotation", async () => {
@@ -398,7 +430,7 @@ describe("Most", function () {
             ethAddress,
             0,
           ),
-      ).to.be.revertedWith("Not a member of the guardian committee");
+      ).to.be.revertedWithCustomError(most, "NotInCommittee");
 
       await expect(
         most
@@ -411,7 +443,7 @@ describe("Most", function () {
             ethAddress,
             0,
           ),
-      ).to.be.revertedWith("Not a member of the guardian committee");
+      ).to.be.revertedWithCustomError(most, "NotInCommittee");
     });
   });
 
@@ -457,6 +489,77 @@ describe("Most", function () {
       expect(await weth.balanceOf(accounts[10].address)).to.equal(0);
       expect(balanceAfterMost - balanceBeforeMost).to.equal(0);
       expect(balanceAfter - balanceBefore).to.equal(token_amount);
+    });
+
+    it("Unsuccessful transfer to a contract fails with event", async () => {
+      const { most, weth, wethAddress, mostAddress, token } = await loadFixture(
+        deployEightGuardianMostFixture,
+      );
+      const token_amount = ethToWei(TOKEN_AMOUNT);
+      const accounts = await ethers.getSigners();
+      // token contract doesn't accept ether so any native ether transfer to it will fail
+      const ethAddress = token.target;
+      const requestHash = ethers.solidityPackedKeccak256(
+        ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
+        [
+          0,
+          addressToBytes32(wethAddress),
+          token_amount,
+          addressToBytes32(ethAddress),
+          0,
+        ],
+      );
+      await most.pause();
+      await most.addPair(addressToBytes32(wethAddress), WRAPPED_TOKEN_ADDRESS);
+      await most.unpause();
+      const provider = await hre.ethers.provider;
+      // Provide funds for Most
+      await weth.deposit({ value: token_amount });
+      expect(await weth.balanceOf(accounts[0].address)).to.equal(token_amount);
+      await weth.transfer(mostAddress, token_amount);
+      expect(await weth.balanceOf(mostAddress)).to.equal(token_amount);
+
+      const balanceBefore = await provider.getBalance(ethAddress);
+      const balanceBeforeMost = await provider.getBalance(mostAddress);
+
+      for (const signer of accounts.slice(1, 5)) {
+        await most
+          .connect(signer)
+          .receiveRequest(
+            requestHash,
+            0,
+            addressToBytes32(wethAddress),
+            token_amount,
+            addressToBytes32(ethAddress),
+            0,
+          );
+      }
+
+      const res = expect(
+        most
+          .connect(accounts[5])
+          .receiveRequest(
+            requestHash,
+            0,
+            addressToBytes32(wethAddress),
+            token_amount,
+            addressToBytes32(ethAddress),
+            0,
+          ),
+      );
+      await res.to.emit(most, "EthTransferFailed").withArgs(requestHash);
+
+      await res.to.emit(most, "RequestProcessed").withArgs(requestHash);
+
+      const balanceAfter = await provider.getBalance(ethAddress);
+      const balanceAfterMost = await provider.getBalance(mostAddress);
+
+      expect(await weth.balanceOf(ethAddress)).to.equal(0);
+      expect(await weth.balanceOf(mostAddress)).to.equal(0);
+
+      // we expect that native ether is locked in the most contract
+      expect(balanceAfterMost - balanceBeforeMost).to.equal(token_amount);
+      expect(balanceAfter - balanceBefore).to.equal(0);
     });
   });
 

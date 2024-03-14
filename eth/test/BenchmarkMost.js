@@ -32,10 +32,16 @@ describe("MostBenchmark", function () {
 
     // Easy way to get a "random" bytes32 value
     let azContract = getRandomAlephAccount(42);
+    let azContract2 = getRandomAlephAccount(43);
     let tokenAddressBytes32 = addressToBytes32(tokenAddress);
 
     // Add pair of linked contracts
+    await most.pause();
     await most.addPair(tokenAddressBytes32, azContract, { from: accounts[0] });
+    await most.addPair(addressToBytes32(wethAddress), azContract2, {
+      from: accounts[0],
+    });
+    await most.unpause();
 
     // Gas estimate for sendRequest
 
@@ -69,6 +75,22 @@ describe("MostBenchmark", function () {
     await most.sendRequest(tokenAddressBytes32, 1000, azAccount, {
       gas: gasEstimateSend,
       from: accounts[0],
+    });
+
+    const gasEstimateSendNative = await most.sendRequestNative.estimateGas(
+      azAccount,
+      { from: accounts[0], value: 1000 },
+    );
+
+    console.log(
+      "Gas estimate for sendRequestNative: ",
+      Number(gasEstimateSendNative),
+    );
+
+    await most.sendRequestNative(azAccount, {
+      gas: gasEstimateSendNative,
+      from: accounts[0],
+      value: 1000,
     });
 
     // Gas estimate for bridgeReceive
