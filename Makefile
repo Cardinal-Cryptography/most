@@ -252,6 +252,11 @@ drink-tests: # Run drink tests
 drink-tests: compile-azero
 	cd azero && npm run drink-tests
 
+.PHONY: drink-tests-docker
+drink-tests: # Run drink tests with docker contract build
+drink-tests: compile-azero-docker
+	cd azero && npm run drink-tests
+
 .PHONY: check-js-format
 check-js-format: # Check js formatting
 check-js-format:
