@@ -91,6 +91,7 @@ contract Most is
 
         __Ownable_init(owner);
         __Pausable_init();
+        _pause();
     }
 
     /// @dev required by the OZ UUPS module

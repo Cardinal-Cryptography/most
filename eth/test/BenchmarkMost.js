@@ -36,7 +36,6 @@ describe("MostBenchmark", function () {
     let tokenAddressBytes32 = addressToBytes32(tokenAddress);
 
     // Add pair of linked contracts
-    await most.pause();
     await most.addPair(tokenAddressBytes32, azContract, { from: accounts[0] });
     await most.addPair(addressToBytes32(wethAddress), azContract2, {
       from: accounts[0],

@@ -101,6 +101,7 @@ describe("Most", function () {
       },
     );
     const mostAddress = await most.getAddress();
+    await most.unpause();
 
     const Token = await ethers.getContractFactory("Token");
     const token = await Token.deploy(
@@ -184,7 +185,7 @@ describe("Most", function () {
     });
 
     it("Transfers tokens to Most", async () => {
-      const { most, token, mostAddress, wethAddress, weth } = await loadFixture(
+      const { most, mostAddress, wethAddress, weth } = await loadFixture(
         deployEightGuardianMostFixture,
       );
       await most.pause();
@@ -196,7 +197,7 @@ describe("Most", function () {
     });
 
     it("Emits correct event", async () => {
-      const { most, token, mostAddress, wethAddress } = await loadFixture(
+      const { most, wethAddress } = await loadFixture(
         deployEightGuardianMostFixture,
       );
       await most.pause();
