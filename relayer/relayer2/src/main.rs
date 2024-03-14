@@ -28,8 +28,8 @@ use crate::{
     contracts::MostEvents,
     handlers::EthHandler,
     listeners::{
-        AdvisoryListener, AlephZeroListener, AzeroMostEvents, EthListener, EthMostEvent,
-        EthMostEvents,
+        AdvisoryListener, AlephZeroListener, AzeroMostEvent, AzeroMostEvents, EthListener,
+        EthMostEvent, EthMostEvents,
     },
     redis::RedisManager,
 };
@@ -173,6 +173,7 @@ async fn main() -> Result<()> {
 pub struct Relayer;
 
 impl Relayer {
+    #[allow(clippy::too_many_arguments)]
     pub async fn run(
         config: Arc<Config>,
         mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
@@ -180,7 +181,8 @@ impl Relayer {
         mut eth_event_receiver: mpsc::Receiver<EthMostEvent>,
         eth_event_sender: mpsc::Sender<EthMostEvent>,
         mut azero_events_receiver: mpsc::Receiver<AzeroMostEvents>,
-
+        azero_event_sender: mpsc::Sender<AzeroMostEvent>,
+        mut azero_event_receiver: mpsc::Receiver<AzeroMostEvent>,
         azero_connection: Arc<AzeroConnectionWithSigner>,
         circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
     ) {
@@ -196,20 +198,29 @@ impl Relayer {
                     let AzeroMostEvents { events, events_ack_sender } = azero_events;
                     info!("Received a batch {} of Azero events", events.len ());
 
+                    // let mut acks = Vec::new ();
+                    let mut acks = JoinSet::new();
 
                     for event in events {
-                        // let (event_ack_sender, event_ack_receiver) = oneshot::channel::<()>();
-                        // info!("Sending Eth event {event:?}");
-                        // eth_event_sender.send(EthMostEvent {event, event_ack_sender}).await.unwrap ();
-                        // info!("Awaiting event ack");
-                        // event_ack_receiver.await.unwrap ();
-                        // info!("Event ack received");
+                        let (event_ack_sender, event_ack_receiver) = oneshot::channel::<()>();
+                        info!("Sending AlephZero event {event:?}");
+                        azero_event_sender.send(AzeroMostEvent {event, event_ack_sender}).await.unwrap ();
+                        acks.spawn(event_ack_receiver);
+                    }
 
-                        // todo!();
+                    // wait for all concurrent tasks to finish
+                    while let Some(_res) = acks.join_next().await {
                     }
 
                     info!("Acknowledging Azero events batch receipt");
+                    // marks the batch as done and releases the listener
                     events_ack_sender.send(()).unwrap ();
+                },
+
+                Some (azero_event) = azero_event_receiver.recv () => {
+                // Spawn a new task for handling each event.
+
+
                 },
 
                 Some(eth_events) = eth_events_receiver.recv() => {
@@ -226,6 +237,7 @@ impl Relayer {
                     }
 
                     info!("Acknowledging Eth events batch receipt");
+                    // marks the batch as done and releases the listener
                     events_ack_sender.send(()).unwrap ();
                 },
 

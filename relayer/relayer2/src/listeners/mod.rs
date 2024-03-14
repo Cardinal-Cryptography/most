@@ -33,6 +33,12 @@ pub struct AzeroMostEvents {
     pub events_ack_sender: oneshot::Sender<()>,
 }
 
+#[derive(Debug)]
+pub struct AzeroMostEvent {
+    pub event: ContractEvent,
+    pub event_ack_sender: oneshot::Sender<()>,
+}
+
 pub use advisory::*;
 pub use azero::*;
 pub use eth::*;

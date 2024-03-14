@@ -49,41 +49,6 @@ pub enum EthHandlerError {
 pub struct EthHandler;
 
 impl EthHandler {
-    // pub async fn run(
-    //     mut eth_events_receiver: mpsc::Receiver<EthMostEvents>,
-    //     config: Arc<Config>,
-    //     azero_connection: Arc<AzeroConnectionWithSigner>,
-    //     // is_circuit_open: Arc<AtomicBool>,
-    // ) -> Result<(), EthHandlerError> {
-    //     loop {
-    //         if let Some(eth_events) = eth_events_receiver.recv().await {
-    //             // handle each block in a separate task
-    //             tokio::spawn(handle_events(
-    //                 eth_events,
-    //                 Arc::clone(&config),
-    //                 Arc::clone(&azero_connection),
-    //             ));
-    //         }
-    //     }
-    // }
-
-    // pub async fn handle_events(
-    //     events: EthMostEvents,
-    //     config: Arc<Config>,
-    //     azero_connection: Arc<AzeroConnectionWithSigner>,
-    // ) -> Result<(), EthHandlerError> {
-    //     let EthMostEvents { events, ack_sender } = events;
-
-    //     for event in events {
-    //         handle_event(event, &config, &azero_connection).await?;
-    //     }
-    //     // we processed all the events in this block
-    //     info!("All events processed, sending acknowledgement");
-    //     _ = ack_sender.send(());
-
-    //     Ok(())
-    // }
-
     pub async fn handle_event(
         event: MostEvents,
         config: &Config,
