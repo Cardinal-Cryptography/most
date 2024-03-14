@@ -745,6 +745,24 @@ pub mod most {
             Ok(())
         }
 
+        /// Transfer tokens from the bridge contract to a given account.
+        /// Used to recover user funds in case of a critical bug.
+        /// 
+        /// Can only be called by the contracts owner
+        #[ink(message)]
+        pub fn recover_psp22(
+            &mut self,
+            token: AccountId,
+            receiver: AccountId,
+            amount: u128,
+        ) -> Result<(), MostError> {
+            self.ensure_owner()?;
+
+            let token: ink::contract_ref!(PSP22) = token.into();
+            psp22.transfer(receiver, amount, vec![]);
+            Ok(())
+        }
+
         /// Is the bridge halted?
         #[ink(message)]
         pub fn is_halted(&self) -> Result<bool, MostError> {
