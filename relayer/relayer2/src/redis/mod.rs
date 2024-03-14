@@ -44,11 +44,31 @@ impl RedisManager {
             name,
             default_sync_from_block_eth,
             default_sync_from_block_azero,
+            override_azero_cache,
+            override_eth_cache,
             ..
         } = &*config;
 
         let client = RedisClient::open(redis_node.clone())?;
         let redis_connection = Arc::new(Mutex::new(client.get_connection()?));
+
+        if *override_azero_cache {
+            write_last_processed_block(
+                config.name.clone(),
+                ALEPH_LAST_BLOCK_KEY.to_string(),
+                redis_connection.clone(),
+                *config.default_sync_from_block_azero - 1,
+            )?;
+        }
+
+        if *override_eth_cache {
+            write_last_processed_block(
+                config.name.clone(),
+                ETH_LAST_BLOCK_KEY.to_string(),
+                redis_connection.clone(),
+                *config.default_sync_from_block_eth - 1,
+            )?;
+        }
 
         let first_unprocessed_block_number_eth = read_first_unprocessed_block_number(
             name.clone(),
