@@ -74,11 +74,6 @@ pub enum AzeroListenerError {
     #[error("Missing data from event")]
     MissingEventData(String),
 
-    // #[error("Bridge was halted, restart required")]
-    // BridgeHaltedRestartRequired,
-
-    // #[error("Redis connection error")]
-    // Redis(#[from] RedisError),
     #[error("Join error")]
     Join(#[from] JoinError),
 
@@ -91,7 +86,10 @@ pub enum AzeroListenerError {
     #[error("channel send error")]
     Send(#[from] mpsc::error::SendError<AzeroMostEvents>),
 
-    #[error("channel receive error")]
+    #[error("broadcast send error")]
+    Broadcast(#[from] broadcast::error::SendError<u32>),
+
+    #[error("broadcast receive error")]
     Receive(#[from] broadcast::error::RecvError),
 }
 
@@ -122,7 +120,6 @@ impl AlephZeroListener {
         let pending_blocks: Arc<Mutex<BTreeSet<u32>>> = Arc::new(Mutex::new(BTreeSet::new()));
         let event_handler_tasks_semaphore =
             Arc::new(Semaphore::new(*azero_max_event_handler_tasks));
-        // let mut block_sealing_tasks = JoinSet::new();
 
         let most_azero = MostInstance::new(
             azero_contract_address,
@@ -130,20 +127,6 @@ impl AlephZeroListener {
             *azero_ref_time_limit,
             *azero_proof_size_limit,
         )?;
-
-        // let most_eth_address = eth_contract_address.parse::<Address>()?;
-        // let most_eth = Most::new(most_eth_address, eth_connection.clone());
-
-        // let mut first_unprocessed_block_number = read_first_unprocessed_block_number(
-        //     name.clone(),
-        //     ALEPH_LAST_BLOCK_KEY.to_string(),
-        //     redis_connection.clone(),
-        //     **default_sync_from_block_azero,
-        // )
-        // .await;
-
-        // Add the first block number to the set of pending blocks.
-        // add_to_pending(first_unprocessed_block_number, pending_blocks.clone()).await;
 
         loop {
             let unprocessed_block_number = next_unprocessed_block_number.recv().await?;
@@ -203,7 +186,7 @@ impl AlephZeroListener {
             last_processed_block_number.send(unprocessed_block_number)?;
         }
 
-        Ok(())
+        // Ok(())
     }
 }
 

@@ -44,6 +44,8 @@ mod redis;
 
 const DEV_MNEMONIC: &str =
     "harsh master island dirt equip search awesome double turn crush wool grant";
+// This is more than the maximum number of send_request calls than will fit into the block (execution time)
+const ALEPH_MAX_REQUESTS_PER_BLOCK: usize = 50;
 
 #[derive(Debug, Clone)]
 enum CircuitBreakerEvent {
@@ -115,25 +117,23 @@ async fn main() -> Result<()> {
 
     let eth_connection = Arc::new(eth::connect(&config.eth_node_http_url).await);
 
-    debug!("Established connection to Ethereum node");
+    debug!("Established connection to the Ethereum node");
 
     // Create channels
     let (eth_events_sender, eth_events_receiver) = mpsc::channel::<EthMostEvents>(1);
     let (eth_event_sender, eth_event_receiver) = mpsc::channel::<EthMostEvent>(1);
     let (eth_block_number_sender, eth_block_number_receiver1) = broadcast::channel(1);
     let mut eth_block_number_receiver2 = eth_block_number_sender.subscribe();
-
     let (azero_events_sender, azero_events_receiver) = mpsc::channel::<AzeroMostEvents>(1);
-
+    let (azero_event_sender, azero_event_receiver) =
+        mpsc::channel::<AzeroMostEvents>(ALEPH_MAX_REQUESTS_PER_BLOCK);
     let (azero_block_number_sender, azero_block_number_receiver1) = broadcast::channel(1);
     let mut azero_block_number_receiver2 = azero_block_number_sender.subscribe();
-
     let (circuit_breaker_sender, circuit_breaker_receiver) =
         broadcast::channel::<CircuitBreakerEvent>(1);
 
     // TODO : halted listener tasks
-    // TODO : circuit breaker
-    // TODO : azero event handling tasks (publisher and consumer)
+    // TODO : publish & handle circuit breaker events
 
     let is_circuit_open = Arc::new(AtomicBool::new(true));
 
@@ -179,6 +179,8 @@ impl Relayer {
         mut eth_events_receiver: mpsc::Receiver<EthMostEvents>,
         mut eth_event_receiver: mpsc::Receiver<EthMostEvent>,
         eth_event_sender: mpsc::Sender<EthMostEvent>,
+        mut azero_events_receiver: mpsc::Receiver<AzeroMostEvents>,
+
         azero_connection: Arc<AzeroConnectionWithSigner>,
         circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
     ) {
@@ -188,6 +190,26 @@ impl Relayer {
                     // TODO: close circuit
                     // todo!("")
                     // return;
+                },
+
+                Some (azero_events) = azero_events_receiver.recv () => {
+                    let AzeroMostEvents { events, events_ack_sender } = azero_events;
+                    info!("Received a batch {} of Azero events", events.len ());
+
+
+                    for event in events {
+                        // let (event_ack_sender, event_ack_receiver) = oneshot::channel::<()>();
+                        // info!("Sending Eth event {event:?}");
+                        // eth_event_sender.send(EthMostEvent {event, event_ack_sender}).await.unwrap ();
+                        // info!("Awaiting event ack");
+                        // event_ack_receiver.await.unwrap ();
+                        // info!("Event ack received");
+
+                        // todo!();
+                    }
+
+                    info!("Acknowledging Azero events batch receipt");
+                    events_ack_sender.send(()).unwrap ();
                 },
 
                 Some(eth_events) = eth_events_receiver.recv() => {
