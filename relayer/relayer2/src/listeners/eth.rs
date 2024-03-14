@@ -1,43 +1,26 @@
-use std::{
-    cmp::min,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-};
+use std::{cmp::min, sync::Arc};
 
 use ethers::{
-    abi::EncodePackedError,
     core::types::Address,
     prelude::ContractError,
-    providers::{Http, Middleware, Provider, ProviderError},
+    providers::{Http, Middleware, Provider},
     types::BlockNumber,
-    utils::keccak256,
 };
-use log::{debug, error, info, trace, warn};
-use redis::{aio::Connection as RedisConnection, RedisError};
+use log::{debug, error, info, warn};
 use thiserror::Error;
 use tokio::{
     sync::{
         broadcast,
         mpsc::{self},
-        oneshot, Mutex,
+        oneshot,
     },
     time::{sleep, Duration},
 };
 
 use super::EthMostEvents;
-use crate::{
-    config::Config,
-    connections::{azero::AzeroConnectionWithSigner, eth::EthConnection},
-    contracts::{
-        AzeroContractError, CrosschainTransferRequestFilter, Most, MostEvents, MostInstance,
-    },
-    helpers::concat_u8_arrays,
-};
+use crate::{config::Config, connections::eth::EthConnection, contracts::Most};
 
 pub const ETH_BLOCK_PROD_TIME_SEC: u64 = 15;
-// pub const ETH_LAST_BLOCK_KEY: &str = "ethereum_last_known_block_number";
 
 pub struct EthListener;
 
@@ -50,9 +33,6 @@ pub enum EthListenerError {
 
     #[error("contract error")]
     Contract(#[from] ContractError<Provider<Http>>),
-
-    #[error("redis connection error")]
-    Redis(#[from] RedisError),
 
     #[error("channel send error")]
     Send(#[from] mpsc::error::SendError<EthMostEvents>),
@@ -74,8 +54,6 @@ impl EthListener {
     ) -> Result<(), EthListenerError> {
         let Config {
             eth_contract_address,
-            name,
-            default_sync_from_block_eth,
             sync_step,
             ..
         } = &*config;
@@ -158,18 +136,7 @@ pub async fn get_next_finalized_block_number_eth(
             }
         };
 
+        debug!("Waiting for a next finalized block");
         sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
     }
 }
-
-// async fn wait_until_not_halted(
-//     most_azero: &MostInstance,
-//     azero_connection: &AzeroConnectionWithSigner,
-// ) -> Result<(), EthListenerError> {
-//     loop {
-//         if !most_azero.is_halted(azero_connection).await? {
-//             return Ok(());
-//         }
-//         sleep(Duration::from_secs(10)).await;
-//     }
-// }
