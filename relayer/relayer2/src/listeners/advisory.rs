@@ -1,22 +1,9 @@
-use std::{
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    time::Duration,
-};
+use std::{sync::Arc, time::Duration};
 
-use aleph_client::utility::BlocksApi;
 use futures::future::join_all;
-use log::{info, warn};
+use log::debug;
 use thiserror::Error;
-use tokio::{
-    sync::{
-        broadcast::{self, error::SendError},
-        mpsc,
-    },
-    time::sleep,
-};
+use tokio::{sync::mpsc, time::sleep};
 
 use super::ALEPH_BLOCK_PROD_TIME_SEC;
 use crate::{
@@ -30,14 +17,9 @@ use crate::{
 #[error(transparent)]
 #[non_exhaustive]
 pub enum AdvisoryListenerError {
-    #[error("aleph-client error")]
-    AlephClient(#[from] anyhow::Error),
-
     #[error("azero contract error")]
     AzeroContract(#[from] AzeroContractError),
 
-    // #[error("broadcast send error")]
-    // Broadcast(#[from] broadcast::error::SendError<CircuitBreakerEvent>),
     #[error("channel send error")]
     Send(#[from] mpsc::error::SendError<CircuitBreakerEvent>),
 }
@@ -78,6 +60,7 @@ impl AdvisoryListener {
                 match maybe_emergency {
                     Ok((is_emergency, address)) => {
                         if is_emergency {
+                            debug!("Emergency state in one of the advisory contracts {address}");
                             circuit_breaker_sender
                                 .send(CircuitBreakerEvent::AdvisoryEmergency(address))
                                 .await?;
