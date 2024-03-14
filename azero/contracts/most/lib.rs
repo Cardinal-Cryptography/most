@@ -19,7 +19,7 @@ pub mod most {
     use psp22::{PSP22Error, PSP22};
     use psp22_traits::{Burnable, Mintable};
     use scale::{Decode, Encode};
-    use shared::{concat_u8_arrays, keccak256, Keccak256HashOutput as HashedRequest};
+    use shared::{hash_request_data, Keccak256HashOutput as HashedRequest};
 
     type CommitteeId = u128;
 
@@ -382,15 +382,13 @@ pub mod most {
                 return Ok(());
             }
 
-            let bytes = concat_u8_arrays(vec![
-                &committee_id.to_le_bytes(),
-                &dest_token_address,
-                &amount.to_le_bytes(),
-                &dest_receiver_address,
-                &request_nonce.to_le_bytes(),
-            ]);
-
-            let hash = keccak256(&bytes);
+            let hash = hash_request_data(
+                committee_id,
+                dest_token_address.into(),
+                amount,
+                dest_receiver_address.into(),
+                request_nonce,
+            );
 
             if !request_hash.eq(&hash) {
                 return Err(MostError::HashDoesNotMatchData);

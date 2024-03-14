@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dev-dependencies]
+shared = { path = "../shared" }
 ink-wrapper-types = { version = "0.9.0", default-features = false, features = [
     "drink",
 ] }

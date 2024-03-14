@@ -4,6 +4,6 @@ mod hash;
 mod helpers;
 mod types;
 
-pub use hash::keccak256;
+pub use hash::{keccak256, hash_request_data};
 pub use helpers::concat_u8_arrays;
-pub use types::{CallInput, Keccak256HashOutput, Selector};
+pub use types::Keccak256HashOutput;

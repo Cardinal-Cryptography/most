@@ -41,6 +41,27 @@ pub fn guardian_accounts() -> Vec<ink_primitives::AccountId> {
         .collect()
 }
 
+pub fn mint_to_default_accounts(session: &mut Session) {
+    session
+        .sandbox()
+        .mint_into(ALICE, POCKET_MONEY)
+        .expect("Mint to account should succeed");
+    session
+        .sandbox()
+        .mint_into(BOB, POCKET_MONEY)
+        .expect("Mint to account should succeed");
+    session
+        .sandbox()
+        .mint_into(OWNER, POCKET_MONEY)
+        .expect("Mint to account should succeed");
+    GUARDIANS.iter().for_each(|x| {
+        session
+            .sandbox()
+            .mint_into(x.clone(), POCKET_MONEY)
+            .expect("Mint to account should succeed");
+    });
+}
+
 pub const DEFAULT_THRESHOLD: u128 = 5;
 pub const REMOTE_TOKEN: [u8; 32] = [0x1; 32];
 pub const REMOTE_RECEIVER: [u8; 32] = [0x2; 32];
@@ -54,7 +75,8 @@ pub const RELAY_GAS_USAGE: u128 = 450000;
 
 pub mod most {
     use super::*;
-    use wrappers::most::{self, Instance as Most};
+    use wrappers::most;
+    pub use wrappers::most::{Instance as Most, MostError};
 
     pub fn setup(
         session: &mut Session,
@@ -91,6 +113,121 @@ pub mod most {
             .result
             .to_account_id()
             .into()
+    }
+
+    pub fn add_pair(
+        session: &mut Session,
+        most: &Most,
+        token: [u8; 32],
+        remote_token: [u8; 32],
+        caller: drink::AccountId32,
+    ) -> Result<(), most::MostError> {
+        let _ = session.set_actor(caller);
+
+        handle_ink_error(
+            session
+                .execute(most::Instance::add_pair(most, token, remote_token))
+                .unwrap(),
+        )
+    }
+
+    pub fn set_halted(
+        session: &mut Session,
+        most: &Most,
+        halted: bool,
+        caller: drink::AccountId32,
+    ) -> Result<(), most::MostError> {
+        let _ = session.set_actor(caller);
+
+        handle_ink_error(
+            session
+                .execute(most::Instance::set_halted(most, halted))
+                .unwrap(),
+        )
+    }
+
+    pub fn send_request(
+        session: &mut Session,
+        most: &Most,
+        token: [u8; 32],
+        amount: u128,
+        remote_receiver: [u8; 32],
+        value_transferred: u128,
+        caller: drink::AccountId32,
+    ) -> Result<(), most::MostError> {
+        let _ = session.set_actor(caller);
+
+        handle_ink_error(
+            session
+                .execute(
+                    most::Instance::send_request(most, token, amount, remote_receiver)
+                        .with_value(value_transferred),
+                )
+                .unwrap(),
+        )
+    }
+
+    pub fn receive_request(
+        session: &mut Session,
+        most: &Most,
+        request_hash: [u8; 32],
+        committee_id: u128,
+        dest_token_address: [u8; 32],
+        amount: u128,
+        dest_receiver_address: [u8; 32],
+        request_nonce: u128,
+        caller: drink::AccountId32,
+    ) -> Result<(), most::MostError> {
+        let _ = session.set_actor(caller);
+
+        handle_ink_error(
+            session
+                .execute(most::Instance::receive_request(
+                    most,
+                    request_hash,
+                    committee_id,
+                    dest_token_address,
+                    amount,
+                    dest_receiver_address,
+                    request_nonce,
+                ))
+                .unwrap(),
+        )
+    }
+
+    pub fn set_committee(
+        session: &mut Session,
+        most: &Most,
+        committee: Vec<AccountId>,
+        threshold: u128,
+        caller: drink::AccountId32,
+    ) -> Result<(), most::MostError> {
+        let _ = session.set_actor(caller);
+
+        handle_ink_error(
+            session
+                .execute(most::Instance::set_committee(most, committee, threshold))
+                .unwrap(),
+        )
+    }
+
+    pub fn set_gas_price_oracle(
+        session: &mut Session,
+        most: &Most,
+        gas_price_oracle: AccountId,
+        caller: drink::AccountId32,
+    ) -> Result<(), most::MostError> {
+        let _ = session.set_actor(caller);
+
+        handle_ink_error(
+            session
+                .execute(most::Instance::set_gas_price_oracle(most, gas_price_oracle))
+                .unwrap(),
+        )
+    }
+
+    pub fn get_base_fee(session: &mut Session, most: &Most) -> Result<u128, MostError> {
+        handle_ink_error(session.query(most::Instance::get_base_fee(&most)).unwrap())
     }
 }
 
@@ -142,6 +279,23 @@ pub mod token {
         )
     }
 
+    /// Transfer given amount of given token from sender to receiver.
+    pub fn transfer(
+        session: &mut Session,
+        token: &Token,
+        receiver: AccountId,
+        amount: u128,
+        caller: drink::AccountId32,
+    ) -> Result<(), token::PSP22Error> {
+        let _ = session.set_actor(caller);
+
+        handle_ink_error(
+            session
+                .execute(PSP22::transfer(token, receiver, amount, vec![]))
+                .unwrap(),
+        )
+    }
+
     /// Returns balance of given token for given account.
     /// Fails if anything other than success.
     pub fn balance_of(session: &mut Session, token: &Token, account: AccountId) -> u128 {
@@ -167,10 +321,7 @@ pub mod gas_price_oracle {
 
         let _ = session.set_actor(caller);
 
-        let instance = GasPriceOracle::new(
-            owner,
-            init_price,
-        );
+        let instance = GasPriceOracle::new(owner, init_price);
 
         session
             .instantiate(instance)
@@ -179,14 +330,6 @@ pub mod gas_price_oracle {
             .to_account_id()
             .into()
     }
-}
-
-pub fn get_timestamp(session: &mut Session) -> u64 {
-    session.sandbox().get_timestamp()
-}
-
-pub fn set_timestamp(session: &mut Session, timestamp: u64) {
-    session.sandbox().set_timestamp(timestamp);
 }
 
 pub fn handle_ink_error<R>(res: ContractResult<Result<R, InkLangError>>) -> R {

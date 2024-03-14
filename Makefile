@@ -249,7 +249,7 @@ e2e-tests:
 
 .PHONY: drink-tests
 drink-tests: # Run drink tests
-drink-tests:
+drink-tests: compile-azero
 	cd azero && npm run drink-tests
 
 .PHONY: check-js-format
