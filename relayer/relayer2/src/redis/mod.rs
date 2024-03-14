@@ -2,14 +2,15 @@ use std::sync::{Arc, Mutex};
 
 use redis::{Client as RedisClient, Commands, Connection, RedisError};
 use thiserror::Error;
-use tokio::sync::{
-    broadcast,
-    mpsc::{self},
+use tokio::{
+    select,
+    sync::{broadcast, mpsc},
 };
 
 use crate::config::Config;
 
 pub const ETH_LAST_BLOCK_KEY: &str = "ethereum_last_known_block_number";
+pub const ALEPH_LAST_BLOCK_KEY: &str = "alephzero_last_known_block_number";
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -33,41 +34,63 @@ pub struct RedisManager;
 impl RedisManager {
     pub async fn run(
         config: Arc<Config>,
-        next_unprocessed_block_number: broadcast::Sender<u32>,
-        mut last_processed_block_number: broadcast::Receiver<u32>,
+        next_unprocessed_block_number_eth: broadcast::Sender<u32>,
+        mut last_processed_block_number_eth: broadcast::Receiver<u32>,
+        next_unprocessed_block_number_azero: broadcast::Sender<u32>,
+        mut last_processed_block_number_azero: broadcast::Receiver<u32>,
     ) -> Result<(), RedisManagerError> {
         let Config {
             redis_node,
             name,
             default_sync_from_block_eth,
+            default_sync_from_block_azero,
             ..
         } = &*config;
 
         let client = RedisClient::open(redis_node.clone())?;
         let redis_connection = Arc::new(Mutex::new(client.get_connection()?));
 
-        let first_unprocessed_block_number = read_first_unprocessed_block_number(
+        let first_unprocessed_block_number_eth = read_first_unprocessed_block_number(
             name.clone(),
             ETH_LAST_BLOCK_KEY.to_string(),
             Arc::clone(&redis_connection),
             **default_sync_from_block_eth,
         );
 
-        _ = next_unprocessed_block_number.send(first_unprocessed_block_number)?;
+        next_unprocessed_block_number_eth.send(first_unprocessed_block_number_eth)?;
+
+        let first_unprocessed_block_number_azero = read_first_unprocessed_block_number(
+            name.clone(),
+            ALEPH_LAST_BLOCK_KEY.to_string(),
+            Arc::clone(&redis_connection),
+            **default_sync_from_block_azero,
+        );
+
+        next_unprocessed_block_number_azero.send(first_unprocessed_block_number_azero)?;
 
         loop {
-            let last_processed_block_number = last_processed_block_number.recv().await?;
+            select! {
+                Ok (last_processed_block_number) = last_processed_block_number_eth.recv() => {
+                    write_last_processed_block(
+                        name.clone(),
+                        ETH_LAST_BLOCK_KEY.to_string(),
+                        Arc::clone(&redis_connection),
+                        last_processed_block_number,
+                    )?;
+                },
 
-            // Cache the last processed block number
-            write_last_processed_block(
-                name.clone(),
-                ETH_LAST_BLOCK_KEY.to_string(),
-                Arc::clone(&redis_connection),
-                last_processed_block_number,
-            )?;
+                Ok (last_processed_block_number) = last_processed_block_number_azero.recv () => {
+                    write_last_processed_block(
+                        name.clone(),
+                        ALEPH_LAST_BLOCK_KEY.to_string(),
+                        Arc::clone(&redis_connection),
+                        last_processed_block_number,
+                    )?;
+                }
+
+                else => {}
+            }
         }
-
-        // Ok(())
     }
 }
 
@@ -88,6 +111,7 @@ pub fn read_first_unprocessed_block_number(
     }
 }
 
+/// Caches the last processed block number
 pub fn write_last_processed_block(
     name: String,
     key: String,

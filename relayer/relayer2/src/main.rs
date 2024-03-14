@@ -1,31 +1,20 @@
-use std::{
-    process,
-    sync::{atomic::AtomicBool, mpsc::Receiver, Arc},
-};
+use std::sync::{atomic::AtomicBool, Arc};
 
-use aleph_client::{AccountId, Connection};
+use aleph_client::AccountId;
 use clap::Parser;
 use config::Config;
 use connections::{azero::AzeroConnectionWithSigner, eth::SignedEthConnection};
-// use crossbeam_channel::{
-//     bounded, select, unbounded, Receiver as CrossbeamReceiver, Sender as CrossbeamSender,
-// };
-use ethers::signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, Signer, WalletError};
+use ethers::signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, Signer};
 use eyre::Result;
-use futures::Future;
-use handlers::EthHandlerError;
-use log::{debug, error, info, warn};
-use thiserror::Error;
+use log::{debug, info, warn};
 use tokio::{
     select,
-    sync::{broadcast, mpsc, oneshot, Mutex},
-    task::{self, JoinHandle, JoinSet},
-    time::{sleep, Duration},
+    sync::{broadcast, mpsc, oneshot},
+    task::JoinSet,
 };
 
 use crate::{
     connections::{azero, eth},
-    contracts::MostEvents,
     handlers::{AlephZeroHandler, EthHandler},
     listeners::{
         AdvisoryListener, AlephZeroListener, AzeroMostEvent, AzeroMostEvents, EthListener,
@@ -49,13 +38,11 @@ const ALEPH_MAX_REQUESTS_PER_BLOCK: usize = 50;
 
 #[derive(Debug, Clone)]
 enum CircuitBreakerEvent {
-    // EventHandlerSuccess,
     EthEventHandlerFailure,
     AlephZeroEventHandlerFailure,
     BridgeHaltAzero,
     BridgeHaltEth,
     AdvisoryEmergency(AccountId),
-    Other(String),
 }
 
 #[tokio::main]
@@ -156,7 +143,7 @@ async fn main() -> Result<()> {
         Arc::clone(&config),
         Arc::clone(&azero_connection),
         azero_events_sender,
-        azero_block_number_sender,
+        azero_block_number_sender.clone(),
         azero_block_number_receiver1,
     ));
 
@@ -164,6 +151,8 @@ async fn main() -> Result<()> {
         Arc::clone(&config),
         eth_block_number_sender.clone(),
         eth_block_number_receiver2,
+        azero_block_number_sender.clone(),
+        azero_block_number_receiver2,
     ));
 
     // tokio::try_join!(task1, task2).expect("Listener task should never finish");
@@ -274,7 +263,7 @@ impl Relayer {
                     event_ack_sender.send(()).unwrap ();
                 }
 
-                else => break
+                else => {}
             }
         }
     }
