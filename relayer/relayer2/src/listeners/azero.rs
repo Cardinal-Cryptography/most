@@ -1,44 +1,23 @@
-use std::{
-    cmp::min,
-    collections::BTreeSet,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-};
+use std::{cmp::min, collections::BTreeSet, sync::Arc};
 
 use aleph_client::{
     contract::event::{BlockDetails, ContractEvent},
     utility::BlocksApi,
     AlephConfig, AsConnection, Connection,
 };
-use ethers::{
-    abi::{self, Token},
-    core::types::Address,
-    prelude::{ContractCall, ContractError},
-    providers::{Middleware, ProviderError},
-    types::U64,
-    utils::keccak256,
-};
-use log::{debug, error, info, warn};
-use redis::{aio::Connection as RedisConnection, RedisError};
-use subxt::{events::Events, utils::H256};
+use log::{error, info, warn};
+use subxt::events::Events;
 use thiserror::Error;
 use tokio::{
-    sync::{broadcast, mpsc, oneshot, AcquireError, Mutex, OwnedSemaphorePermit, Semaphore},
+    sync::{broadcast, mpsc, oneshot, Mutex},
     task::{JoinError, JoinSet},
-    time::{sleep, Duration},
 };
 
 use super::AzeroMostEvents;
 use crate::{
     config::Config,
-    connections::{azero::AzeroWsConnection, eth::SignedEthConnection},
-    contracts::{
-        get_request_event_data, AzeroContractError, CrosschainTransferRequestData, Most,
-        MostInstance,
-    },
-    listeners::eth::{get_next_finalized_block_number_eth, ETH_BLOCK_PROD_TIME_SEC},
+    connections::azero::AzeroWsConnection,
+    contracts::{AzeroContractError, MostInstance},
 };
 
 pub const ALEPH_BLOCK_PROD_TIME_SEC: u64 = 1;
@@ -50,38 +29,17 @@ pub enum AzeroListenerError {
     #[error("Aleph-client error")]
     AlephClient(#[from] anyhow::Error),
 
-    #[error("Error when parsing ethereum address")]
-    FromHex(#[from] rustc_hex::FromHexError),
-
     #[error("Subxt error")]
     Subxt(#[from] subxt::Error),
-
-    #[error("Ethers provider error")]
-    Provider(#[from] ProviderError),
 
     #[error("Azero contract error")]
     AzeroContract(#[from] AzeroContractError),
 
-    #[error("Eth contract error")]
-    EthContractTx(#[from] ContractError<SignedEthConnection>),
-
     #[error("No block found")]
     BlockNotFound,
 
-    #[error("Tx was not present in any block or mempool after the maximum number of retries")]
-    TxNotPresentInBlockOrMempool,
-
-    #[error("Missing data from event")]
-    MissingEventData(String),
-
     #[error("Join error")]
     Join(#[from] JoinError),
-
-    #[error("Semaphore error")]
-    Semaphore(#[from] AcquireError),
-
-    #[error("Contract reverted")]
-    EthContractReverted,
 
     #[error("channel send error")]
     Send(#[from] mpsc::error::SendError<AzeroMostEvents>),
@@ -109,17 +67,11 @@ impl AlephZeroListener {
             azero_contract_address,
             azero_ref_time_limit,
             azero_proof_size_limit,
-            azero_max_event_handler_tasks,
-            eth_contract_address,
-            default_sync_from_block_azero,
-            name,
             sync_step,
             ..
         } = &*config;
 
         let pending_blocks: Arc<Mutex<BTreeSet<u32>>> = Arc::new(Mutex::new(BTreeSet::new()));
-        let event_handler_tasks_semaphore =
-            Arc::new(Semaphore::new(*azero_max_event_handler_tasks));
 
         let most_azero = MostInstance::new(
             azero_contract_address,
@@ -182,11 +134,9 @@ impl AlephZeroListener {
             info!("Awaiting ack");
             _ = events_ack_receiver.await;
 
-            // publish this block number as processed
+            // publish this block number as fully processed
             last_processed_block_number.send(unprocessed_block_number)?;
         }
-
-        // Ok(())
     }
 }
 
@@ -232,7 +182,7 @@ async fn fetch_events_in_block_range(
 
     let mut block_events = Vec::new();
 
-    // Wait for all event processing tasks to finish.
+    // Wait for all event processing tasks to finish
     while let Some(result) = event_fetching_tasks.join_next().await {
         block_events.push(result??);
     }
@@ -264,6 +214,6 @@ async fn get_next_finalized_block_number_azero(
         };
 
         // If we are up to date, we can sleep for a longer time.
-        sleep(Duration::from_secs(10 * ALEPH_BLOCK_PROD_TIME_SEC)).await;
+        // sleep(Duration::from_secs(10 * ALEPH_BLOCK_PROD_TIME_SEC)).await;
     }
 }
