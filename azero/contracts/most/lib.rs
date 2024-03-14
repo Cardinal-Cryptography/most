@@ -746,8 +746,7 @@ pub mod most {
             Ok(())
         }
 
-        /// Transfer tokens from the bridge contract to a given account.
-        /// Used to recover user funds in case of a critical bug.
+        /// Transfer PSP22 tokens from the bridge contract to a given account.
         ///
         /// Can only be called by the contracts owner
         #[ink(message)]
@@ -761,6 +760,21 @@ pub mod most {
 
             let mut token: ink::contract_ref!(PSP22) = token.into();
             token.transfer(receiver, amount, vec![])?;
+            Ok(())
+        }
+
+        /// Transfer AZERO tokens from the bridge contract to a given account.
+        ///
+        /// Can only be called by the contracts owner
+        #[ink(message)]
+        pub fn recover_azero(
+            &mut self,
+            receiver: AccountId,
+            amount: u128,
+        ) -> Result<(), MostError> {
+            self.ensure_owner()?;
+
+            self.env().transfer(receiver, amount)?;
             Ok(())
         }
 
