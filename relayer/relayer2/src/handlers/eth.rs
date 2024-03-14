@@ -1,38 +1,12 @@
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
-
-use ethers::{
-    abi::EncodePackedError,
-    core::types::Address,
-    prelude::ContractError,
-    providers::{Http, Middleware, Provider, ProviderError},
-    types::BlockNumber,
-    utils::keccak256,
-};
-use log::{debug, error, info, trace, warn};
-use redis::{aio::Connection as RedisConnection, RedisError};
+use ethers::utils::keccak256;
+use log::{debug, error, info, trace};
 use thiserror::Error;
-use tokio::{
-    sync::{
-        broadcast,
-        mpsc::{self, error::SendError},
-        Mutex,
-    },
-    task::JoinHandle,
-    time::{sleep, Duration},
-};
 
 use crate::{
     config::Config,
-    connections::{azero::AzeroConnectionWithSigner, eth::EthConnection},
-    contracts::{
-        AzeroContractError, CrosschainTransferRequestFilter, Most, MostEvents, MostInstance,
-    },
+    connections::azero::AzeroConnectionWithSigner,
+    contracts::{AzeroContractError, CrosschainTransferRequestFilter, MostEvents, MostInstance},
     helpers::concat_u8_arrays,
-    listeners::EthMostEvents,
-    CircuitBreakerEvent,
 };
 
 #[derive(Debug, Error)]
@@ -41,9 +15,6 @@ use crate::{
 pub enum EthHandlerError {
     #[error("azero contract error")]
     AzeroContract(#[from] AzeroContractError),
-
-    #[error("channel send error")]
-    Send(#[from] SendError<u32>),
 }
 
 pub struct EthHandler;

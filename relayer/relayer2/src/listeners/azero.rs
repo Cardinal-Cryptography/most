@@ -41,7 +41,7 @@ use crate::{
     listeners::eth::{get_next_finalized_block_number_eth, ETH_BLOCK_PROD_TIME_SEC},
 };
 
-const ALEPH_BLOCK_PROD_TIME_SEC: u64 = 1;
+pub const ALEPH_BLOCK_PROD_TIME_SEC: u64 = 1;
 
 #[derive(Debug, Error)]
 #[error(transparent)]

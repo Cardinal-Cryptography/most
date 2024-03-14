@@ -72,7 +72,7 @@ async fn main() -> Result<()> {
     };
     let azero_signed_connection = Arc::new(azero_signed_connection);
 
-    debug!("Established connection to Aleph Zero node");
+    info!("Established connection to Aleph Zero node");
 
     let wallet = if config.dev {
         // If no keystore path is provided, we use the default development mnemonic
@@ -201,12 +201,12 @@ impl Relayer {
                     }
 
                     // wait for all concurrent tasks to finish
-                    info!("Awaiting for events to be handled");
-                    while let Some(_res) = acks.join_next().await {
-                        // TODO: add why and send to circuit breaker channel
+                    info!("Awaiting all events to be acknowledged");
+                    while (acks.join_next().await).is_some() {
+                      debug!("Ack received");
                     }
 
-                    info!("Acknowledging Azero events batch as handled");
+                    info!("Acknowledging Azero events batch");
                     // marks the batch as done and releases the listener
                     events_ack_sender.send(()).unwrap ();
                 },
@@ -228,7 +228,7 @@ impl Relayer {
                             circuit_breaker_sender.send (CircuitBreakerEvent::AlephZeroEventHandlerFailure).unwrap ();
                         }
 
-                        info!("Acknowledging AlephZero event as handled");
+                        info!("Acknowledging AlephZero event");
                         event_ack_sender.send (()).unwrap ();
                     });
                 },
@@ -246,7 +246,7 @@ impl Relayer {
                         info!("Event ack received");
                     }
 
-                    info!("Acknowledging Eth events batch as handled");
+                    info!("Acknowledging Eth events batch");
                     // marks the batch as done and releases the listener
                     events_ack_sender.send(()).unwrap ();
                 },
@@ -259,7 +259,7 @@ impl Relayer {
                         warn!("Eth event handler failure {why:?}");
                         circuit_breaker_sender.send (CircuitBreakerEvent::EthEventHandlerFailure).unwrap ();
                     }
-                    info!("Acknowledging Eth event as handled");
+                    info!("Acknowledging Eth event");
                     event_ack_sender.send(()).unwrap ();
                 }
 

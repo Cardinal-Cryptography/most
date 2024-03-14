@@ -18,6 +18,7 @@ use tokio::{
     time::sleep,
 };
 
+use super::ALEPH_BLOCK_PROD_TIME_SEC;
 use crate::{
     config::Config,
     connections::azero::AzeroWsConnection,
@@ -88,7 +89,10 @@ impl AdvisoryListener {
             }
 
             // sleep for about half a block production time before making another round of queries
-            sleep(Duration::from_millis(500)).await;
+            sleep(Duration::from_millis(
+                (ALEPH_BLOCK_PROD_TIME_SEC * 1000) / 2,
+            ))
+            .await;
         }
     }
 }

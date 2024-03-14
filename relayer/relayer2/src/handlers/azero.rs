@@ -1,17 +1,6 @@
-use std::{
-    cmp::min,
-    collections::BTreeSet,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-};
+use std::sync::Arc;
 
-use aleph_client::{
-    contract::event::{BlockDetails, ContractEvent},
-    utility::BlocksApi,
-    AlephConfig, AsConnection,
-};
+use aleph_client::contract::event::ContractEvent;
 use ethers::{
     abi::{self, Token},
     core::types::Address,
@@ -21,22 +10,14 @@ use ethers::{
     utils::keccak256,
 };
 use log::{debug, error, info, warn};
-use redis::{aio::Connection as RedisConnection, RedisError};
-use subxt::{events::Events, utils::H256};
+use subxt::utils::H256;
 use thiserror::Error;
-use tokio::{
-    sync::{AcquireError, Mutex, OwnedSemaphorePermit, Semaphore},
-    task::{JoinError, JoinSet},
-    time::{sleep, Duration},
-};
+use tokio::time::{sleep, Duration};
 
 use crate::{
     config::Config,
-    connections::{azero::AzeroWsConnection, eth::SignedEthConnection},
-    contracts::{
-        get_request_event_data, AzeroContractError, CrosschainTransferRequestData, Most,
-        MostInstance,
-    },
+    connections::eth::SignedEthConnection,
+    contracts::{get_request_event_data, AzeroContractError, CrosschainTransferRequestData, Most},
     listeners::{get_next_finalized_block_number_eth, ETH_BLOCK_PROD_TIME_SEC},
 };
 
@@ -44,13 +25,8 @@ use crate::{
 #[error(transparent)]
 #[non_exhaustive]
 pub enum AlephZeroHandlerError {
-    #[error("Aleph-client error")]
-    AlephClient(#[from] anyhow::Error),
     #[error("Error when parsing ethereum address")]
     FromHex(#[from] rustc_hex::FromHexError),
-
-    #[error("Subxt error")]
-    Subxt(#[from] subxt::Error),
 
     #[error("Ethers provider error")]
     Provider(#[from] ProviderError),
@@ -61,23 +37,8 @@ pub enum AlephZeroHandlerError {
     #[error("Eth contract error")]
     EthContractTx(#[from] ContractError<SignedEthConnection>),
 
-    #[error("No block found")]
-    BlockNotFound,
-
     #[error("Tx was not present in any block or mempool after the maximum number of retries")]
     TxNotPresentInBlockOrMempool,
-
-    #[error("Missing data from event")]
-    MissingEventData(String),
-
-    #[error("Bridge was halted, restart required")]
-    BridgeHaltedRestartRequired,
-
-    #[error("Join error")]
-    Join(#[from] JoinError),
-
-    #[error("Semaphore error")]
-    Semaphore(#[from] AcquireError),
 
     #[error("Contract reverted")]
     EthContractReverted,
