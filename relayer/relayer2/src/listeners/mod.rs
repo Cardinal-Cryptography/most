@@ -1,3 +1,5 @@
+use aleph_client::{contract::event::ContractEvent, AlephConfig};
+use subxt::{events::Events, utils::H256};
 use tokio::sync::oneshot;
 
 use crate::{
@@ -22,6 +24,12 @@ pub struct EthMostEvent {
 #[derive(Debug)]
 pub struct EthMostEvents {
     pub events: Vec<MostEvents>,
+    pub events_ack_sender: oneshot::Sender<()>,
+}
+
+#[derive(Debug)]
+pub struct AzeroMostEvents {
+    pub events: Vec<ContractEvent>,
     pub events_ack_sender: oneshot::Sender<()>,
 }
 

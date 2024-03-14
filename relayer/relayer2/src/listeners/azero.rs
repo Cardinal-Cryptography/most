@@ -25,11 +25,12 @@ use redis::{aio::Connection as RedisConnection, RedisError};
 use subxt::{events::Events, utils::H256};
 use thiserror::Error;
 use tokio::{
-    sync::{broadcast, AcquireError, Mutex, OwnedSemaphorePermit, Semaphore},
+    sync::{broadcast, mpsc, oneshot, AcquireError, Mutex, OwnedSemaphorePermit, Semaphore},
     task::{JoinError, JoinSet},
     time::{sleep, Duration},
 };
 
+use super::AzeroMostEvents;
 use crate::{
     config::Config,
     connections::{azero::AzeroWsConnection, eth::SignedEthConnection},
@@ -87,6 +88,9 @@ pub enum AzeroListenerError {
     #[error("Contract reverted")]
     EthContractReverted,
 
+    #[error("channel send error")]
+    Send(#[from] mpsc::error::SendError<AzeroMostEvents>),
+
     #[error("channel receive error")]
     Receive(#[from] broadcast::error::RecvError),
 }
@@ -97,11 +101,9 @@ pub struct AlephZeroListener;
 impl AlephZeroListener {
     pub async fn run(
         config: Arc<Config>,
-        // azero_connection: Arc<AzeroWsConnection>,
         azero_connection: Arc<Connection>,
-        // eth_connection: Arc<SignedEthConnection>,
-        // redis_connection: Arc<Mutex<RedisConnection>>,
-        // emergency: Arc<AtomicBool>,
+        azero_events_sender: mpsc::Sender<AzeroMostEvents>,
+        last_processed_block_number: broadcast::Sender<u32>,
         mut next_unprocessed_block_number: broadcast::Receiver<u32>,
     ) -> Result<(), AzeroListenerError> {
         let Config {
@@ -169,14 +171,36 @@ impl AlephZeroListener {
             }
 
             // Fetch the events in parallel.
-            let events = fetch_events_in_block_range(
+            let all_events = fetch_events_in_block_range(
                 azero_connection.clone(),
                 unprocessed_block_number,
                 to_block,
             )
             .await?;
 
-            todo!("")
+            let filtered_events = all_events
+                .into_iter()
+                .flat_map(|(block_details, events)| {
+                    most_azero.filter_events(events, block_details.clone())
+                })
+                .collect::<Vec<ContractEvent>>();
+
+            let (events_ack_sender, events_ack_receiver) = oneshot::channel::<()>();
+
+            info!("Sending a batch of {} events", filtered_events.len());
+
+            azero_events_sender
+                .send(AzeroMostEvents {
+                    events: filtered_events,
+                    events_ack_sender,
+                })
+                .await?;
+
+            info!("Awaiting ack");
+            _ = events_ack_receiver.await;
+
+            // publish this block number as processed
+            last_processed_block_number.send(unprocessed_block_number)?;
         }
 
         Ok(())

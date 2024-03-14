@@ -55,7 +55,7 @@ pub enum EthListenerError {
     Redis(#[from] RedisError),
 
     #[error("channel send error")]
-    Send(#[from] mpsc::error::SendError<u32>),
+    Send(#[from] mpsc::error::SendError<EthMostEvents>),
 
     #[error("channel broadcast error")]
     Broadcast(#[from] broadcast::error::SendError<u32>),
@@ -121,11 +121,10 @@ impl EthListener {
                     events,
                     events_ack_sender,
                 })
-                .await
-                .expect("Cannot publish events to the channel ");
+                .await?;
 
             // wait for ack before moving on to the next batch
-            info!("Awaiting ack for the published events");
+            info!("Awaiting ack");
             _ = events_ack_receiver.await;
 
             // publish this block number as processed

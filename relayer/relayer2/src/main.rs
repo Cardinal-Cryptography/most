@@ -27,7 +27,10 @@ use crate::{
     connections::{azero, eth},
     contracts::MostEvents,
     handlers::EthHandler,
-    listeners::{AdvisoryListener, AlephZeroListener, EthListener, EthMostEvent, EthMostEvents},
+    listeners::{
+        AdvisoryListener, AlephZeroListener, AzeroMostEvents, EthListener, EthMostEvent,
+        EthMostEvents,
+    },
     redis::RedisManager,
 };
 
@@ -120,8 +123,10 @@ async fn main() -> Result<()> {
     let (eth_block_number_sender, eth_block_number_receiver1) = broadcast::channel(1);
     let mut eth_block_number_receiver2 = eth_block_number_sender.subscribe();
 
+    let (azero_events_sender, azero_events_receiver) = mpsc::channel::<AzeroMostEvents>(1);
+
     let (azero_block_number_sender, azero_block_number_receiver1) = broadcast::channel(1);
-    let mut eazero_block_number_receiver2 = azero_block_number_sender.subscribe();
+    let mut azero_block_number_receiver2 = azero_block_number_sender.subscribe();
 
     let (circuit_breaker_sender, circuit_breaker_receiver) =
         broadcast::channel::<CircuitBreakerEvent>(1);
@@ -149,6 +154,8 @@ async fn main() -> Result<()> {
     let azero_listener = tokio::spawn(AlephZeroListener::run(
         Arc::clone(&config),
         Arc::clone(&azero_connection),
+        azero_events_sender,
+        azero_block_number_sender,
         azero_block_number_receiver1,
     ));
 
@@ -158,15 +165,8 @@ async fn main() -> Result<()> {
         eth_block_number_receiver2,
     ));
 
-    // let eth_handler = tokio::spawn(EthHandler::run(
-    //     eth_events_receiver,
-    //     Arc::clone(&config),
-    //     Arc::clone(&azero_signed_connection),
-    //     Arc::clone(&is_circuit_open),
-    // ));
-
     // tokio::try_join!(task1, task2).expect("Listener task should never finish");
-    // TODO: handle restart, or crash and rely on k8s
+    // TODO: handle restarts
     std::process::exit(1);
 }
 
