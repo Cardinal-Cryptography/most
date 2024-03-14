@@ -71,11 +71,8 @@ impl AdvisoryListener {
                 }
             }
 
-            // sleep for about half a block production time before making another round of queries
-            sleep(Duration::from_millis(
-                (ALEPH_BLOCK_PROD_TIME_SEC * 1000) / 2,
-            ))
-            .await;
+            // sleep for a block production time before making another round of queries
+            sleep(Duration::from_secs(ALEPH_BLOCK_PROD_TIME_SEC)).await;
         }
     }
 }

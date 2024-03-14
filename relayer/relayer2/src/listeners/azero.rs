@@ -100,11 +100,6 @@ impl AlephZeroListener {
                 unprocessed_block_number, to_block
             );
 
-            // Add the next block numbers now, so that there is always some block number in the set.
-            for block_number in unprocessed_block_number..=to_block {
-                add_to_pending(block_number + 1, pending_blocks.clone()).await;
-            }
-
             // Fetch the events in parallel.
             let all_events = fetch_events_in_block_range(
                 azero_connection.clone(),
@@ -138,11 +133,6 @@ impl AlephZeroListener {
             last_processed_block_number.send(unprocessed_block_number)?;
         }
     }
-}
-
-async fn add_to_pending(block_number: u32, pending_blocks: Arc<Mutex<BTreeSet<u32>>>) {
-    let mut pending_blocks = pending_blocks.lock().await;
-    pending_blocks.insert(block_number);
 }
 
 async fn fetch_events_in_block_range(
