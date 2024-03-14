@@ -199,7 +199,7 @@ impl Relayer {
 
                 Some (azero_events) = azero_events_receiver.recv () => {
                     let AzeroMostEvents { events, events_ack_sender } = azero_events;
-                    info!("Received a batch {} of Azero events", events.len ());
+                    info!("Received a batch of {} Azero events", events.len ());
 
                     // let mut acks = Vec::new ();
                     let mut acks = JoinSet::new();
@@ -212,34 +212,36 @@ impl Relayer {
                     }
 
                     // wait for all concurrent tasks to finish
+                    info!("Awaiting for events to be handled");
                     while let Some(_res) = acks.join_next().await {
                         // TODO: add why and send to circuit breaker channel
                     }
 
-                    info!("Acknowledging Azero events batch receipt");
+                    info!("Acknowledging Azero events batch as handled");
                     // marks the batch as done and releases the listener
                     events_ack_sender.send(()).unwrap ();
                 },
 
                 Some (azero_event) = azero_event_receiver.recv () => {
-                    // Spawn a new task for handling each event.
-
                     let config = Arc::clone (&config);
                     let eth_connection = Arc::clone (&eth_signed_connection);
-                    // let circuit_breaker_sender = circuit_breaker_sender.clone ();
 
-                    tokio::spawn (async  {
+                    let circuit_breaker_sender_rc = Arc::new (circuit_breaker_sender.clone ()) ;
+
+                    // Spawn a new task for handling each event
+                    tokio::spawn (async move  {
                         let AzeroMostEvent { event, event_ack_sender } = azero_event;
 
-                        // let circuit_breaker_sender = circuit_breaker_sender.clone ();
+                        let circuit_breaker_sender = Arc::clone (&circuit_breaker_sender_rc) ;
 
                         if let Err(why) = AlephZeroHandler::handle_event(config, eth_connection, event).await {
                             warn!("AlephZero event handler failed {why:?}");
-                            circuit_breaker_sender.clone ().send (CircuitBreakerEvent::AlephZeroEventHandlerFailure).unwrap ();
+                            circuit_breaker_sender.send (CircuitBreakerEvent::AlephZeroEventHandlerFailure).unwrap ();
                         }
 
+                        info!("Acknowledging AlephZero event as handled");
+                        event_ack_sender.send (()).unwrap ();
                     });
-
                 },
 
                 Some(eth_events) = eth_events_receiver.recv() => {
@@ -255,7 +257,7 @@ impl Relayer {
                         info!("Event ack received");
                     }
 
-                    info!("Acknowledging Eth events batch receipt");
+                    info!("Acknowledging Eth events batch as handled");
                     // marks the batch as done and releases the listener
                     events_ack_sender.send(()).unwrap ();
                 },
@@ -268,7 +270,7 @@ impl Relayer {
                         warn!("Eth event handler failure {why:?}");
                         circuit_breaker_sender.send (CircuitBreakerEvent::EthEventHandlerFailure).unwrap ();
                     }
-                    info!("Acknowledging Eth event receipt");
+                    info!("Acknowledging Eth event as handled");
                     event_ack_sender.send(()).unwrap ();
                 }
 
