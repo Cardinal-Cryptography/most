@@ -1,4 +1,4 @@
-use std::{cmp::min, collections::BTreeSet, sync::Arc};
+use std::{cmp::min, sync::Arc};
 
 use aleph_client::{
     contract::event::{BlockDetails, ContractEvent},
@@ -9,7 +9,7 @@ use log::{error, info, warn};
 use subxt::events::Events;
 use thiserror::Error;
 use tokio::{
-    sync::{broadcast, mpsc, oneshot, Mutex},
+    sync::{broadcast, mpsc, oneshot},
     task::{JoinError, JoinSet},
 };
 
@@ -70,8 +70,6 @@ impl AlephZeroListener {
             sync_step,
             ..
         } = &*config;
-
-        let pending_blocks: Arc<Mutex<BTreeSet<u32>>> = Arc::new(Mutex::new(BTreeSet::new()));
 
         let most_azero = MostInstance::new(
             azero_contract_address,

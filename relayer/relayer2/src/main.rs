@@ -108,6 +108,7 @@ async fn main() -> Result<()> {
     debug!("Established connection to the Ethereum node");
 
     // Create channels
+    // TODO: tweak channel buffers
     let (eth_events_sender, eth_events_receiver) = mpsc::channel::<EthMostEvents>(1);
     let (eth_event_sender, eth_event_receiver) = mpsc::channel::<EthMostEvent>(1);
     let (eth_block_number_sender, eth_block_number_receiver1) = broadcast::channel(1);
