@@ -1,6 +1,9 @@
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
+use std::{
+    cmp::min,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
 use ethers::{
@@ -91,13 +94,13 @@ impl EthListener {
             .await;
 
             // don't query for more than `sync_step` blocks at one time.
-            let to_block = std::cmp::min(
+            let to_block = min(
                 next_finalized_block_number,
                 unprocessed_block_number + sync_step,
             );
 
             info!(
-                "Processing a batch of eth events from blocks {} - {}",
+                "Processing events from blocks {} - {}",
                 unprocessed_block_number, to_block
             );
 
@@ -111,7 +114,7 @@ impl EthListener {
 
             let (events_ack_sender, events_ack_receiver) = oneshot::channel();
 
-            info!("Sending a batch of {} Eth events", events.len());
+            info!("Sending a batch of {} events", events.len());
 
             eth_events_sender
                 .send(EthMostEvents {
@@ -119,10 +122,10 @@ impl EthListener {
                     events_ack_sender,
                 })
                 .await
-                .expect("Cannot publish a batch of events to the eth events channel ");
+                .expect("Cannot publish events to the channel ");
 
             // wait for ack before moving on to the next batch
-            info!("Awaiting ack for the published events batch");
+            info!("Awaiting ack for the published events");
             _ = events_ack_receiver.await;
 
             // publish this block number as processed

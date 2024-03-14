@@ -10,6 +10,7 @@ use crate::{
 };
 
 mod advisory;
+mod azero;
 mod eth;
 
 #[derive(Debug)]
@@ -25,4 +26,5 @@ pub struct EthMostEvents {
 }
 
 pub use advisory::*;
+pub use azero::*;
 pub use eth::*;

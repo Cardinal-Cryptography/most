@@ -27,7 +27,7 @@ use crate::{
     connections::{azero, eth},
     contracts::MostEvents,
     handlers::EthHandler,
-    listeners::{AdvisoryListener, EthListener, EthMostEvent, EthMostEvents},
+    listeners::{AdvisoryListener, AlephZeroListener, EthListener, EthMostEvent, EthMostEvents},
     redis::RedisManager,
 };
 
@@ -119,6 +119,10 @@ async fn main() -> Result<()> {
     let (eth_event_sender, eth_event_receiver) = mpsc::channel::<EthMostEvent>(1);
     let (eth_block_number_sender, eth_block_number_receiver1) = broadcast::channel(1);
     let mut eth_block_number_receiver2 = eth_block_number_sender.subscribe();
+
+    let (azero_block_number_sender, azero_block_number_receiver1) = broadcast::channel(1);
+    let mut eazero_block_number_receiver2 = azero_block_number_sender.subscribe();
+
     let (circuit_breaker_sender, circuit_breaker_receiver) =
         broadcast::channel::<CircuitBreakerEvent>(1);
 
@@ -140,6 +144,12 @@ async fn main() -> Result<()> {
         eth_events_sender,
         eth_block_number_sender.clone(),
         eth_block_number_receiver1,
+    ));
+
+    let azero_listener = tokio::spawn(AlephZeroListener::run(
+        Arc::clone(&config),
+        Arc::clone(&azero_connection),
+        azero_block_number_receiver1,
     ));
 
     let redis_manager = tokio::spawn(RedisManager::run(
