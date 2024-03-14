@@ -1,5 +1,5 @@
-mod advisory;
-mod gas_price_oracle;
-mod governance;
-mod most;
-mod token;
+pub mod advisory;
+pub mod gas_price_oracle;
+pub mod most;
+pub mod token;
+pub mod migrations;

@@ -247,6 +247,11 @@ e2e-tests:
 	cd e2e-tests && \
 		RUST_LOG=info cargo test test::$(TEST_CASE) -- --color always --exact --nocapture --test-threads=1
 
+.PHONY: drink-tests
+drink-tests: # Run drink tests
+drink-tests:
+	cd azero && npm run drink-tests
+
 .PHONY: check-js-format
 check-js-format: # Check js formatting
 check-js-format:
