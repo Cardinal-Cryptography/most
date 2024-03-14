@@ -95,17 +95,10 @@ async function addTokenPair(
   );
 }
 
-async function unpauseMost(
-  mostContract,
-  safeInstances,
-) {
-  console.log(
-    "Unpausing Most:"
-  );
+async function unpauseMost(mostContract, safeInstances) {
+  console.log("Unpausing Most:");
 
-  const iface = await new ethers.Interface([
-    "function unpause()",
-  ]);
+  const iface = await new ethers.Interface(["function unpause()"]);
 
   const transactions = [
     {
@@ -131,9 +124,7 @@ async function unpauseMost(
   // execute safe tx
   await executeSafeTransaction(safeInstances[0], safeTransaction);
 
-  console.log(
-    "Most is now unpaused."
-  );
+  console.log("Most is now unpaused.");
 }
 
 // signing with on-chain signatures

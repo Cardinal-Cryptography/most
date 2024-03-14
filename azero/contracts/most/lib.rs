@@ -748,7 +748,7 @@ pub mod most {
 
         /// Transfer tokens from the bridge contract to a given account.
         /// Used to recover user funds in case of a critical bug.
-        /// 
+        ///
         /// Can only be called by the contracts owner
         #[ink(message)]
         pub fn recover_psp22(
