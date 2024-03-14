@@ -295,7 +295,7 @@ contract Most is
     function setCommittee(
         address[] calldata _committee,
         uint256 _signatureThreshold
-    ) external onlyOwner {
+    ) external onlyOwner whenPaused {
         ++committeeId;
         _setCommittee(_committee, _signatureThreshold);
         emit CommitteeUpdated(committeeId);

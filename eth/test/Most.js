@@ -396,7 +396,9 @@ describe("Most", function () {
       await token.transfer(await most.getAddress(), TOKEN_AMOUNT * 2);
 
       // Rotate committee
+      await most.connect(accounts[0]).pause();
       await most.connect(accounts[0]).setCommittee(accounts.slice(3, 10), 5);
+      await most.connect(accounts[0]).unpause();
 
       await most
         .connect(accounts[2])

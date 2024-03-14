@@ -700,6 +700,7 @@ pub mod most {
             signature_threshold: u128,
         ) -> Result<(), MostError> {
             self.ensure_owner()?;
+            self.ensure_halted()?;
             Self::check_committee(&committee, signature_threshold)?;
 
             let mut data = self.data()?;
@@ -758,8 +759,8 @@ pub mod most {
         ) -> Result<(), MostError> {
             self.ensure_owner()?;
 
-            let token: ink::contract_ref!(PSP22) = token.into();
-            psp22.transfer(receiver, amount, vec![]);
+            let mut token: ink::contract_ref!(PSP22) = token.into();
+            token.transfer(receiver, amount, vec![])?;
             Ok(())
         }
 
