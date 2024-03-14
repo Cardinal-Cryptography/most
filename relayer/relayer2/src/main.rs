@@ -6,7 +6,7 @@ use std::{
 use aleph_client::{AccountId, Connection};
 use clap::Parser;
 use config::Config;
-use connections::azero::AzeroConnectionWithSigner;
+use connections::{azero::AzeroConnectionWithSigner, eth::SignedEthConnection};
 // use crossbeam_channel::{
 //     bounded, select, unbounded, Receiver as CrossbeamReceiver, Sender as CrossbeamSender,
 // };
@@ -26,7 +26,7 @@ use tokio::{
 use crate::{
     connections::{azero, eth},
     contracts::MostEvents,
-    handlers::EthHandler,
+    handlers::{AlephZeroHandler, EthHandler},
     listeners::{
         AdvisoryListener, AlephZeroListener, AzeroMostEvent, AzeroMostEvents, EthListener,
         EthMostEvent, EthMostEvents,
@@ -51,6 +51,7 @@ const ALEPH_MAX_REQUESTS_PER_BLOCK: usize = 50;
 enum CircuitBreakerEvent {
     // EventHandlerSuccess,
     EthEventHandlerFailure,
+    AlephZeroEventHandlerFailure,
     BridgeHaltAzero,
     BridgeHaltEth,
     AdvisoryEmergency(AccountId),
@@ -130,7 +131,7 @@ async fn main() -> Result<()> {
     let (azero_block_number_sender, azero_block_number_receiver1) = broadcast::channel(1);
     let mut azero_block_number_receiver2 = azero_block_number_sender.subscribe();
     let (circuit_breaker_sender, circuit_breaker_receiver) =
-        broadcast::channel::<CircuitBreakerEvent>(1);
+        mpsc::channel::<CircuitBreakerEvent>(1);
 
     // TODO : halted listener tasks
     // TODO : publish & handle circuit breaker events
@@ -184,10 +185,12 @@ impl Relayer {
         azero_event_sender: mpsc::Sender<AzeroMostEvent>,
         mut azero_event_receiver: mpsc::Receiver<AzeroMostEvent>,
         azero_connection: Arc<AzeroConnectionWithSigner>,
+        eth_signed_connection: Arc<SignedEthConnection>,
         circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
     ) {
         loop {
             select! {
+
                 circuit_breaker_event = circuit_breaker_receiver.recv () => {
                     // TODO: close circuit
                     // todo!("")
@@ -210,6 +213,7 @@ impl Relayer {
 
                     // wait for all concurrent tasks to finish
                     while let Some(_res) = acks.join_next().await {
+                        // TODO: add why and send to circuit breaker channel
                     }
 
                     info!("Acknowledging Azero events batch receipt");
@@ -218,8 +222,23 @@ impl Relayer {
                 },
 
                 Some (azero_event) = azero_event_receiver.recv () => {
-                // Spawn a new task for handling each event.
+                    // Spawn a new task for handling each event.
 
+                    let config = Arc::clone (&config);
+                    let eth_connection = Arc::clone (&eth_signed_connection);
+                    // let circuit_breaker_sender = circuit_breaker_sender.clone ();
+
+                    tokio::spawn (async  {
+                        let AzeroMostEvent { event, event_ack_sender } = azero_event;
+
+                        // let circuit_breaker_sender = circuit_breaker_sender.clone ();
+
+                        if let Err(why) = AlephZeroHandler::handle_event(config, eth_connection, event).await {
+                            warn!("AlephZero event handler failed {why:?}");
+                            circuit_breaker_sender.clone ().send (CircuitBreakerEvent::AlephZeroEventHandlerFailure).unwrap ();
+                        }
+
+                    });
 
                 },
 
