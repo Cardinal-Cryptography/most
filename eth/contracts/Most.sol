@@ -374,10 +374,6 @@ contract Most is
             address(token).code.length > 0;
     }
 
-    function isContract(address _addr) internal view returns (bool) {
-        return _addr.code.length != 0;
-    }
-
     /// @dev Accept ether only from weth contract or through payable methods
     receive() external payable {
         require(msg.sender == wethAddress);

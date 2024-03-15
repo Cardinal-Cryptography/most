@@ -262,6 +262,7 @@ mod e2e {
                         dest_token_address: REMOTE_TOKEN,
                         amount: amount_to_send,
                         dest_receiver_address: REMOTE_RECEIVER,
+                        sender_address: *account_id(AccountKeyring::Alice).as_ref(),
                         request_nonce: 0,
                     }
                 );
