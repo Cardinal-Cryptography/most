@@ -359,9 +359,7 @@ describe("Most", function () {
     });
 
     it("Emits correct events when token is reverting transactions", async () => {
-      const { most } = await loadFixture(
-        deployEightGuardianMostFixture,
-      );
+      const { most } = await loadFixture(deployEightGuardianMostFixture);
 
       const PoisonedToken = await ethers.getContractFactory("PoisonedToken");
       const token = await PoisonedToken.deploy(
@@ -398,19 +396,23 @@ describe("Most", function () {
           );
       }
 
-      res = expect(most
-        .connect(accounts[5])
-        .receiveRequest(
-          requestHash,
-          0,
-          tokenAddressBytes32,
-          TOKEN_AMOUNT,
-          ethAddress,
-          senderAddress,
-          0,
-        ));
-        await res.to.emit(most, "RequestProcessed").withArgs(requestHash);
-        await res.to.emit(most, "CrosschainTransferRequest").withArgs(0, WRAPPED_TOKEN_ADDRESS, TOKEN_AMOUNT, senderAddress, 0);
+      res = expect(
+        most
+          .connect(accounts[5])
+          .receiveRequest(
+            requestHash,
+            0,
+            tokenAddressBytes32,
+            TOKEN_AMOUNT,
+            ethAddress,
+            senderAddress,
+            0,
+          ),
+      );
+      await res.to.emit(most, "RequestProcessed").withArgs(requestHash);
+      await res.to
+        .emit(most, "CrosschainTransferRequest")
+        .withArgs(0, WRAPPED_TOKEN_ADDRESS, TOKEN_AMOUNT, senderAddress, 0);
     });
 
     it("Reverts on non-matching hash", async () => {
@@ -530,7 +532,14 @@ describe("Most", function () {
       const senderAddress = getRandomAlephAccount(23);
       const requestHash = ethers.solidityPackedKeccak256(
         ["uint256", "bytes32", "uint256", "bytes32", "bytes32", "uint256"],
-        [0, addressToBytes32(wethAddress), token_amount, ethAddress, senderAddress, 0],
+        [
+          0,
+          addressToBytes32(wethAddress),
+          token_amount,
+          ethAddress,
+          senderAddress,
+          0,
+        ],
       );
 
       const provider = await hre.ethers.provider;
@@ -629,7 +638,9 @@ describe("Most", function () {
 
       await res.to.emit(most, "RequestProcessed").withArgs(requestHash);
 
-      await res.to.emit(most, "CrosschainTransferRequest").withArgs(0, WRAPPED_TOKEN_ADDRESS, token_amount, senderAddress, 0);
+      await res.to
+        .emit(most, "CrosschainTransferRequest")
+        .withArgs(0, WRAPPED_TOKEN_ADDRESS, token_amount, senderAddress, 0);
 
       const balanceAfter = await provider.getBalance(ethAddress);
       const balanceAfterMost = await provider.getBalance(mostAddress);

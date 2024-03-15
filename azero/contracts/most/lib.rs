@@ -38,7 +38,6 @@ pub mod most {
         pub amount: u128,
         #[ink(topic)]
         pub dest_receiver_address: [u8; 32],
-        #[ink(topic)]
         pub sender_address: [u8; 32],
         pub request_nonce: u128,
     }
