@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
 use aleph_client::AccountId;
+use backoff::{retry, Error, ExponentialBackoff};
 use clap::Parser;
 use config::Config;
 use connections::{azero::AzeroConnectionWithSigner, eth::SignedEthConnection};
-use ethers::signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, Signer, WalletError};
+use ethers::signers::{coins_bip39::English, MnemonicBuilder, Signer, WalletError};
 use futures::TryFutureExt;
 use listeners::{AdvisoryListenerError, AzeroListenerError, EthListenerError};
 use log::{debug, error, info, warn};
@@ -240,6 +241,7 @@ async fn main() -> Result<(), RelayerError> {
             Ok(_) => error!("One of the core tasks has exited. This is fatal"),
             Err(RelayerError::Recoverable) => {
                 info!("Trying to recover");
+
                 spawn_relayer(
                     &mut tasks,
                     config.clone(),
@@ -249,7 +251,23 @@ async fn main() -> Result<(), RelayerError> {
                     azero_signed_connection.clone(),
                     eth_signed_connection.clone(),
                     circuit_breaker_sender.clone(),
-                );
+                )
+
+                // let op = || {
+                //     spawn_relayer(
+                //         &mut tasks,
+                //         config.clone(),
+                //         circuit_breaker_receiver.clone(),
+                //         eth_events_receiver.clone(),
+                //         azero_events_receiver.clone(),
+                //         azero_signed_connection.clone(),
+                //         eth_signed_connection.clone(),
+                //         circuit_breaker_sender.clone(),
+                //     )
+                //     .map_err(Error::transient)
+                // };
+
+                // let _res = retry(&mut ExponentialBackoff::default(), op);
             }
             Err(why) => error!("Fatal error in one of the core components: {why:?}"),
         }
@@ -269,18 +287,15 @@ fn spawn_relayer(
     eth_signed_connection: Arc<SignedEthConnection>,
     circuit_breaker_sender: mpsc::Sender<CircuitBreakerEvent>,
 ) {
-    tasks.spawn(async move {
-        Relayer::run(
-            config,
-            circuit_breaker_receiver,
-            eth_events_receiver,
-            azero_events_receiver,
-            azero_signed_connection,
-            eth_signed_connection,
-            circuit_breaker_sender,
-        )
-        .await
-    });
+    tasks.spawn(Relayer::run(
+        config,
+        circuit_breaker_receiver,
+        eth_events_receiver,
+        azero_events_receiver,
+        azero_signed_connection,
+        eth_signed_connection,
+        circuit_breaker_sender,
+    ));
 }
 
 pub struct Relayer;
