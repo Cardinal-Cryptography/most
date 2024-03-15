@@ -60,6 +60,8 @@ contract Most is
 
     event EthTransferFailed(bytes32 requestHash);
 
+    event TokenTransferFailed(bytes32 requestHash);
+
     event CommitteeUpdated(uint256 newCommitteeId);
 
     modifier _onlyCommitteeMember(uint256 _committeeId) {
@@ -129,30 +131,23 @@ contract Most is
     /// @dev Tx emits a CrosschainTransferRequest event that the relayers listen to
     /// & forward to the destination chain.
     function sendRequest(
-        bytes32 srcTokenAddress,
-        uint256 amount,
-        bytes32 destReceiverAddress
+        bytes32 _srcTokenAddress,
+        uint256 _amount,
+        bytes32 _destReceiverAddress
     ) external whenNotPaused {
-        if (amount == 0) revert ZeroAmount();
+        if (_amount == 0) revert ZeroAmount();
 
-        IERC20 token = IERC20(bytes32ToAddress(srcTokenAddress));
-
-        bytes32 destTokenAddress = supportedPairs[srcTokenAddress];
-        if (destTokenAddress == 0x0) revert UnsupportedPair();
+        IERC20 token = IERC20(bytes32ToAddress(_srcTokenAddress));
 
         // lock tokens in this contract
         // message sender needs to give approval else this tx will revert
-        token.safeTransferFrom(msg.sender, address(this), amount);
+        token.safeTransferFrom(msg.sender, address(this), _amount);
 
-        emit CrosschainTransferRequest(
-            committeeId,
-            destTokenAddress,
-            amount,
-            destReceiverAddress,
-            requestNonce
+        _sendRequest(
+            _getRemoteTokenAddress(_srcTokenAddress),
+            _amount,
+            _destReceiverAddress
         );
-
-        ++requestNonce;
     }
 
     /// @notice Invoke this tx to transfer funds to the destination chain.
@@ -162,32 +157,10 @@ contract Most is
     /// @dev Tx emits a CrosschainTransferRequest event that the relayers listen to
     /// & forward to the destination chain.
     function sendRequestNative(
-        bytes32 destReceiverAddress
+        bytes32 _destReceiverAddress
     ) external payable whenNotPaused {
-        uint256 amount = msg.value;
-        if (amount == 0) revert ZeroAmount();
-
-        bytes32 destTokenAddress = supportedPairs[
-            addressToBytes32(wethAddress)
-        ];
-
-        if (destTokenAddress == 0x0) revert UnsupportedPair();
-
-        (bool success, ) = wethAddress.call{value: amount}(
-            abi.encodeCall(IWETH9.deposit, ())
-        );
-
-        if (!success) revert WrappingEth();
-
-        emit CrosschainTransferRequest(
-            committeeId,
-            destTokenAddress,
-            amount,
-            destReceiverAddress,
-            requestNonce
-        );
-
-        ++requestNonce;
+        uint256 _amount = msg.value;
+        _sendRequestNative(_amount, _destReceiverAddress);
     }
 
     /// @notice Aggregates relayer signatures and returns the locked tokens.
@@ -201,6 +174,7 @@ contract Most is
         bytes32 destTokenAddress,
         uint256 amount,
         bytes32 destReceiverAddress,
+        bytes32 _senderAddress,
         uint256 _requestNonce
     ) external whenNotPaused _onlyCommitteeMember(_committeeId) {
         // Don't revert if the request has already been processed as
@@ -216,6 +190,7 @@ contract Most is
                 destTokenAddress,
                 amount,
                 destReceiverAddress,
+                _senderAddress,
                 _requestNonce
             )
         );
@@ -241,7 +216,6 @@ contract Most is
             address _destReceiverAddress = bytes32ToAddress(
                 destReceiverAddress
             );
-            // return the locked tokens
             if (_destTokenAddress == wethAddress) {
                 (bool unwrapSuccess, ) = wethAddress.call(
                     abi.encodeCall(IWETH9.withdraw, (amount))
@@ -252,16 +226,29 @@ contract Most is
                     gas: GAS_LIMIT
                 }("");
                 if (!sendNativeEthSuccess) {
-                    if (isContract(_destReceiverAddress)) {
-                        // fail without revert
-                        emit EthTransferFailed(requestHash);
-                    } else {
-                        revert EthTransfer();
-                    }
+                    emit EthTransferFailed(requestHash);
+
+                    // In case of a failure return the locked ETH to the sender
+                    _sendRequestNative(amount, _senderAddress);
                 }
             } else {
                 IERC20 token = IERC20(_destTokenAddress);
-                token.safeTransfer(_destReceiverAddress, amount);
+                if (
+                    !tokenTransferReturnSuccess(
+                        token,
+                        _destReceiverAddress,
+                        amount
+                    )
+                ) {
+                    emit TokenTransferFailed(requestHash);
+
+                    // In case of a failure return the locked tokens to the sender
+                    _sendRequest(
+                        _getRemoteTokenAddress(destReceiverAddress),
+                        amount,
+                        _senderAddress
+                    );
+                }
             }
             emit RequestProcessed(requestHash);
         }
@@ -328,6 +315,63 @@ contract Most is
 
     function addressToBytes32(address addr) internal pure returns (bytes32) {
         return bytes32(uint256(uint160(addr)));
+    }
+
+    function _getRemoteTokenAddress(
+        bytes32 _tokenAddress
+    ) private view returns (bytes32) {
+        bytes32 remoteTokenAddress = supportedPairs[_tokenAddress];
+        if (remoteTokenAddress == 0x0) revert UnsupportedPair();
+        return remoteTokenAddress;
+    }
+
+    function _sendRequest(
+        bytes32 _destTokenAddress,
+        uint256 _amount,
+        bytes32 _destReceiverAddress
+    ) private {
+        emit CrosschainTransferRequest(
+            committeeId,
+            _destTokenAddress,
+            _amount,
+            _destReceiverAddress,
+            requestNonce
+        );
+
+        ++requestNonce;
+    }
+
+    function _sendRequestNative(
+        uint256 _amount,
+        bytes32 _destReceiverAddress
+    ) private {
+        if (_amount == 0) revert ZeroAmount();
+
+        bytes32 _destTokenAddress = _getRemoteTokenAddress(
+            addressToBytes32(wethAddress)
+        );
+
+        (bool _success, ) = wethAddress.call{value: _amount}(
+            abi.encodeCall(IWETH9.deposit, ())
+        );
+        if (!_success) revert WrappingEth();
+
+        _sendRequest(_destTokenAddress, _amount, _destReceiverAddress);
+    }
+
+    /// @dev Adapted from Openzeppelin SafeERC20 - check if the ERC20 token transfer succeeded
+    function tokenTransferReturnSuccess(
+        IERC20 token,
+        address receiver,
+        uint256 amount
+    ) private returns (bool) {
+        (bool success, bytes memory returndata) = address(token).call(
+            abi.encodeCall(token.transfer, (receiver, amount))
+        );
+        return
+            success &&
+            (returndata.length == 0 || abi.decode(returndata, (bool))) &&
+            address(token).code.length > 0;
     }
 
     function isContract(address _addr) internal view returns (bool) {

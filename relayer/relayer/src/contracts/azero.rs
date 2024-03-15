@@ -206,6 +206,7 @@ pub struct CrosschainTransferRequestData {
     pub dest_token_address: [u8; 32],
     pub amount: u128,
     pub dest_receiver_address: [u8; 32],
+    pub sender_address: [u8; 32],
     pub request_nonce: u128,
 }
 
@@ -216,6 +217,7 @@ pub fn get_request_event_data(
     let dest_token_address: [u8; 32] = decode_seq_field(data, "dest_token_address")?;
     let amount: u128 = decode_uint_field(data, "amount")?;
     let dest_receiver_address: [u8; 32] = decode_seq_field(data, "dest_receiver_address")?;
+    let sender_address: [u8; 32] = decode_seq_field(data, "sender_address")?;
     let request_nonce: u128 = decode_uint_field(data, "request_nonce")?;
 
     Ok(CrosschainTransferRequestData {
@@ -223,6 +225,7 @@ pub fn get_request_event_data(
         dest_token_address,
         amount,
         dest_receiver_address,
+        sender_address,
         request_nonce,
     })
 }

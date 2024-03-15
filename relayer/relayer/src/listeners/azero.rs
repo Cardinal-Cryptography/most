@@ -364,6 +364,7 @@ async fn handle_event(
                 dest_token_address,
                 amount,
                 dest_receiver_address,
+                sender_address,
                 request_nonce,
             } = get_request_event_data(&data)?;
 
@@ -381,6 +382,7 @@ async fn handle_event(
                 Token::FixedBytes(dest_token_address.to_vec()),
                 Token::Uint(amount.into()),
                 Token::FixedBytes(dest_receiver_address.to_vec()),
+                Token::FixedBytes(sender_address.to_vec()),
                 Token::Uint(request_nonce.into()),
             ]);
 
@@ -400,6 +402,7 @@ async fn handle_event(
                 dest_token_address,
                 amount.into(),
                 dest_receiver_address,
+                sender_address,
                 request_nonce.into(),
             );
 

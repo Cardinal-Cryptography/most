@@ -217,9 +217,10 @@ describe("Most", function () {
       );
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
+      const senderAddress = getRandomAlephAccount(23);
       const requestHash = ethers.solidityPackedKeccak256(
-        ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
-        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
+        ["uint256", "bytes32", "uint256", "bytes32", "bytes32", "uint256"],
+        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, senderAddress, 0],
       );
 
       await expect(
@@ -231,6 +232,7 @@ describe("Most", function () {
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
+            senderAddress,
             0,
           ),
       ).to.be.revertedWithCustomError(most, "NotInCommittee");
@@ -242,9 +244,10 @@ describe("Most", function () {
       );
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
+      const senderAddress = getRandomAlephAccount(23);
       const requestHash = ethers.solidityPackedKeccak256(
-        ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
-        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
+        ["uint256", "bytes32", "uint256", "bytes32", "bytes32", "uint256"],
+        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, senderAddress, 0],
       );
 
       await most
@@ -255,6 +258,7 @@ describe("Most", function () {
           tokenAddressBytes32,
           TOKEN_AMOUNT,
           ethAddress,
+          senderAddress,
           0,
         );
       await expect(
@@ -266,6 +270,7 @@ describe("Most", function () {
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
+            senderAddress,
             0,
           ),
       )
@@ -279,9 +284,10 @@ describe("Most", function () {
       );
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
+      const senderAddress = getRandomAlephAccount(23);
       const requestHash = ethers.solidityPackedKeccak256(
-        ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
-        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
+        ["uint256", "bytes32", "uint256", "bytes32", "bytes32", "uint256"],
+        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, senderAddress, 0],
       );
 
       // Provide funds for Most
@@ -296,6 +302,7 @@ describe("Most", function () {
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
+            senderAddress,
             0,
           );
       }
@@ -309,6 +316,7 @@ describe("Most", function () {
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
+            senderAddress,
             0,
           ),
       )
@@ -322,9 +330,10 @@ describe("Most", function () {
       );
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
+      const senderAddress = getRandomAlephAccount(23);
       const requestHash = ethers.solidityPackedKeccak256(
-        ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
-        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
+        ["uint256", "bytes32", "uint256", "bytes32", "bytes32", "uint256"],
+        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, senderAddress, 0],
       );
 
       // Provide funds for Most
@@ -339,6 +348,7 @@ describe("Most", function () {
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
+            senderAddress,
             0,
           );
       }
@@ -354,9 +364,10 @@ describe("Most", function () {
       );
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
+      const senderAddress = getRandomAlephAccount(23);
       const requestHash = ethers.solidityPackedKeccak256(
-        ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
-        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 1],
+        ["uint256", "bytes32", "uint256", "bytes32", "bytes32", "uint256"],
+        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, senderAddress, 1],
       );
 
       // Provide funds for Most
@@ -371,6 +382,7 @@ describe("Most", function () {
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
+            senderAddress,
             0,
           ),
       ).to.be.revertedWithCustomError(most, "DataHashMismatch");
@@ -382,13 +394,14 @@ describe("Most", function () {
       );
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
+      const senderAddress = getRandomAlephAccount(23);
       const requestHashOld = ethers.solidityPackedKeccak256(
-        ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
-        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
+        ["uint256", "bytes32", "uint256", "bytes32", "bytes32", "uint256"],
+        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, senderAddress, 0],
       );
       const requestHashNew = ethers.solidityPackedKeccak256(
-        ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
-        [1, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
+        ["uint256", "bytes32", "uint256", "bytes32", "bytes32", "uint256"],
+        [1, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, senderAddress, 0],
       );
 
       // Provide funds for Most
@@ -405,6 +418,7 @@ describe("Most", function () {
           tokenAddressBytes32,
           TOKEN_AMOUNT,
           ethAddress,
+          senderAddress,
           0,
         );
 
@@ -416,6 +430,7 @@ describe("Most", function () {
           tokenAddressBytes32,
           TOKEN_AMOUNT,
           ethAddress,
+          senderAddress,
           0,
         );
 
@@ -428,6 +443,7 @@ describe("Most", function () {
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
+            senderAddress,
             0,
           ),
       ).to.be.revertedWithCustomError(most, "NotInCommittee");
@@ -441,6 +457,7 @@ describe("Most", function () {
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
+            senderAddress,
             0,
           ),
       ).to.be.revertedWithCustomError(most, "NotInCommittee");
@@ -455,9 +472,10 @@ describe("Most", function () {
       const token_amount = ethToWei(TOKEN_AMOUNT);
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
+      const senderAddress = getRandomAlephAccount(23);
       const requestHash = ethers.solidityPackedKeccak256(
-        ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
-        [0, addressToBytes32(wethAddress), token_amount, ethAddress, 0],
+        ["uint256", "bytes32", "uint256", "bytes32", "bytes32", "uint256"],
+        [0, addressToBytes32(wethAddress), token_amount, ethAddress, senderAddress, 0],
       );
 
       const provider = await hre.ethers.provider;
@@ -479,6 +497,7 @@ describe("Most", function () {
             addressToBytes32(wethAddress),
             token_amount,
             ethAddress,
+            senderAddress,
             0,
           );
       }
@@ -499,13 +518,15 @@ describe("Most", function () {
       const accounts = await ethers.getSigners();
       // token contract doesn't accept ether so any native ether transfer to it will fail
       const ethAddress = token.target;
+      const senderAddress = getRandomAlephAccount(23);
       const requestHash = ethers.solidityPackedKeccak256(
-        ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
+        ["uint256", "bytes32", "uint256", "bytes32", "bytes32", "uint256"],
         [
           0,
           addressToBytes32(wethAddress),
           token_amount,
           addressToBytes32(ethAddress),
+          senderAddress,
           0,
         ],
       );
@@ -531,6 +552,7 @@ describe("Most", function () {
             addressToBytes32(wethAddress),
             token_amount,
             addressToBytes32(ethAddress),
+            senderAddress,
             0,
           );
       }
@@ -544,6 +566,7 @@ describe("Most", function () {
             addressToBytes32(wethAddress),
             token_amount,
             addressToBytes32(ethAddress),
+            senderAddress,
             0,
           ),
       );
@@ -551,14 +574,16 @@ describe("Most", function () {
 
       await res.to.emit(most, "RequestProcessed").withArgs(requestHash);
 
+      await res.to.emit(most, "CrosschainTransferRequest").withArgs(0, WRAPPED_TOKEN_ADDRESS, token_amount, senderAddress, 0);
+
       const balanceAfter = await provider.getBalance(ethAddress);
       const balanceAfterMost = await provider.getBalance(mostAddress);
 
       expect(await weth.balanceOf(ethAddress)).to.equal(0);
-      expect(await weth.balanceOf(mostAddress)).to.equal(0);
+      expect(await weth.balanceOf(mostAddress)).to.equal(token_amount);
 
       // we expect that native ether is locked in the most contract
-      expect(balanceAfterMost - balanceBeforeMost).to.equal(token_amount);
+      expect(balanceAfterMost - balanceBeforeMost).to.equal(0);
       expect(balanceAfter - balanceBefore).to.equal(0);
     });
   });
