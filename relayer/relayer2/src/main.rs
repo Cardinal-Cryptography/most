@@ -1,4 +1,4 @@
-use std::sync::{atomic::AtomicBool, Arc};
+use std::sync::{atomic::AtomicBool, Arc, Mutex};
 
 use aleph_client::AccountId;
 use clap::Parser;
@@ -162,12 +162,9 @@ async fn main() -> Result<(), RelayerError> {
     // Create channels
     // TODO: tweak channel buffers
     let (eth_events_sender, eth_events_receiver) = mpsc::channel::<EthMostEvents>(1);
-    let (eth_event_sender, eth_event_receiver) = mpsc::channel::<EthMostEvent>(1);
     let (eth_block_number_sender, eth_block_number_receiver1) = broadcast::channel(1);
     let eth_block_number_receiver2 = eth_block_number_sender.subscribe();
     let (azero_events_sender, azero_events_receiver) = mpsc::channel::<AzeroMostEvents>(1);
-    let (azero_event_sender, azero_event_receiver) =
-        mpsc::channel::<AzeroMostEvent>(ALEPH_MAX_REQUESTS_PER_BLOCK);
     let (azero_block_number_sender, azero_block_number_receiver1) = broadcast::channel(1);
     let azero_block_number_receiver2 = azero_block_number_sender.subscribe();
     let (circuit_breaker_sender, circuit_breaker_receiver) =
@@ -219,16 +216,16 @@ async fn main() -> Result<(), RelayerError> {
         .map_err(RelayerError::from),
     );
 
+    let circuit_breaker_receiver = Arc::new(Mutex::new(circuit_breaker_receiver));
+    let eth_events_receiver = Arc::new(Mutex::new(eth_events_receiver));
+    let azero_events_receiver = Arc::new(Mutex::new(azero_events_receiver));
+
     spawn_relayer(
         &mut tasks,
         config.clone(),
-        circuit_breaker_receiver,
-        eth_events_receiver,
-        eth_event_receiver,
-        eth_event_sender.clone(),
-        azero_events_receiver,
-        azero_event_sender.clone(),
-        azero_event_receiver,
+        circuit_breaker_receiver.clone(),
+        eth_events_receiver.clone(),
+        azero_events_receiver.clone(),
         azero_signed_connection.clone(),
         eth_signed_connection.clone(),
         circuit_breaker_sender.clone(),
@@ -244,13 +241,9 @@ async fn main() -> Result<(), RelayerError> {
                 spawn_relayer(
                     &mut tasks,
                     config.clone(),
-                    circuit_breaker_receiver,
-                    eth_events_receiver,
-                    eth_event_receiver,
-                    eth_event_sender.clone(),
-                    azero_events_receiver,
-                    azero_event_sender.clone(),
-                    azero_event_receiver,
+                    circuit_breaker_receiver.clone(),
+                    eth_events_receiver.clone(),
+                    azero_events_receiver.clone(),
                     azero_signed_connection.clone(),
                     eth_signed_connection.clone(),
                     circuit_breaker_sender.clone(),
@@ -266,30 +259,39 @@ async fn main() -> Result<(), RelayerError> {
 fn spawn_relayer(
     tasks: &mut JoinSet<Result<(), RelayerError>>,
     config: Arc<Config>,
-    mut circuit_breaker_receiver: mpsc::Receiver<CircuitBreakerEvent>,
-    mut eth_events_receiver: mpsc::Receiver<EthMostEvents>,
-    mut eth_event_receiver: mpsc::Receiver<EthMostEvent>,
-    eth_event_sender: mpsc::Sender<EthMostEvent>,
-    mut azero_events_receiver: mpsc::Receiver<AzeroMostEvents>,
-    azero_event_sender: mpsc::Sender<AzeroMostEvent>,
-    mut azero_event_receiver: mpsc::Receiver<AzeroMostEvent>,
+    circuit_breaker_receiver: Arc<Mutex<mpsc::Receiver<CircuitBreakerEvent>>>,
+    eth_events_receiver: Arc<Mutex<mpsc::Receiver<EthMostEvents>>>,
+    azero_events_receiver: Arc<Mutex<mpsc::Receiver<AzeroMostEvents>>>,
     azero_signed_connection: Arc<AzeroConnectionWithSigner>,
     eth_signed_connection: Arc<SignedEthConnection>,
     circuit_breaker_sender: mpsc::Sender<CircuitBreakerEvent>,
 ) {
-    tasks.spawn(Relayer::run(
-        config,
-        circuit_breaker_receiver,
-        eth_events_receiver,
-        eth_event_receiver,
-        eth_event_sender,
-        azero_events_receiver,
-        azero_event_sender,
-        azero_event_receiver,
-        azero_signed_connection,
-        eth_signed_connection,
-        circuit_breaker_sender,
-    ));
+    tasks.spawn(async move {
+        // let circuit_breaker_receiver = Arc::clone(&circuit_breaker_receiver);
+        // let eth_events_receiver = Arc::clone(&eth_events_receiver);
+        // let azero_events_receiver = Arc::clone(&azero_events_receiver);
+
+        let mut circuit_breaker_receiver_lo = circuit_breaker_receiver
+            .lock()
+            .expect("Can obtain exclusive lock");
+        let mut eth_events_receiver_lo = eth_events_receiver
+            .lock()
+            .expect("Can obtain exclusive lock");
+        let mut azero_events_receiver_lo = azero_events_receiver
+            .lock()
+            .expect("Can obtain exclusive lock");
+
+        Relayer::run(
+            config,
+            circuit_breaker_receiver_lo,
+            eth_events_receiver_lo,
+            azero_events_receiver_lo,
+            azero_signed_connection,
+            eth_signed_connection,
+            circuit_breaker_sender,
+        )
+        .await
+    });
 }
 
 pub struct Relayer;
@@ -303,15 +305,15 @@ impl Relayer {
         config: Arc<Config>,
         mut circuit_breaker_receiver: mpsc::Receiver<CircuitBreakerEvent>,
         mut eth_events_receiver: mpsc::Receiver<EthMostEvents>,
-        mut eth_event_receiver: mpsc::Receiver<EthMostEvent>,
-        eth_event_sender: mpsc::Sender<EthMostEvent>,
         mut azero_events_receiver: mpsc::Receiver<AzeroMostEvents>,
-        azero_event_sender: mpsc::Sender<AzeroMostEvent>,
-        mut azero_event_receiver: mpsc::Receiver<AzeroMostEvent>,
-        azero_connection: Arc<AzeroConnectionWithSigner>,
+        azero_signed_connection: Arc<AzeroConnectionWithSigner>,
         eth_signed_connection: Arc<SignedEthConnection>,
         circuit_breaker_sender: mpsc::Sender<CircuitBreakerEvent>,
     ) -> Result<(), RelayerError> {
+        let (azero_event_sender, mut azero_event_receiver) =
+            mpsc::channel::<AzeroMostEvent>(ALEPH_MAX_REQUESTS_PER_BLOCK);
+        let (eth_event_sender, mut eth_event_receiver) = mpsc::channel::<EthMostEvent>(1);
+
         loop {
             select! {
                 Some (event) = circuit_breaker_receiver.recv () => {
@@ -388,7 +390,7 @@ impl Relayer {
                     let EthMostEvent { event, event_ack_sender } = eth_event;
                     info!("Received an Eth event {event:?}");
 
-                    if let Err(why) = EthHandler::handle_event (event,  &config, &azero_connection).await {
+                    if let Err(why) = EthHandler::handle_event (event,  &config, &azero_signed_connection).await {
                         warn!("Eth event handler failure {why:?}");
                         circuit_breaker_sender.send (CircuitBreakerEvent::EthEventHandlerFailure).await? ;
                     }
