@@ -169,7 +169,7 @@ async fn main() -> Result<(), RelayerError> {
     let mut eth_block_number_receiver2 = eth_block_number_sender.subscribe();
     let (azero_events_sender, azero_events_receiver) = mpsc::channel::<AzeroMostEvents>(1);
     let (azero_event_sender, azero_event_receiver) =
-        mpsc::channel::<AzeroMostEvents>(ALEPH_MAX_REQUESTS_PER_BLOCK);
+        mpsc::channel::<AzeroMostEvent>(ALEPH_MAX_REQUESTS_PER_BLOCK);
     let (azero_block_number_sender, azero_block_number_receiver1) = broadcast::channel(1);
     let mut azero_block_number_receiver2 = azero_block_number_sender.subscribe();
     let (circuit_breaker_sender, circuit_breaker_receiver) =
@@ -231,7 +231,7 @@ async fn main() -> Result<(), RelayerError> {
         azero_events_receiver,
         azero_event_sender,
         azero_event_receiver,
-        azero_connection,
+        azero_signed_connection,
         eth_signed_connection,
         circuit_breaker_sender,
     ));
