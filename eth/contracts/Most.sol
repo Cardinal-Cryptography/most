@@ -60,6 +60,8 @@ contract Most is
 
     event EthTransferFailed(bytes32 requestHash);
 
+    event TokenTransferFailed(bytes32 requestHash);
+
     event CommitteeUpdated(uint256 newCommitteeId);
 
     modifier _onlyCommitteeMember(uint256 _committeeId) {
@@ -253,16 +255,19 @@ contract Most is
                     gas: GAS_LIMIT
                 }("");
                 if (!sendNativeEthSuccess) {
-                    if (isContract(_destReceiverAddress)) {
-                        // fail without revert
-                        emit EthTransferFailed(requestHash);
-                    } else {
-                        revert EthTransfer();
-                    }
+                    emit EthTransferFailed(requestHash);
                 }
             } else {
                 IERC20 token = IERC20(_destTokenAddress);
-                token.safeTransfer(_destReceiverAddress, amount);
+                if (
+                    !tokenTransferReturnSuccess(
+                        token,
+                        _destReceiverAddress,
+                        amount
+                    )
+                ) {
+                    emit TokenTransferFailed(requestHash);
+                }
             }
             emit RequestProcessed(requestHash);
         }
@@ -331,8 +336,19 @@ contract Most is
         return bytes32(uint256(uint160(addr)));
     }
 
-    function isContract(address _addr) internal view returns (bool) {
-        return _addr.code.length != 0;
+    /// @dev Adapted from Openzeppelin SafeERC20 - check if the ERC20 token transfer succeeded
+    function tokenTransferReturnSuccess(
+        IERC20 token,
+        address receiver,
+        uint256 amount
+    ) private returns (bool) {
+        (bool success, bytes memory returndata) = address(token).call(
+            abi.encodeCall(token.transfer, (receiver, amount))
+        );
+        return
+            success &&
+            (returndata.length == 0 || abi.decode(returndata, (bool))) &&
+            address(token).code.length > 0;
     }
 
     /// @dev Accept ether only from weth contract or through payable methods

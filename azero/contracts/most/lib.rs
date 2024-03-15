@@ -26,6 +26,7 @@ pub mod most {
     const GAS_ORACLE_MAX_AGE: u64 = 24 * 60 * 60 * 1000; // 1 day
     const ORACLE_CALL_GAS_LIMIT: u64 = 2_000_000_000;
     const BASE_FEE_BUFFER_PERCENTAGE: u128 = 20;
+    const ETH_ZERO_ADDRESS: [u8; 32] = [0; 32];
 
     #[ink(event)]
     #[derive(Debug)]
@@ -190,6 +191,7 @@ pub mod most {
         IsHalted,
         HaltRequired,
         NoMintPermission,
+        ZeroAddress,
     }
 
     impl From<InkEnvError> for MostError {
@@ -285,6 +287,10 @@ pub mod most {
             dest_receiver_address: [u8; 32],
         ) -> Result<(), MostError> {
             self.ensure_not_halted()?;
+
+            if dest_receiver_address == ETH_ZERO_ADDRESS {
+                return Err(MostError::ZeroAddress);
+            }
 
             if amount == 0 {
                 return Err(MostError::ZeroTransferAmount);
