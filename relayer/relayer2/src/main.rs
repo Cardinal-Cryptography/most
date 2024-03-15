@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{cmp::max, sync::Arc};
 
 use aleph_client::AccountId;
 use clap::Parser;
@@ -14,6 +14,7 @@ use tokio::{
     select,
     sync::{broadcast, mpsc, oneshot, Mutex},
     task::{JoinError, JoinSet},
+    time::{sleep, Duration},
 };
 
 use crate::{
@@ -234,7 +235,7 @@ async fn main() -> Result<(), RelayerError> {
         circuit_breaker_sender.clone(),
     );
 
-    // TODO : graceful restarts with backoff
+    let mut delay = Duration::from_secs(2);
     while let Some(result) = tasks.join_next().await {
         match result? {
             Ok(_) => error!("One of the core tasks has exited. This is fatal"),
@@ -249,7 +250,9 @@ async fn main() -> Result<(), RelayerError> {
                     azero_signed_connection.clone(),
                     eth_signed_connection.clone(),
                     circuit_breaker_sender.clone(),
-                )
+                );
+                sleep(max(Duration::from_secs(900), delay)).await;
+                delay *= 2;
             }
             Err(why) => error!("Fatal error in one of the core components: {why:?}"),
         }
