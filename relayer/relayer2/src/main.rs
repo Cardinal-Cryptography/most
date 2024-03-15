@@ -42,9 +42,7 @@ const ALEPH_MAX_REQUESTS_PER_BLOCK: usize = 50;
 #[derive(Debug, Error)]
 #[error(transparent)]
 #[non_exhaustive]
-pub enum RelayerError {
-    // #[error("fatal error in one of the core components")]
-    // Fatal,
+enum RelayerError {
     #[error("An error which can be handled by restarting")]
     Recoverable,
 
@@ -166,17 +164,16 @@ async fn main() -> Result<(), RelayerError> {
     let (eth_events_sender, eth_events_receiver) = mpsc::channel::<EthMostEvents>(1);
     let (eth_event_sender, eth_event_receiver) = mpsc::channel::<EthMostEvent>(1);
     let (eth_block_number_sender, eth_block_number_receiver1) = broadcast::channel(1);
-    let mut eth_block_number_receiver2 = eth_block_number_sender.subscribe();
+    let eth_block_number_receiver2 = eth_block_number_sender.subscribe();
     let (azero_events_sender, azero_events_receiver) = mpsc::channel::<AzeroMostEvents>(1);
     let (azero_event_sender, azero_event_receiver) =
         mpsc::channel::<AzeroMostEvent>(ALEPH_MAX_REQUESTS_PER_BLOCK);
     let (azero_block_number_sender, azero_block_number_receiver1) = broadcast::channel(1);
-    let mut azero_block_number_receiver2 = azero_block_number_sender.subscribe();
+    let azero_block_number_receiver2 = azero_block_number_sender.subscribe();
     let (circuit_breaker_sender, circuit_breaker_receiver) =
         mpsc::channel::<CircuitBreakerEvent>(1);
 
     // TODO : halted listener tasks
-    // TODO : graceful restarts with backoff
 
     let mut tasks = JoinSet::new();
 
@@ -222,6 +219,64 @@ async fn main() -> Result<(), RelayerError> {
         .map_err(RelayerError::from),
     );
 
+    spawn_relayer(
+        &mut tasks,
+        config.clone(),
+        circuit_breaker_receiver,
+        eth_events_receiver,
+        eth_event_receiver,
+        eth_event_sender.clone(),
+        azero_events_receiver,
+        azero_event_sender.clone(),
+        azero_event_receiver,
+        azero_signed_connection.clone(),
+        eth_signed_connection.clone(),
+        circuit_breaker_sender.clone(),
+    );
+
+    // TODO: handle relayer restarts
+    // TODO : graceful restarts with backoff
+    while let Some(result) = tasks.join_next().await {
+        match result? {
+            Ok(_) => error!("One of the core tasks has exited. This is fatal"),
+            Err(RelayerError::Recoverable) => {
+                info!("Trying to recover");
+                spawn_relayer(
+                    &mut tasks,
+                    config.clone(),
+                    circuit_breaker_receiver,
+                    eth_events_receiver,
+                    eth_event_receiver,
+                    eth_event_sender.clone(),
+                    azero_events_receiver,
+                    azero_event_sender.clone(),
+                    azero_event_receiver,
+                    azero_signed_connection.clone(),
+                    eth_signed_connection.clone(),
+                    circuit_breaker_sender.clone(),
+                );
+            }
+            Err(why) => error!("Fatal error in one of the core components: {why:?}"),
+        }
+    }
+
+    std::process::exit(1);
+}
+
+fn spawn_relayer(
+    tasks: &mut JoinSet<Result<(), RelayerError>>,
+    config: Arc<Config>,
+    mut circuit_breaker_receiver: mpsc::Receiver<CircuitBreakerEvent>,
+    mut eth_events_receiver: mpsc::Receiver<EthMostEvents>,
+    mut eth_event_receiver: mpsc::Receiver<EthMostEvent>,
+    eth_event_sender: mpsc::Sender<EthMostEvent>,
+    mut azero_events_receiver: mpsc::Receiver<AzeroMostEvents>,
+    azero_event_sender: mpsc::Sender<AzeroMostEvent>,
+    mut azero_event_receiver: mpsc::Receiver<AzeroMostEvent>,
+    azero_signed_connection: Arc<AzeroConnectionWithSigner>,
+    eth_signed_connection: Arc<SignedEthConnection>,
+    circuit_breaker_sender: mpsc::Sender<CircuitBreakerEvent>,
+) {
     tasks.spawn(Relayer::run(
         config,
         circuit_breaker_receiver,
@@ -235,17 +290,6 @@ async fn main() -> Result<(), RelayerError> {
         eth_signed_connection,
         circuit_breaker_sender,
     ));
-
-    // TODO: handle relayer restarts
-    // TODO : add backoff
-    while let Some(result) = tasks.join_next().await {
-        match result? {
-            Ok(_) => todo!(),
-            Err(why) => todo!(),
-        }
-    }
-
-    std::process::exit(1);
 }
 
 pub struct Relayer;
@@ -270,19 +314,10 @@ impl Relayer {
     ) -> Result<(), RelayerError> {
         loop {
             select! {
-
-                Some (circuit_breaker_event) = circuit_breaker_receiver.recv () => {
-                    // match circuit_breaker_event {
-                    //     Ok (event) => {
-                    //         warn!("Relayer is exiting due to a circuit breaker event {event:?}");
-                    //         return Err(RelayerError::Recoverable);
-                    //     },
-                    //     Err(why) => {
-                    //         error!("Cannot read from circuit breaker channel: {why:?}");
-                    //         return Err(RelayerError::Fatal);
-                    //     },
-                    // }
-                                                                                    },
+                Some (event) = circuit_breaker_receiver.recv () => {
+                    warn!("Relayer is exiting due to a circuit breaker event {event:?}");
+                    return Err(RelayerError::Recoverable);
+                },
 
                 Some (azero_events) = azero_events_receiver.recv () => {
                     let AzeroMostEvents { events, events_ack_sender } = azero_events;
