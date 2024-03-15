@@ -1,11 +1,9 @@
-// use std::sync::{atomic::AtomicBool, Arc, Mutex};
-
 use std::sync::Arc;
 
 use aleph_client::AccountId;
 use clap::Parser;
 use config::Config;
-use connections::{azero::AzeroConnectionWithSigner, eth::SignedEthConnection, EthConnectionError};
+use connections::{azero::AzeroConnectionWithSigner, eth::SignedEthConnection};
 use ethers::signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, Signer, WalletError};
 use futures::TryFutureExt;
 use listeners::{AdvisoryListenerError, AzeroListenerError, EthListenerError};
@@ -94,7 +92,7 @@ enum CircuitBreakerEvent {
     AlephZeroEventHandlerFailure,
     BridgeHaltAzero,
     BridgeHaltEth,
-    AdvisoryEmergency(AccountId),
+    AdvisoryEmergency(#[allow(dead_code)] AccountId), // field is needed for logs
 }
 
 #[tokio::main]
@@ -106,6 +104,7 @@ async fn main() -> Result<(), RelayerError> {
 
     let azero_connection = Arc::new(azero::init(&config.azero_node_wss_url).await);
     let azero_signed_connection = if let Some(cid) = config.signer_cid {
+        info!("[AlephZero] Creating signed connection using a Signer client");
         AzeroConnectionWithSigner::with_signer(
             azero::init(&config.azero_node_wss_url).await,
             cid,
@@ -115,6 +114,12 @@ async fn main() -> Result<(), RelayerError> {
     } else if config.dev {
         let azero_seed = "//".to_owned() + &config.dev_account_index.to_string();
         let keypair = aleph_client::keypair_from_string(&azero_seed);
+
+        info!(
+            "[AlephZero] Creating signed connection using a development key {}",
+            keypair.account_id()
+        );
+
         AzeroConnectionWithSigner::with_keypair(
             azero::init(&config.azero_node_wss_url).await,
             keypair,
@@ -126,33 +131,29 @@ async fn main() -> Result<(), RelayerError> {
 
     info!("Established connection to Aleph Zero node");
 
-    // TODO: clean up the dev / keystore / cid logic
-    // TODO: add logs
-    let wallet = if config.dev {
-        // If no keystore path is provided, we use the default development mnemonic
-        MnemonicBuilder::<English>::default()
-            .phrase(DEV_MNEMONIC)
-            .index(config.dev_account_index)?
-            .build()?
-    } else {
-        info!(
-            "Creating wallet from a keystore path: {}",
-            config.eth_keystore_path
-        );
-        LocalWallet::decrypt_keystore(&config.eth_keystore_path, &config.eth_keystore_password)?
-    };
-
-    info!("Wallet address: {}", wallet.address());
-
     let eth_signed_connection = if let Some(cid) = config.signer_cid {
+        info!("[Ethereum] Creating signed connection using a Signer client");
         eth::with_signer(
             eth::connect(&config.eth_node_http_url).await,
             cid,
             config.signer_port,
         )
         .await?
-    } else {
+    } else if config.dev {
+        let wallet =
+            // use the default development mnemonic
+            MnemonicBuilder::<English>::default()
+                .phrase(DEV_MNEMONIC)
+                .index(config.dev_account_index)?
+                .build()?;
+
+        info!(
+            "[Ethereum] Creating signed connection using a development key {}",
+            &wallet.address()
+        );
         eth::with_local_wallet(eth::connect(&config.eth_node_http_url).await, wallet).await?
+    } else {
+        panic!("Use dev mode or connect to a signer");
     };
 
     let eth_signed_connection = Arc::new(eth_signed_connection);
