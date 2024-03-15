@@ -7,7 +7,7 @@ mkdir -p $SCRIPT_DIR/../contracts/drink-tests/src/wrappers
 mkdir -p $SCRIPT_DIR/../contracts/drink-tests/resources
 
 ## Builds all contracts and generates code for contract interaction. Run in a container.
-docker run --rm -it \
+docker run --rm \
     --name ink-dev \
     -v "$SCRIPT_DIR/..":/code \
     $INK_DEV_IMAGE \

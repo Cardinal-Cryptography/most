@@ -33,3 +33,7 @@ jobs:
       - name: Run tests
         shell: bash
         run: make test-ink
+
+      - name: Run drink tests
+        shell: bash
+        run: make drink-tests-docker

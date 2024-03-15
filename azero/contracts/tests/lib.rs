@@ -35,7 +35,7 @@ mod e2e {
     use oracle::oracle::OracleRef;
     use psp22::{PSP22Error, PSP22};
     use scale::{Decode, Encode};
-    use shared::{keccak256, Keccak256HashOutput};
+    use shared::{hash_request_data, Keccak256HashOutput};
     use wrapped_token::TokenRef;
 
     use crate::events::{
@@ -1058,24 +1058,6 @@ mod e2e {
 
     fn guardian_keys() -> Vec<Keypair> {
         vec![bob(), charlie(), dave(), eve(), ferdie()]
-    }
-
-    fn hash_request_data(
-        commitee_id: CommitteeId,
-        token_address: AccountId,
-        amount: u128,
-        receiver_address: AccountId,
-        request_nonce: u128,
-    ) -> Keccak256HashOutput {
-        let request_data = [
-            &commitee_id.to_le_bytes(),
-            AsRef::<[u8]>::as_ref(&token_address),
-            &amount.to_le_bytes(),
-            AsRef::<[u8]>::as_ref(&receiver_address),
-            &request_nonce.to_le_bytes(),
-        ]
-        .concat();
-        keccak256(&request_data)
     }
 
     #[derive(Debug)]
