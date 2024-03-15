@@ -244,7 +244,7 @@ contract Most is
 
                     // In case of a failure return the locked tokens to the sender
                     _sendRequest(
-                        _getRemoteTokenAddress(destReceiverAddress),
+                        _getRemoteTokenAddress(destTokenAddress),
                         amount,
                         _senderAddress
                     );

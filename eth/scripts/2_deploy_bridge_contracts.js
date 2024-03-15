@@ -34,7 +34,7 @@ async function main() {
 
     const Token = await ethers.getContractFactory("Token");
     console.log("Deploying USDT...");
-    const usdt = await Poison.deploy(
+    const usdt = await Token.deploy(
       "12000000000000000000000000",
       "6",
       "Tether",

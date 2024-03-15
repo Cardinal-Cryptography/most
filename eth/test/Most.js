@@ -358,6 +358,61 @@ describe("Most", function () {
       );
     });
 
+    it("Emits correct events when token is reverting transactions", async () => {
+      const { most } = await loadFixture(
+        deployEightGuardianMostFixture,
+      );
+
+      const PoisonedToken = await ethers.getContractFactory("PoisonedToken");
+      const token = await PoisonedToken.deploy(
+        "10000000000000000000000000",
+        "18",
+        "PoisonedToken",
+        "POISON",
+      );
+      const tokenAddressBytes32 = addressToBytes32(await token.getAddress());
+
+      await most.pause();
+      await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
+      await most.unpause();
+
+      const accounts = await ethers.getSigners();
+      const ethAddress = addressToBytes32(accounts[10].address);
+      const senderAddress = getRandomAlephAccount(23);
+      const requestHash = ethers.solidityPackedKeccak256(
+        ["uint256", "bytes32", "uint256", "bytes32", "bytes32", "uint256"],
+        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, senderAddress, 0],
+      );
+
+      for (let i = 1; i < 5; i++) {
+        await most
+          .connect(accounts[i])
+          .receiveRequest(
+            requestHash,
+            0,
+            tokenAddressBytes32,
+            TOKEN_AMOUNT,
+            ethAddress,
+            senderAddress,
+            0,
+          );
+      }
+
+      res = expect(most
+        .connect(accounts[5])
+        .receiveRequest(
+          requestHash,
+          0,
+          tokenAddressBytes32,
+          TOKEN_AMOUNT,
+          ethAddress,
+          senderAddress,
+          0,
+        ));
+        await res.to.emit(most, "RequestProcessed").withArgs(requestHash);
+        await res.to.emit(most, "CrosschainTransferRequest").withArgs(0, WRAPPED_TOKEN_ADDRESS, TOKEN_AMOUNT, senderAddress, 0);
+    });
+
     it("Reverts on non-matching hash", async () => {
       const { most, token, tokenAddressBytes32 } = await loadFixture(
         deployEightGuardianMostFixture,
