@@ -790,6 +790,10 @@ mod e2e {
 
         let previous_committee_size = guardian_ids().len();
 
+        most_set_halted(&mut client, &alice(), most_address, true)
+            .await
+            .expect("can set halted");
+
         most_set_committee(
             &mut client,
             &alice(),
@@ -799,6 +803,10 @@ mod e2e {
         )
         .await
         .expect("can set committee");
+
+        most_set_halted(&mut client, &alice(), most_address, false)
+            .await
+            .expect("can set halted");
 
         let member_id = guardian_ids()[0];
 
@@ -919,6 +927,10 @@ mod e2e {
     fn committee_change(mut client: ink_e2e::Client<C, E>) {
         let (most_address, token_address) = setup_default_most_and_token(&mut client, true).await;
 
+        most_set_halted(&mut client, &alice(), most_address, true)
+            .await
+            .expect("can set halted");
+
         most_set_committee(
             &mut client,
             &alice(),
@@ -940,6 +952,10 @@ mod e2e {
         )
         .await
         .expect("can set committee");
+
+        most_set_halted(&mut client, &alice(), most_address, false)
+            .await
+            .expect("can set halted");
 
         let new_committee_id = 2;
 

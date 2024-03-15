@@ -698,6 +698,7 @@ pub mod most {
             signature_threshold: u128,
         ) -> Result<(), MostError> {
             self.ensure_owner()?;
+            self.ensure_halted()?;
             Self::check_committee(&committee, signature_threshold)?;
 
             let mut data = self.data()?;
@@ -740,6 +741,38 @@ pub mod most {
                 });
             }
 
+            Ok(())
+        }
+
+        /// Transfer PSP22 tokens from the bridge contract to a given account.
+        ///
+        /// Can only be called by the contracts owner
+        #[ink(message)]
+        pub fn recover_psp22(
+            &mut self,
+            token: AccountId,
+            receiver: AccountId,
+            amount: u128,
+        ) -> Result<(), MostError> {
+            self.ensure_owner()?;
+
+            let mut token: ink::contract_ref!(PSP22) = token.into();
+            token.transfer(receiver, amount, vec![])?;
+            Ok(())
+        }
+
+        /// Transfer AZERO tokens from the bridge contract to a given account.
+        ///
+        /// Can only be called by the contracts owner
+        #[ink(message)]
+        pub fn recover_azero(
+            &mut self,
+            receiver: AccountId,
+            amount: u128,
+        ) -> Result<(), MostError> {
+            self.ensure_owner()?;
+
+            self.env().transfer(receiver, amount)?;
             Ok(())
         }
 

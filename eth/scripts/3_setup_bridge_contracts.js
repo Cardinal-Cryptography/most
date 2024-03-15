@@ -55,8 +55,6 @@ async function addTokenPair(
   );
 
   const iface = await new ethers.Interface([
-    "function pause()",
-    "function unpause()",
     "function addPair(bytes32 from, bytes32 to)",
   ]);
 
@@ -68,17 +66,7 @@ async function addTokenPair(
   const transactions = [
     {
       to: mostContract.address,
-      data: await iface.encodeFunctionData("pause", []),
-      value: 0,
-    },
-    {
-      to: mostContract.address,
       data: addPaircalldata,
-      value: 0,
-    },
-    {
-      to: mostContract.address,
-      data: await iface.encodeFunctionData("unpause", []),
       value: 0,
     },
   ];
@@ -105,6 +93,38 @@ async function addTokenPair(
     "=>",
     await mostContract.supportedPairs(ethTokenAddressBytes),
   );
+}
+
+async function unpauseMost(mostContract, safeInstances) {
+  console.log("Unpausing Most:");
+
+  const iface = await new ethers.Interface(["function unpause()"]);
+
+  const transactions = [
+    {
+      to: mostContract.address,
+      data: await iface.encodeFunctionData("unpause", []),
+      value: 0,
+    },
+  ];
+
+  console.log("creating a Safe transactions:", transactions);
+
+  const safeTransaction = await safeInstances[0].createTransaction({
+    transactions,
+  });
+  const safeTxHash = await safeInstances[0].getTransactionHash(safeTransaction);
+
+  console.log("safeTxHash", safeTxHash);
+
+  for (const safeInstance of safeInstances) {
+    await signSafeTransaction(safeInstance, safeTxHash);
+  }
+
+  // execute safe tx
+  await executeSafeTransaction(safeInstances[0], safeTransaction);
+
+  console.log("Most is now unpaused.");
 }
 
 // signing with on-chain signatures
@@ -186,6 +206,9 @@ async function main() {
       safeSdk0,
       safeSdk1,
     ]);
+
+    // --- unpause most
+    await unpauseMost(most, [safeSdk0, safeSdk1]);
   }
 
   // -- update migrations
