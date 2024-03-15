@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use aleph_client::AccountId;
-use backoff::{retry, Error, ExponentialBackoff};
 use clap::Parser;
 use config::Config;
 use connections::{azero::AzeroConnectionWithSigner, eth::SignedEthConnection};
@@ -45,7 +44,7 @@ const ALEPH_MAX_REQUESTS_PER_BLOCK: usize = 50;
 #[non_exhaustive]
 enum RelayerError {
     #[error("An error which can be handled by restarting")]
-    Recoverable,
+    Recoverable(CircuitBreakerEvent),
 
     #[error("Ack receiver has dropper before the message could be delivered")]
     AckReceiverDropped,
@@ -239,9 +238,8 @@ async fn main() -> Result<(), RelayerError> {
     while let Some(result) = tasks.join_next().await {
         match result? {
             Ok(_) => error!("One of the core tasks has exited. This is fatal"),
-            Err(RelayerError::Recoverable) => {
-                info!("Trying to recover");
-
+            Err(RelayerError::Recoverable(from)) => {
+                info!("Trying to recover from {from:?}");
                 spawn_relayer(
                     &mut tasks,
                     config.clone(),
@@ -252,22 +250,6 @@ async fn main() -> Result<(), RelayerError> {
                     eth_signed_connection.clone(),
                     circuit_breaker_sender.clone(),
                 )
-
-                // let op = || {
-                //     spawn_relayer(
-                //         &mut tasks,
-                //         config.clone(),
-                //         circuit_breaker_receiver.clone(),
-                //         eth_events_receiver.clone(),
-                //         azero_events_receiver.clone(),
-                //         azero_signed_connection.clone(),
-                //         eth_signed_connection.clone(),
-                //         circuit_breaker_sender.clone(),
-                //     )
-                //     .map_err(Error::transient)
-                // };
-
-                // let _res = retry(&mut ExponentialBackoff::default(), op);
             }
             Err(why) => error!("Fatal error in one of the core components: {why:?}"),
         }
@@ -323,7 +305,7 @@ impl Relayer {
             select! {
                 Some (event) = circuit_breaker_receiver.recv () => {
                     warn!("Relayer is exiting due to a circuit breaker event {event:?}");
-                    return Err(RelayerError::Recoverable);
+                    return Err(RelayerError::Recoverable (event));
                 },
 
                 Some (azero_events) = azero_events_receiver.recv () => {
