@@ -38,7 +38,7 @@ pub enum AzeroListenerError {
     #[error("No block found")]
     BlockNotFound,
 
-    #[error("Join error")]
+    #[error("Task join error")]
     Join(#[from] JoinError),
 
     #[error("channel send error")]

@@ -3,14 +3,17 @@ use std::sync::{atomic::AtomicBool, Arc};
 use aleph_client::AccountId;
 use clap::Parser;
 use config::Config;
-use connections::{azero::AzeroConnectionWithSigner, eth::SignedEthConnection};
-use ethers::signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, Signer};
-use eyre::Result;
-use log::{debug, info, warn};
+use connections::{azero::AzeroConnectionWithSigner, eth::SignedEthConnection, EthConnectionError};
+use ethers::signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, Signer, WalletError};
+use futures::TryFutureExt;
+use listeners::{AdvisoryListenerError, AzeroListenerError, EthListenerError};
+use log::{debug, error, info, warn};
+use redis::RedisManagerError;
+use thiserror::Error;
 use tokio::{
     select,
     sync::{broadcast, mpsc, oneshot},
-    task::JoinSet,
+    task::{JoinError, JoinSet},
 };
 
 use crate::{
@@ -36,6 +39,55 @@ const DEV_MNEMONIC: &str =
 // This is more than the maximum number of send_request calls than will fit into the block (execution time)
 const ALEPH_MAX_REQUESTS_PER_BLOCK: usize = 50;
 
+#[derive(Debug, Error)]
+#[error(transparent)]
+#[non_exhaustive]
+pub enum RelayerError {
+    // #[error("fatal error in one of the core components")]
+    // Fatal,
+    #[error("An error which can be handled by restarting")]
+    Recoverable,
+
+    #[error("Ack receiver has dropper before the message could be delivered")]
+    AckReceiverDropped,
+
+    #[error("AlephZero node connection error")]
+    AzeroConnection(#[from] connections::azero::Error),
+
+    #[error("Ethereum node connection error")]
+    EthereumConnection(#[from] connections::eth::EthConnectionError),
+
+    #[error("Ethereum wallet error")]
+    EthWallet(#[from] WalletError),
+
+    #[error("Task join error")]
+    Join(#[from] JoinError),
+
+    #[error("AlephZero channel send error")]
+    AzeroEventSend(#[from] mpsc::error::SendError<AzeroMostEvent>),
+
+    #[error("Ethereum event channel send error")]
+    EthEventSend(#[from] mpsc::error::SendError<EthMostEvent>),
+
+    #[error("circuit breaker channel send error")]
+    CircuitBreakerSend(#[from] mpsc::error::SendError<CircuitBreakerEvent>),
+
+    #[error("ack receive error")]
+    AckReceive(#[from] oneshot::error::RecvError),
+
+    #[error("Advisory listener failure")]
+    AdvisoryListener(#[from] AdvisoryListenerError),
+
+    #[error("AlephZero listener failure")]
+    AlephZeroListener(#[from] AzeroListenerError),
+
+    #[error("Ethereum listener failure")]
+    EthListener(#[from] EthListenerError),
+
+    #[error("Redis manager failure")]
+    RedisManager(#[from] RedisManagerError),
+}
+
 #[derive(Debug, Clone)]
 enum CircuitBreakerEvent {
     EthEventHandlerFailure,
@@ -46,7 +98,7 @@ enum CircuitBreakerEvent {
 }
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> Result<(), RelayerError> {
     let config = Arc::new(Config::parse());
     env_logger::init();
 
@@ -74,6 +126,8 @@ async fn main() -> Result<()> {
 
     info!("Established connection to Aleph Zero node");
 
+    // TODO: clean up the dev / keystore / cid logic
+    // TODO: add logs
     let wallet = if config.dev {
         // If no keystore path is provided, we use the default development mnemonic
         MnemonicBuilder::<English>::default()
@@ -122,52 +176,88 @@ async fn main() -> Result<()> {
         mpsc::channel::<CircuitBreakerEvent>(1);
 
     // TODO : halted listener tasks
-    // TODO : publish & handle circuit breaker events
+    // TODO : graceful restarts with backoff
 
-    let is_circuit_open = Arc::new(AtomicBool::new(true));
+    let mut tasks = JoinSet::new();
 
-    let advisory = tokio::spawn(AdvisoryListener::run(
-        Arc::clone(&config),
-        Arc::clone(&azero_connection),
-        circuit_breaker_sender.clone(),
+    tasks.spawn(
+        AdvisoryListener::run(
+            Arc::clone(&config),
+            Arc::clone(&azero_connection),
+            circuit_breaker_sender.clone(),
+        )
+        .map_err(RelayerError::from),
+    );
+
+    tasks.spawn(
+        EthListener::run(
+            Arc::clone(&config),
+            Arc::clone(&eth_connection),
+            eth_events_sender.clone(),
+            eth_block_number_sender.clone(),
+            eth_block_number_receiver1,
+        )
+        .map_err(RelayerError::from),
+    );
+
+    tasks.spawn(
+        AlephZeroListener::run(
+            Arc::clone(&config),
+            Arc::clone(&azero_connection),
+            azero_events_sender,
+            azero_block_number_sender.clone(),
+            azero_block_number_receiver1,
+        )
+        .map_err(RelayerError::from),
+    );
+
+    tasks.spawn(
+        RedisManager::run(
+            Arc::clone(&config),
+            eth_block_number_sender.clone(),
+            eth_block_number_receiver2,
+            azero_block_number_sender.clone(),
+            azero_block_number_receiver2,
+        )
+        .map_err(RelayerError::from),
+    );
+
+    tasks.spawn(Relayer::run(
+        config,
+        circuit_breaker_receiver,
+        eth_events_receiver,
+        eth_event_receiver,
+        eth_event_sender,
+        azero_events_receiver,
+        azero_event_sender,
+        azero_event_receiver,
+        azero_connection,
+        eth_signed_connection,
+        circuit_breaker_sender,
     ));
 
-    let eth_listener = tokio::spawn(EthListener::run(
-        Arc::clone(&config),
-        eth_connection,
-        eth_events_sender,
-        eth_block_number_sender.clone(),
-        eth_block_number_receiver1,
-    ));
+    // TODO: handle relayer restarts
+    // TODO : add backoff
+    while let Some(result) = tasks.join_next().await {
+        match result? {
+            Ok(_) => todo!(),
+            Err(why) => todo!(),
+        }
+    }
 
-    let azero_listener = tokio::spawn(AlephZeroListener::run(
-        Arc::clone(&config),
-        Arc::clone(&azero_connection),
-        azero_events_sender,
-        azero_block_number_sender.clone(),
-        azero_block_number_receiver1,
-    ));
-
-    let redis_manager = tokio::spawn(RedisManager::run(
-        Arc::clone(&config),
-        eth_block_number_sender.clone(),
-        eth_block_number_receiver2,
-        azero_block_number_sender.clone(),
-        azero_block_number_receiver2,
-    ));
-
-    // tokio::try_join!(task1, task2).expect("Listener task should never finish");
-    // TODO: handle restarts
     std::process::exit(1);
 }
 
 pub struct Relayer;
 
+// TODO:
+// gracefull exit (Ok) - restart with backoff
+// ungracefull exit (Err) - kills the process
 impl Relayer {
     #[allow(clippy::too_many_arguments)]
-    pub async fn run(
+    async fn run(
         config: Arc<Config>,
-        mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
+        mut circuit_breaker_receiver: mpsc::Receiver<CircuitBreakerEvent>,
         mut eth_events_receiver: mpsc::Receiver<EthMostEvents>,
         mut eth_event_receiver: mpsc::Receiver<EthMostEvent>,
         eth_event_sender: mpsc::Sender<EthMostEvent>,
@@ -176,16 +266,23 @@ impl Relayer {
         mut azero_event_receiver: mpsc::Receiver<AzeroMostEvent>,
         azero_connection: Arc<AzeroConnectionWithSigner>,
         eth_signed_connection: Arc<SignedEthConnection>,
-        circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
-    ) {
+        circuit_breaker_sender: mpsc::Sender<CircuitBreakerEvent>,
+    ) -> Result<(), RelayerError> {
         loop {
             select! {
 
-                circuit_breaker_event = circuit_breaker_receiver.recv () => {
-                    // TODO: close circuit
-                    // todo!("")
-                    // return;
-                },
+                Some (circuit_breaker_event) = circuit_breaker_receiver.recv () => {
+                    // match circuit_breaker_event {
+                    //     Ok (event) => {
+                    //         warn!("Relayer is exiting due to a circuit breaker event {event:?}");
+                    //         return Err(RelayerError::Recoverable);
+                    //     },
+                    //     Err(why) => {
+                    //         error!("Cannot read from circuit breaker channel: {why:?}");
+                    //         return Err(RelayerError::Fatal);
+                    //     },
+                    // }
+                                                                                    },
 
                 Some (azero_events) = azero_events_receiver.recv () => {
                     let AzeroMostEvents { events, events_ack_sender } = azero_events;
@@ -197,19 +294,19 @@ impl Relayer {
                     for event in events {
                         let (event_ack_sender, event_ack_receiver) = oneshot::channel::<()>();
                         info!("Sending AlephZero event {event:?}");
-                        azero_event_sender.send(AzeroMostEvent {event, event_ack_sender}).await.unwrap ();
+                        azero_event_sender.send(AzeroMostEvent {event, event_ack_sender}).await?;
                         acks.spawn(event_ack_receiver);
                     }
 
                     // wait for all concurrent tasks to finish
                     info!("Awaiting all events to be acknowledged");
                     while (acks.join_next().await).is_some() {
-                      debug!("Ack received");
+                        debug!("Ack received");
                     }
 
                     info!("Acknowledging Azero events batch");
                     // marks the batch as done and releases the listener
-                    events_ack_sender.send(()).unwrap ();
+                    events_ack_sender.send(()).map_err(|_| RelayerError::AckReceiverDropped)?;
                 },
 
                 Some (azero_event) = azero_event_receiver.recv () => {
@@ -226,11 +323,11 @@ impl Relayer {
 
                         if let Err(why) = AlephZeroHandler::handle_event(config, eth_connection, event).await {
                             warn!("AlephZero event handler failed {why:?}");
-                            circuit_breaker_sender.send (CircuitBreakerEvent::AlephZeroEventHandlerFailure).unwrap ();
+                            circuit_breaker_sender.send (CircuitBreakerEvent::AlephZeroEventHandlerFailure).await.expect ("circuit breaker receiver has dropped before the message could be delivered");
                         }
 
                         info!("Acknowledging AlephZero event");
-                        event_ack_sender.send (()).unwrap ();
+                        event_ack_sender.send (()).expect ("event ack receiver has dropped before the message could be delivered");
                     });
                 },
 
@@ -241,15 +338,15 @@ impl Relayer {
                     for event in events {
                         let (event_ack_sender, event_ack_receiver) = oneshot::channel::<()>();
                         info!("Sending Eth event {event:?}");
-                        eth_event_sender.send(EthMostEvent {event, event_ack_sender}).await.unwrap ();
+                        eth_event_sender.send(EthMostEvent {event, event_ack_sender}).await?;
                         info!("Awaiting event ack");
-                        event_ack_receiver.await.unwrap ();
+                        event_ack_receiver.await?;
                         info!("Event ack received");
                     }
 
                     info!("Acknowledging Eth events batch");
                     // marks the batch as done and releases the listener
-                    events_ack_sender.send(()).unwrap ();
+                    events_ack_sender.send(()).map_err(|_| RelayerError::AckReceiverDropped)?;
                 },
 
                 Some (eth_event) = eth_event_receiver.recv() => {
@@ -258,13 +355,15 @@ impl Relayer {
 
                     if let Err(why) = EthHandler::handle_event (event,  &config, &azero_connection).await {
                         warn!("Eth event handler failure {why:?}");
-                        circuit_breaker_sender.send (CircuitBreakerEvent::EthEventHandlerFailure).unwrap ();
+                        circuit_breaker_sender.send (CircuitBreakerEvent::EthEventHandlerFailure).await? ;
                     }
                     info!("Acknowledging Eth event");
-                    event_ack_sender.send(()).unwrap ();
-                }
+                    event_ack_sender.send(()).map_err(|_| RelayerError::AckReceiverDropped)?;
+                },
 
-                else => {}
+                else => {
+                    debug!("Nothing to do, idling");
+                }
             }
         }
     }

@@ -4370,7 +4370,6 @@ dependencies = [
  "clap",
  "env_logger",
  "ethers",
- "eyre",
  "futures",
  "hex",
  "log",

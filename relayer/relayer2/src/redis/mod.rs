@@ -1,5 +1,6 @@
 use std::sync::{Arc, Mutex};
 
+use log::debug;
 use redis::{Client as RedisClient, Commands, Connection, RedisError};
 use thiserror::Error;
 use tokio::{
@@ -106,9 +107,11 @@ impl RedisManager {
                         Arc::clone(&redis_connection),
                         last_processed_block_number,
                     )?;
-                }
+                },
 
-                else => {}
+                else => {
+                    debug!("Nothing to do, idling");
+                }
             }
         }
     }
