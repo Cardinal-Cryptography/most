@@ -1,4 +1,6 @@
-use std::sync::{atomic::AtomicBool, Arc, Mutex};
+// use std::sync::{atomic::AtomicBool, Arc, Mutex};
+
+use std::sync::Arc;
 
 use aleph_client::AccountId;
 use clap::Parser;
@@ -12,7 +14,7 @@ use redis::RedisManagerError;
 use thiserror::Error;
 use tokio::{
     select,
-    sync::{broadcast, mpsc, oneshot},
+    sync::{broadcast, mpsc, oneshot, Mutex},
     task::{JoinError, JoinSet},
 };
 
@@ -231,7 +233,6 @@ async fn main() -> Result<(), RelayerError> {
         circuit_breaker_sender.clone(),
     );
 
-    // TODO: handle relayer restarts
     // TODO : graceful restarts with backoff
     while let Some(result) = tasks.join_next().await {
         match result? {
@@ -256,6 +257,7 @@ async fn main() -> Result<(), RelayerError> {
     std::process::exit(1);
 }
 
+#[allow(clippy::too_many_arguments)]
 fn spawn_relayer(
     tasks: &mut JoinSet<Result<(), RelayerError>>,
     config: Arc<Config>,
@@ -267,25 +269,11 @@ fn spawn_relayer(
     circuit_breaker_sender: mpsc::Sender<CircuitBreakerEvent>,
 ) {
     tasks.spawn(async move {
-        // let circuit_breaker_receiver = Arc::clone(&circuit_breaker_receiver);
-        // let eth_events_receiver = Arc::clone(&eth_events_receiver);
-        // let azero_events_receiver = Arc::clone(&azero_events_receiver);
-
-        let mut circuit_breaker_receiver_lo = circuit_breaker_receiver
-            .lock()
-            .expect("Can obtain exclusive lock");
-        let mut eth_events_receiver_lo = eth_events_receiver
-            .lock()
-            .expect("Can obtain exclusive lock");
-        let mut azero_events_receiver_lo = azero_events_receiver
-            .lock()
-            .expect("Can obtain exclusive lock");
-
         Relayer::run(
             config,
-            circuit_breaker_receiver_lo,
-            eth_events_receiver_lo,
-            azero_events_receiver_lo,
+            circuit_breaker_receiver,
+            eth_events_receiver,
+            azero_events_receiver,
             azero_signed_connection,
             eth_signed_connection,
             circuit_breaker_sender,
@@ -296,16 +284,13 @@ fn spawn_relayer(
 
 pub struct Relayer;
 
-// TODO:
-// gracefull exit (Ok) - restart with backoff
-// ungracefull exit (Err) - kills the process
 impl Relayer {
     #[allow(clippy::too_many_arguments)]
     async fn run(
         config: Arc<Config>,
-        mut circuit_breaker_receiver: mpsc::Receiver<CircuitBreakerEvent>,
-        mut eth_events_receiver: mpsc::Receiver<EthMostEvents>,
-        mut azero_events_receiver: mpsc::Receiver<AzeroMostEvents>,
+        circuit_breaker_receiver: Arc<Mutex<mpsc::Receiver<CircuitBreakerEvent>>>,
+        eth_events_receiver: Arc<Mutex<mpsc::Receiver<EthMostEvents>>>,
+        azero_events_receiver: Arc<Mutex<mpsc::Receiver<AzeroMostEvents>>>,
         azero_signed_connection: Arc<AzeroConnectionWithSigner>,
         eth_signed_connection: Arc<SignedEthConnection>,
         circuit_breaker_sender: mpsc::Sender<CircuitBreakerEvent>,
@@ -313,6 +298,10 @@ impl Relayer {
         let (azero_event_sender, mut azero_event_receiver) =
             mpsc::channel::<AzeroMostEvent>(ALEPH_MAX_REQUESTS_PER_BLOCK);
         let (eth_event_sender, mut eth_event_receiver) = mpsc::channel::<EthMostEvent>(1);
+
+        let mut circuit_breaker_receiver = circuit_breaker_receiver.lock().await;
+        let mut eth_events_receiver = eth_events_receiver.lock().await;
+        let mut azero_events_receiver = azero_events_receiver.lock().await;
 
         loop {
             select! {
