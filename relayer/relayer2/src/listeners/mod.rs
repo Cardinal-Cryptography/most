@@ -1,15 +1,7 @@
-use aleph_client::{contract::event::ContractEvent, AlephConfig};
-use subxt::{events::Events, utils::H256};
+use aleph_client::contract::event::ContractEvent;
 use tokio::sync::oneshot;
 
-use crate::{
-    config::Config,
-    connections::{azero::AzeroConnectionWithSigner, eth::EthConnection},
-    contracts::{
-        AzeroContractError, CrosschainTransferRequestFilter, Most, MostEvents, MostInstance,
-    },
-    helpers::concat_u8_arrays,
-};
+use crate::contracts::MostEvents;
 
 mod advisory;
 mod azero;

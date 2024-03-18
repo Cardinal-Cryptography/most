@@ -7,7 +7,8 @@ use connections::{azero::AzeroConnectionWithSigner, eth::SignedEthConnection};
 use ethers::signers::{coins_bip39::English, MnemonicBuilder, Signer, WalletError};
 use futures::TryFutureExt;
 use listeners::{
-    AdvisoryListenerError, AlephZeroHaltedListenerError, AzeroListenerError, EthListenerError,
+    AdvisoryListenerError, AlephZeroHaltedListenerError, AzeroListenerError, EthereumListenerError,
+    EthereumPausedListenerError,
 };
 use log::{debug, error, info, warn};
 use redis::RedisManagerError;
@@ -24,7 +25,7 @@ use crate::{
     handlers::{AlephZeroHandler, EthHandler},
     listeners::{
         AdvisoryListener, AlephZeroHaltedListener, AlephZeroListener, AzeroMostEvent,
-        AzeroMostEvents, EthListener, EthMostEvent, EthMostEvents,
+        AzeroMostEvents, EthMostEvent, EthMostEvents, EthereumListener, EthereumPausedListener,
     },
     redis::RedisManager,
 };
@@ -79,25 +80,28 @@ enum RelayerError {
     #[error("Advisory listener failure")]
     AdvisoryListener(#[from] AdvisoryListenerError),
 
-    #[error("AlephZero listener failure")]
+    #[error("AlephZero Most listener failure")]
     AlephZeroListener(#[from] AzeroListenerError),
 
-    #[error("Ethereum listener failure")]
-    EthListener(#[from] EthListenerError),
+    #[error("Ethereum Most listener failure")]
+    EthereumListener(#[from] EthereumListenerError),
 
     #[error("Redis manager failure")]
     RedisManager(#[from] RedisManagerError),
 
-    #[error("AlephZero halted listener failure")]
+    #[error("AlephZero Most halted listener failure")]
     AlephZeroHaltedListener(#[from] AlephZeroHaltedListenerError),
+
+    #[error("Ethereum's Most paused listener failure")]
+    EthereumPausedListener(#[from] EthereumPausedListenerError),
 }
 
 #[derive(Debug, Clone)]
 enum CircuitBreakerEvent {
     EthEventHandlerFailure,
     AlephZeroEventHandlerFailure,
-    BridgeHaltAzero,
-    BridgeHaltEth,
+    BridgeHaltAlephZero,
+    BridgeHaltEthereum,
     AdvisoryEmergency(#[allow(dead_code)] AccountId), // field is needed for logs
 }
 
@@ -179,14 +183,21 @@ async fn main() -> Result<(), RelayerError> {
     let (circuit_breaker_sender, circuit_breaker_receiver) =
         mpsc::channel::<CircuitBreakerEvent>(1);
 
-    // TODO : halted listener tasks
-
     let mut tasks = JoinSet::new();
 
     tasks.spawn(
         AlephZeroHaltedListener::run(
             Arc::clone(&config),
             Arc::clone(&azero_connection),
+            circuit_breaker_sender.clone(),
+        )
+        .map_err(RelayerError::from),
+    );
+
+    tasks.spawn(
+        EthereumPausedListener::run(
+            Arc::clone(&config),
+            Arc::clone(&eth_connection),
             circuit_breaker_sender.clone(),
         )
         .map_err(RelayerError::from),
@@ -202,7 +213,7 @@ async fn main() -> Result<(), RelayerError> {
     );
 
     tasks.spawn(
-        EthListener::run(
+        EthereumListener::run(
             Arc::clone(&config),
             Arc::clone(&eth_connection),
             eth_events_sender.clone(),

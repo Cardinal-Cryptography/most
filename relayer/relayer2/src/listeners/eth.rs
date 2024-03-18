@@ -18,16 +18,18 @@ use tokio::{
 };
 
 use super::EthMostEvents;
-use crate::{config::Config, connections::eth::EthConnection, contracts::Most};
+use crate::{
+    config::Config, connections::eth::EthConnection, contracts::Most, CircuitBreakerEvent,
+};
 
 pub const ETH_BLOCK_PROD_TIME_SEC: u64 = 15;
 
-pub struct EthListener;
+pub struct EthereumListener;
 
 #[derive(Debug, Error)]
 #[error(transparent)]
 #[non_exhaustive]
-pub enum EthListenerError {
+pub enum EthereumListenerError {
     #[error("error when parsing ethereum address")]
     FromHex(#[from] rustc_hex::FromHexError),
 
@@ -44,14 +46,14 @@ pub enum EthListenerError {
     Receive(#[from] broadcast::error::RecvError),
 }
 
-impl EthListener {
+impl EthereumListener {
     pub async fn run(
         config: Arc<Config>,
         eth_connection: Arc<EthConnection>,
         eth_events_sender: mpsc::Sender<EthMostEvents>,
         last_processed_block_number: broadcast::Sender<u32>,
         mut next_unprocessed_block_number: broadcast::Receiver<u32>,
-    ) -> Result<(), EthListenerError> {
+    ) -> Result<(), EthereumListenerError> {
         let Config {
             eth_contract_address,
             sync_step,
@@ -138,5 +140,45 @@ pub async fn get_next_finalized_block_number_eth(
 
         debug!("Waiting for a next finalized block");
         sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
+    }
+}
+
+#[derive(Debug, Error)]
+#[error(transparent)]
+#[non_exhaustive]
+pub enum EthereumPausedListenerError {
+    #[error("error when parsing ethereum address")]
+    FromHex(#[from] rustc_hex::FromHexError),
+
+    #[error("channel send error")]
+    Send(#[from] mpsc::error::SendError<CircuitBreakerEvent>),
+
+    #[error("contract error")]
+    Contract(#[from] ContractError<Provider<Http>>),
+}
+
+pub struct EthereumPausedListener;
+
+impl EthereumPausedListener {
+    pub async fn run(
+        config: Arc<Config>,
+        eth_connection: Arc<EthConnection>,
+        circuit_breaker_sender: mpsc::Sender<CircuitBreakerEvent>,
+    ) -> Result<(), EthereumPausedListenerError> {
+        let Config {
+            eth_contract_address,
+            ..
+        } = &*config;
+
+        let address = eth_contract_address.parse::<Address>()?;
+        let most_eth = Most::new(address, Arc::clone(&eth_connection));
+
+        loop {
+            if most_eth.paused().await? {
+                circuit_breaker_sender
+                    .send(CircuitBreakerEvent::BridgeHaltEthereum)
+                    .await?;
+            }
+        }
     }
 }

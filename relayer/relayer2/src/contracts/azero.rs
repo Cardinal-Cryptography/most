@@ -10,15 +10,15 @@ use aleph_client::{
         ContractInstance,
     },
     contract_transcode::{ContractMessageTranscoder, Value, Value::Seq},
-    pallets::contract::{ContractCallArgs, ContractRpc, ContractsUserApi},
+    pallets::contract::ContractsUserApi,
     sp_weights::weight_v2::Weight,
-    AccountId, AlephConfig, AsConnection, Connection, SignedConnectionApi, TxInfo, TxStatus,
+    AccountId, AlephConfig, Connection, TxInfo, TxStatus,
 };
 use log::trace;
 use subxt::events::Events;
 use thiserror::Error;
 
-use crate::{connections::azero::AzeroConnectionWithSigner, contracts::azero::Value::Tuple};
+use crate::connections::azero::AzeroConnectionWithSigner;
 
 #[derive(Debug, Error)]
 #[error(transparent)]

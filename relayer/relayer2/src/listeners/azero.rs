@@ -243,7 +243,7 @@ impl AlephZeroHaltedListener {
         loop {
             if most_azero.is_halted(&azero_connection).await? {
                 circuit_breaker_sender
-                    .send(CircuitBreakerEvent::BridgeHaltAzero)
+                    .send(CircuitBreakerEvent::BridgeHaltAlephZero)
                     .await?;
             }
             // sleep for a block production time before making another round of queries
