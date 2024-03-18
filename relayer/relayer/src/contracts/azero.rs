@@ -9,7 +9,10 @@ use aleph_client::{
         event::{translate_events, BlockDetails, ContractEvent},
         ContractInstance,
     },
-    contract_transcode::{ContractMessageTranscoder, Value, Value::Seq},
+    contract_transcode::{
+        ContractMessageTranscoder,
+        Value::{self, Seq},
+    },
     pallets::contract::ContractsUserApi,
     sp_weights::weight_v2::Weight,
     AccountId, AlephConfig, Connection, TxInfo, TxStatus,
@@ -133,8 +136,8 @@ impl MostInstance {
     pub async fn is_halted(&self, connection: &Connection) -> Result<bool, AzeroContractError> {
         Ok(self
             .contract
-            .contract_read0::<bool, _>(connection, "is_halted")
-            .await?)
+            .contract_read0::<Result<bool, _>, _>(connection, "is_halted")
+            .await??)
     }
 
     pub fn filter_events(
