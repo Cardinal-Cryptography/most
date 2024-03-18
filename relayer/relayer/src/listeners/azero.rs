@@ -131,9 +131,8 @@ impl AlephZeroListener {
             info!("Events ack received");
 
             // publish this block number as the last fully processed
-            let most_recent = to_block + 1;
-            info!("Sending {most_recent} as the most recently seen block number");
-            last_processed_block_number.send(most_recent)?;
+            info!("Marking {to_block} as the most recently seen block number");
+            last_processed_block_number.send(to_block + 1)?;
         }
     }
 }
