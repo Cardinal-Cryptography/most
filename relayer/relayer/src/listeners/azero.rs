@@ -203,6 +203,9 @@ async fn get_next_finalized_block_number_azero(
                 warn!("Aleph Client error when getting best finalized block hash: {err}");
             }
         };
+
+        // If we are up to date, we can sleep for a longer time.
+        sleep(Duration::from_secs(10 * ALEPH_BLOCK_PROD_TIME_SEC)).await;
     }
 }
 
