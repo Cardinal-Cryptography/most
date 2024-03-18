@@ -76,7 +76,7 @@ impl EthereumListener {
             // don't query for more than `sync_step` blocks at one time.
             let to_block = min(
                 next_finalized_block_number,
-                unprocessed_block_number + sync_step,
+                unprocessed_block_number + sync_step - 1,
             );
 
             info!(
@@ -106,9 +106,12 @@ impl EthereumListener {
             // wait for ack before moving on to the next batch
             info!("Awaiting ack");
             _ = events_ack_receiver.await;
+            info!("Events ack received");
 
-            // publish this block number as processed
-            last_processed_block_number.send(unprocessed_block_number)?;
+            // publish this block number as the last fully processed
+
+            info!("Sending {to_block} as the most recently seen block number");
+            last_processed_block_number.send(to_block + 1)?;
         }
     }
 }

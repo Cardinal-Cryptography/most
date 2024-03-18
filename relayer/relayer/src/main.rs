@@ -327,7 +327,6 @@ impl Relayer {
     ) -> Result<(), RelayerError> {
         let (azero_event_sender, mut azero_event_receiver) =
             mpsc::channel::<AzeroMostEvent>(ALEPH_MAX_REQUESTS_PER_BLOCK);
-        let (eth_event_sender, mut eth_event_receiver) = mpsc::channel::<EthMostEvent>(1);
 
         let mut circuit_breaker_receiver = circuit_breaker_receiver.lock().await;
         let mut eth_events_receiver = eth_events_receiver.lock().await;
@@ -362,6 +361,7 @@ impl Relayer {
                     info!("[AlephZero] Acknowledging events batch");
                     // marks the batch as done and releases the listener
                     events_ack_sender.send(()).map_err(|_| RelayerError::AckReceiverDropped)?;
+                    info!("[AlephZero] All events acknowledged");
                 },
 
                 Some (azero_event) = azero_event_receiver.recv () => {
@@ -383,6 +383,7 @@ impl Relayer {
 
                         info!("[AlephZero] Acknowledging event");
                         event_ack_sender.send (()).expect ("[AlephZero] event ack receiver has dropped before the message could be delivered");
+                        info!("[AlephZero] Event acknowledged");
                     });
                 },
 
@@ -391,29 +392,18 @@ impl Relayer {
                     info!("[Ethereum] Received a batch of {} events", events.len ());
 
                     for event in events {
-                        let (event_ack_sender, event_ack_receiver) = oneshot::channel::<()>();
-                        info!("[Ethereum] Sending event {event:?}");
-                        eth_event_sender.send(EthMostEvent {event, event_ack_sender}).await?;
-                        info!("[Ethereum] Awaiting event ack");
-                        event_ack_receiver.await?;
-                        info!("[Ethereum] Event ack received");
+
+                        if let Err(why) = EthHandler::handle_event (event,  &config, &azero_signed_connection).await {
+                            warn!("[Ethereum] event handler failure {why:?}");
+                            circuit_breaker_sender.send (CircuitBreakerEvent::EthEventHandlerFailure).await? ;
+                            break;
+                        }
+
                     }
 
                     info!("[Ethereum] Acknowledging events batch");
                     // marks the batch as done and releases the listener
                     events_ack_sender.send(()).map_err(|_| RelayerError::AckReceiverDropped)?;
-                },
-
-                Some (eth_event) = eth_event_receiver.recv() => {
-                    let EthMostEvent { event, event_ack_sender } = eth_event;
-                    info!("[Ethereum] Received event {event:?}");
-
-                    if let Err(why) = EthHandler::handle_event (event,  &config, &azero_signed_connection).await {
-                        warn!("[Ethereum] event handler failure {why:?}");
-                        circuit_breaker_sender.send (CircuitBreakerEvent::EthEventHandlerFailure).await? ;
-                    }
-                    info!("[Ethereum] Acknowledging event");
-                    event_ack_sender.send(()).map_err(|_| RelayerError::AckReceiverDropped)?;
                 },
 
                 else => {
