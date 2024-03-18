@@ -279,10 +279,14 @@ async fn main() -> Result<(), RelayerError> {
                 sleep(max(Duration::from_secs(900), delay)).await;
                 delay *= 2;
             }
-            Err(why) => error!("Fatal error in one of the core components: {why:?}"),
+            Err(why) => {
+                error!("Fatal error in one of the core components: {why:?}");
+                std::process::exit(1);
+            }
         }
     }
 
+    error!("We should have never gotten here!");
     std::process::exit(1);
 }
 

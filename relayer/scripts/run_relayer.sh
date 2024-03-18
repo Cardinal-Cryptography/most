@@ -33,6 +33,8 @@ ARGS=(
   --dev-account-index=${RELAYER_ID} \
   --default-sync-from-block-eth=0 \
   --default-sync-from-block-azero=0 \
+  --override-azero-cache \
+  --override-eth-cache \
   --dev
 )
 
