@@ -342,25 +342,24 @@ impl Relayer {
 
                 Some (azero_events) = azero_events_receiver.recv () => {
                     let AzeroMostEvents { events, events_ack_sender } = azero_events;
-                    info!("Received a batch of {} Azero events", events.len ());
+                    info!("[AlephZero] Received a batch of {} events", events.len ());
 
-                    // let mut acks = Vec::new ();
                     let mut acks = JoinSet::new();
 
                     for event in events {
                         let (event_ack_sender, event_ack_receiver) = oneshot::channel::<()>();
-                        info!("Sending AlephZero event {event:?}");
+                        info!("[AlephZero] Sending event {event:?}");
                         azero_event_sender.send(AzeroMostEvent {event, event_ack_sender}).await?;
                         acks.spawn(event_ack_receiver);
                     }
 
                     // wait for all concurrent tasks to finish
-                    info!("Awaiting all events to be acknowledged");
+                    info!("[AlephZero] Awaiting all events to be acknowledged");
                     while (acks.join_next().await).is_some() {
-                        debug!("Ack received");
+                        debug!("[AlephZero] Ack received");
                     }
 
-                    info!("Acknowledging Azero events batch");
+                    info!("[AlephZero] Acknowledging events batch");
                     // marks the batch as done and releases the listener
                     events_ack_sender.send(()).map_err(|_| RelayerError::AckReceiverDropped)?;
                 },
@@ -378,42 +377,42 @@ impl Relayer {
                         let circuit_breaker_sender = Arc::clone (&circuit_breaker_sender_rc) ;
 
                         if let Err(why) = AlephZeroHandler::handle_event(config, eth_connection, event).await {
-                            warn!("AlephZero event handler failed {why:?}");
+                            warn!("[AlephZero] event handler failed {why:?}");
                             circuit_breaker_sender.send (CircuitBreakerEvent::AlephZeroEventHandlerFailure).await.expect ("circuit breaker receiver has dropped before the message could be delivered");
                         }
 
-                        info!("Acknowledging AlephZero event");
-                        event_ack_sender.send (()).expect ("event ack receiver has dropped before the message could be delivered");
+                        info!("[AlephZero] Acknowledging event");
+                        event_ack_sender.send (()).expect ("[AlephZero] event ack receiver has dropped before the message could be delivered");
                     });
                 },
 
                 Some(eth_events) = eth_events_receiver.recv() => {
                     let EthMostEvents { events, events_ack_sender } = eth_events;
-                    info!("Received a batch {} of Eth events", events.len ());
+                    info!("[Ethereum] Received a batch of {} events", events.len ());
 
                     for event in events {
                         let (event_ack_sender, event_ack_receiver) = oneshot::channel::<()>();
-                        info!("Sending Eth event {event:?}");
+                        info!("[Ethereum] Sending event {event:?}");
                         eth_event_sender.send(EthMostEvent {event, event_ack_sender}).await?;
-                        info!("Awaiting event ack");
+                        info!("[Ethereum] Awaiting event ack");
                         event_ack_receiver.await?;
-                        info!("Event ack received");
+                        info!("[Ethereum] Event ack received");
                     }
 
-                    info!("Acknowledging Eth events batch");
+                    info!("[Ethereum] Acknowledging events batch");
                     // marks the batch as done and releases the listener
                     events_ack_sender.send(()).map_err(|_| RelayerError::AckReceiverDropped)?;
                 },
 
                 Some (eth_event) = eth_event_receiver.recv() => {
                     let EthMostEvent { event, event_ack_sender } = eth_event;
-                    info!("Received an Eth event {event:?}");
+                    info!("[Ethereum] Received event {event:?}");
 
                     if let Err(why) = EthHandler::handle_event (event,  &config, &azero_signed_connection).await {
-                        warn!("Eth event handler failure {why:?}");
+                        warn!("[Ethereum] event handler failure {why:?}");
                         circuit_breaker_sender.send (CircuitBreakerEvent::EthEventHandlerFailure).await? ;
                     }
-                    info!("Acknowledging Eth event");
+                    info!("[Ethereum] Acknowledging event");
                     event_ack_sender.send(()).map_err(|_| RelayerError::AckReceiverDropped)?;
                 },
 
