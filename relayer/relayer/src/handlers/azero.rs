@@ -12,19 +12,26 @@ use ethers::{
 use log::{debug, error, info, warn};
 use subxt::utils::H256;
 use thiserror::Error;
-use tokio::time::{sleep, Duration};
+use tokio::{
+    sync::{mpsc, oneshot},
+    task::JoinSet,
+    time::{sleep, Duration},
+};
 
 use crate::{
     config::Config,
     connections::eth::SignedEthConnection,
     contracts::{get_request_event_data, AzeroContractError, CrosschainTransferRequestData, Most},
-    listeners::{get_next_finalized_block_number_eth, ETH_BLOCK_PROD_TIME_SEC},
+    listeners::{
+        get_next_finalized_block_number_eth, AzeroMostEvent, AzeroMostEvents,
+        ETH_BLOCK_PROD_TIME_SEC,
+    },
 };
 
 #[derive(Debug, Error)]
 #[error(transparent)]
 #[non_exhaustive]
-pub enum AlephZeroHandlerError {
+pub enum AlephZeroEventHandlerError {
     #[error("Error when parsing ethereum address")]
     FromHex(#[from] rustc_hex::FromHexError),
 
@@ -44,14 +51,14 @@ pub enum AlephZeroHandlerError {
     EthContractReverted,
 }
 
-pub struct AlephZeroHandler;
+pub struct AlephZeroEventHandler;
 
-impl AlephZeroHandler {
+impl AlephZeroEventHandler {
     pub async fn handle_event(
         config: Arc<Config>,
         eth_connection: Arc<SignedEthConnection>,
         event: ContractEvent,
-    ) -> Result<(), AlephZeroHandlerError> {
+    ) -> Result<(), AlephZeroEventHandlerError> {
         let Config {
             eth_contract_address,
             eth_tx_min_confirmations,
@@ -124,7 +131,7 @@ impl AlephZeroHandler {
                     .confirmations(*eth_tx_min_confirmations)
                     .retries(*eth_tx_submission_retries)
                     .await?
-                    .ok_or(AlephZeroHandlerError::TxNotPresentInBlockOrMempool)?;
+                    .ok_or(AlephZeroEventHandlerError::TxNotPresentInBlockOrMempool)?;
 
                 let tx_hash = receipt.transaction_hash;
                 let tx_status = receipt.status;
@@ -134,7 +141,7 @@ impl AlephZeroHandler {
                     warn!(
                     "Tx with nonce {request_nonce} has been sent to the Ethereum network: {tx_hash:?} but it reverted."
                 );
-                    return Err(AlephZeroHandlerError::EthContractReverted);
+                    return Err(AlephZeroEventHandlerError::EthContractReverted);
                 }
 
                 info!("Tx with nonce {request_nonce} has been sent to the Ethereum network: {tx_hash:?} and received {eth_tx_min_confirmations} confirmations.");
@@ -146,10 +153,74 @@ impl AlephZeroHandler {
     }
 }
 
+#[derive(Debug, Error)]
+#[error(transparent)]
+#[non_exhaustive]
+pub enum AlephZeroEventsHandlerError {
+    #[error("event channel send error")]
+    EventSend(#[from] mpsc::error::SendError<AzeroMostEvent>),
+
+    // #[error("events channel send error")]
+    // EventsSend(#[from] mpsc::error::SendError<EthMostEvents>),
+
+    // #[error("ack receive error")]
+    // AckReceive(#[from] oneshot::error::RecvError),
+    #[error("events ack receiver dropped")]
+    EventsAckReceiverDropped,
+}
+
+pub struct AlephZeroEventsHandler;
+
+impl AlephZeroEventsHandler {
+    pub async fn run(
+        mut azero_events_receiver: mpsc::Receiver<AzeroMostEvents>,
+        azero_event_sender: mpsc::Sender<AzeroMostEvent>,
+    ) -> Result<(), AlephZeroEventsHandlerError> {
+        loop {
+            if let Some(azero_events) = azero_events_receiver.recv().await {
+                //
+                let AzeroMostEvents {
+                    events,
+                    events_ack_sender,
+                } = azero_events;
+                info!("[AlephZero] Received a batch of {} events", events.len());
+
+                let mut acks = JoinSet::new();
+
+                for event in events {
+                    let (event_ack_sender, event_ack_receiver) = oneshot::channel::<()>();
+                    info!("[AlephZero] Sending event {event:?}");
+                    azero_event_sender
+                        .send(AzeroMostEvent {
+                            event,
+                            event_ack_sender,
+                        })
+                        .await?;
+                    acks.spawn(event_ack_receiver);
+                }
+
+                // wait for all concurrent tasks to finish
+                info!("[AlephZero] Awaiting all events to be acknowledged");
+                while (acks.join_next().await).is_some() {
+                    debug!("[AlephZero] Ack received");
+                }
+
+                info!("[AlephZero] Acknowledging events batch");
+                // marks the batch as done and releases the listener
+                events_ack_sender
+                    .send(())
+                    .map_err(|_| AlephZeroEventsHandlerError::EventsAckReceiverDropped)?;
+                info!("[AlephZero] All events acknowledged");
+                //
+            }
+        }
+    }
+}
+
 async fn wait_for_eth_tx_finality(
     eth_connection: Arc<SignedEthConnection>,
     tx_hash: H256,
-) -> Result<(), AlephZeroHandlerError> {
+) -> Result<(), AlephZeroEventHandlerError> {
     info!("Waiting for tx finality: {tx_hash:?}");
     loop {
         sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;

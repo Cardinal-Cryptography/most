@@ -1,30 +1,32 @@
 use ethers::utils::keccak256;
 use log::{debug, error, info, trace};
 use thiserror::Error;
+use tokio::sync::{mpsc, oneshot};
 
 use crate::{
     config::Config,
     connections::azero::AzeroConnectionWithSigner,
     contracts::{AzeroContractError, CrosschainTransferRequestFilter, MostEvents, MostInstance},
     helpers::concat_u8_arrays,
+    listeners::{EthMostEvent, EthMostEvents},
 };
 
 #[derive(Debug, Error)]
 #[error(transparent)]
 #[non_exhaustive]
-pub enum EthHandlerError {
+pub enum EthereumEventHandlerError {
     #[error("azero contract error")]
     AzeroContract(#[from] AzeroContractError),
 }
 
-pub struct EthHandler;
+pub struct EthereumEventHandler;
 
-impl EthHandler {
+impl EthereumEventHandler {
     pub async fn handle_event(
         event: MostEvents,
         config: &Config,
         azero_connection: &AzeroConnectionWithSigner,
-    ) -> Result<(), EthHandlerError> {
+    ) -> Result<(), EthereumEventHandlerError> {
         let Config {
             azero_contract_address,
             azero_contract_metadata,
@@ -80,5 +82,62 @@ impl EthHandler {
         }
 
         Ok(())
+    }
+}
+
+#[derive(Debug, Error)]
+#[error(transparent)]
+#[non_exhaustive]
+pub enum EthereumEventsHandlerError {
+    #[error("event channel send error")]
+    EventSend(#[from] mpsc::error::SendError<EthMostEvent>),
+
+    #[error("events channel send error")]
+    EventsSend(#[from] mpsc::error::SendError<EthMostEvents>),
+
+    #[error("ack receive error")]
+    AckReceive(#[from] oneshot::error::RecvError),
+
+    #[error("events ack receiver dropped")]
+    EventsAckReceiverDropped,
+}
+
+pub struct EthereumEventsHandler;
+
+impl EthereumEventsHandler {
+    pub async fn run(
+        mut eth_events_receiver: mpsc::Receiver<EthMostEvents>,
+        eth_event_sender: mpsc::Sender<EthMostEvent>,
+    ) -> Result<(), EthereumEventsHandlerError> {
+        loop {
+            if let Some(eth_events) = eth_events_receiver.recv().await {
+                let EthMostEvents {
+                    events,
+                    events_ack_sender,
+                } = eth_events;
+                info!("[Ethereum] Received a batch of {} events", events.len());
+
+                for event in events {
+                    let (event_ack_sender, event_ack_receiver) = oneshot::channel::<()>();
+                    info!("[Ethereum] Sending event {event:?}");
+                    eth_event_sender
+                        .send(EthMostEvent {
+                            event,
+                            event_ack_sender,
+                        })
+                        .await?;
+                    info!("[Ethereum] Awaiting event ack");
+                    // wait until this event is handled before proceeding.
+                    event_ack_receiver.await?;
+                    info!("[Ethereum] Event ack received");
+                }
+
+                info!("[Ethereum] Acknowledging events batch");
+                // marks the batch as done and releases the listener
+                events_ack_sender
+                    .send(())
+                    .map_err(|_| EthereumEventsHandlerError::EventsAckReceiverDropped)?;
+            }
+        }
     }
 }
