@@ -5,7 +5,6 @@ const { u8aToHex } = require("@polkadot/util");
 const Safe = require("@safe-global/protocol-kit").default;
 const { EthersAdapter } = require("@safe-global/protocol-kit");
 
-// const contracts = require("../addresses.json");
 const azeroContracts = require("../../azero/addresses.json");
 
 async function createSafeInstance(signer, contracts) {
