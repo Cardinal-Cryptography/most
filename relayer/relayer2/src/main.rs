@@ -6,7 +6,9 @@ use config::Config;
 use connections::{azero::AzeroConnectionWithSigner, eth::SignedEthConnection};
 use ethers::signers::{coins_bip39::English, MnemonicBuilder, Signer, WalletError};
 use futures::TryFutureExt;
-use listeners::{AdvisoryListenerError, AzeroListenerError, EthListenerError};
+use listeners::{
+    AdvisoryListenerError, AlephZeroHaltedListenerError, AzeroListenerError, EthListenerError,
+};
 use log::{debug, error, info, warn};
 use redis::RedisManagerError;
 use thiserror::Error;
@@ -21,8 +23,8 @@ use crate::{
     connections::{azero, eth},
     handlers::{AlephZeroHandler, EthHandler},
     listeners::{
-        AdvisoryListener, AlephZeroListener, AzeroMostEvent, AzeroMostEvents, EthListener,
-        EthMostEvent, EthMostEvents,
+        AdvisoryListener, AlephZeroHaltedListener, AlephZeroListener, AzeroMostEvent,
+        AzeroMostEvents, EthListener, EthMostEvent, EthMostEvents,
     },
     redis::RedisManager,
 };
@@ -85,6 +87,9 @@ enum RelayerError {
 
     #[error("Redis manager failure")]
     RedisManager(#[from] RedisManagerError),
+
+    #[error("AlephZero halted listener failure")]
+    AlephZeroHaltedListener(#[from] AlephZeroHaltedListenerError),
 }
 
 #[derive(Debug, Clone)]
@@ -177,6 +182,15 @@ async fn main() -> Result<(), RelayerError> {
     // TODO : halted listener tasks
 
     let mut tasks = JoinSet::new();
+
+    tasks.spawn(
+        AlephZeroHaltedListener::run(
+            Arc::clone(&config),
+            Arc::clone(&azero_connection),
+            circuit_breaker_sender.clone(),
+        )
+        .map_err(RelayerError::from),
+    );
 
     tasks.spawn(
         AdvisoryListener::run(

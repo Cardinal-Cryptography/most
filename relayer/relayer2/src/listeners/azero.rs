@@ -1,4 +1,4 @@
-use std::{cmp::min, sync::Arc};
+use std::{cmp::min, sync::Arc, time::Duration};
 
 use aleph_client::{
     contract::event::{BlockDetails, ContractEvent},
@@ -11,6 +11,7 @@ use thiserror::Error;
 use tokio::{
     sync::{broadcast, mpsc, oneshot},
     task::{JoinError, JoinSet},
+    time::sleep,
 };
 
 use super::AzeroMostEvents;
@@ -18,6 +19,7 @@ use crate::{
     config::Config,
     connections::azero::AzeroWsConnection,
     contracts::{AzeroContractError, MostInstance},
+    CircuitBreakerEvent,
 };
 
 pub const ALEPH_BLOCK_PROD_TIME_SEC: u64 = 1;
@@ -200,8 +202,52 @@ async fn get_next_finalized_block_number_azero(
                 warn!("Aleph Client error when getting best finalized block hash: {err}");
             }
         };
+    }
+}
 
-        // If we are up to date, we can sleep for a longer time.
-        // sleep(Duration::from_secs(10 * ALEPH_BLOCK_PROD_TIME_SEC)).await;
+#[derive(Debug, Error)]
+#[error(transparent)]
+#[non_exhaustive]
+pub enum AlephZeroHaltedListenerError {
+    #[error("Azero contract error")]
+    AzeroContract(#[from] AzeroContractError),
+
+    #[error("channel send error")]
+    Send(#[from] mpsc::error::SendError<CircuitBreakerEvent>),
+}
+
+#[derive(Copy, Clone)]
+pub struct AlephZeroHaltedListener;
+
+impl AlephZeroHaltedListener {
+    pub async fn run(
+        config: Arc<Config>,
+        azero_connection: Arc<AzeroWsConnection>,
+        circuit_breaker_sender: mpsc::Sender<CircuitBreakerEvent>,
+    ) -> Result<(), AlephZeroHaltedListenerError> {
+        let Config {
+            azero_contract_metadata,
+            azero_contract_address,
+            azero_ref_time_limit,
+            azero_proof_size_limit,
+            ..
+        } = &*config;
+
+        let most_azero = MostInstance::new(
+            azero_contract_address,
+            azero_contract_metadata,
+            *azero_ref_time_limit,
+            *azero_proof_size_limit,
+        )?;
+
+        loop {
+            if most_azero.is_halted(&azero_connection).await? {
+                circuit_breaker_sender
+                    .send(CircuitBreakerEvent::BridgeHaltAzero)
+                    .await?;
+            }
+            // sleep for a block production time before making another round of queries
+            sleep(Duration::from_secs(ALEPH_BLOCK_PROD_TIME_SEC)).await;
+        }
     }
 }
