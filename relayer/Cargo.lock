@@ -4337,32 +4337,7 @@ checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
 
 [[package]]
 name = "relayer"
-version = "0.1.0"
-dependencies = [
- "aleph_client",
- "anyhow",
- "async-trait",
- "clap",
- "env_logger",
- "ethers",
- "eyre",
- "futures",
- "hex",
- "log",
- "parity-scale-codec",
- "redis",
- "rustc-hex",
- "serde",
- "serde_json",
- "signer_client",
- "subxt",
- "thiserror",
- "tokio",
-]
-
-[[package]]
-name = "relayer2"
-version = "0.1.0"
+version = "2.0.0"
 dependencies = [
  "aleph_client",
  "anyhow",
