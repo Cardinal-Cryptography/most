@@ -130,7 +130,8 @@ impl AlephZeroListener {
             _ = events_ack_receiver.await;
 
             // publish this block number as fully processed
-            last_processed_block_number.send(unprocessed_block_number)?;
+            info!("Sending {to_block} as the most recently seen block number");
+            last_processed_block_number.send(to_block + 1)?;
         }
     }
 }
