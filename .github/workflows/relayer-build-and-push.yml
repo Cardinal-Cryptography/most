@@ -15,6 +15,20 @@ on:
       docker-tag:
         description: Docker image tag
         value: ${{ jobs.build-and-push.outputs.docker-tag }}
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: One of 'bridgenet', 'testnet', 'mainnet'
+        type: string
+        required: true
+      frontend-environment:
+        description: Environment name for frontend
+        type: string
+        required: true
+    outputs:
+      docker-tag:
+        description: Docker image tag
+        value: ${{ jobs.build-and-push.outputs.docker-tag }}
 
 jobs:
   check-vars-and-secrets:
@@ -53,20 +67,18 @@ jobs:
             exit 1
           fi
 
-          # TODO: Remove when implemented
           if [[ \
-            '${{ inputs.frontend-environment }}' != 'dev'
+            '${{ inputs.frontend-environment }}' != 'dev' && \
+            '${{ inputs.frontend-environment }}' != 'stage'
           ]]; then
-            echo 'Only dev frontend environment is implemented at this moment'
+            echo 'Only dev and stage frontend environment is implemented at this moment'
             exit 1          
           fi
 
-          # TODO: Remove when implemented
           if [[ \
-            '${{ inputs.environment }}' == 'testnet' || \
             '${{ inputs.environment }}' == 'mainnet' \
           ]]; then
-            echo 'testnet and mainnet are not implemented yet'
+            echo 'mainnet is not implemented yet'
             exit 1
           fi
 
@@ -78,11 +90,25 @@ jobs:
         # yamllint disable-line rule:line-length
         uses: Cardinal-Cryptography/github-actions/get-ref-properties@v6
 
-      - name: Download addresses from S3 bucket
+      - name: Download addresses from S3 bucket for dev
         uses: Cardinal-Cryptography/github-actions/download-contract-addresses@v6
+        if: ${{ inputs.frontend-environment == 'dev' }}
         with:
           aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ADDRESSES_BRIDGENET_DEV_RO_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ADDRESSES_BRIDGENET_DEV_RO_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
+          s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
+          project: most
+          chain-environment: ${{ inputs.environment }}
+          frontend-environment: ${{ inputs.frontend-environment }}
+          dst-addresses: downloaded-addresses-${{ inputs.environment }}-${{ inputs.frontend-environment }}.json
+
+      - name: Download addresses from S3 bucket for stage
+        uses: Cardinal-Cryptography/github-actions/download-contract-addresses@v6
+        if: ${{ inputs.frontend-environment == 'stage' }}
+        with:
+          aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ADDRESSES_TESTNET_STAGE_RO_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ADDRESSES_TESTNET_STAGE_RO_AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
           s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
           project: most

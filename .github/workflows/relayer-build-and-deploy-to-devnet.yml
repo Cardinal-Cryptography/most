@@ -17,7 +17,7 @@ jobs:
   build-and-push:
     needs: [check-vars-and-secrets]
     name: Build and push
-    uses: ./.github/workflows/_relayer-build-and-push.yml
+    uses: ./.github/workflows/relayer-build-and-push.yml
     secrets: inherit
     with:
       environment: bridgenet

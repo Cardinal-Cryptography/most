@@ -1,0 +1,177 @@
+---
+name: Testnet - deploy contracts
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+concurrency:
+  group: "${{ github.ref }}-${{ github.workflow }}"
+  cancel-in-progress: false
+
+jobs:
+  check-vars-and-secrets:
+    name: Check vars and secrets
+    uses: ./.github/workflows/_check-vars-and-secrets.yml
+    secrets: inherit
+
+  test-azero-contracts:
+    needs: [check-vars-and-secrets]
+    uses: ./.github/workflows/test-azero-contracts.yml
+
+  test-eth-contracts:
+    needs: [check-vars-and-secrets]
+    uses: ./.github/workflows/test-eth-contracts.yml
+
+  deploy-contracts:
+    name: Deploy and setup contracts
+    runs-on: [self-hosted, Linux, X64, large]
+    needs: [test-eth-contracts, test-azero-contracts]
+    outputs:
+      artifact-matrix-json: ${{ steps.get-artifact-matrix.outputs.artifact-matrix }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup node
+        uses: asdf-vm/actions/install@v2
+
+      - name: Deploy eth contracts
+        shell: bash
+        run: make deploy-eth NETWORK=testnet
+
+      - name: Deploy and setup azero contracts
+        shell: bash
+        run: AZERO_ENV=testnet make deploy-azero-docker
+
+      - name: Setup eth contracts
+        shell: bash
+        run: make setup-eth NETWORK=testnet
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eth-deployed-contracts
+          if-no-files-found: error
+          retention-days: 1
+          path: |
+            eth/artifacts
+            eth/addresses.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: azero-deployed-contracts
+          if-no-files-found: error
+          retention-days: 1
+          path: |
+            azero/artifacts
+            azero/addresses.json
+
+      - name: Get list of contracts
+        shell: bash
+        id: get-artifact-matrix
+        run: |
+          find eth/artifacts/contracts -maxdepth 2 -regex '.*\/[a-zA-Z0-9_-]*\.json$' \
+            > tmp-files.txt
+          find azero/artifacts -maxdepth 1 -type f -regex '.*\/[a-zA-Z0-9_-]*\.json$' -o -regex '.*\/[a-zA-Z0-9_-]*\.contract$' \
+            >> tmp-files.txt
+
+          touch tmp-artifacts-matrix.txt
+
+          for filepath in `cat tmp-files.txt | grep .json`; do
+            filename=$(basename ${filepath});
+            filename_without_ext=${filename%.json};
+            filename_without_ext=${filename_without_ext%.contract};
+            filename_without_ext_lc=$(echo "${filename_without_ext}" | tr '[:upper:]' '[:lower:]')
+            contract_type=$(echo "${filepath}" | cut -d/ -f1)
+            contract_name="${contract_type}_${filename_without_ext_lc}"
+
+            echo "${filepath}|${contract_name}" >> tmp-artifacts-matrix.txt
+          done
+
+          cat tmp-artifacts-matrix.txt | \
+            jq -nRc '{"include":[ inputs | split("|") | { "from":(.[0]), "to": (.[1]) } ]}' \
+            > tmp-artifacts-matrix.json
+
+          cat tmp-artifacts-matrix.json
+
+          echo "artifact-matrix=$(cat tmp-artifacts-matrix.json)" >> $GITHUB_OUTPUT
+
+  upload-contract-artifacts:
+    name: Upload contract artifacts to S3
+    runs-on: [self-hosted, Linux, X64, small]
+    needs: [deploy-contracts]
+    strategy:
+      matrix: ${{ fromJson(needs.deploy-contracts.outputs.artifact-matrix-json) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: azero-deployed-contracts
+          path: azero
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: eth-deployed-contracts
+          path: eth
+
+      - name: Store artifact in S3 bucket
+        uses: Cardinal-Cryptography/github-actions/store-contract-artifact@v6
+        with:
+          aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RW_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RW_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
+          s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
+          project: most
+          version: ${{ github.sha }}
+          contract: ${{ matrix.to }}
+          src-artifact: ${{ matrix.from }}
+          if-exist: overwrite
+
+  upload-contract-addresses:
+    name: Upload contract addresses to S3
+    runs-on: [self-hosted, Linux, X64, small]
+    needs: [deploy-contracts]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: azero-deployed-contracts
+          path: azero
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: eth-deployed-contracts
+          path: eth
+
+      - name: Prepare contract_spec JSON
+        uses: Cardinal-Cryptography/github-actions/generate-contract-spec@v6
+        with:
+          src-files: |-
+            eth/addresses.json|eth_
+            azero/addresses.json|azero_
+          dst-file: contract_spec.json
+          spec-version: '0.1'
+          contract-version: '${{ github.sha }}'
+
+      - name: Print out contract_spec JSON
+        shell: bash
+        run: |
+          cat contract_spec.json
+
+      - name: Store addresses in S3 bucket
+        uses: Cardinal-Cryptography/github-actions/store-contract-addresses@v6
+        with:
+          aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ADDRESSES_TESTNET_STAGE_RW_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ADDRESSES_TESTNET_STAGE_RW_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
+          s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
+          project: most
+          chain-environment: testnet
+          frontend-environment: stage
+          src-addresses: contract_spec.json
+          if-exist: overwrite
