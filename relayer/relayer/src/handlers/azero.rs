@@ -14,7 +14,7 @@ use subxt::utils::H256;
 use thiserror::Error;
 use tokio::{
     select,
-    sync::{broadcast, mpsc},
+    sync::{broadcast, mpsc, Mutex},
     task::{JoinError, JoinSet},
     time::{sleep, Duration},
 };
@@ -175,11 +175,15 @@ impl AlephZeroEventsHandler {
     pub async fn run(
         config: Arc<Config>,
         eth_signed_connection: Arc<SignedEthConnection>,
-        mut azero_events_receiver: mpsc::Receiver<AzeroMostEvents>,
+        azero_events_receiver: Arc<Mutex<mpsc::Receiver<AzeroMostEvents>>>,
         circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
         mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
     ) -> Result<CircuitBreakerEvent, AlephZeroEventsHandlerError> {
+        let mut azero_events_receiver = azero_events_receiver.lock().await;
+
         loop {
+            debug!("Ping");
+
             select! {
                 cb_event = circuit_breaker_receiver.recv() => {
                     warn!("Exiting due to a circuit breaker event {cb_event:?}");

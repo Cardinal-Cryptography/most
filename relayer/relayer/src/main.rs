@@ -18,7 +18,7 @@ use log::{debug, error, info, warn};
 use redis::RedisManagerError;
 use thiserror::Error;
 use tokio::{
-    sync::{broadcast, mpsc, oneshot},
+    sync::{broadcast, mpsc, oneshot, Mutex},
     task::{JoinError, JoinSet},
 };
 
@@ -180,21 +180,30 @@ async fn main() -> Result<(), RelayerError> {
 
     let mut tasks = JoinSet::new();
 
+    let eth_events_receiver = Arc::new(Mutex::new(eth_events_receiver));
+    let azero_events_receiver = Arc::new(Mutex::new(azero_events_receiver));
+
+    // let mut eth_events_receiver = eth_events_receiver.lock().await;
+    // let mut azero_events_receiver = azero_events_receiver.lock().await;
+
     run_relayer(
         &mut tasks,
-        config,
-        azero_connection,
-        azero_signed_connection,
-        eth_connection,
-        eth_signed_connection,
-        eth_events_sender,
-        eth_events_receiver,
-        azero_events_sender,
-        azero_events_receiver,
-        eth_block_number_sender,
-        azero_block_number_sender,
-        circuit_breaker_sender,
-    );
+        config.clone(),
+        azero_connection.clone(),
+        azero_signed_connection.clone(),
+        eth_connection.clone(),
+        eth_signed_connection.clone(),
+        eth_events_sender.clone(),
+        // eth_events_receiver,
+        eth_events_receiver.clone(),
+        azero_events_sender.clone(),
+        // azero_events_receiver,
+        azero_events_receiver.clone(),
+        eth_block_number_sender.clone(),
+        azero_block_number_sender.clone(),
+        circuit_breaker_sender.clone(),
+    )
+    .await;
 
     // TODO wait for all tasks to finish and reboot
 
@@ -202,7 +211,32 @@ async fn main() -> Result<(), RelayerError> {
         match result? {
             Ok(result) => {
                 debug!("One of the core components exited gracefully due to : {result:?}");
-                info!("remaining: {}", &tasks.len());
+                // info!("remaining: {}", &tasks.len());
+
+                if tasks.is_empty() {
+                    // let mut eth_events_receiver = eth_events_receiver.lock().await;
+                    // let mut azero_events_receiver = azero_events_receiver.lock().await;
+
+                    // let eth_events_receiver = Arc::clone(&eth_events_receiver);
+                    // let azero_events_receiver = Arc::clone(&azero_events_receiver);
+
+                    run_relayer(
+                        &mut tasks,
+                        config.clone(),
+                        azero_connection.clone(),
+                        azero_signed_connection.clone(),
+                        eth_connection.clone(),
+                        eth_signed_connection.clone(),
+                        eth_events_sender.clone(),
+                        eth_events_receiver.clone(),
+                        azero_events_sender.clone(),
+                        azero_events_receiver.clone(),
+                        eth_block_number_sender.clone(),
+                        azero_block_number_sender.clone(),
+                        circuit_breaker_sender.clone(),
+                    )
+                    .await
+                }
             }
             Err(why) => {
                 error!("One of the core components exited with an error {why:?}. This is fatal");
@@ -216,7 +250,7 @@ async fn main() -> Result<(), RelayerError> {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn run_relayer(
+async fn run_relayer(
     tasks: &mut JoinSet<Result<CircuitBreakerEvent, RelayerError>>,
     config: Arc<Config>,
 
@@ -227,20 +261,18 @@ fn run_relayer(
     eth_signed_connection: Arc<SignedEthConnection>,
 
     eth_events_sender: mpsc::Sender<EthMostEvents>,
-    eth_events_receiver: mpsc::Receiver<EthMostEvents>,
+    // mut eth_events_receiver: mpsc::Receiver<EthMostEvents>,
+    eth_events_receiver: Arc<Mutex<mpsc::Receiver<EthMostEvents>>>,
+
     azero_events_sender: mpsc::Sender<AzeroMostEvents>,
-    azero_events_receiver: mpsc::Receiver<AzeroMostEvents>,
+    // mut azero_events_receiver: mpsc::Receiver<AzeroMostEvents>,
+    azero_events_receiver: Arc<Mutex<mpsc::Receiver<AzeroMostEvents>>>,
 
     eth_block_number_sender: broadcast::Sender<u32>,
     azero_block_number_sender: broadcast::Sender<u32>,
 
     circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
 ) {
-    // let mut circuit_breaker_receiver = circuit_breaker_receiver.lock().await;
-    // let mut eth_events_receiver = eth_events_receiver.lock().await;
-    // let mut azero_events_receiver = azero_events_receiver.lock().await;
-    // let mut eth_block_number_receiver = eth_block_number_receiver.lock().await;
-
     tasks.spawn(
         AdvisoryListener::run(
             Arc::clone(&config),
