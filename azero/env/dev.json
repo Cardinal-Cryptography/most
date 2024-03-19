@@ -10,8 +10,8 @@
   "deployer_seed": "//Alice",
   "signature_threshold": 2,
   "pocket_money": 1000000000000,
-  "min_fee": 10000000000000,
-  "max_fee": 100000000000000,
-  "default_fee": 30000000000000,
-  "relay_gas_usage": 50000
+  "min_gas_price": 60000000,
+  "max_gas_price": 450000000,
+  "default_gas_price": 180000000,
+  "relay_gas_usage": 450000
 }

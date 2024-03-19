@@ -52,24 +52,28 @@ async function addTokenPair(
   const azeroTokenAddressBytes = u8aToHex(
     new Keyring({ type: "sr25519" }).decodeAddress(azeroTokenAddress),
   );
-  let iface = await new ethers.Interface([
+
+  const iface = await new ethers.Interface([
     "function addPair(bytes32 from, bytes32 to)",
   ]);
-  let calldata = await iface.encodeFunctionData("addPair", [
+
+  const addPaircalldata = await iface.encodeFunctionData("addPair", [
     ethTokenAddressBytes,
     azeroTokenAddressBytes,
   ]);
 
-  const safeTransactionData = {
-    to: mostContract.address,
-    data: calldata,
-    value: 0,
-  };
+  const transactions = [
+    {
+      to: mostContract.address,
+      data: addPaircalldata,
+      value: 0,
+    },
+  ];
 
-  console.log("creating a Safe transaction:", safeTransactionData);
+  console.log("creating a Safe transactions:", transactions);
 
   const safeTransaction = await safeInstances[0].createTransaction({
-    transactions: [safeTransactionData],
+    transactions,
   });
   const safeTxHash = await safeInstances[0].getTransactionHash(safeTransaction);
 
@@ -88,6 +92,38 @@ async function addTokenPair(
     "=>",
     await mostContract.supportedPairs(ethTokenAddressBytes),
   );
+}
+
+async function unpauseMost(mostContract, safeInstances) {
+  console.log("Unpausing Most:");
+
+  const iface = await new ethers.Interface(["function unpause()"]);
+
+  const transactions = [
+    {
+      to: mostContract.address,
+      data: await iface.encodeFunctionData("unpause", []),
+      value: 0,
+    },
+  ];
+
+  console.log("creating a Safe transactions:", transactions);
+
+  const safeTransaction = await safeInstances[0].createTransaction({
+    transactions,
+  });
+  const safeTxHash = await safeInstances[0].getTransactionHash(safeTransaction);
+
+  console.log("safeTxHash", safeTxHash);
+
+  for (const safeInstance of safeInstances) {
+    await signSafeTransaction(safeInstance, safeTxHash);
+  }
+
+  // execute safe tx
+  await executeSafeTransaction(safeInstances[0], safeTransaction);
+
+  console.log("Most is now unpaused.");
 }
 
 // signing with on-chain signatures
@@ -169,6 +205,9 @@ async function main() {
       safeSdk0,
       safeSdk1,
     ]);
+
+    // --- unpause most
+    await unpauseMost(most, [safeSdk0, safeSdk1]);
   }
 
   // -- update migrations

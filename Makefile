@@ -142,8 +142,8 @@ print-azero-codehashes: compile-azero-docker
 .PHONY: deploy-azero-docker
 deploy-azero-docker: # Deploy azero contracts compiling in docker
 deploy-azero-docker: azero-deps compile-azero-docker
-	cd azero && npm run deploy
-	cd azero && npm run setup
+	cd azero && AZERO_ENV=$(AZERO_ENV) npm run deploy
+	cd azero && AZERO_ENV=$(AZERO_ENV) npm run setup
 
 .PHONY: azero-deps
 azero-deps: # Install azero dependencies
@@ -163,12 +163,12 @@ compile-azero: azero-deps
 .PHONY: deploy-azero
 deploy-azero: # Deploy azero contracts
 deploy-azero: compile-azero
-	cd azero && npm run deploy
+	cd azero && AZERO_ENV=$(AZERO_ENV) npm run deploy
 
 .PHONY: setup-azero
 setup-azero: # Setup azero contracts
 setup-azero: compile-azero
-	cd azero && npm run setup
+	cd azero && AZERO_ENV=$(AZERO_ENV) npm run setup
 
 .PHONY: deploy
 deploy: # Deploy all contracts
@@ -246,6 +246,16 @@ e2e-tests: # Run specific e2e test. Requires: `TEST_CASE=test_module::test_name`
 e2e-tests:
 	cd e2e-tests && \
 		RUST_LOG=info cargo test test::$(TEST_CASE) -- --color always --exact --nocapture --test-threads=1
+
+.PHONY: drink-tests
+drink-tests: # Run drink tests
+drink-tests: compile-azero
+	cd azero && npm run drink-tests
+
+.PHONY: drink-tests-docker
+drink-tests-docker: # Run drink tests with docker contract build
+drink-tests-docker: compile-azero-docker
+	cd azero && npm run drink-tests
 
 .PHONY: check-js-format
 check-js-format: # Check js formatting

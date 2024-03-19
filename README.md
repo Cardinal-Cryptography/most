@@ -23,7 +23,55 @@ Bring your assets to Aleph Zero and benefit from its scalable privacy-enhancing 
 
 ## Prerequisites
 
-Have docker and docker-compose installed.
+Have docker, docker-compose (`1.29.2`) and cargo-contract (`3.2.0`) installed.
+
+## Testing the contracts
+
+### Solidity contracts
+
+To run the tests for the Solidity `Most.sol` contract, run:
+
+```bash
+make test-solidity
+```
+
+It will run the tests using the Hardhat framework.
+Alternatively, you can run the tests directly from the selected file in the `eth` directory, for example:
+
+```bash
+cd eth
+npx hardhat test test/Most.js
+```
+
+### Ink! contracts
+
+#### Unit tests
+
+To run the unit tests for the ink! contracts, run:
+
+```bash
+make test-ink-unit
+```
+
+These will allow you to test the contracts in isolation, without the need for running a blockchain node in the background.
+
+#### DRink! tests
+
+To run DRink! based tests, which allow for testing interactions between multiple contracts without the need to run a node, run:
+
+```bash
+make drink-tests
+```
+DRink! tests are located in `azero/contracts/drink-tests/`.
+
+### ink_e2e tests
+
+To run the end-to-end tests for the ink! `most` contracts, run (requires docker-compose `1.29.2`):
+
+```bash
+make test-ink-e2e
+```
+These tests are located at `azero/contracts/tests`.
 
 ## Running the local development environment
 
@@ -119,7 +167,7 @@ Interact with the deployed contracts instance:
 
 ```javascript
 let Most = await ethers.getContractFactory("Most")
-let most = most.attach("insert contract address here")
+let most = Most.attach("insert contract address here")
 let accounts = await ethers.getSigners();
 
 await most.isGuardian(accounts[0])

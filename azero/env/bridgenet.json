@@ -9,8 +9,9 @@
   "gas_price_oracle_owner": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
   "deployer_seed": "//Alice",
   "signature_threshold": 2,
-  "commission_per_dix_mille": 300,
   "pocket_money": 1000000000000,
-  "minimum_transfer_amount_usd": 50,
-  "relay_gas_usage": 50000
+  "min_gas_price": 60000000,
+  "max_gas_price": 450000000,
+  "default_gas_price": 180000000,
+  "relay_gas_usage": 450000
 }
