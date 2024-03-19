@@ -55,7 +55,7 @@ impl RedisManager {
         let redis_connection = Arc::new(Mutex::new(client.get_connection()?));
 
         if *override_azero_cache {
-            write_last_processed_block(
+            write_block_number(
                 config.name.clone(),
                 ALEPH_LAST_BLOCK_KEY.to_string(),
                 redis_connection.clone(),
@@ -64,7 +64,7 @@ impl RedisManager {
         }
 
         if *override_eth_cache {
-            write_last_processed_block(
+            write_block_number(
                 config.name.clone(),
                 ETH_LAST_BLOCK_KEY.to_string(),
                 redis_connection.clone(),
@@ -72,7 +72,7 @@ impl RedisManager {
             )?;
         }
 
-        let first_unprocessed_block_number_eth = read_first_unprocessed_block_number(
+        let first_unprocessed_block_number_eth = read_block_number(
             name.clone(),
             ETH_LAST_BLOCK_KEY.to_string(),
             Arc::clone(&redis_connection),
@@ -81,7 +81,7 @@ impl RedisManager {
 
         next_unprocessed_block_number_eth.send(first_unprocessed_block_number_eth)?;
 
-        let first_unprocessed_block_number_azero = read_first_unprocessed_block_number(
+        let first_unprocessed_block_number_azero = read_block_number(
             name.clone(),
             ALEPH_LAST_BLOCK_KEY.to_string(),
             Arc::clone(&redis_connection),
@@ -103,10 +103,9 @@ impl RedisManager {
 
                 Ok (last_processed_block_number) = last_processed_block_number_eth.recv() => {
 
+                    info!("Writing {last_processed_block_number} as next block to process for ethereum");
 
-                    info!("Writing {last_processed_block_number} for ethereum");
-
-                    write_last_processed_block(
+                    write_block_number(
                         name.clone(),
                         ETH_LAST_BLOCK_KEY.to_string(),
                         Arc::clone(&redis_connection),
@@ -116,9 +115,9 @@ impl RedisManager {
 
                 Ok (last_processed_block_number) = last_processed_block_number_azero.recv () => {
 
-                    info!("Writing {last_processed_block_number} for AlephZero");
+                    info!("Writing {last_processed_block_number} as next block to process for AlephZero");
 
-                    write_last_processed_block(
+                    write_block_number(
                         name.clone(),
                         ALEPH_LAST_BLOCK_KEY.to_string(),
                         Arc::clone(&redis_connection),
@@ -130,7 +129,7 @@ impl RedisManager {
     }
 }
 
-pub fn read_first_unprocessed_block_number(
+pub fn read_block_number(
     name: String,
     key: String,
     redis_connection: Arc<Mutex<Connection>>,
@@ -139,7 +138,7 @@ pub fn read_first_unprocessed_block_number(
     let mut locked_connection = redis_connection.lock().expect("mutex lock");
 
     match locked_connection.get::<_, u32>(format!("{name}:{key}")) {
-        Ok(value) => value + 1,
+        Ok(value) => value,
         Err(why) => {
             log::warn!("Redis connection error {why:?}");
             default_block
@@ -148,7 +147,7 @@ pub fn read_first_unprocessed_block_number(
 }
 
 /// Caches the last processed block number
-pub fn write_last_processed_block(
+pub fn write_block_number(
     name: String,
     key: String,
     redis_connection: Arc<Mutex<Connection>>,
