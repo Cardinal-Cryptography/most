@@ -228,6 +228,9 @@ pub enum AlephZeroHaltedListenerError {
 
     #[error("broadcast send error")]
     BroadcastSend(#[from] broadcast::error::SendError<CircuitBreakerEvent>),
+
+    #[error("broadcast receive error")]
+    BroadcastReceive(#[from] broadcast::error::RecvError),
 }
 
 #[derive(Copy, Clone)]
@@ -238,7 +241,8 @@ impl AlephZeroHaltedListener {
         config: Arc<Config>,
         azero_connection: Arc<AzeroWsConnection>,
         circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
-    ) -> Result<(), AlephZeroHaltedListenerError> {
+        mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
+    ) -> Result<CircuitBreakerEvent, AlephZeroHaltedListenerError> {
         let Config {
             azero_contract_metadata,
             azero_contract_address,
@@ -255,11 +259,21 @@ impl AlephZeroHaltedListener {
         )?;
 
         loop {
-            if most_azero.is_halted(&azero_connection).await? {
-                circuit_breaker_sender.send(CircuitBreakerEvent::BridgeHaltAlephZero)?;
+            select! {
+                cb_event = circuit_breaker_receiver.recv () => {
+                    warn!("Exiting due to a circuit breaker event {cb_event:?}");
+                    return Ok(cb_event?);
+                },
+
+                is_halted = most_azero.is_halted(&azero_connection) => {
+                    if is_halted? {
+                        circuit_breaker_sender.send(CircuitBreakerEvent::BridgeHaltAlephZero)?;
+                        return Ok(CircuitBreakerEvent::BridgeHaltAlephZero);
+                    }
+                    // sleep before making another query
+                    sleep(Duration::from_secs(ALEPH_BLOCK_PROD_TIME_SEC)).await;
+                }
             }
-            // sleep for a block production time before making another round of queries
-            sleep(Duration::from_secs(ALEPH_BLOCK_PROD_TIME_SEC)).await;
         }
     }
 }

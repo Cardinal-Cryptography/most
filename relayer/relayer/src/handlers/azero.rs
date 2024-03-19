@@ -182,7 +182,6 @@ pub enum AlephZeroEventsHandlerError {
 
 pub struct AlephZeroEventsHandler;
 
-// TODO: handle single events here (ditch the event channel)
 impl AlephZeroEventsHandler {
     pub async fn run(
         config: Arc<Config>,
@@ -230,7 +229,7 @@ impl AlephZeroEventsHandler {
                         Ok(_) => debug!("Event succesfully handled"),
                         Err(why) => {
                             warn!("[AlephZero] event handler failed {why:?}");
-                            let status = CircuitBreakerEvent::EthEventHandlerFailure;
+                            let status = CircuitBreakerEvent::AlephZeroEventHandlerFailure;
                             circuit_breaker_sender.send(status.clone())?;
                             warn!("Exiting");
                             return Ok(status);

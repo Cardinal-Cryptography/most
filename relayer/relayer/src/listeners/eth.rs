@@ -36,11 +36,11 @@ pub enum EthereumListenerError {
     #[error("channel send error")]
     Send(#[from] mpsc::error::SendError<EthMostEvents>),
 
-    #[error("broadcast send error")]
-    BroadcastSend(#[from] broadcast::error::SendError<u32>),
+    #[error("channel broadcast error")]
+    Broadcast(#[from] broadcast::error::SendError<u32>),
 
-    #[error("broadcast receive error")]
-    BroadcastReceive(#[from] broadcast::error::RecvError),
+    #[error("channel receive error")]
+    Receive(#[from] broadcast::error::RecvError),
 }
 
 impl EthereumListener {
@@ -159,6 +159,9 @@ pub enum EthereumPausedListenerError {
     #[error("broadcast send error")]
     BroadcastSend(#[from] broadcast::error::SendError<CircuitBreakerEvent>),
 
+    #[error("broadcast receive error")]
+    BroadcastReceive(#[from] broadcast::error::RecvError),
+
     #[error("contract error")]
     Contract(#[from] ContractError<Provider<Http>>),
 }
@@ -170,7 +173,8 @@ impl EthereumPausedListener {
         config: Arc<Config>,
         eth_connection: Arc<EthConnection>,
         circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
-    ) -> Result<(), EthereumPausedListenerError> {
+        mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
+    ) -> Result<CircuitBreakerEvent, EthereumPausedListenerError> {
         let Config {
             eth_contract_address,
             ..
@@ -180,8 +184,18 @@ impl EthereumPausedListener {
         let most_eth = Most::new(address, Arc::clone(&eth_connection));
 
         loop {
-            if most_eth.paused().await? {
-                circuit_breaker_sender.send(CircuitBreakerEvent::BridgeHaltEthereum)?;
+            select! {
+                cb_event = circuit_breaker_receiver.recv () => {
+                    warn!("Exiting due to a circuit breaker event {cb_event:?}");
+                    return Ok(cb_event?);
+                },
+
+                else => {
+                    if most_eth.paused().await? {
+                        circuit_breaker_sender.send(CircuitBreakerEvent::BridgeHaltEthereum)?;
+                        return Ok (CircuitBreakerEvent::BridgeHaltEthereum)
+                    }
+                }
             }
         }
     }

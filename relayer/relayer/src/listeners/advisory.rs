@@ -1,9 +1,9 @@
 use std::{sync::Arc, time::Duration};
 
 use futures::future::join_all;
-use log::debug;
+use log::{debug, warn};
 use thiserror::Error;
-use tokio::{sync::broadcast, time::sleep};
+use tokio::{select, sync::broadcast, time::sleep};
 
 use super::ALEPH_BLOCK_PROD_TIME_SEC;
 use crate::{
@@ -22,6 +22,9 @@ pub enum AdvisoryListenerError {
 
     #[error("broadcast send error")]
     BroadcastSend(#[from] broadcast::error::SendError<CircuitBreakerEvent>),
+
+    #[error("broadcast receive error")]
+    BroadcastReceive(#[from] broadcast::error::RecvError),
 }
 
 pub struct AdvisoryListener;
@@ -31,7 +34,8 @@ impl AdvisoryListener {
         config: Arc<Config>,
         azero_connection: Arc<AzeroWsConnection>,
         circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
-    ) -> Result<(), AdvisoryListenerError> {
+        mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
+    ) -> Result<CircuitBreakerEvent, AdvisoryListenerError> {
         let Config {
             advisory_contract_metadata,
             advisory_contract_addresses,
@@ -51,27 +55,36 @@ impl AdvisoryListener {
             )?;
 
         loop {
-            let all: Vec<_> = contracts
-                .iter()
-                .map(|advisory| advisory.is_emergency(&azero_connection))
-                .collect();
+            select! {
+                cb_event = circuit_breaker_receiver.recv () => {
+                    warn!("Exiting due to a circuit breaker event {cb_event:?}");
+                    return Ok(cb_event?);
+                },
 
-            for maybe_emergency in join_all(all).await {
-                match maybe_emergency {
-                    Ok((is_emergency, address)) => {
-                        if is_emergency {
-                            debug!("Emergency state in one of the advisory contracts {address}");
-                            circuit_breaker_sender
-                                .send(CircuitBreakerEvent::AdvisoryEmergency(address))?;
-                            break;
+                else => {
+                    let all: Vec<_> = contracts
+                        .iter()
+                        .map(|advisory| advisory.is_emergency(&azero_connection))
+                        .collect();
+
+                    for maybe_emergency in join_all(all).await {
+                        match maybe_emergency {
+                            Ok((is_emergency, address)) => {
+                                if is_emergency {
+                                    debug!("Emergency state in one of the advisory contracts {address}");
+                                    let status = CircuitBreakerEvent::AdvisoryEmergency(address);
+                                    circuit_breaker_sender.send(status.clone())?;
+                                    return Ok(status.clone());
+                                }
+                            }
+                            Err(why) => return Err(AdvisoryListenerError::AzeroContract(why)),
                         }
                     }
-                    Err(why) => return Err(AdvisoryListenerError::AzeroContract(why)),
+
+                    // sleep for a block production time before making another round of queries
+                    sleep(Duration::from_secs(ALEPH_BLOCK_PROD_TIME_SEC)).await;
                 }
             }
-
-            // sleep for a block production time before making another round of queries
-            sleep(Duration::from_secs(ALEPH_BLOCK_PROD_TIME_SEC)).await;
         }
     }
 }
