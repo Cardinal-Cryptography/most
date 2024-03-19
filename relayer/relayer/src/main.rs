@@ -86,7 +86,8 @@ enum RelayerError {
 
     #[error("AlephZero Most halted listener failure")]
     AlephZeroHaltedListener(#[from] AlephZeroHaltedListenerError),
-    // #[error("Ethereum's Most paused listener failure")]
+
+    #[error("Ethereum's Most paused listener failure")]
     EthereumPausedListener(#[from] EthereumPausedListenerError),
 }
 
@@ -186,6 +187,10 @@ async fn main() -> Result<(), RelayerError> {
                 debug!("One of the core components exited gracefully due to : {result:?}, remaining: {}", &tasks.len());
 
                 if tasks.is_empty() {
+                    info!("Relayer exited. Waiting {delay:?} before rebooting.");
+                    sleep(min(Duration::from_secs(900), delay)).await;
+                    delay *= 2;
+
                     run_relayer(
                         &mut tasks,
                         config.clone(),
@@ -194,8 +199,6 @@ async fn main() -> Result<(), RelayerError> {
                         eth_connection.clone(),
                         eth_signed_connection.clone(),
                     );
-                    sleep(min(Duration::from_secs(900), delay)).await;
-                    delay *= 2;
                 }
             }
             Err(why) => {

@@ -112,21 +112,23 @@ impl EthereumListener {
                                 },
 
                                 Ok (events) = query.query() => {
-                                    let (events_ack_sender, events_ack_receiver) = oneshot::channel::<()>();
+                                    if !events.is_empty () {
+                                        let (events_ack_sender, events_ack_receiver) = oneshot::channel::<()>();
+                                        info!(target: "EthereumListener","Sending a batch of {} events", &events.len());
 
-                                    info!(target: "EthereumListener","Sending a batch of {} events", &events.len());
+                                        eth_events_sender
+                                            .send(EthMostEvents {
+                                                events: events.clone (),
+                                                events_ack_sender,
+                                            }).await?;
 
-                                    eth_events_sender
-                                        .send(EthMostEvents {
-                                            events: events.clone (),
-                                            events_ack_sender,
-                                        }).await?;
+                                        info!(target: "EthereumListener","Awaiting events ack");
+                                        events_ack_receiver.await.map_err (|_| EthereumListenerError::AckSenderDropped)?;
+                                        // publish this block number as the last fully processed
+                                        info!(target: "EthereumListener","Events ack received, marking {to_block} as the most recently seen block number");
+                                        last_processed_block_number.send(to_block + 1)?;
+                                    }
 
-                                    info!(target: "EthereumListener","Awaiting events ack");
-                                    events_ack_receiver.await.map_err (|_| EthereumListenerError::AckSenderDropped)?;
-                                    // publish this block number as the last fully processed
-                                    info!(target: "EthereumListener","Events ack received, marking {to_block} as the most recently seen block number");
-                                    last_processed_block_number.send(to_block + 1)?;
                                 }
                             }
                         }
