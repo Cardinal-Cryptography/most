@@ -7,12 +7,6 @@ mod advisory;
 mod azero;
 mod eth;
 
-// #[derive(Debug)]
-// pub struct EthMostEvent {
-//     pub event: MostEvents,
-//     pub event_ack_sender: oneshot::Sender<()>,
-// }
-
 #[derive(Debug)]
 pub struct EthMostEvents {
     pub events: Vec<MostEvents>,
@@ -24,12 +18,6 @@ pub struct AzeroMostEvents {
     pub events: Vec<ContractEvent>,
     pub events_ack_sender: oneshot::Sender<()>,
 }
-
-// #[derive(Debug)]
-// pub struct AzeroMostEvent {
-//     pub event: ContractEvent,
-//     pub event_ack_sender: oneshot::Sender<()>,
-// }
 
 pub use advisory::*;
 pub use azero::*;

@@ -10,8 +10,8 @@ use tokio::{
 
 use crate::{config::Config, CircuitBreakerEvent};
 
-pub const ETH_LAST_BLOCK_KEY: &str = "ethereum_last_known_block_number";
-pub const ALEPH_LAST_BLOCK_KEY: &str = "alephzero_last_known_block_number";
+pub const ETH_BLOCK_KEY: &str = "ethereum_block_number";
+pub const ALEPH_BLOCK_KEY: &str = "alephzero_block_number";
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -57,24 +57,24 @@ impl RedisManager {
         if *override_azero_cache {
             write_block_number(
                 config.name.clone(),
-                ALEPH_LAST_BLOCK_KEY.to_string(),
+                ALEPH_BLOCK_KEY.to_string(),
                 redis_connection.clone(),
-                *config.default_sync_from_block_azero - 1,
+                *config.default_sync_from_block_azero,
             )?;
         }
 
         if *override_eth_cache {
             write_block_number(
                 config.name.clone(),
-                ETH_LAST_BLOCK_KEY.to_string(),
+                ETH_BLOCK_KEY.to_string(),
                 redis_connection.clone(),
-                *config.default_sync_from_block_eth - 1,
+                *config.default_sync_from_block_eth,
             )?;
         }
 
         let first_unprocessed_block_number_eth = read_block_number(
             name.clone(),
-            ETH_LAST_BLOCK_KEY.to_string(),
+            ETH_BLOCK_KEY.to_string(),
             Arc::clone(&redis_connection),
             **default_sync_from_block_eth,
         );
@@ -83,7 +83,7 @@ impl RedisManager {
 
         let first_unprocessed_block_number_azero = read_block_number(
             name.clone(),
-            ALEPH_LAST_BLOCK_KEY.to_string(),
+            ALEPH_BLOCK_KEY.to_string(),
             Arc::clone(&redis_connection),
             **default_sync_from_block_azero,
         );
@@ -107,7 +107,7 @@ impl RedisManager {
 
                     write_block_number(
                         name.clone(),
-                        ETH_LAST_BLOCK_KEY.to_string(),
+                        ETH_BLOCK_KEY.to_string(),
                         Arc::clone(&redis_connection),
                         last_processed_block_number,
                     )?;
@@ -119,7 +119,7 @@ impl RedisManager {
 
                     write_block_number(
                         name.clone(),
-                        ALEPH_LAST_BLOCK_KEY.to_string(),
+                        ALEPH_BLOCK_KEY.to_string(),
                         Arc::clone(&redis_connection),
                         last_processed_block_number,
                     )?;

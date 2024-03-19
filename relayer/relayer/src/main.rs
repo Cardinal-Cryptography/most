@@ -215,10 +215,8 @@ async fn main() -> Result<(), RelayerError> {
 fn run_relayer(
     tasks: &mut JoinSet<Result<CircuitBreakerEvent, RelayerError>>,
     config: Arc<Config>,
-
     azero_connection: Arc<AzeroWsConnection>,
     azero_signed_connection: Arc<AzeroConnectionWithSigner>,
-
     eth_connection: Arc<EthConnection>,
     eth_signed_connection: Arc<SignedEthConnection>,
 ) {
