@@ -236,11 +236,9 @@ fn run_relayer(
     azero_events_receiver: mpsc::Receiver<AzeroMostEvents>,
 
     eth_block_number_sender: broadcast::Sender<u32>,
-    // eth_block_number_receiver: broadcast::Receiver<u32>,
     azero_block_number_sender: broadcast::Sender<u32>,
-    // azero_block_number_receiver: broadcast::Receiver<u32>,
+
     circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
-    // circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
 ) {
     // let mut circuit_breaker_receiver = circuit_breaker_receiver.lock().await;
     // let mut eth_events_receiver = eth_events_receiver.lock().await;
