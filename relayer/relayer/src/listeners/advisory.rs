@@ -57,6 +57,8 @@ impl AdvisoryListener {
             )?;
 
         loop {
+            debug!("Ping");
+
             select! {
                 cb_event = circuit_breaker_receiver.recv () => {
                     warn!("Exiting due to a circuit breaker event {cb_event:?}");

@@ -5,7 +5,7 @@ use aleph_client::{
     utility::BlocksApi,
     AlephConfig, AsConnection, Connection,
 };
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use subxt::events::Events;
 use thiserror::Error;
 use tokio::{
@@ -86,9 +86,11 @@ impl AlephZeroListener {
         )?;
 
         loop {
+            debug!(target: "AlephZeroListener", "Ping");
+
             select! {
                 cb_event = circuit_breaker_receiver.recv() => {
-                    warn!("Exiting before handling next block due to a circuit breaker event {cb_event:?}");
+                    warn!(target: "AlephZeroListener", "Exiting before handling next block due to a circuit breaker event {cb_event:?}");
                     return Ok(cb_event?);
                 },
 
@@ -106,7 +108,7 @@ impl AlephZeroListener {
                         unprocessed_block_number + (*sync_step) - 1,
                     );
 
-                    info!(
+                    info!(target: "AlephZeroListener",
                         "Processing events from blocks {} - {}",
                         unprocessed_block_number, to_block
                     );
@@ -130,7 +132,7 @@ impl AlephZeroListener {
 
                     select! {
                         cb_event = circuit_breaker_receiver.recv () => {
-                            warn!("Exiting before sending events due to a circuit breaker event {cb_event:?}");
+                            warn!(target: "AlephZeroListener", "Exiting before sending events due to a circuit breaker event {cb_event:?}");
                             return Ok(cb_event?);
                         },
 
@@ -139,26 +141,14 @@ impl AlephZeroListener {
                                 events: filtered_events.clone (),
                                 events_ack_sender,
                             }) => {
-                                info!("Sending a batch of {} events", &filtered_events.len());
+                                info!(target: "AlephZeroListener", "Sending a batch of {} events", &filtered_events.len());
                             },
-
-                        else => {
-                            info!("Idling");
-                        }
-
                     }
 
-                    // TODO: select!
-                    match events_ack_receiver.await {
-                        Ok(_) => {
-                            info!("Events ack received");
-                            // publish this block number as the last fully processed
-                            info!("Marking {to_block} as the most recently seen block number");
-                            last_processed_block_number.send(to_block + 1)?;
-                        },
-                        Err(_) => return Err(AlephZeroListenerError::AckSenderDropped)
-                    }
-
+                    info!(target: "AlephZeroListener", "Awaiting events ack");
+                    events_ack_receiver.await.map_err(|_| AlephZeroListenerError::AckSenderDropped)?;
+                    info!(target: "AlephZeroListener", "Events ack received, marking {to_block} as the most recently seen block number");
+                    last_processed_block_number.send(to_block + 1)?;
                 }
             }
         }
@@ -277,17 +267,25 @@ impl AlephZeroHaltedListener {
             *azero_proof_size_limit,
         )?;
 
+        info!(
+            target: "AlephZeroHaltedListener",
+            "Starting"
+        );
+
         loop {
+            debug!(target: "AlephZeroHaltedListener", "Ping");
+
             select! {
                 cb_event = circuit_breaker_receiver.recv () => {
-                    warn!("Exiting due to a circuit breaker event {cb_event:?}");
+                    warn!(target: "AlephZeroHaltedListener","Exiting due to a circuit breaker event {cb_event:?}");
                     return Ok(cb_event?);
                 },
 
                 is_halted = most_azero.is_halted(&azero_connection) => {
                     if is_halted? {
                         circuit_breaker_sender.send(CircuitBreakerEvent::BridgeHaltAlephZero)?;
-                        warn!("Most is halted, exiting");
+                        warn!(target: "AlephZeroHaltedListener",
+                              "Most is halted, exiting");
                         return Ok(CircuitBreakerEvent::BridgeHaltAlephZero);
                     }
                     // sleep before making another query

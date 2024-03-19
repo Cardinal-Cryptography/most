@@ -251,25 +251,25 @@ fn run_relayer(
         .map_err(RelayerError::from),
     );
 
-    // tasks.spawn(
-    //     AlephZeroHaltedListener::run(
-    //         Arc::clone(&config),
-    //         Arc::clone(&azero_connection),
-    //         circuit_breaker_sender.clone(),
-    //         circuit_breaker_sender.subscribe(),
-    //     )
-    //     .map_err(RelayerError::from),
-    // );
+    tasks.spawn(
+        AlephZeroHaltedListener::run(
+            Arc::clone(&config),
+            Arc::clone(&azero_connection),
+            circuit_breaker_sender.clone(),
+            circuit_breaker_sender.subscribe(),
+        )
+        .map_err(RelayerError::from),
+    );
 
-    // tasks.spawn(
-    //     EthereumPausedListener::run(
-    //         Arc::clone(&config),
-    //         Arc::clone(&eth_connection),
-    //         circuit_breaker_sender.clone(),
-    //         circuit_breaker_sender.subscribe(),
-    //     )
-    //     .map_err(RelayerError::from),
-    // );
+    tasks.spawn(
+        EthereumPausedListener::run(
+            Arc::clone(&config),
+            Arc::clone(&eth_connection),
+            circuit_breaker_sender.clone(),
+            circuit_breaker_sender.subscribe(),
+        )
+        .map_err(RelayerError::from),
+    );
 
     tasks.spawn(
         RedisManager::run(

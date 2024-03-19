@@ -65,21 +65,21 @@ impl EthereumListener {
         let most_eth = Most::new(address, Arc::clone(&eth_connection));
 
         loop {
-            debug!("Ping");
+            debug!(target: "EthereumListener", "Ping");
 
             select! {
                 cb_event = circuit_breaker_receiver.recv() => {
-                    warn!("Exiting before handling next block due to a circuit breaker event {cb_event:?}");
+                    warn!(target: "EthereumListener","Exiting before handling next block due to a circuit breaker event {cb_event:?}");
                     return Ok(cb_event?);
                 },
 
                 Ok (unprocessed_block_number) = next_unprocessed_block_number.recv() => {
                     // Query for the next unknown finalized block number, if not present we wait for it.
-                    info!("Waiting for the next finalized block number");
+                    info!(target: "EthereumListener","Waiting for the next finalized block number");
 
                     select! {
                         cb_event = circuit_breaker_receiver.recv () => {
-                            warn!("Exiting before sending events due to a circuit breaker event {cb_event:?}");
+                            warn!(target: "EthereumListener","Exiting before sending events due to a circuit breaker event {cb_event:?}");
                             return Ok(cb_event?);
                         },
 
@@ -94,9 +94,9 @@ impl EthereumListener {
                                 unprocessed_block_number + sync_step - 1,
                             );
 
-                            info!(
-                                "Processing events from blocks {} - {}",
-                                unprocessed_block_number, to_block
+                            info!(target: "EthereumListener",
+                                  "Processing events from blocks {} - {}",
+                                  unprocessed_block_number, to_block
                             );
 
                             // listen to events
@@ -107,14 +107,14 @@ impl EthereumListener {
 
                             select! {
                                 cb_event = circuit_breaker_receiver.recv () => {
-                                    warn!("Exiting before sending events due to a circuit breaker event {cb_event:?}");
+                                    warn!(target: "EthereumListener","Exiting before sending events due to a circuit breaker event {cb_event:?}");
                                     return Ok(cb_event?);
                                 },
 
                                 Ok (events) = query.query() => {
                                     let (events_ack_sender, events_ack_receiver) = oneshot::channel::<()>();
 
-                                    info!("Sending a batch of {} events", &events.len());
+                                    info!(target: "EthereumListener","Sending a batch of {} events", &events.len());
 
                                     eth_events_sender
                                         .send(EthMostEvents {
@@ -122,10 +122,10 @@ impl EthereumListener {
                                             events_ack_sender,
                                         }).await?;
 
-                                    info!("Awaiting events ack");
+                                    info!(target: "EthereumListener","Awaiting events ack");
                                     events_ack_receiver.await.map_err (|_| EthereumListenerError::AckSenderDropped)?;
                                     // publish this block number as the last fully processed
-                                    info!("Events ack received, marking {to_block} as the most recently seen block number");
+                                    info!(target: "EthereumListener","Events ack received, marking {to_block} as the most recently seen block number");
                                     last_processed_block_number.send(to_block + 1)?;
                                 }
                             }
@@ -198,25 +198,31 @@ impl EthereumPausedListener {
             ..
         } = &*config;
 
+        info!(target: "EthereumPausedListener", "Starting");
+
         let address = eth_contract_address.parse::<Address>()?;
         let most_eth = Most::new(address, Arc::clone(&eth_connection));
 
         loop {
+            debug!(target: "EthereumPausedListener","Ping");
+
             select! {
                 cb_event = circuit_breaker_receiver.recv () => {
-                    warn!("Exiting due to a circuit breaker event {cb_event:?}");
+                    warn!(target: "EthereumPausedListener", "Exiting due to a circuit breaker event {cb_event:?}");
                     return Ok(cb_event?);
                 },
 
                 else => {
+                    info!(target: "EthereumPausedListener", "Querying");
                     if most_eth.paused().await? {
                         circuit_breaker_sender.send(CircuitBreakerEvent::BridgeHaltEthereum)?;
-                        warn!("Most is paused, exiting");
+                        warn!(target: "EthereumPausedListener", "Most is paused, exiting");
                         return Ok (CircuitBreakerEvent::BridgeHaltEthereum)
                     }
-                    sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
                 }
             }
+
+            // sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
         }
     }
 }
