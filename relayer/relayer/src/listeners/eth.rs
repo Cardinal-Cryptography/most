@@ -214,7 +214,7 @@ impl EthereumPausedListener {
 
             _ = async {
                 loop {
-                    error!(target: "EthereumPausedListener", "Querying");
+                    info!(target: "EthereumPausedListener", "Querying");
                     if most_eth.paused().await? {
                         circuit_breaker_sender.send(CircuitBreakerEvent::BridgeHaltEthereum)?;
                         warn!(target: "EthereumPausedListener", "Most is paused, exiting");
