@@ -23,10 +23,7 @@ use crate::{
     config::Config,
     connections::eth::SignedEthConnection,
     contracts::{get_request_event_data, AzeroContractError, CrosschainTransferRequestData, Most},
-    listeners::{
-        get_next_finalized_block_number_eth, AzeroMostEvent, AzeroMostEvents,
-        ETH_BLOCK_PROD_TIME_SEC,
-    },
+    listeners::{get_next_finalized_block_number_eth, AzeroMostEvents, ETH_BLOCK_PROD_TIME_SEC},
     CircuitBreakerEvent,
 };
 

@@ -3,7 +3,10 @@ use std::{cmp::max, result, sync::Arc};
 use aleph_client::AccountId;
 use clap::Parser;
 use config::Config;
-use connections::{azero::AzeroConnectionWithSigner, eth::SignedEthConnection};
+use connections::{
+    azero::{AzeroConnectionWithSigner, AzeroWsConnection},
+    eth::{EthConnection, SignedEthConnection},
+};
 use ethers::signers::{coins_bip39::English, MnemonicBuilder, Signer, WalletError};
 use futures::TryFutureExt;
 use handlers::{AlephZeroEventsHandlerError, EthereumEventsHandlerError};
@@ -27,8 +30,8 @@ use crate::{
         AlephZeroEventHandler, AlephZeroEventsHandler, EthereumEventHandler, EthereumEventsHandler,
     },
     listeners::{
-        AdvisoryListener, AlephZeroHaltedListener, AlephZeroListener, AzeroMostEvent,
-        AzeroMostEvents, EthMostEvent, EthMostEvents, EthereumListener, EthereumPausedListener,
+        AdvisoryListener, AlephZeroHaltedListener, AlephZeroListener, AzeroMostEvents,
+        EthMostEvents, EthereumListener, EthereumPausedListener,
     },
     redis::RedisManager,
 };
@@ -65,12 +68,6 @@ enum RelayerError {
 
     #[error("Task join error")]
     Join(#[from] JoinError),
-
-    #[error("AlephZero channel send error")]
-    AzeroEventSend(#[from] mpsc::error::SendError<AzeroMostEvent>),
-
-    #[error("Ethereum event channel send error")]
-    EthEventSend(#[from] mpsc::error::SendError<EthMostEvent>),
 
     #[error("circuit breaker channel send error")]
     CircuitBreakerSend(#[from] mpsc::error::SendError<CircuitBreakerEvent>),
@@ -182,15 +179,50 @@ async fn main() -> Result<(), RelayerError> {
     // Create channels
     // TODO: tweak channel buffers
     let (eth_events_sender, eth_events_receiver) = mpsc::channel::<EthMostEvents>(1);
-    let (eth_block_number_sender, eth_block_number_receiver) = broadcast::channel(1);
-    // let eth_block_number_receiver2 = eth_block_number_sender.subscribe();
-    let (azero_events_sender, azero_events_receiver) = mpsc::channel::<AzeroMostEvents>(1);
-    let (azero_block_number_sender, _azero_block_number_receiver) = broadcast::channel(1);
+    let (eth_block_number_sender, eth_block_number_receiver) = broadcast::channel::<u32>(1);
 
-    let (circuit_breaker_sender, _circuit_breaker_receiver) =
+    let (azero_events_sender, azero_events_receiver) = mpsc::channel::<AzeroMostEvents>(1);
+    let (azero_block_number_sender, azero_block_number_receiver) = broadcast::channel::<u32>(1);
+
+    let (circuit_breaker_sender, circuit_breaker_receiver) =
         broadcast::channel::<CircuitBreakerEvent>(1);
 
     let mut tasks = JoinSet::new();
+
+    // TODO wait for all tasks to finish and reboot
+
+    error!("We should have never gotten here!");
+    std::process::exit(1);
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn run_relayer(
+    tasks: &mut JoinSet<Result<CircuitBreakerEvent, RelayerError>>,
+    config: Arc<Config>,
+
+    azero_connection: Arc<AzeroWsConnection>,
+    azero_signed_connection: Arc<AzeroConnectionWithSigner>,
+
+    eth_connection: Arc<EthConnection>,
+    eth_signed_connection: Arc<SignedEthConnection>,
+
+    eth_events_sender: mpsc::Sender<EthMostEvents>,
+    eth_events_receiver: mpsc::Receiver<EthMostEvents>,
+    azero_events_sender: mpsc::Sender<AzeroMostEvents>,
+    azero_events_receiver: mpsc::Receiver<AzeroMostEvents>,
+
+    eth_block_number_sender: broadcast::Sender<u32>,
+    eth_block_number_receiver: broadcast::Receiver<u32>,
+    azero_block_number_sender: broadcast::Sender<u32>,
+    azero_block_number_receiver: broadcast::Receiver<u32>,
+
+    circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
+    circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
+) {
+    // let mut circuit_breaker_receiver = circuit_breaker_receiver.lock().await;
+    // let mut eth_events_receiver = eth_events_receiver.lock().await;
+    // let mut azero_events_receiver = azero_events_receiver.lock().await;
+    // let mut eth_block_number_receiver = eth_block_number_receiver.lock().await;
 
     tasks.spawn(
         AdvisoryListener::run(
@@ -279,9 +311,4 @@ async fn main() -> Result<(), RelayerError> {
         )
         .map_err(RelayerError::from),
     );
-
-    // TODO wait for all tasks to finish and reboot
-
-    // error!("We should have never gotten here!");
-    std::process::exit(1);
 }

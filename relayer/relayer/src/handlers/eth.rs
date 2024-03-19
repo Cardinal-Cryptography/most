@@ -13,7 +13,7 @@ use crate::{
     connections::azero::AzeroConnectionWithSigner,
     contracts::{AzeroContractError, CrosschainTransferRequestFilter, MostEvents, MostInstance},
     helpers::concat_u8_arrays,
-    listeners::{EthMostEvent, EthMostEvents},
+    listeners::EthMostEvents,
     CircuitBreakerEvent,
 };
 
