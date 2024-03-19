@@ -71,7 +71,7 @@ impl AdvisoryListener {
                         match maybe_emergency {
                             Ok((is_emergency, address)) => {
                                 if is_emergency {
-                                    debug!("Emergency state in one of the advisory contracts {address}");
+                                    warn!("Exiting due to emergency state in one of the advisory contracts {address}");
                                     let status = CircuitBreakerEvent::AdvisoryEmergency(address);
                                     circuit_breaker_sender.send(status.clone())?;
                                     return Ok(status.clone());

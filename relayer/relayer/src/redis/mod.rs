@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use log::debug;
+use log::{debug, warn};
 use redis::{Client as RedisClient, Commands, Connection, RedisError};
 use thiserror::Error;
 use tokio::{
@@ -8,7 +8,7 @@ use tokio::{
     sync::{broadcast, mpsc},
 };
 
-use crate::config::Config;
+use crate::{config::Config, CircuitBreakerEvent};
 
 pub const ETH_LAST_BLOCK_KEY: &str = "ethereum_last_known_block_number";
 pub const ALEPH_LAST_BLOCK_KEY: &str = "alephzero_last_known_block_number";
@@ -39,7 +39,8 @@ impl RedisManager {
         mut last_processed_block_number_eth: broadcast::Receiver<u32>,
         next_unprocessed_block_number_azero: broadcast::Sender<u32>,
         mut last_processed_block_number_azero: broadcast::Receiver<u32>,
-    ) -> Result<(), RedisManagerError> {
+        mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
+    ) -> Result<CircuitBreakerEvent, RedisManagerError> {
         let Config {
             redis_node,
             name,
@@ -91,6 +92,11 @@ impl RedisManager {
 
         loop {
             select! {
+                cb_event = circuit_breaker_receiver.recv () => {
+                    warn!("Exiting due to a circuit breaker event {cb_event:?}");
+                    return Ok(cb_event?);
+                },
+
                 Ok (last_processed_block_number) = last_processed_block_number_eth.recv() => {
                     write_last_processed_block(
                         name.clone(),
@@ -109,9 +115,9 @@ impl RedisManager {
                     )?;
                 },
 
-                else => {
-                    debug!("Nothing to do, idling");
-                }
+                // else => {
+                //     debug!("Nothing to do, idling");
+                // }
             }
         }
     }

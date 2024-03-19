@@ -193,8 +193,10 @@ impl EthereumPausedListener {
                 else => {
                     if most_eth.paused().await? {
                         circuit_breaker_sender.send(CircuitBreakerEvent::BridgeHaltEthereum)?;
+                        warn!("Most is paused, exiting");
                         return Ok (CircuitBreakerEvent::BridgeHaltEthereum)
                     }
+                    sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
                 }
             }
         }
