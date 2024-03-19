@@ -282,12 +282,14 @@ impl AlephZeroHaltedListener {
                 },
 
                 is_halted = most_azero.is_halted(&azero_connection) => {
+                    debug!(target: "AlephZeroHaltedListener", "Querying");
                     if is_halted? {
                         circuit_breaker_sender.send(CircuitBreakerEvent::BridgeHaltAlephZero)?;
                         warn!(target: "AlephZeroHaltedListener",
                               "Most is halted, exiting");
                         return Ok(CircuitBreakerEvent::BridgeHaltAlephZero);
                     }
+
                     // sleep before making another query
                     sleep(Duration::from_secs(ALEPH_BLOCK_PROD_TIME_SEC)).await;
                 }

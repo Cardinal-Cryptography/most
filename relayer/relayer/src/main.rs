@@ -121,7 +121,7 @@ async fn main() -> Result<(), RelayerError> {
         let keypair = aleph_client::keypair_from_string(&azero_seed);
 
         info!(
-            "[AlephZero] Creating signed connection using a development key {}",
+            "Creating signed connection using a development key {}",
             keypair.account_id()
         );
 
@@ -137,7 +137,7 @@ async fn main() -> Result<(), RelayerError> {
     info!("Established connection to Aleph Zero node");
 
     let eth_signed_connection = if let Some(cid) = config.signer_cid {
-        info!("[Ethereum] Creating signed connection using a Signer client");
+        info!("Creating signed connection using a Signer client");
         eth::with_signer(
             eth::connect(&config.eth_node_http_url).await,
             cid,
@@ -153,7 +153,7 @@ async fn main() -> Result<(), RelayerError> {
                 .build()?;
 
         info!(
-            "[Ethereum] Creating signed connection using a development key {}",
+            "Creating signed connection using a development key {}",
             &wallet.address()
         );
         eth::with_local_wallet(eth::connect(&config.eth_node_http_url).await, wallet).await?

@@ -204,7 +204,7 @@ impl EthereumPausedListener {
         let most_eth = Most::new(address, Arc::clone(&eth_connection));
 
         loop {
-            debug!(target: "EthereumPausedListener","Ping");
+            debug!(target: "EthereumPausedListener", "Ping");
 
             select! {
                 cb_event = circuit_breaker_receiver.recv () => {
@@ -212,8 +212,9 @@ impl EthereumPausedListener {
                     return Ok(cb_event?);
                 },
 
+                // TODO: remove else
                 else => {
-                    info!(target: "EthereumPausedListener", "Querying");
+                    error!(target: "EthereumPausedListener", "Querying");
                     if most_eth.paused().await? {
                         circuit_breaker_sender.send(CircuitBreakerEvent::BridgeHaltEthereum)?;
                         warn!(target: "EthereumPausedListener", "Most is paused, exiting");
@@ -221,6 +222,13 @@ impl EthereumPausedListener {
                     }
                 }
             }
+
+            // info!(target: "EthereumPausedListener", "Querying");
+            // if most_eth.paused().await? {
+            //     circuit_breaker_sender.send(CircuitBreakerEvent::BridgeHaltEthereum)?;
+            //     warn!(target: "EthereumPausedListener", "Most is paused, exiting");
+            //     return Ok(CircuitBreakerEvent::BridgeHaltEthereum);
+            // }
 
             // sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
         }

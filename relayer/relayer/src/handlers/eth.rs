@@ -140,11 +140,9 @@ impl EthereumEventsHandler {
 
                             result = EthereumEventHandler::handle_event(event, &config, &azero_signed_connection) => {
                                 if let Err(why) = result {
-                                    warn!("event handler failure {why:?}");
-                                    let status = CircuitBreakerEvent::EthEventHandlerFailure;
-                                    circuit_breaker_sender.send(status.clone ())?;
-                                    warn!("Exiting");
-                                    return Ok (status);
+                                    circuit_breaker_sender.send(CircuitBreakerEvent::EthEventHandlerFailure)?;
+                                    warn!("Event handler failed {why:?}, exiting");
+                                    return Ok (CircuitBreakerEvent::EthEventHandlerFailure);
                                 }
                             },
 

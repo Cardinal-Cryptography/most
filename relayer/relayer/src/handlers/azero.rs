@@ -187,7 +187,6 @@ impl AlephZeroEventsHandler {
                 },
 
                 Some(azero_events) = azero_events_receiver.recv() => {
-
                     let AzeroMostEvents {
                         events,
                         events_ack_sender,
@@ -196,40 +195,31 @@ impl AlephZeroEventsHandler {
                     info!("Received a batch of {} events", events.len());
 
                     let mut tasks = JoinSet::new();
-
                     for event in events {
-                        let config = Arc::clone(&config);
-                        let eth_connection = Arc::clone(&eth_signed_connection);
-
-                        // TODO: remove else
-                        select! {
-                            cb_event = circuit_breaker_receiver.recv() => {
-                                warn!("Exiting due to a circuit breaker event {cb_event:?}");
-                                return Ok(cb_event?);
-                            }
-
-                            else => {
-                                // spawn concurrent tasks for each one of the long running handlers
-                                tasks.spawn(AlephZeroEventHandler::handle_event(
-                                    event,
-                                    Arc::clone(&config),
-                                    Arc::clone(&eth_connection),
-                                ));
-                            }
-                        }
+                        // spawn each handler in separate task as it's time consuming
+                        tasks.spawn(AlephZeroEventHandler::handle_event(
+                            event,
+                            Arc::clone(&config),
+                            Arc::clone(&eth_signed_connection),
+                        ));
                     }
 
                     // wait for all concurrent handler tasks to finish
                     info!("Awaiting all handler tasks to finish");
-                    while let Some(result) = tasks.join_next().await {
-                        match result? {
-                            Ok(_) => debug!("Event succesfully handled"),
-                            Err(why) => {
-                                warn!("Event handler failed {why:?}");
-                                let status = CircuitBreakerEvent::AlephZeroEventHandlerFailure;
-                                circuit_breaker_sender.send(status.clone())?;
-                                warn!("Exiting");
-                                return Ok(status);
+
+                    while !tasks.is_empty() {
+                        select! {
+                            cb_event = circuit_breaker_receiver.recv() => {
+                                warn!("Exiting due to a circuit breaker event {cb_event:?}");
+                                return Ok(cb_event?);
+                            },
+
+                            Some (result) = tasks.join_next() => {
+                                if let Err (why) = result {
+                                    circuit_breaker_sender.send(CircuitBreakerEvent::AlephZeroEventHandlerFailure)?;
+                                    warn!("Event handler failed {why:?}, exiting");
+                                    return Ok(CircuitBreakerEvent::AlephZeroEventHandlerFailure);
+                                }
                             }
                         }
                     }
