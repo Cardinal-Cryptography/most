@@ -5,7 +5,7 @@ use log::{debug, error, info, trace, warn};
 use thiserror::Error;
 use tokio::{
     select,
-    sync::{broadcast, mpsc, Mutex},
+    sync::{broadcast, mpsc},
 };
 
 use crate::{
@@ -110,13 +110,11 @@ pub struct EthereumEventsHandler;
 impl EthereumEventsHandler {
     pub async fn run(
         config: Arc<Config>,
-        eth_events_receiver: Arc<Mutex<mpsc::Receiver<EthMostEvents>>>,
+        mut eth_events_receiver: mpsc::Receiver<EthMostEvents>,
         azero_signed_connection: Arc<AzeroConnectionWithSigner>,
         circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
         mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
     ) -> Result<CircuitBreakerEvent, EthereumEventsHandlerError> {
-        let mut eth_events_receiver = eth_events_receiver.lock().await;
-
         loop {
             debug!("Ping");
 

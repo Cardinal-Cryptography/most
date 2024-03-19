@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{cmp::min, sync::Arc, time::Duration};
 
 use aleph_client::AccountId;
 use clap::Parser;
@@ -14,12 +14,13 @@ use listeners::{
     AdvisoryListenerError, AlephZeroHaltedListenerError, AlephZeroListenerError,
     EthereumListenerError, EthereumPausedListenerError,
 };
-use log::{debug, error, info, warn};
+use log::{debug, error, info};
 use redis::RedisManagerError;
 use thiserror::Error;
 use tokio::{
-    sync::{broadcast, mpsc, oneshot, Mutex},
+    sync::{broadcast, mpsc, oneshot},
     task::{JoinError, JoinSet},
+    time::sleep,
 };
 
 use crate::{
@@ -42,8 +43,6 @@ mod redis;
 
 const DEV_MNEMONIC: &str =
     "harsh master island dirt equip search awesome double turn crush wool grant";
-// This is more than the maximum number of send_request calls than will fit into the block (execution time)
-// const ALEPH_MAX_REQUESTS_PER_BLOCK: usize = 50;
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -167,24 +166,7 @@ async fn main() -> Result<(), RelayerError> {
 
     debug!("Established connection to the Ethereum node");
 
-    // Create channels
-    // TODO: tweak channel buffers
-    let (eth_events_sender, eth_events_receiver) = mpsc::channel::<EthMostEvents>(1);
-    let (eth_block_number_sender, _eth_block_number_receiver) = broadcast::channel::<u32>(1);
-
-    let (azero_events_sender, azero_events_receiver) = mpsc::channel::<AzeroMostEvents>(1);
-    let (azero_block_number_sender, _azero_block_number_receiver) = broadcast::channel::<u32>(1);
-
-    let (circuit_breaker_sender, _circuit_breaker_receiver) =
-        broadcast::channel::<CircuitBreakerEvent>(1);
-
     let mut tasks = JoinSet::new();
-
-    let eth_events_receiver = Arc::new(Mutex::new(eth_events_receiver));
-    let azero_events_receiver = Arc::new(Mutex::new(azero_events_receiver));
-
-    // let mut eth_events_receiver = eth_events_receiver.lock().await;
-    // let mut azero_events_receiver = azero_events_receiver.lock().await;
 
     run_relayer(
         &mut tasks,
@@ -193,33 +175,17 @@ async fn main() -> Result<(), RelayerError> {
         azero_signed_connection.clone(),
         eth_connection.clone(),
         eth_signed_connection.clone(),
-        eth_events_sender.clone(),
-        // eth_events_receiver,
-        eth_events_receiver.clone(),
-        azero_events_sender.clone(),
-        // azero_events_receiver,
-        azero_events_receiver.clone(),
-        eth_block_number_sender.clone(),
-        azero_block_number_sender.clone(),
-        circuit_breaker_sender.clone(),
-    )
-    .await;
+    );
 
-    // TODO wait for all tasks to finish and reboot
-
+    // TODO: reduce backoff
+    // wait for all tasks to finish and reboot
+    let mut delay = Duration::from_secs(2);
     while let Some(result) = tasks.join_next().await {
         match result? {
             Ok(result) => {
-                debug!("One of the core components exited gracefully due to : {result:?}");
-                // info!("remaining: {}", &tasks.len());
+                debug!("One of the core components exited gracefully due to : {result:?}, remaining: {}", &tasks.len());
 
                 if tasks.is_empty() {
-                    // let mut eth_events_receiver = eth_events_receiver.lock().await;
-                    // let mut azero_events_receiver = azero_events_receiver.lock().await;
-
-                    // let eth_events_receiver = Arc::clone(&eth_events_receiver);
-                    // let azero_events_receiver = Arc::clone(&azero_events_receiver);
-
                     run_relayer(
                         &mut tasks,
                         config.clone(),
@@ -227,15 +193,9 @@ async fn main() -> Result<(), RelayerError> {
                         azero_signed_connection.clone(),
                         eth_connection.clone(),
                         eth_signed_connection.clone(),
-                        eth_events_sender.clone(),
-                        eth_events_receiver.clone(),
-                        azero_events_sender.clone(),
-                        azero_events_receiver.clone(),
-                        eth_block_number_sender.clone(),
-                        azero_block_number_sender.clone(),
-                        circuit_breaker_sender.clone(),
-                    )
-                    .await
+                    );
+                    sleep(min(Duration::from_secs(900), delay)).await;
+                    delay *= 2;
                 }
             }
             Err(why) => {
@@ -250,7 +210,7 @@ async fn main() -> Result<(), RelayerError> {
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn run_relayer(
+fn run_relayer(
     tasks: &mut JoinSet<Result<CircuitBreakerEvent, RelayerError>>,
     config: Arc<Config>,
 
@@ -259,20 +219,18 @@ async fn run_relayer(
 
     eth_connection: Arc<EthConnection>,
     eth_signed_connection: Arc<SignedEthConnection>,
-
-    eth_events_sender: mpsc::Sender<EthMostEvents>,
-    // mut eth_events_receiver: mpsc::Receiver<EthMostEvents>,
-    eth_events_receiver: Arc<Mutex<mpsc::Receiver<EthMostEvents>>>,
-
-    azero_events_sender: mpsc::Sender<AzeroMostEvents>,
-    // mut azero_events_receiver: mpsc::Receiver<AzeroMostEvents>,
-    azero_events_receiver: Arc<Mutex<mpsc::Receiver<AzeroMostEvents>>>,
-
-    eth_block_number_sender: broadcast::Sender<u32>,
-    azero_block_number_sender: broadcast::Sender<u32>,
-
-    circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
 ) {
+    // Create channels
+    // TODO: tweak channel buffers
+    let (eth_events_sender, eth_events_receiver) = mpsc::channel::<EthMostEvents>(1);
+    let (eth_block_number_sender, _eth_block_number_receiver) = broadcast::channel::<u32>(1);
+
+    let (azero_events_sender, azero_events_receiver) = mpsc::channel::<AzeroMostEvents>(1);
+    let (azero_block_number_sender, _azero_block_number_receiver) = broadcast::channel::<u32>(1);
+
+    let (circuit_breaker_sender, _circuit_breaker_receiver) =
+        broadcast::channel::<CircuitBreakerEvent>(1);
+
     tasks.spawn(
         AdvisoryListener::run(
             Arc::clone(&config),

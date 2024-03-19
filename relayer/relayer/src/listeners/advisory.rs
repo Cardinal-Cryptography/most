@@ -89,6 +89,8 @@ impl AdvisoryListener {
                 }
 
             }
+
+            sleep(Duration::from_secs(ALEPH_BLOCK_PROD_TIME_SEC)).await;
         }
     }
 }
