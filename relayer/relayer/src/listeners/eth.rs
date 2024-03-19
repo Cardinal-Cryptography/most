@@ -182,6 +182,9 @@ pub enum EthereumPausedListenerError {
 
     #[error("contract error")]
     Contract(#[from] ContractError<Provider<Http>>),
+
+    #[error("unexpected error")]
+    Unexpected,
 }
 
 pub struct EthereumPausedListener;
@@ -203,34 +206,26 @@ impl EthereumPausedListener {
         let address = eth_contract_address.parse::<Address>()?;
         let most_eth = Most::new(address, Arc::clone(&eth_connection));
 
-        loop {
-            debug!(target: "EthereumPausedListener", "Ping");
+        select! {
+            cb_event = circuit_breaker_receiver.recv () => {
+                warn!(target: "EthereumPausedListener", "Exiting due to a circuit breaker event {cb_event:?}");
+                Ok(cb_event?)
+            },
 
-            select! {
-                cb_event = circuit_breaker_receiver.recv () => {
-                    warn!(target: "EthereumPausedListener", "Exiting due to a circuit breaker event {cb_event:?}");
-                    return Ok(cb_event?);
-                },
-
-                // TODO: remove else
-                else => {
+            _ = async {
+                loop {
                     error!(target: "EthereumPausedListener", "Querying");
                     if most_eth.paused().await? {
                         circuit_breaker_sender.send(CircuitBreakerEvent::BridgeHaltEthereum)?;
                         warn!(target: "EthereumPausedListener", "Most is paused, exiting");
-                        return Ok (CircuitBreakerEvent::BridgeHaltEthereum)
+                        return Ok::<CircuitBreakerEvent, EthereumPausedListenerError>(CircuitBreakerEvent::BridgeHaltEthereum);
                     }
+
+                    sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
                 }
+            } => {
+                Err (EthereumPausedListenerError::Unexpected)
             }
-
-            // info!(target: "EthereumPausedListener", "Querying");
-            // if most_eth.paused().await? {
-            //     circuit_breaker_sender.send(CircuitBreakerEvent::BridgeHaltEthereum)?;
-            //     warn!(target: "EthereumPausedListener", "Most is paused, exiting");
-            //     return Ok(CircuitBreakerEvent::BridgeHaltEthereum);
-            // }
-
-            // sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
         }
     }
 }
