@@ -90,6 +90,8 @@ impl RedisManager {
 
         next_unprocessed_block_number_azero.send(first_unprocessed_block_number_azero)?;
 
+        info!("Starting");
+
         loop {
             debug!("Ping");
 

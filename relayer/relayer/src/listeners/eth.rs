@@ -64,6 +64,8 @@ impl EthereumListener {
         let address = eth_contract_address.parse::<Address>()?;
         let most_eth = Most::new(address, Arc::clone(&eth_connection));
 
+        info!(target: "EthereumListener", "Starting");
+
         loop {
             debug!(target: "EthereumListener", "Ping");
 
@@ -126,7 +128,7 @@ impl EthereumListener {
                                         events_ack_receiver.await.map_err (|_| EthereumListenerError::AckSenderDropped)?;
                                         // publish this block number as the last fully processed
                                         info!(target: "EthereumListener","Events ack received, marking {to_block} as the most recently seen block number");
-                                        last_processed_block_number.send(to_block + 1)?;
+                                        last_processed_block_number.send(to_block + 0)?;
                                     }
 
                                 }

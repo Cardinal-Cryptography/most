@@ -115,6 +115,8 @@ impl EthereumEventsHandler {
         circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
         mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
     ) -> Result<CircuitBreakerEvent, EthereumEventsHandlerError> {
+        info!("Starting");
+
         loop {
             debug!("Ping");
 
