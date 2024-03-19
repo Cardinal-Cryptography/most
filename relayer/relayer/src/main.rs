@@ -180,7 +180,7 @@ async fn main() -> Result<(), RelayerError> {
 
     // TODO: reduce backoff
     // wait for all tasks to finish and reboot
-    let mut delay = Duration::from_secs(2);
+    let delay = Duration::from_secs(2);
     while let Some(result) = tasks.join_next().await {
         match result? {
             Ok(result) => {
@@ -188,8 +188,7 @@ async fn main() -> Result<(), RelayerError> {
 
                 if tasks.is_empty() {
                     info!("Relayer exited. Waiting {delay:?} before rebooting.");
-                    sleep(min(Duration::from_secs(900), delay)).await;
-                    delay *= 2;
+                    sleep(delay).await;
 
                     run_relayer(
                         &mut tasks,

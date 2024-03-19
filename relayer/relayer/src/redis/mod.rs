@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use log::{debug, warn};
+use log::{debug, info, warn};
 use redis::{Client as RedisClient, Commands, Connection, RedisError};
 use thiserror::Error;
 use tokio::{

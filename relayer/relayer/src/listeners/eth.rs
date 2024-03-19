@@ -126,10 +126,10 @@ impl EthereumListener {
 
                                         info!(target: "EthereumListener","Awaiting events ack");
                                         events_ack_receiver.await.map_err (|_| EthereumListenerError::AckSenderDropped)?;
-                                        // publish this block number as the last fully processed
-                                        info!(target: "EthereumListener","Events ack received, marking {to_block} as the most recently seen block number");
-                                        last_processed_block_number.send(to_block + 0)?;
                                     }
+                                    // publish this block number as the last fully processed
+                                    info!(target: "EthereumListener","Events ack received, marking {to_block} as the most recently seen block number");
+                                    last_processed_block_number.send(to_block + 1)?;
 
                                 }
                             }
@@ -218,7 +218,7 @@ impl EthereumPausedListener {
 
             _ = async {
                 loop {
-                    info!(target: "EthereumPausedListener", "Querying");
+                    debug!(target: "EthereumPausedListener", "Querying");
                     if most_eth.paused().await? {
                         circuit_breaker_sender.send(CircuitBreakerEvent::BridgeHaltEthereum)?;
                         warn!(target: "EthereumPausedListener", "Most is paused, exiting");
