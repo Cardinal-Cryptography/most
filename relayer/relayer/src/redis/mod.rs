@@ -103,7 +103,7 @@ impl RedisManager {
 
                 Ok (last_processed_block_number) = last_processed_block_number_eth.recv() => {
 
-                    info!("Writing {last_processed_block_number} as next block to process for ethereum");
+                    info!("Writing {last_processed_block_number} as the next block to process for ethereum");
 
                     write_block_number(
                         name.clone(),
@@ -115,7 +115,7 @@ impl RedisManager {
 
                 Ok (last_processed_block_number) = last_processed_block_number_azero.recv () => {
 
-                    info!("Writing {last_processed_block_number} as next block to process for AlephZero");
+                    info!("Writing {last_processed_block_number} as the next block to process for AlephZero");
 
                     write_block_number(
                         name.clone(),

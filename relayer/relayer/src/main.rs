@@ -1,4 +1,4 @@
-use std::{cmp::min, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use aleph_client::AccountId;
 use clap::Parser;
@@ -178,7 +178,7 @@ async fn main() -> Result<(), RelayerError> {
         eth_signed_connection.clone(),
     );
 
-    // TODO: reduce backoff
+    // TODO: restart with backoff
     // wait for all tasks to finish and reboot
     let delay = Duration::from_secs(2);
     while let Some(result) = tasks.join_next().await {

@@ -109,8 +109,8 @@ impl AlephZeroListener {
                     );
 
                     info!(target: "AlephZeroListener",
-                        "Processing events from blocks {} - {}",
-                        unprocessed_block_number, to_block
+                          "Processing events from blocks {} - {}",
+                          unprocessed_block_number, to_block
                     );
 
                     // Fetch the events in parallel.
@@ -128,26 +128,30 @@ impl AlephZeroListener {
                         })
                         .collect::<Vec<ContractEvent>>();
 
-                    let (events_ack_sender, events_ack_receiver) = oneshot::channel::<()>();
+                    if !filtered_events.is_empty () {
+                        let (events_ack_sender, events_ack_receiver) = oneshot::channel::<()>();
 
-                    select! {
-                        cb_event = circuit_breaker_receiver.recv () => {
-                            warn!(target: "AlephZeroListener", "Exiting before sending events due to a circuit breaker event {cb_event:?}");
-                            return Ok(cb_event?);
-                        },
-
-                        Ok (_) = azero_events_sender
-                            .send(AzeroMostEvents {
-                                events: filtered_events.clone (),
-                                events_ack_sender,
-                            }) => {
-                                info!(target: "AlephZeroListener", "Sending a batch of {} events", &filtered_events.len());
+                        select! {
+                            cb_event = circuit_breaker_receiver.recv () => {
+                                warn!(target: "AlephZeroListener", "Exiting before sending events due to a circuit breaker event {cb_event:?}");
+                                return Ok(cb_event?);
                             },
+
+                            Ok (_) = azero_events_sender
+                                .send(AzeroMostEvents {
+                                    events: filtered_events.clone (),
+                                    events_ack_sender,
+                                }) => {
+                                    info!(target: "AlephZeroListener", "Sending a batch of {} events", &filtered_events.len());
+                                },
+                        }
+
+                        info!(target: "AlephZeroListener", "Awaiting events ack");
+                        events_ack_receiver.await.map_err(|_| AlephZeroListenerError::AckSenderDropped)?;
+                        info!(target: "AlephZeroListener", "Events ack received");
                     }
 
-                    info!(target: "AlephZeroListener", "Awaiting events ack");
-                    events_ack_receiver.await.map_err(|_| AlephZeroListenerError::AckSenderDropped)?;
-                    info!(target: "AlephZeroListener", "Events ack received, marking {to_block} as the most recently seen block number");
+                    info!(target: "AlephZeroListener", "Marking {to_block} as the most recently seen block number");
                     last_processed_block_number.send(to_block + 1)?;
                 }
             }
