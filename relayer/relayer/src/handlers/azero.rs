@@ -199,29 +199,33 @@ impl AlephZeroEventsHandler {
                 } = azero_events;
 
                 info!("[AlephZero] Received a batch of {} events", events.len());
-                let mut tasks = vec![];
+
+                let mut tasks = JoinSet::new();
 
                 for event in events {
                     let config = Arc::clone(&config);
                     let eth_connection = Arc::clone(&eth_signed_connection);
 
                     select! {
-                        cb_event = circuit_breaker_receiver.recv () => {
+                        cb_event = circuit_breaker_receiver.recv() => {
                             warn!("Exiting due to a circuit breaker event {cb_event:?}");
                             return Ok(cb_event?);
-                        },
+                        }
 
-                        task = tokio::spawn (async move {
-                            AlephZeroEventHandler::handle_event(event, Arc::clone (&config), Arc::clone (&eth_connection)).await
-                        }) => {
-                            tasks.push(task);
+                        else => {
+                            // spawn concurrent tasks for each one of the long running handlers
+                            tasks.spawn(AlephZeroEventHandler::handle_event(
+                                event,
+                                Arc::clone(&config),
+                                Arc::clone(&eth_connection),
+                            ));
                         }
                     }
                 }
 
                 // wait for all concurrent handler tasks to finish
                 info!("[AlephZero] Awaiting all handler tasks to finish");
-                for result in tasks {
+                while let Some(result) = tasks.join_next().await {
                     match result? {
                         Ok(_) => debug!("Event succesfully handled"),
                         Err(why) => {
