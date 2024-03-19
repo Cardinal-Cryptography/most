@@ -306,26 +306,26 @@ fn run_relayer(
         .map_err(RelayerError::from),
     );
 
-    // tasks.spawn(
-    //     AlephZeroListener::run(
-    //         Arc::clone(&config),
-    //         Arc::clone(&azero_connection),
-    //         azero_events_sender,
-    //         azero_block_number_sender.clone(),
-    //         azero_block_number_sender.subscribe(),
-    //         circuit_breaker_sender.subscribe(),
-    //     )
-    //     .map_err(RelayerError::from),
-    // );
+    tasks.spawn(
+        AlephZeroListener::run(
+            Arc::clone(&config),
+            Arc::clone(&azero_connection),
+            azero_events_sender,
+            azero_block_number_sender.clone(),
+            azero_block_number_sender.subscribe(),
+            circuit_breaker_sender.subscribe(),
+        )
+        .map_err(RelayerError::from),
+    );
 
-    // tasks.spawn(
-    //     AlephZeroEventsHandler::run(
-    //         Arc::clone(&config),
-    //         Arc::clone(&eth_signed_connection),
-    //         azero_events_receiver,
-    //         circuit_breaker_sender.clone(),
-    //         circuit_breaker_sender.subscribe(),
-    //     )
-    //     .map_err(RelayerError::from),
-    // );
+    tasks.spawn(
+        AlephZeroEventsHandler::run(
+            Arc::clone(&config),
+            Arc::clone(&eth_signed_connection),
+            azero_events_receiver,
+            circuit_breaker_sender.clone(),
+            circuit_breaker_sender.subscribe(),
+        )
+        .map_err(RelayerError::from),
+    );
 }

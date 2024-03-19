@@ -65,7 +65,7 @@ impl EthereumListener {
         let most_eth = Most::new(address, Arc::clone(&eth_connection));
 
         loop {
-            info!("Ping");
+            debug!("Ping");
 
             select! {
                 cb_event = circuit_breaker_receiver.recv() => {
@@ -76,8 +76,6 @@ impl EthereumListener {
                 Ok (unprocessed_block_number) = next_unprocessed_block_number.recv() => {
                     // Query for the next unknown finalized block number, if not present we wait for it.
                     info!("Waiting for the next finalized block number");
-
-                    // TODO: select
 
                     select! {
                         cb_event = circuit_breaker_receiver.recv () => {
@@ -101,43 +99,36 @@ impl EthereumListener {
                                 unprocessed_block_number, to_block
                             );
 
-                            // Query for events
-                            let events = most_eth
+                            // listen to events
+                            let query = most_eth
                                 .events()
                                 .from_block(unprocessed_block_number)
-                                .to_block(to_block)
-                                .query()
-                                .await?;
+                                .to_block(to_block);
 
-                            let (events_ack_sender, events_ack_receiver) = oneshot::channel();
-
-                            info!("Awaiting ack");
                             select! {
                                 cb_event = circuit_breaker_receiver.recv () => {
                                     warn!("Exiting before sending events due to a circuit breaker event {cb_event:?}");
                                     return Ok(cb_event?);
                                 },
 
-                                Ok (_) = eth_events_sender
-                                    .send(EthMostEvents {
-                                        events: events.clone (),
-                                        events_ack_sender,
-                                    }) => {
-                                        info!("Sending a batch of {} events", &events.len());
-                                    },
+                                Ok (events) = query.query() => {
+                                    let (events_ack_sender, events_ack_receiver) = oneshot::channel::<()>();
 
+                                    info!("Sending a batch of {} events", &events.len());
+
+                                    eth_events_sender
+                                        .send(EthMostEvents {
+                                            events: events.clone (),
+                                            events_ack_sender,
+                                        }).await?;
+
+                                    info!("Awaiting events ack");
+                                    events_ack_receiver.await.map_err (|_| EthereumListenerError::AckSenderDropped)?;
+                                    // publish this block number as the last fully processed
+                                    info!("Events ack received, marking {to_block} as the most recently seen block number");
+                                    last_processed_block_number.send(to_block + 1)?;
+                                }
                             }
-
-                            info!("Awaiting events ack");
-
-                            events_ack_receiver.await.map_err (|_| EthereumListenerError::AckSenderDropped)?;
-
-                            info!("Events ack received");
-                            // publish this block number as the last fully processed
-                            info!("Marking {to_block} as the most recently seen block number");
-                            last_processed_block_number.send(to_block + 1)?;
-
-
                         }
                     }
                 },
