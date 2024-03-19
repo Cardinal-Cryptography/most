@@ -116,36 +116,49 @@ impl EthereumEventsHandler {
         mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
     ) -> Result<CircuitBreakerEvent, EthereumEventsHandlerError> {
         loop {
-            if let Some(eth_events) = eth_events_receiver.recv().await {
-                let EthMostEvents {
-                    events,
-                    events_ack_sender,
-                } = eth_events;
-                info!("[Ethereum] Received a batch of {} events", events.len());
+            info!("Ping");
 
-                for event in events {
-                    select! {
-                        cb_event = circuit_breaker_receiver.recv () => {
-                            return Ok(cb_event?);
-                        },
+            select! {
+                cb_event = circuit_breaker_receiver.recv() => {
+                    warn!("Exiting due to a circuit breaker event {cb_event:?}");
+                    return Ok(cb_event?);
+                },
 
-                        result = EthereumEventHandler::handle_event(event, &config, &azero_signed_connection) => {
-                            if let Err(why) = result {
-                                warn!("[Ethereum] event handler failure {why:?}");
-                                let status = CircuitBreakerEvent::EthEventHandlerFailure;
-                                circuit_breaker_sender.send(status.clone ())?;
-                                warn!("Exiting");
-                                return Ok (status);
-                            }
+                Some(eth_events) = eth_events_receiver.recv() => {
+                    let EthMostEvents {
+                        events,
+                        events_ack_sender,
+                    } = eth_events;
+                    info!("Received a batch of {} events", events.len());
+
+                    for event in events {
+                        select! {
+                            cb_event = circuit_breaker_receiver.recv () => {
+                                warn!("Exiting due to a circuit breaker event {cb_event:?}");
+                                return Ok(cb_event?);
+                            },
+
+                            result = EthereumEventHandler::handle_event(event, &config, &azero_signed_connection) => {
+                                if let Err(why) = result {
+                                    warn!("event handler failure {why:?}");
+                                    let status = CircuitBreakerEvent::EthEventHandlerFailure;
+                                    circuit_breaker_sender.send(status.clone ())?;
+                                    warn!("Exiting");
+                                    return Ok (status);
+                                }
+                            },
+
                         }
                     }
+
+                    info!("Acknowledging events batch");
+                    // marks the batch as done and releases the listener
+                    events_ack_sender
+                        .send(())
+                        .map_err(|_| EthereumEventsHandlerError::EventsAckReceiverDropped)?;
+
                 }
 
-                info!("[Ethereum] Acknowledging events batch");
-                // marks the batch as done and releases the listener
-                events_ack_sender
-                    .send(())
-                    .map_err(|_| EthereumEventsHandlerError::EventsAckReceiverDropped)?;
             }
         }
     }

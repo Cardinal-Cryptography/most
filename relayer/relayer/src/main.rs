@@ -11,8 +11,8 @@ use ethers::signers::{coins_bip39::English, MnemonicBuilder, Signer, WalletError
 use futures::TryFutureExt;
 use handlers::{AlephZeroEventsHandlerError, EthereumEventsHandlerError};
 use listeners::{
-    AdvisoryListenerError, AlephZeroHaltedListenerError, AzeroListenerError, EthereumListenerError,
-    EthereumPausedListenerError,
+    AdvisoryListenerError, AlephZeroHaltedListenerError, AlephZeroListenerError,
+    EthereumListenerError, EthereumPausedListenerError,
 };
 use log::{debug, error, info, warn};
 use redis::RedisManagerError;
@@ -49,10 +49,6 @@ const DEV_MNEMONIC: &str =
 #[error(transparent)]
 #[non_exhaustive]
 enum RelayerError {
-    // #[error("An error which can be handled by restarting")]
-    // Recoverable(CircuitBreakerEvent),
-    // #[error("Ack receiver has dropper before the message could be delivered")]
-    // AckReceiverDropped,
     #[error("AlephZero node connection error")]
     AzeroConnection(#[from] connections::azero::Error),
 
@@ -75,7 +71,7 @@ enum RelayerError {
     AdvisoryListener(#[from] AdvisoryListenerError),
 
     #[error("AlephZero Most listener failure")]
-    AlephZeroListener(#[from] AzeroListenerError),
+    AlephZeroListener(#[from] AlephZeroListenerError),
 
     #[error("AlephZero events handler failure")]
     AlephZeroEventsHandler(#[from] AlephZeroEventsHandlerError),
@@ -91,8 +87,7 @@ enum RelayerError {
 
     #[error("AlephZero Most halted listener failure")]
     AlephZeroHaltedListener(#[from] AlephZeroHaltedListenerError),
-
-    #[error("Ethereum's Most paused listener failure")]
+    // #[error("Ethereum's Most paused listener failure")]
     EthereumPausedListener(#[from] EthereumPausedListenerError),
 }
 
@@ -206,7 +201,8 @@ async fn main() -> Result<(), RelayerError> {
     while let Some(result) = tasks.join_next().await {
         match result? {
             Ok(result) => {
-                warn!("One of the core components gracefully exited due to : {result:?}")
+                debug!("One of the core components exited gracefully due to : {result:?}");
+                info!("remaining: {}", &tasks.len());
             }
             Err(why) => {
                 error!("One of the core components exited with an error {why:?}. This is fatal");
@@ -255,25 +251,25 @@ fn run_relayer(
         .map_err(RelayerError::from),
     );
 
-    tasks.spawn(
-        AlephZeroHaltedListener::run(
-            Arc::clone(&config),
-            Arc::clone(&azero_connection),
-            circuit_breaker_sender.clone(),
-            circuit_breaker_sender.subscribe(),
-        )
-        .map_err(RelayerError::from),
-    );
+    // tasks.spawn(
+    //     AlephZeroHaltedListener::run(
+    //         Arc::clone(&config),
+    //         Arc::clone(&azero_connection),
+    //         circuit_breaker_sender.clone(),
+    //         circuit_breaker_sender.subscribe(),
+    //     )
+    //     .map_err(RelayerError::from),
+    // );
 
-    tasks.spawn(
-        EthereumPausedListener::run(
-            Arc::clone(&config),
-            Arc::clone(&eth_connection),
-            circuit_breaker_sender.clone(),
-            circuit_breaker_sender.subscribe(),
-        )
-        .map_err(RelayerError::from),
-    );
+    // tasks.spawn(
+    //     EthereumPausedListener::run(
+    //         Arc::clone(&config),
+    //         Arc::clone(&eth_connection),
+    //         circuit_breaker_sender.clone(),
+    //         circuit_breaker_sender.subscribe(),
+    //     )
+    //     .map_err(RelayerError::from),
+    // );
 
     tasks.spawn(
         RedisManager::run(
@@ -310,26 +306,26 @@ fn run_relayer(
         .map_err(RelayerError::from),
     );
 
-    tasks.spawn(
-        AlephZeroListener::run(
-            Arc::clone(&config),
-            Arc::clone(&azero_connection),
-            azero_events_sender,
-            azero_block_number_sender.clone(),
-            azero_block_number_sender.subscribe(),
-            circuit_breaker_sender.subscribe(),
-        )
-        .map_err(RelayerError::from),
-    );
+    // tasks.spawn(
+    //     AlephZeroListener::run(
+    //         Arc::clone(&config),
+    //         Arc::clone(&azero_connection),
+    //         azero_events_sender,
+    //         azero_block_number_sender.clone(),
+    //         azero_block_number_sender.subscribe(),
+    //         circuit_breaker_sender.subscribe(),
+    //     )
+    //     .map_err(RelayerError::from),
+    // );
 
-    tasks.spawn(
-        AlephZeroEventsHandler::run(
-            Arc::clone(&config),
-            Arc::clone(&eth_signed_connection),
-            azero_events_receiver,
-            circuit_breaker_sender.clone(),
-            circuit_breaker_sender.subscribe(),
-        )
-        .map_err(RelayerError::from),
-    );
+    // tasks.spawn(
+    //     AlephZeroEventsHandler::run(
+    //         Arc::clone(&config),
+    //         Arc::clone(&eth_signed_connection),
+    //         azero_events_receiver,
+    //         circuit_breaker_sender.clone(),
+    //         circuit_breaker_sender.subscribe(),
+    //     )
+    //     .map_err(RelayerError::from),
+    // );
 }

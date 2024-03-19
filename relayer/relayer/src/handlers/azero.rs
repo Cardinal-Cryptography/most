@@ -14,7 +14,7 @@ use subxt::utils::H256;
 use thiserror::Error;
 use tokio::{
     select,
-    sync::{broadcast, mpsc, oneshot},
+    sync::{broadcast, mpsc},
     task::{JoinError, JoinSet},
     time::{sleep, Duration},
 };
@@ -193,7 +193,7 @@ impl AlephZeroEventsHandler {
                         events_ack_sender,
                     } = azero_events;
 
-                    info!("[AlephZero] Received a batch of {} events", events.len());
+                    info!("Received a batch of {} events", events.len());
 
                     let mut tasks = JoinSet::new();
 
@@ -201,6 +201,7 @@ impl AlephZeroEventsHandler {
                         let config = Arc::clone(&config);
                         let eth_connection = Arc::clone(&eth_signed_connection);
 
+                        // TODO: remove else
                         select! {
                             cb_event = circuit_breaker_receiver.recv() => {
                                 warn!("Exiting due to a circuit breaker event {cb_event:?}");
@@ -219,12 +220,12 @@ impl AlephZeroEventsHandler {
                     }
 
                     // wait for all concurrent handler tasks to finish
-                    info!("[AlephZero] Awaiting all handler tasks to finish");
+                    info!("Awaiting all handler tasks to finish");
                     while let Some(result) = tasks.join_next().await {
                         match result? {
                             Ok(_) => debug!("Event succesfully handled"),
                             Err(why) => {
-                                warn!("[AlephZero] event handler failed {why:?}");
+                                warn!("Event handler failed {why:?}");
                                 let status = CircuitBreakerEvent::AlephZeroEventHandlerFailure;
                                 circuit_breaker_sender.send(status.clone())?;
                                 warn!("Exiting");
@@ -233,12 +234,12 @@ impl AlephZeroEventsHandler {
                         }
                     }
 
-                    info!("[AlephZero] Acknowledging events batch");
+                    info!("Acknowledging events batch");
                     // marks the batch as done and releases the listener
                     events_ack_sender
                         .send(())
                         .map_err(|_| AlephZeroEventsHandlerError::EventsAckReceiverDropped)?;
-                    info!("[AlephZero] All events acknowledged");
+                    info!("All events acknowledged");
                 }
             }
         }

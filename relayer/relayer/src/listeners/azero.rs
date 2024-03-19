@@ -28,7 +28,7 @@ pub const ALEPH_BLOCK_PROD_TIME_SEC: u64 = 1;
 #[derive(Debug, Error)]
 #[error(transparent)]
 #[non_exhaustive]
-pub enum AzeroListenerError {
+pub enum AlephZeroListenerError {
     #[error("Aleph-client error")]
     AlephClient(#[from] anyhow::Error),
 
@@ -52,6 +52,9 @@ pub enum AzeroListenerError {
 
     #[error("broadcast receive error")]
     Receive(#[from] broadcast::error::RecvError),
+
+    #[error("sender dropped before ack was received")]
+    AckSenderDropped,
 }
 
 #[derive(Copy, Clone)]
@@ -65,7 +68,7 @@ impl AlephZeroListener {
         last_processed_block_number: broadcast::Sender<u32>,
         mut next_unprocessed_block_number: broadcast::Receiver<u32>,
         mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
-    ) -> Result<CircuitBreakerEvent, AzeroListenerError> {
+    ) -> Result<CircuitBreakerEvent, AlephZeroListenerError> {
         let Config {
             azero_contract_metadata,
             azero_contract_address,
@@ -83,62 +86,78 @@ impl AlephZeroListener {
         )?;
 
         loop {
-            let unprocessed_block_number = next_unprocessed_block_number.recv().await?;
-
-            // Query for the next unknown finalized block number, if not present we wait for it
-            let next_finalized_block_number = get_next_finalized_block_number_azero(
-                azero_connection.clone(),
-                unprocessed_block_number,
-            )
-            .await;
-
-            let to_block = min(
-                next_finalized_block_number,
-                unprocessed_block_number + (*sync_step) - 1,
-            );
-
-            info!(
-                "Processing events from blocks {} - {}",
-                unprocessed_block_number, to_block
-            );
-
-            // Fetch the events in parallel.
-            let all_events = fetch_events_in_block_range(
-                azero_connection.clone(),
-                unprocessed_block_number,
-                to_block,
-            )
-            .await?;
-
-            let filtered_events = all_events
-                .into_iter()
-                .flat_map(|(block_details, events)| {
-                    most_azero.filter_events(events, block_details.clone())
-                })
-                .collect::<Vec<ContractEvent>>();
-
-            let (events_ack_sender, events_ack_receiver) = oneshot::channel::<()>();
-
-            info!("Sending a batch of {} events", filtered_events.len());
-
-            azero_events_sender
-                .send(AzeroMostEvents {
-                    events: filtered_events,
-                    events_ack_sender,
-                })
-                .await?;
-
-            info!("Awaiting ack");
             select! {
-                cb_event = circuit_breaker_receiver.recv () => {
-                    warn!("Exiting due to a circuit breaker event {cb_event:?}");
+                cb_event = circuit_breaker_receiver.recv() => {
+                    warn!("Exiting before handling next block due to a circuit breaker event {cb_event:?}");
                     return Ok(cb_event?);
                 },
 
-                _ = events_ack_receiver => {
-                    info!("Events ack received");
-                    info!("Marking {to_block} as the most recently seen block number");
-                    last_processed_block_number.send(to_block + 1)?;
+                Ok (unprocessed_block_number) = next_unprocessed_block_number.recv() => {
+
+                    // Query for the next unknown finalized block number, if not present we wait for it
+                    let next_finalized_block_number = get_next_finalized_block_number_azero(
+                        azero_connection.clone(),
+                        unprocessed_block_number,
+                    )
+                        .await;
+
+                    let to_block = min(
+                        next_finalized_block_number,
+                        unprocessed_block_number + (*sync_step) - 1,
+                    );
+
+                    info!(
+                        "Processing events from blocks {} - {}",
+                        unprocessed_block_number, to_block
+                    );
+
+                    // Fetch the events in parallel.
+                    let all_events = fetch_events_in_block_range(
+                        azero_connection.clone(),
+                        unprocessed_block_number,
+                        to_block,
+                    )
+                        .await?;
+
+                    let filtered_events = all_events
+                        .into_iter()
+                        .flat_map(|(block_details, events)| {
+                            most_azero.filter_events(events, block_details.clone())
+                        })
+                        .collect::<Vec<ContractEvent>>();
+
+                    let (events_ack_sender, events_ack_receiver) = oneshot::channel::<()>();
+
+                    select! {
+                        cb_event = circuit_breaker_receiver.recv () => {
+                            warn!("Exiting before sending events due to a circuit breaker event {cb_event:?}");
+                            return Ok(cb_event?);
+                        },
+
+                        Ok (_) = azero_events_sender
+                            .send(AzeroMostEvents {
+                                events: filtered_events.clone (),
+                                events_ack_sender,
+                            }) => {
+                                info!("Sending a batch of {} events", &filtered_events.len());
+                            },
+
+                        else => {
+                            info!("Idling");
+                        }
+
+                    }
+
+                    // TODO: select!
+                    match events_ack_receiver.await {
+                        Ok(_) => {
+                            info!("Events ack received");
+                            // publish this block number as the last fully processed
+                            info!("Marking {to_block} as the most recently seen block number");
+                            last_processed_block_number.send(to_block + 1)?;
+                        },
+                        Err(_) => return Err(AlephZeroListenerError::AckSenderDropped)
+                    }
 
                 }
             }
@@ -150,7 +169,7 @@ async fn fetch_events_in_block_range(
     azero_connection: Arc<AzeroWsConnection>,
     from_block: u32,
     to_block: u32,
-) -> Result<Vec<(BlockDetails, Events<AlephConfig>)>, AzeroListenerError> {
+) -> Result<Vec<(BlockDetails, Events<AlephConfig>)>, AlephZeroListenerError> {
     let mut event_fetching_tasks = JoinSet::new();
 
     for block_number in from_block..=to_block {
@@ -160,7 +179,7 @@ async fn fetch_events_in_block_range(
             let block_hash = azero_connection
                 .get_block_hash(block_number)
                 .await?
-                .ok_or(AzeroListenerError::BlockNotFound)?;
+                .ok_or(AlephZeroListenerError::BlockNotFound)?;
 
             let events = azero_connection
                 .as_connection()
@@ -171,7 +190,7 @@ async fn fetch_events_in_block_range(
                 .events()
                 .await?;
 
-            Ok::<_, AzeroListenerError>((
+            Ok::<_, AlephZeroListenerError>((
                 BlockDetails {
                     block_number,
                     block_hash,

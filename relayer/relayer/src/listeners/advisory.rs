@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use futures::future::join_all;
-use log::{info, warn};
+use log::{debug, info, warn};
 use thiserror::Error;
 use tokio::{select, sync::broadcast, time::sleep};
 
@@ -68,7 +68,9 @@ impl AdvisoryListener {
                         .iter()
                         .map(|advisory| advisory.is_emergency(&azero_connection))
                         .collect::<Vec<_>>()) => {
-                    info!("Querying");
+
+                    debug!("Querying");
+
                     for maybe_emergency in results {
                         match maybe_emergency {
                             Ok((is_emergency, address)) => {
