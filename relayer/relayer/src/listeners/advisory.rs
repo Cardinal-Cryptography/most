@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use futures::future::join_all;
 use log::debug;
 use thiserror::Error;
-use tokio::{sync::mpsc, time::sleep};
+use tokio::{sync::broadcast, time::sleep};
 
 use super::ALEPH_BLOCK_PROD_TIME_SEC;
 use crate::{
@@ -20,8 +20,8 @@ pub enum AdvisoryListenerError {
     #[error("azero contract error")]
     AzeroContract(#[from] AzeroContractError),
 
-    #[error("channel send error")]
-    Send(#[from] mpsc::error::SendError<CircuitBreakerEvent>),
+    #[error("broadcast send error")]
+    BroadcastSend(#[from] broadcast::error::SendError<CircuitBreakerEvent>),
 }
 
 pub struct AdvisoryListener;
@@ -30,7 +30,7 @@ impl AdvisoryListener {
     pub async fn run(
         config: Arc<Config>,
         azero_connection: Arc<AzeroWsConnection>,
-        circuit_breaker_sender: mpsc::Sender<CircuitBreakerEvent>,
+        circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
     ) -> Result<(), AdvisoryListenerError> {
         let Config {
             advisory_contract_metadata,
@@ -62,8 +62,7 @@ impl AdvisoryListener {
                         if is_emergency {
                             debug!("Emergency state in one of the advisory contracts {address}");
                             circuit_breaker_sender
-                                .send(CircuitBreakerEvent::AdvisoryEmergency(address))
-                                .await?;
+                                .send(CircuitBreakerEvent::AdvisoryEmergency(address))?;
                             break;
                         }
                     }

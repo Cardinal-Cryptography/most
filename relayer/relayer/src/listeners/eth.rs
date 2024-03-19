@@ -9,11 +9,8 @@ use ethers::{
 use log::{debug, error, info, warn};
 use thiserror::Error;
 use tokio::{
-    sync::{
-        broadcast,
-        mpsc::{self},
-        oneshot,
-    },
+    select,
+    sync::{broadcast, mpsc, oneshot},
     time::{sleep, Duration},
 };
 
@@ -39,11 +36,11 @@ pub enum EthereumListenerError {
     #[error("channel send error")]
     Send(#[from] mpsc::error::SendError<EthMostEvents>),
 
-    #[error("channel broadcast error")]
-    Broadcast(#[from] broadcast::error::SendError<u32>),
+    #[error("broadcast send error")]
+    BroadcastSend(#[from] broadcast::error::SendError<u32>),
 
-    #[error("channel receive error")]
-    Receive(#[from] broadcast::error::RecvError),
+    #[error("broadcast receive error")]
+    BroadcastReceive(#[from] broadcast::error::RecvError),
 }
 
 impl EthereumListener {
@@ -53,7 +50,8 @@ impl EthereumListener {
         eth_events_sender: mpsc::Sender<EthMostEvents>,
         last_processed_block_number: broadcast::Sender<u32>,
         mut next_unprocessed_block_number: broadcast::Receiver<u32>,
-    ) -> Result<(), EthereumListenerError> {
+        mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
+    ) -> Result<CircuitBreakerEvent, EthereumListenerError> {
         let Config {
             eth_contract_address,
             sync_step,
@@ -103,14 +101,20 @@ impl EthereumListener {
                 })
                 .await?;
 
-            // wait for ack before moving on to the next batch
             info!("Awaiting ack");
-            _ = events_ack_receiver.await;
-            info!("Events ack received");
+            select! {
+                cb_event = circuit_breaker_receiver.recv () => {
+                    warn!("Exiting due to a circuit breaker event {cb_event:?}");
+                    return Ok(cb_event?);
+                },
 
-            // publish this block number as the last fully processed
-            info!("Marking {to_block} as the most recently seen block number");
-            last_processed_block_number.send(to_block + 1)?;
+                _ = events_ack_receiver => {
+                    info!("Events ack received");
+                    // publish this block number as the last fully processed
+                    info!("Marking {to_block} as the most recently seen block number");
+                    last_processed_block_number.send(to_block + 1)?;
+                }
+            }
         }
     }
 }
@@ -152,8 +156,8 @@ pub enum EthereumPausedListenerError {
     #[error("error when parsing ethereum address")]
     FromHex(#[from] rustc_hex::FromHexError),
 
-    #[error("channel send error")]
-    Send(#[from] mpsc::error::SendError<CircuitBreakerEvent>),
+    #[error("broadcast send error")]
+    BroadcastSend(#[from] broadcast::error::SendError<CircuitBreakerEvent>),
 
     #[error("contract error")]
     Contract(#[from] ContractError<Provider<Http>>),
@@ -165,7 +169,7 @@ impl EthereumPausedListener {
     pub async fn run(
         config: Arc<Config>,
         eth_connection: Arc<EthConnection>,
-        circuit_breaker_sender: mpsc::Sender<CircuitBreakerEvent>,
+        circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
     ) -> Result<(), EthereumPausedListenerError> {
         let Config {
             eth_contract_address,
@@ -177,9 +181,7 @@ impl EthereumPausedListener {
 
         loop {
             if most_eth.paused().await? {
-                circuit_breaker_sender
-                    .send(CircuitBreakerEvent::BridgeHaltEthereum)
-                    .await?;
+                circuit_breaker_sender.send(CircuitBreakerEvent::BridgeHaltEthereum)?;
             }
         }
     }

@@ -9,6 +9,7 @@ use log::{error, info, warn};
 use subxt::events::Events;
 use thiserror::Error;
 use tokio::{
+    select,
     sync::{broadcast, mpsc, oneshot},
     task::{JoinError, JoinSet},
     time::sleep,
@@ -63,7 +64,8 @@ impl AlephZeroListener {
         azero_events_sender: mpsc::Sender<AzeroMostEvents>,
         last_processed_block_number: broadcast::Sender<u32>,
         mut next_unprocessed_block_number: broadcast::Receiver<u32>,
-    ) -> Result<(), AzeroListenerError> {
+        mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
+    ) -> Result<CircuitBreakerEvent, AzeroListenerError> {
         let Config {
             azero_contract_metadata,
             azero_contract_address,
@@ -127,12 +129,19 @@ impl AlephZeroListener {
                 .await?;
 
             info!("Awaiting ack");
-            _ = events_ack_receiver.await;
-            info!("Events ack received");
+            select! {
+                cb_event = circuit_breaker_receiver.recv () => {
+                    warn!("Exiting due to a circuit breaker event {cb_event:?}");
+                    return Ok(cb_event?);
+                },
 
-            // publish this block number as the last fully processed
-            info!("Marking {to_block} as the most recently seen block number");
-            last_processed_block_number.send(to_block + 1)?;
+                _ = events_ack_receiver => {
+                    info!("Events ack received");
+                    info!("Marking {to_block} as the most recently seen block number");
+                    last_processed_block_number.send(to_block + 1)?;
+
+                }
+            }
         }
     }
 }
@@ -217,8 +226,8 @@ pub enum AlephZeroHaltedListenerError {
     #[error("Azero contract error")]
     AzeroContract(#[from] AzeroContractError),
 
-    #[error("channel send error")]
-    Send(#[from] mpsc::error::SendError<CircuitBreakerEvent>),
+    #[error("broadcast send error")]
+    BroadcastSend(#[from] broadcast::error::SendError<CircuitBreakerEvent>),
 }
 
 #[derive(Copy, Clone)]
@@ -228,7 +237,7 @@ impl AlephZeroHaltedListener {
     pub async fn run(
         config: Arc<Config>,
         azero_connection: Arc<AzeroWsConnection>,
-        circuit_breaker_sender: mpsc::Sender<CircuitBreakerEvent>,
+        circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
     ) -> Result<(), AlephZeroHaltedListenerError> {
         let Config {
             azero_contract_metadata,
@@ -247,9 +256,7 @@ impl AlephZeroHaltedListener {
 
         loop {
             if most_azero.is_halted(&azero_connection).await? {
-                circuit_breaker_sender
-                    .send(CircuitBreakerEvent::BridgeHaltAlephZero)
-                    .await?;
+                circuit_breaker_sender.send(CircuitBreakerEvent::BridgeHaltAlephZero)?;
             }
             // sleep for a block production time before making another round of queries
             sleep(Duration::from_secs(ALEPH_BLOCK_PROD_TIME_SEC)).await;

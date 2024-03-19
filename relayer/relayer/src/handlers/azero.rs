@@ -13,8 +13,9 @@ use log::{debug, error, info, warn};
 use subxt::utils::H256;
 use thiserror::Error;
 use tokio::{
-    sync::{mpsc, oneshot},
-    task::JoinSet,
+    select,
+    sync::{broadcast, mpsc, oneshot},
+    task::{JoinError, JoinSet},
     time::{sleep, Duration},
 };
 
@@ -26,6 +27,7 @@ use crate::{
         get_next_finalized_block_number_eth, AzeroMostEvent, AzeroMostEvents,
         ETH_BLOCK_PROD_TIME_SEC,
     },
+    CircuitBreakerEvent,
 };
 
 #[derive(Debug, Error)]
@@ -55,9 +57,9 @@ pub struct AlephZeroEventHandler;
 
 impl AlephZeroEventHandler {
     pub async fn handle_event(
+        event: ContractEvent,
         config: Arc<Config>,
         eth_connection: Arc<SignedEthConnection>,
-        event: ContractEvent,
     ) -> Result<(), AlephZeroEventHandlerError> {
         let Config {
             eth_contract_address,
@@ -157,8 +159,8 @@ impl AlephZeroEventHandler {
 #[error(transparent)]
 #[non_exhaustive]
 pub enum AlephZeroEventsHandlerError {
-    #[error("event channel send error")]
-    EventSend(#[from] mpsc::error::SendError<AzeroMostEvent>),
+    // #[error("event channel send error")]
+    // EventSend(#[from] mpsc::error::SendError<AzeroMostEvent>),
 
     // #[error("events channel send error")]
     // EventsSend(#[from] mpsc::error::SendError<EthMostEvents>),
@@ -167,42 +169,69 @@ pub enum AlephZeroEventsHandlerError {
     // AckReceive(#[from] oneshot::error::RecvError),
     #[error("events ack receiver dropped")]
     EventsAckReceiverDropped,
+
+    #[error("broadcast receive error")]
+    BroadcastReceive(#[from] broadcast::error::RecvError),
+
+    #[error("broadcast send error")]
+    BroadcastSend(#[from] broadcast::error::SendError<CircuitBreakerEvent>),
+
+    #[error("Task join error")]
+    Join(#[from] JoinError),
 }
 
 pub struct AlephZeroEventsHandler;
 
+// TODO: handle single events here (ditch the event channel)
 impl AlephZeroEventsHandler {
     pub async fn run(
+        config: Arc<Config>,
+        eth_signed_connection: Arc<SignedEthConnection>,
         mut azero_events_receiver: mpsc::Receiver<AzeroMostEvents>,
-        azero_event_sender: mpsc::Sender<AzeroMostEvent>,
-    ) -> Result<(), AlephZeroEventsHandlerError> {
+        circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
+        mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
+    ) -> Result<CircuitBreakerEvent, AlephZeroEventsHandlerError> {
         loop {
             if let Some(azero_events) = azero_events_receiver.recv().await {
-                //
                 let AzeroMostEvents {
                     events,
                     events_ack_sender,
                 } = azero_events;
-                info!("[AlephZero] Received a batch of {} events", events.len());
 
-                let mut acks = JoinSet::new();
+                info!("[AlephZero] Received a batch of {} events", events.len());
+                let mut tasks = vec![];
 
                 for event in events {
-                    let (event_ack_sender, event_ack_receiver) = oneshot::channel::<()>();
-                    info!("[AlephZero] Sending event {event:?}");
-                    azero_event_sender
-                        .send(AzeroMostEvent {
-                            event,
-                            event_ack_sender,
-                        })
-                        .await?;
-                    acks.spawn(event_ack_receiver);
+                    let config = Arc::clone(&config);
+                    let eth_connection = Arc::clone(&eth_signed_connection);
+
+                    select! {
+                        cb_event = circuit_breaker_receiver.recv () => {
+                            warn!("Exiting due to a circuit breaker event {cb_event:?}");
+                            return Ok(cb_event?);
+                        },
+
+                        task = tokio::spawn (async move {
+                            AlephZeroEventHandler::handle_event(event, Arc::clone (&config), Arc::clone (&eth_connection)).await
+                        }) => {
+                            tasks.push(task);
+                        }
+                    }
                 }
 
-                // wait for all concurrent tasks to finish
-                info!("[AlephZero] Awaiting all events to be acknowledged");
-                while (acks.join_next().await).is_some() {
-                    debug!("[AlephZero] Ack received");
+                // wait for all concurrent handler tasks to finish
+                info!("[AlephZero] Awaiting all handler tasks to finish");
+                for result in tasks {
+                    match result? {
+                        Ok(_) => debug!("Event succesfully handled"),
+                        Err(why) => {
+                            warn!("[AlephZero] event handler failed {why:?}");
+                            let status = CircuitBreakerEvent::EthEventHandlerFailure;
+                            circuit_breaker_sender.send(status.clone())?;
+                            warn!("Exiting");
+                            return Ok(status);
+                        }
+                    }
                 }
 
                 info!("[AlephZero] Acknowledging events batch");
@@ -211,7 +240,6 @@ impl AlephZeroEventsHandler {
                     .send(())
                     .map_err(|_| AlephZeroEventsHandlerError::EventsAckReceiverDropped)?;
                 info!("[AlephZero] All events acknowledged");
-                //
             }
         }
     }

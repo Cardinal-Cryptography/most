@@ -1,7 +1,12 @@
+use std::sync::Arc;
+
 use ethers::utils::keccak256;
-use log::{debug, error, info, trace};
+use log::{debug, error, info, trace, warn};
 use thiserror::Error;
-use tokio::sync::{mpsc, oneshot};
+use tokio::{
+    select,
+    sync::{broadcast, mpsc, oneshot},
+};
 
 use crate::{
     config::Config,
@@ -9,6 +14,7 @@ use crate::{
     contracts::{AzeroContractError, CrosschainTransferRequestFilter, MostEvents, MostInstance},
     helpers::concat_u8_arrays,
     listeners::{EthMostEvent, EthMostEvents},
+    CircuitBreakerEvent,
 };
 
 #[derive(Debug, Error)]
@@ -89,26 +95,32 @@ impl EthereumEventHandler {
 #[error(transparent)]
 #[non_exhaustive]
 pub enum EthereumEventsHandlerError {
-    #[error("event channel send error")]
-    EventSend(#[from] mpsc::error::SendError<EthMostEvent>),
-
-    #[error("events channel send error")]
-    EventsSend(#[from] mpsc::error::SendError<EthMostEvents>),
-
-    #[error("ack receive error")]
-    AckReceive(#[from] oneshot::error::RecvError),
-
+    // #[error("event channel send error")]
+    // EventSend(#[from] mpsc::error::SendError<EthMostEvent>),
+    // #[error("events channel send error")]
+    // EventsSend(#[from] mpsc::error::SendError<EthMostEvents>),
+    // #[error("ack receive error")]
+    // AckReceive(#[from] oneshot::error::RecvError),
     #[error("events ack receiver dropped")]
     EventsAckReceiverDropped,
+
+    #[error("broadcast receive error")]
+    BroadcastReceive(#[from] broadcast::error::RecvError),
+
+    #[error("broadcast send error")]
+    BroadcastSend(#[from] broadcast::error::SendError<CircuitBreakerEvent>),
 }
 
 pub struct EthereumEventsHandler;
 
 impl EthereumEventsHandler {
     pub async fn run(
+        config: Arc<Config>,
         mut eth_events_receiver: mpsc::Receiver<EthMostEvents>,
-        eth_event_sender: mpsc::Sender<EthMostEvent>,
-    ) -> Result<(), EthereumEventsHandlerError> {
+        azero_signed_connection: Arc<AzeroConnectionWithSigner>,
+        circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
+        mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
+    ) -> Result<CircuitBreakerEvent, EthereumEventsHandlerError> {
         loop {
             if let Some(eth_events) = eth_events_receiver.recv().await {
                 let EthMostEvents {
@@ -118,18 +130,21 @@ impl EthereumEventsHandler {
                 info!("[Ethereum] Received a batch of {} events", events.len());
 
                 for event in events {
-                    let (event_ack_sender, event_ack_receiver) = oneshot::channel::<()>();
-                    info!("[Ethereum] Sending event {event:?}");
-                    eth_event_sender
-                        .send(EthMostEvent {
-                            event,
-                            event_ack_sender,
-                        })
-                        .await?;
-                    info!("[Ethereum] Awaiting event ack");
-                    // wait until this event is handled before proceeding.
-                    event_ack_receiver.await?;
-                    info!("[Ethereum] Event ack received");
+                    select! {
+                        cb_event = circuit_breaker_receiver.recv () => {
+                            return Ok(cb_event?);
+                        },
+
+                        result = EthereumEventHandler::handle_event(event, &config, &azero_signed_connection) => {
+                            if let Err(why) = result {
+                                warn!("[Ethereum] event handler failure {why:?}");
+                                let status = CircuitBreakerEvent::EthEventHandlerFailure;
+                                circuit_breaker_sender.send(status.clone ())?;
+                                warn!("Exiting");
+                                return Ok (status);
+                            }
+                        }
+                    }
                 }
 
                 info!("[Ethereum] Acknowledging events batch");
