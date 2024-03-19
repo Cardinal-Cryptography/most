@@ -1,4 +1,4 @@
-use std::{cmp::max, result, sync::Arc};
+use std::sync::Arc;
 
 use aleph_client::AccountId;
 use clap::Parser;
@@ -18,17 +18,13 @@ use log::{debug, error, info, warn};
 use redis::RedisManagerError;
 use thiserror::Error;
 use tokio::{
-    select,
-    sync::{broadcast, mpsc, oneshot, Mutex},
+    sync::{broadcast, mpsc, oneshot},
     task::{JoinError, JoinSet},
-    time::{sleep, Duration},
 };
 
 use crate::{
     connections::{azero, eth},
-    handlers::{
-        AlephZeroEventHandler, AlephZeroEventsHandler, EthereumEventHandler, EthereumEventsHandler,
-    },
+    handlers::{AlephZeroEventsHandler, EthereumEventsHandler},
     listeners::{
         AdvisoryListener, AlephZeroHaltedListener, AlephZeroListener, AzeroMostEvents,
         EthMostEvents, EthereumListener, EthereumPausedListener,
@@ -47,7 +43,7 @@ mod redis;
 const DEV_MNEMONIC: &str =
     "harsh master island dirt equip search awesome double turn crush wool grant";
 // This is more than the maximum number of send_request calls than will fit into the block (execution time)
-const ALEPH_MAX_REQUESTS_PER_BLOCK: usize = 50;
+// const ALEPH_MAX_REQUESTS_PER_BLOCK: usize = 50;
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -179,24 +175,52 @@ async fn main() -> Result<(), RelayerError> {
     // Create channels
     // TODO: tweak channel buffers
     let (eth_events_sender, eth_events_receiver) = mpsc::channel::<EthMostEvents>(1);
-    let (eth_block_number_sender, eth_block_number_receiver) = broadcast::channel::<u32>(1);
+    let (eth_block_number_sender, _eth_block_number_receiver) = broadcast::channel::<u32>(1);
 
     let (azero_events_sender, azero_events_receiver) = mpsc::channel::<AzeroMostEvents>(1);
-    let (azero_block_number_sender, azero_block_number_receiver) = broadcast::channel::<u32>(1);
+    let (azero_block_number_sender, _azero_block_number_receiver) = broadcast::channel::<u32>(1);
 
-    let (circuit_breaker_sender, circuit_breaker_receiver) =
+    let (circuit_breaker_sender, _circuit_breaker_receiver) =
         broadcast::channel::<CircuitBreakerEvent>(1);
 
     let mut tasks = JoinSet::new();
 
+    run_relayer(
+        &mut tasks,
+        config,
+        azero_connection,
+        azero_signed_connection,
+        eth_connection,
+        eth_signed_connection,
+        eth_events_sender,
+        eth_events_receiver,
+        azero_events_sender,
+        azero_events_receiver,
+        eth_block_number_sender,
+        azero_block_number_sender,
+        circuit_breaker_sender,
+    );
+
     // TODO wait for all tasks to finish and reboot
+
+    while let Some(result) = tasks.join_next().await {
+        match result? {
+            Ok(result) => {
+                warn!("One of the core components gracefully exited due to : {result:?}")
+            }
+            Err(why) => {
+                error!("One of the core components exited with an error {why:?}. This is fatal");
+                std::process::exit(1);
+            }
+        }
+    }
 
     error!("We should have never gotten here!");
     std::process::exit(1);
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn run_relayer(
+fn run_relayer(
     tasks: &mut JoinSet<Result<CircuitBreakerEvent, RelayerError>>,
     config: Arc<Config>,
 
@@ -212,12 +236,11 @@ async fn run_relayer(
     azero_events_receiver: mpsc::Receiver<AzeroMostEvents>,
 
     eth_block_number_sender: broadcast::Sender<u32>,
-    eth_block_number_receiver: broadcast::Receiver<u32>,
+    // eth_block_number_receiver: broadcast::Receiver<u32>,
     azero_block_number_sender: broadcast::Sender<u32>,
-    azero_block_number_receiver: broadcast::Receiver<u32>,
-
+    // azero_block_number_receiver: broadcast::Receiver<u32>,
     circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
-    circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
+    // circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
 ) {
     // let mut circuit_breaker_receiver = circuit_breaker_receiver.lock().await;
     // let mut eth_events_receiver = eth_events_receiver.lock().await;
@@ -272,7 +295,7 @@ async fn run_relayer(
             Arc::clone(&eth_connection),
             eth_events_sender.clone(),
             eth_block_number_sender.clone(),
-            eth_block_number_receiver,
+            eth_block_number_sender.subscribe(),
             circuit_breaker_sender.subscribe(),
         )
         .map_err(RelayerError::from),

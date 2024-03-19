@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use futures::future::join_all;
-use log::{debug, warn};
+use log::{info, warn};
 use thiserror::Error;
 use tokio::{select, sync::broadcast, time::sleep};
 
@@ -42,6 +42,8 @@ impl AdvisoryListener {
             ..
         } = &*config;
 
+        info!("Starting");
+
         let contracts: Vec<AdvisoryInstance> = advisory_contract_addresses
             .clone()
             .expect("Advisory addresses")
@@ -61,17 +63,17 @@ impl AdvisoryListener {
                     return Ok(cb_event?);
                 },
 
-                else => {
-                    let all: Vec<_> = contracts
+                results = join_all(
+                    contracts
                         .iter()
                         .map(|advisory| advisory.is_emergency(&azero_connection))
-                        .collect();
-
-                    for maybe_emergency in join_all(all).await {
+                        .collect::<Vec<_>>()) => {
+                    info!("Querying");
+                    for maybe_emergency in results {
                         match maybe_emergency {
                             Ok((is_emergency, address)) => {
                                 if is_emergency {
-                                    warn!("Exiting due to emergency state in one of the advisory contracts {address}");
+                                    warn!("Exiting due to an emergency state in one of the advisory contracts {address}");
                                     let status = CircuitBreakerEvent::AdvisoryEmergency(address);
                                     circuit_breaker_sender.send(status.clone())?;
                                     return Ok(status.clone());
@@ -80,10 +82,8 @@ impl AdvisoryListener {
                             Err(why) => return Err(AdvisoryListenerError::AzeroContract(why)),
                         }
                     }
-
-                    // sleep for a block production time before making another round of queries
-                    sleep(Duration::from_secs(ALEPH_BLOCK_PROD_TIME_SEC)).await;
                 }
+
             }
         }
     }

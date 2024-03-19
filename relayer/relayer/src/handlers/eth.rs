@@ -5,7 +5,7 @@ use log::{debug, error, info, trace, warn};
 use thiserror::Error;
 use tokio::{
     select,
-    sync::{broadcast, mpsc, oneshot},
+    sync::{broadcast, mpsc},
 };
 
 use crate::{
@@ -95,12 +95,6 @@ impl EthereumEventHandler {
 #[error(transparent)]
 #[non_exhaustive]
 pub enum EthereumEventsHandlerError {
-    // #[error("event channel send error")]
-    // EventSend(#[from] mpsc::error::SendError<EthMostEvent>),
-    // #[error("events channel send error")]
-    // EventsSend(#[from] mpsc::error::SendError<EthMostEvents>),
-    // #[error("ack receive error")]
-    // AckReceive(#[from] oneshot::error::RecvError),
     #[error("events ack receiver dropped")]
     EventsAckReceiverDropped,
 

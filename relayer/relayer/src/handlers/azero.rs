@@ -156,14 +156,6 @@ impl AlephZeroEventHandler {
 #[error(transparent)]
 #[non_exhaustive]
 pub enum AlephZeroEventsHandlerError {
-    // #[error("event channel send error")]
-    // EventSend(#[from] mpsc::error::SendError<AzeroMostEvent>),
-
-    // #[error("events channel send error")]
-    // EventsSend(#[from] mpsc::error::SendError<EthMostEvents>),
-
-    // #[error("ack receive error")]
-    // AckReceive(#[from] oneshot::error::RecvError),
     #[error("events ack receiver dropped")]
     EventsAckReceiverDropped,
 
