@@ -36,14 +36,19 @@ async function main(): Promise<void> {
 
     const weth = new Token(weth_azero, signer, api);
 
+    // check senders balance
     let response = await weth.query.balanceOf(signer.address);
     let balance = response.value.ok.rawNumber.toNumber();
 
     console.log("wETH [", weth_azero, "]", "balance of:", signer.address, ":", balance);
     if (balance < amount) {
-        throw new TypeError('Balance too low');
+        // nothing can be done
+        throw new Error('Balance too low');
     }
 
+    // TODO check approval
+
+    // approve Most to withdraw
     await weth.tx.approve(most_azero, amount);
 
     // send request
