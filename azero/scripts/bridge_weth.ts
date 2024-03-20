@@ -58,7 +58,9 @@ async function main(): Promise<void> {
     let srcTokenAddress = hexToBytes(accountIdToHex(weth_azero));
     let destReceiverAddress = hexToBytes(ethers.zeroPadValue(ethers.getBytes(receiver), 32));
 
-    await most.tx.sendRequest(srcTokenAddress, amount, destReceiverAddress);
+    let tx = await most.tx.sendRequest(srcTokenAddress, amount, destReceiverAddress);
+
+    console.log("Tx hash:", tx.txHash, ", block number:", tx.result.blockNumber.toNumber());
 
     await api.disconnect();
     console.log("Done");
