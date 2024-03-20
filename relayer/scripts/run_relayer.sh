@@ -21,7 +21,7 @@ function get_address {
 ETH_NETWORK=${ETH_NETWORK:-"http://127.0.0.1:8545"}
 AZERO_NETWORK=${AZERO_NETWORK:-"ws://127.0.0.1:9944"}
 
-RELAYER_ID=${RELAYER_ID:-0}
+RELAYER_ID=${RELAYER_ID:-1}
 
 ARGS=(
   run --bin relayer -- --name "guardian_${RELAYER_ID}" \

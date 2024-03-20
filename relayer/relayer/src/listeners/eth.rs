@@ -41,9 +41,8 @@ pub enum EthereumListenerError {
 
     #[error("channel receive error")]
     Receive(#[from] broadcast::error::RecvError),
-
-    #[error("sender dropped before ack was received")]
-    AckSenderDropped,
+    // #[error("sender dropped before ack was received")]
+    // AckSenderDropped,
 }
 
 impl EthereumListener {
@@ -124,12 +123,32 @@ impl EthereumListener {
                                                 events_ack_sender,
                                             }).await?;
 
-                                        info!(target: "EthereumListener","Awaiting events ack");
-                                        events_ack_receiver.await.map_err (|_| EthereumListenerError::AckSenderDropped)?;
+                                        info!(target: "EthereumListener", "Awaiting events ack");
+
+                                        // select between ack and the channel, because the handler could have exited
+                                        select! {
+                                            cb_event = circuit_breaker_receiver.recv () => {
+                                                warn!(target: "EthereumListener", "Exiting before events ack due to a circuit breaker event {cb_event:?}");
+                                                return Ok(cb_event?);
+                                            },
+                                            ack_result = events_ack_receiver => {
+                                                // ack_result.map_err (|_| EthereumListenerError::AckSenderDropped)?;
+                                                if ack_result.is_ok () {
+                                                    info!(target: "EthereumListener", "Events ack received, marking {to_block} as the most recently seen block number");
+                                                    // we send + 1 as this is the next block we'd like to see
+                                                    last_processed_block_number.send(to_block + 1)?;
+                                                }
+                                            }
+                                        }
+                                        // events_ack_receiver.await.map_err (|_| EthereumListenerError::AckSenderDropped)?;
+                                    } else {
+                                        info!(target: "EthereumListener", "Marking {to_block} as the most recently seen block number");
+                                        // we send + 1 as this is the next block we'd like to see
+                                        last_processed_block_number.send(to_block + 1)?;
                                     }
                                     // publish this block number as the last fully processed
-                                    info!(target: "EthereumListener","Events ack received, marking {to_block} as the most recently seen block number");
-                                    last_processed_block_number.send(to_block + 1)?;
+                                    // info!(target: "EthereumListener","Events ack received, marking {to_block} as the most recently seen block number");
+                                    // last_processed_block_number.send(to_block + 1)?;
 
                                 }
                             }

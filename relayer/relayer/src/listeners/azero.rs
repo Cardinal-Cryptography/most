@@ -147,11 +147,20 @@ impl AlephZeroListener {
                         }
 
                         info!(target: "AlephZeroListener", "Awaiting events ack");
-                        events_ack_receiver.await.map_err(|_| AlephZeroListenerError::AckSenderDropped)?;
-                        info!(target: "AlephZeroListener", "Events ack received");
+
+                        select! {
+                            cb_event = circuit_breaker_receiver.recv () => {
+                                warn!(target: "AlephZeroListener", "Exiting before sending events due to a circuit breaker event {cb_event:?}");
+                                return Ok(cb_event?);
+                            },
+
+                            ack_result = events_ack_receiver => {
+                                ack_result.map_err(|_| AlephZeroListenerError::AckSenderDropped)?;
+                            }
+                        }
                     }
 
-                    info!(target: "AlephZeroListener", "Marking {to_block} as the most recently seen block number");
+                    info!(target: "AlephZeroListener", "Events ack received, marking {to_block} as the most recently seen block number");
                     last_processed_block_number.send(to_block + 1)?;
                 }
             }

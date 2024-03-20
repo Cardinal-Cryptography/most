@@ -13,7 +13,7 @@ import type BN from "bn.js";
 
 const envFile = process.env.AZERO_ENV;
 
-// bridges (redeems) 1 unit of wETH on the AlephZero to 1 unit of wETH on the Ethereum chain
+// bridges (redeems) 1 unit of wETH from AlephZero to Ethereum
 async function main(): Promise<void> {
     const config = await import_env(envFile);
     const { ws_node, deployer_seed } = config;

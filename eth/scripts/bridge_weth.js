@@ -3,6 +3,7 @@ const fs = require("node:fs");
 const { u8aToHex } = require("@polkadot/util");
 const { Keyring } = require("@polkadot/keyring");
 
+// bridges (sends) 1 unit of wETH from Ethereum to AlephZero
 async function main() {
     const signers = await ethers.getSigners();
     accounts = signers.map((s) => s.address);

@@ -23,6 +23,23 @@ use crate::{
 pub enum EthereumEventHandlerError {
     #[error("azero contract error")]
     AzeroContract(#[from] AzeroContractError),
+    #[error(
+        "receive_request tx has failed:\n
+request_hash: {request_hash:?}\n
+committee_id: {committee_id:?}\n
+dest_token_address: {dest_token_address:?}\n
+amount {amount:?}\n
+dest_receiver_address: {dest_receiver_address:?}\n
+request_nonce: {request_nonce:?}"
+    )]
+    ReceiveRequestTxFailure {
+        request_hash: [u8; 32],
+        committee_id: u128,
+        dest_token_address: [u8; 32],
+        amount: u128,
+        dest_receiver_address: [u8; 32],
+        request_nonce: u128,
+    },
 }
 
 pub struct EthereumEventHandler;
@@ -74,17 +91,31 @@ impl EthereumEventHandler {
             )?;
 
             // send vote
+
+            let committee_id = committee_id.as_u128();
+            let amount = amount.as_u128();
+            let request_nonce = request_nonce.as_u128();
+
             contract
                 .receive_request(
                     azero_connection,
                     request_hash,
-                    committee_id.as_u128(),
+                    committee_id,
                     dest_token_address,
-                    amount.as_u128(),
+                    amount,
                     dest_receiver_address,
-                    request_nonce.as_u128(),
+                    request_nonce,
                 )
-                .await?;
+                .await
+                // default AlephCLient error is unwieldy, dumps the entire runtime
+                .map_err(|_| EthereumEventHandlerError::ReceiveRequestTxFailure {
+                    request_hash,
+                    committee_id,
+                    dest_token_address,
+                    amount,
+                    dest_receiver_address,
+                    request_nonce,
+                })?;
         }
 
         Ok(())
