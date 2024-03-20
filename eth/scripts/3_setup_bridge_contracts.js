@@ -167,7 +167,7 @@ async function main() {
   const most = await Most.at(addresses.most);
 
   if (network.name == "development" || network.name == "bridgenet") {
-    // NOTE : TEMPorary before devnet is fixed and uses propere genesis that seeds these accounts with funds
+    // NOTE : TEMPorary before devnet is fixed and uses proper genesis that seeds these accounts with funds
     for (const to of signers.slice(1, 4)) {
       await signers[0].sendTransaction({
         to: to.address,

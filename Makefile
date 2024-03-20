@@ -196,6 +196,16 @@ stop-relayers:
 bridge: # Run the bridge
 bridge: local-bridgenet deploy run-relayers devnet-relayers-logs
 
+.PHONY: bridge-weth-azero
+bridge-weth-azero: # Request a transfer of 1 unit of wETH from AlephZero to Ethereum
+bridge-weth-azero:
+	cd azero && AZERO_ENV=$(AZERO_ENV) npm run bridge-weth
+
+.PHONY: bridge-weth-ethereum
+bridge-weth-ethereum: # Request a transfer of 1 unit of wETH from Ethereum to AlephZero
+bridge-weth-ethereum:
+	cd eth && npx hardhat run --network $(NETWORK) scripts/bridge_weth.js
+
 .PHONY: bridgenet-bridge
 bridgenet-bridge: # Run the bridge on bridgenet
 bridgenet-bridge: build-docker-relayer redis-instance

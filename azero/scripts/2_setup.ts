@@ -68,6 +68,8 @@ async function main(): Promise<void> {
   const api = await ApiPromise.create({ provider: wsProvider });
   const deployer = keyring.addFromUri(deployer_seed);
 
+  console.log("Using ", deployer.address, "as the transaction signer");
+
   const migrations = new Migrations(migrations_azero, deployer, api);
 
   // check migrations
@@ -81,6 +83,7 @@ async function main(): Promise<void> {
 
   // premint some token for DEV
   if (process.env.AZERO_ENV == "dev" || process.env.AZERO_ENV == "bridgenet") {
+
     await mintTokens(
       weth_azero,
       1000000000000000,
