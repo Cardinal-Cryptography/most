@@ -52,8 +52,6 @@ pub enum AlephZeroListenerError {
 
     #[error("broadcast receive error")]
     Receive(#[from] broadcast::error::RecvError),
-    // #[error("sender dropped before ack was received")]
-    // AckSenderDropped,
 }
 
 #[derive(Copy, Clone)]
@@ -127,7 +125,12 @@ impl AlephZeroListener {
                         })
                         .collect::<Vec<ContractEvent>>();
 
-                    if !filtered_events.is_empty () {
+                    if filtered_events.is_empty () {
+                        info!(target: "AlephZeroListener", "Marking {to_block} as the most recently seen block number");
+                        // send n+1 as the next block we want to start from
+                        last_processed_block_number.send(to_block + 1)?;
+                    } else {
+
                         let (events_ack_sender, events_ack_receiver) = oneshot::channel::<()>();
 
                         select! {
@@ -154,21 +157,13 @@ impl AlephZeroListener {
                             },
 
                             ack_result = events_ack_receiver => {
-                                // ack_result.map_err(|_| AlephZeroListenerError::AckSenderDropped)?;
-
                                 if ack_result.is_ok () {
                                     info!(target: "AlephZeroListener", "Events ack received, marking {to_block} as the most recently seen block number");
                                     last_processed_block_number.send(to_block + 1)?;
                                 }
                             }
                         }
-
-                    } else {
-                        info!(target: "AlephZeroListener", "Marking {to_block} as the most recently seen block number");
-                        // send n+1 as th eenxt block we want to start from
-                        last_processed_block_number.send(to_block + 1)?;
                     }
-
                 }
             }
         }

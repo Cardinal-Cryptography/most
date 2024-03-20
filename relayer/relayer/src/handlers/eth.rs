@@ -23,6 +23,7 @@ use crate::{
 pub enum EthereumEventHandlerError {
     #[error("azero contract error")]
     AzeroContract(#[from] AzeroContractError),
+
     #[error(
         "receive_request tx has failed:\n
 request_hash: {request_hash:?}\n
@@ -107,7 +108,8 @@ impl EthereumEventHandler {
                     request_nonce,
                 )
                 .await
-                // default AlephCLient error is unwieldy, dumps the entire runtime
+                // default AlephClient error is MBs large and useless, dumps the entire runtime for some reasons
+                // TODO: log hex encoded values for human consumption
                 .map_err(|_| EthereumEventHandlerError::ReceiveRequestTxFailure {
                     request_hash,
                     committee_id,
