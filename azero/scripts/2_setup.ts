@@ -51,16 +51,13 @@ async function mintTokens(
 async function main(): Promise<void> {
   const config = await import_env(envFile);
 
-  const { ws_node, deployer_seed } = config;
+  const { ws_node, deployer_seed, dev } = config;
 
   const {
+    tokens,
     most: most_azero,
-    weth: weth_azero,
-    usdt: usdt_azero,
     migrations: migrations_azero,
   } = await import_azero_addresses();
-
-  const { weth: weth_eth, usdt: usdt_eth } = await import_eth_addresses();
 
   const wsProvider = new WsProvider(ws_node);
   const keyring = new Keyring({ type: "sr25519" });
@@ -80,34 +77,29 @@ async function main(): Promise<void> {
   }
 
   // premint some token for DEV
-  if (process.env.AZERO_ENV == "dev" || process.env.AZERO_ENV == "bridgenet") {
-    await mintTokens(
-      weth_azero,
-      1000000000000000,
-      deployer.address,
-      deployer,
-      api,
-      most_azero,
-    );
-    await mintTokens(
-      usdt_azero,
-      1000000000000000,
-      deployer.address,
-      deployer,
-      api,
-      most_azero,
-    );
+  if (dev) {
+    for (let [_, azero_address] of tokens) {
+      await mintTokens(
+        azero_address,
+        1000000000000000,
+        deployer.address,
+        deployer,
+        api,
+        most_azero,
+      );
+    }
+  }
 
-    const most = new Most(most_azero, deployer, api);
+  const most = new Most(most_azero, deployer, api);
 
-    await addTokenPair(weth_eth, weth_azero, most);
-    await addTokenPair(usdt_eth, usdt_azero, most);
+  for (let [eth_address, azero_address] of tokens) {
+    await addTokenPair(eth_address, azero_address, most);
+  }
 
-    // Activate Most if we are in dev environment
+  if (dev) {
     await most.tx.setHalted(false);
   }
 
-  // update migrations
   await migrations.tx.setCompleted(2);
 
   await api.disconnect();

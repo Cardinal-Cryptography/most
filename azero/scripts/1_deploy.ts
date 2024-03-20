@@ -8,10 +8,11 @@ import OracleConstructors from "../types/constructors/oracle";
 import AdvisoryConstructors from "../types/constructors/advisory";
 import {
   uploadCode,
-  Addresses,
-  storeAddresses,
   estimateContractInit,
   import_env,
+  storeAddresses,
+  Addresses,
+  import_eth_addresses
 } from "./utils";
 import "dotenv/config";
 import "@polkadot/api-augment";
@@ -47,19 +48,20 @@ async function deployToken(
 
 async function main(): Promise<void> {
   const config = await import_env(envFile);
+  const ethAddresses = await import_eth_addresses();
 
   const {
     ws_node,
     relayers,
-    contracts_owner,
-    gas_price_oracle_owner,
     deployer_seed,
     signature_threshold,
     pocket_money,
     relay_gas_usage,
-    min_fee,
-    max_fee,
-    default_fee,
+    min_gas_price,
+    max_gas_price,
+    default_gas_price,
+    tokens,
+    dev
   } = config;
 
   const wsProvider = new WsProvider(ws_node);
@@ -109,11 +111,11 @@ async function main(): Promise<void> {
     api,
     deployer,
     "advisory.contract",
-    [contracts_owner],
+    [deployer.address],
   );
 
   const { address: advisoryAddress } = await advisoryConstructors.new(
-    contracts_owner, // owner
+    deployer.address, // owner
     { gasLimit: estimatedGasAdvisory },
   );
 
@@ -121,11 +123,11 @@ async function main(): Promise<void> {
     api,
     deployer,
     "oracle.contract",
-    [gas_price_oracle_owner, 10000000000],
+    [deployer.address, 10000000000],
   );
 
   const { address: oracleAddress } = await oracleConstructors.new(
-    gas_price_oracle_owner, // owner
+    deployer.address, // owner
     10000000000, // initial value
     { gasLimit: estimatedGasOracle },
   );
@@ -139,11 +141,11 @@ async function main(): Promise<void> {
       signature_threshold!,
       pocket_money!,
       relay_gas_usage!,
-      min_fee!,
-      max_fee!,
-      default_fee!,
+      min_gas_price!,
+      max_gas_price!,
+      default_gas_price!,
       oracleAddress,
-      contracts_owner,
+      deployer.address,
     ],
   );
 
@@ -152,42 +154,47 @@ async function main(): Promise<void> {
     signature_threshold!,
     pocket_money!,
     relay_gas_usage!,
-    min_fee!,
-    max_fee!,
-    default_fee!,
+    min_gas_price!,
+    max_gas_price!,
+    default_gas_price!,
     oracleAddress,
-    contracts_owner,
+    deployer.address,
     { gasLimit: estimatedGasMost },
   );
 
   console.log("most address:", mostAddress);
 
-  const minterBurner =
-    process.env.AZERO_ENV == "dev" || process.env.AZERO_ENV == "bridgenet"
-      ? deployer.address
-      : mostAddress;
+  const minterBurner = dev ? deployer.address : mostAddress;
+  var tokenAddresses = [];
+  for (let token of tokens) {
+    const initialSupply = 0;
+    const tokenArgs: TokenArgs = [
+      initialSupply,
+      token.symbol,
+      token.name,
+      token.decimals,
+      minterBurner,
+    ];
 
-  const wethArgs: TokenArgs = [0, "wETH", "Wrapped Ether", 18, minterBurner];
+    const { address } = await deployToken(tokenArgs, api, deployer);
+    console.log(token.symbol, "address:", address);
 
-  const usdtArgs: TokenArgs = [0, "USDT", "Tether", 6, minterBurner];
+    let ethAddress = token.checkAddress ?
+      ethAddresses[token.checkAddress] :
+      token.ethAddress!;
 
-  const { address: wethAddress } = await deployToken(wethArgs, api, deployer);
-  console.log("wETH address:", wethAddress);
+    tokenAddresses.push([ethAddress, address]);
+  }
 
-  const { address: usdtAddress } = await deployToken(usdtArgs, api, deployer);
-  console.log("USDT address:", usdtAddress);
-
-  // update migrations
   const migrations = new Migrations(migrationsAddress, deployer, api);
   await migrations.tx.setCompleted(1);
 
   const addresses: Addresses = {
     migrations: migrationsAddress,
     most: mostAddress,
-    weth: wethAddress,
-    usdt: usdtAddress,
     oracle: oracleAddress,
     advisory: advisoryAddress,
+    tokens: tokenAddresses,
   };
   console.log("addresses:", addresses);
 
