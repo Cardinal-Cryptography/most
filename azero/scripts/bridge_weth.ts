@@ -56,9 +56,7 @@ async function main(): Promise<void> {
     console.log("Requesting transfer of", amount, "units of", weth_azero, "to", receiver);
 
     let srcTokenAddress = hexToBytes(accountIdToHex(weth_azero));
-    // console.log(srcTokenAddress);
     let destReceiverAddress = hexToBytes(ethers.zeroPadValue(ethers.getBytes(receiver), 32));
-    // console.log(destReceiverAddress);
 
     await most.tx.sendRequest(srcTokenAddress, amount, destReceiverAddress);
 

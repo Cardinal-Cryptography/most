@@ -196,14 +196,14 @@ stop-relayers:
 bridge: # Run the bridge
 bridge: local-bridgenet deploy run-relayers devnet-relayers-logs
 
-.PHONY: bridge-weth-azero
-bridge-weth-azero: # Request a transfer of 1 unit of wETH from AlephZero to Ethereum
-bridge-weth-azero:
+.PHONY: azero-ethereum-transfer
+azero-ethereum-transfer: # Request a transfer of 1 unit of wETH from AlephZero to Ethereum
+azero-ethereum-transfer:
 	cd azero && AZERO_ENV=$(AZERO_ENV) npm run bridge-weth
 
-.PHONY: bridge-weth-ethereum
-bridge-weth-ethereum: # Request a transfer of 1 unit of wETH from Ethereum to AlephZero
-bridge-weth-ethereum:
+.PHONY: ethereum-azero-transfer
+ethereum-azero-transfer: # Request a transfer of 1 unit of wETH from Ethereum to AlephZero
+ethereum-azero-transfer:
 	cd eth && npx hardhat run --network $(NETWORK) scripts/bridge_weth.js
 
 .PHONY: bridgenet-bridge
