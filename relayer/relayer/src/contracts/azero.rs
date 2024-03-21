@@ -145,16 +145,20 @@ impl MostInstance {
         connection: &Connection,
         request_hash: [u8; 32],
         account: AccountId,
+        committee_id: u128,
     ) -> Result<bool, AzeroContractError> {
-        let response: Result<bool, _> = self
+        Ok(self
             .contract
             .contract_read(
                 connection,
                 "needs_signature",
-                &[bytes32_to_str(&request_hash), account.to_string()],
+                &[
+                    bytes32_to_str(&request_hash),
+                    account.to_string(),
+                    committee_id.to_string(),
+                ],
             )
-            .await?;
-        Ok(response?)
+            .await?)
     }
 
     pub fn filter_events(

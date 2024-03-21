@@ -95,6 +95,7 @@ impl EthereumEventHandler {
                     azero_connection.as_connection(),
                     request_hash,
                     azero_connection.account_id().clone(),
+                    committee_id,
                 )
                 .await?
             {

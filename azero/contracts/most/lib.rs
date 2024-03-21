@@ -657,23 +657,23 @@ pub mod most {
             &self,
             request_hash: HashedRequest,
             account: AccountId,
-        ) -> Result<bool, MostError> {
-            if !self.is_in_committee(self.get_current_committee_id()?, account) {
+            committee_id: CommitteeId,
+        ) -> bool {
+            if !self.is_in_committee(committee_id, account) {
                 // signer not in the current committee
-                return Ok(false);
+                return false;
             }
 
             if self.processed_requests.contains(request_hash) {
                 // request already processed
-                return Ok(false);
+                return false;
             }
 
             if self.has_signed_request(account, request_hash) {
                 // request already signed
-                return Ok(false);
+                return false;
             }
-
-            Ok(true)
+            true
         }
 
         // ---  setter txs

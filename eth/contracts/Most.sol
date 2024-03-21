@@ -323,9 +323,10 @@ contract Most is
 
     function needsSignature(
         bytes32 requestHash,
-        address account
+        address account,
+        uint256 _committeeId
     ) external view returns (bool) {
-      if (!isInCommittee(committeeId, account)) {
+      if (!isInCommittee(_committeeId, account)) {
         return false;
       }
       if (processedRequests[requestHash]) {

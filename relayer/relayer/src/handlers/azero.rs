@@ -105,14 +105,18 @@ impl AlephZeroEventHandler {
                 let contract = Most::new(address, eth_signed_connection.clone());
 
                 if !contract
-                    .needs_signature(request_hash, eth_signed_connection.address())
+                    .needs_signature(
+                        request_hash,
+                        eth_signed_connection.address(),
+                        committee_id.into(),
+                    )
                     .await?
                 {
                     info!("Guardian signature for {request_hash:?} no longer needed");
                     return Ok(());
                 }
 
-                // TODO: dry run the the tx first
+                // TODO: dry run the tx first
                 // forward transfer & vote
                 let call: ContractCall<SignedEthConnection, ()> = contract.receive_request(
                     request_hash,
