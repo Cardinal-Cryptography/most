@@ -202,7 +202,6 @@ impl AlephZeroEventsHandler {
                         events,
                         to_block,
                         ..
-                        // events_ack_sender,
                     } = azero_events;
 
                     info!("Received a batch of {} events", events.len());

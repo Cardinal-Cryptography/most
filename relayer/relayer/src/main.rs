@@ -178,7 +178,6 @@ async fn main() -> Result<(), RelayerError> {
         eth_signed_connection.clone(),
     );
 
-    // TODO: restart with backoff
     // wait for all tasks to finish and reboot
     let delay = Duration::from_secs(2);
     while let Some(result) = tasks.join_next().await {
@@ -186,6 +185,7 @@ async fn main() -> Result<(), RelayerError> {
             Ok(result) => {
                 debug!("One of the core components exited gracefully due to : {result:?}, remaining: {}", &tasks.len());
 
+                // TODO: restart with backoff
                 if tasks.is_empty() {
                     info!("Relayer exited. Waiting {delay:?} before rebooting.");
                     sleep(delay).await;
@@ -211,7 +211,6 @@ async fn main() -> Result<(), RelayerError> {
     std::process::exit(1);
 }
 
-#[allow(clippy::too_many_arguments)]
 fn run_relayer(
     tasks: &mut JoinSet<Result<CircuitBreakerEvent, RelayerError>>,
     config: Arc<Config>,
@@ -271,7 +270,6 @@ fn run_relayer(
             eth_block_number_sender.clone(),
             eth_block_number_sender.subscribe(),
             azero_block_number_sender.clone(),
-            // azero_block_number_sender.subscribe(),
             azero_block_seal_receiver,
             circuit_breaker_sender.subscribe(),
         )

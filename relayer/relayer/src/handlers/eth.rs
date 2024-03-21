@@ -25,15 +25,7 @@ pub enum EthereumEventHandlerError {
     #[error("azero contract error")]
     AzeroContract(#[from] AzeroContractError),
 
-    #[error(
-        "receive_request tx has failed:\n
-request_hash: {request_hash:?}\n
-committee_id: {committee_id:?}\n
-dest_token_address: {dest_token_address:?}\n
-amount {amount:?}\n
-dest_receiver_address: {dest_receiver_address:?}\n
-request_nonce: {request_nonce:?}"
-    )]
+    #[error("receive_request tx has failed")]
     ReceiveRequestTxFailure {
         request_hash: String,
         committee_id: u128,

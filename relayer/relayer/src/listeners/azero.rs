@@ -209,7 +209,7 @@ async fn fetch_events_in_block_range(
 
     let mut block_events = Vec::new();
 
-    // Wait for all event processing tasks to finish
+    // Wait for all event processing tasks to finish.
     while let Some(result) = event_fetching_tasks.join_next().await {
         block_events.push(result??);
     }
