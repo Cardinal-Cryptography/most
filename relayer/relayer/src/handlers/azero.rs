@@ -56,7 +56,7 @@ impl AlephZeroEventHandler {
     pub async fn handle_event(
         event: ContractEvent,
         config: Arc<Config>,
-        eth_connection: Arc<SignedEthConnection>,
+        eth_signed_connection: Arc<SignedEthConnection>,
     ) -> Result<(), AlephZeroEventHandlerError> {
         let Config {
             eth_contract_address,
@@ -79,10 +79,10 @@ impl AlephZeroEventHandler {
                 } = get_request_event_data(&data)?;
 
                 info!(
-                "Decoded event data: [dest_token_address: 0x{}, amount: {amount}, dest_receiver_address: 0x{}, request_nonce: {request_nonce}]",
-                hex::encode(dest_token_address),
-                hex::encode(dest_receiver_address)
-            );
+                    "Decoded event data: [dest_token_address: 0x{}, amount: {amount}, dest_receiver_address: 0x{}, request_nonce: {request_nonce}]",
+                    hex::encode(dest_token_address),
+                    hex::encode(dest_receiver_address)
+                );
 
                 // NOTE: for some reason, ethers-rs's `encode_packed` does not properly encode the data
                 // (it does not pad uint to 32 bytes, but uses the actual number of bytes required to store the value)
@@ -102,7 +102,15 @@ impl AlephZeroEventHandler {
                 info!("hashed event encoding: 0x{}", hex::encode(request_hash));
 
                 let address = eth_contract_address.parse::<Address>()?;
-                let contract = Most::new(address, eth_connection.clone());
+                let contract = Most::new(address, eth_signed_connection.clone());
+
+                if !contract
+                    .needs_signature(request_hash, eth_signed_connection.address())
+                    .await?
+                {
+                    info!("Guardian signature for {request_hash:?} no longer needed");
+                    return Ok(());
+                }
 
                 // forward transfer & vote
                 let call: ContractCall<SignedEthConnection, ()> = contract.receive_request(
@@ -124,7 +132,7 @@ impl AlephZeroEventHandler {
                 // NOTE: this does not check whether the actual tx reverted on-chain. Reverts are only checked on dry-run.
                 let receipt = call
                     .gas(config.eth_gas_limit)
-                    .nonce(eth_connection.inner().next())
+                    .nonce(eth_signed_connection.inner().next())
                     .send()
                     .await?
                     .confirmations(*eth_tx_min_confirmations)
@@ -144,8 +152,7 @@ impl AlephZeroEventHandler {
                 }
 
                 info!("Tx with nonce {request_nonce} has been sent to the Ethereum network: {tx_hash:?} and received {eth_tx_min_confirmations} confirmations.");
-
-                wait_for_eth_tx_finality(eth_connection, tx_hash).await?;
+                wait_for_eth_tx_finality(eth_signed_connection, tx_hash).await?;
             }
         }
         Ok(())

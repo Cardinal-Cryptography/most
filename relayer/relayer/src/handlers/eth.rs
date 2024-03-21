@@ -83,7 +83,7 @@ impl EthereumEventHandler {
             trace!("event concatenated bytes: {bytes:?}");
 
             let request_hash = keccak256(bytes);
-            debug!("hashed event encoding: {request_hash:?}");
+            info!("hashed event encoding: {request_hash:?}");
 
             let contract = MostInstance::new(
                 azero_contract_address,
@@ -98,15 +98,14 @@ impl EthereumEventHandler {
             let amount = amount.as_u128();
             let request_nonce = request_nonce.as_u128();
 
-            let signature_needed = contract
+            if !contract
                 .needs_signature(
                     azero_connection.as_connection(),
                     request_hash,
                     azero_connection.account_id().clone(),
                 )
-                .await?;
-
-            if !signature_needed {
+                .await?
+            {
                 info!("Guardian signature for {request_hash:?} no longer needed");
                 return Ok(());
             }
