@@ -112,6 +112,7 @@ impl AlephZeroEventHandler {
                     return Ok(());
                 }
 
+                // TODO: dry run the the tx first
                 // forward transfer & vote
                 let call: ContractCall<SignedEthConnection, ()> = contract.receive_request(
                     request_hash,

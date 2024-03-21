@@ -110,6 +110,7 @@ impl EthereumEventHandler {
                 return Ok(());
             }
 
+            // TODO: dry run the tx first
             contract
                 .receive_request(
                     azero_connection,
