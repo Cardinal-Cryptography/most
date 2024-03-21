@@ -5,13 +5,26 @@
     "5Dfis6XL8J2P6JHUnUtArnFWndn62SydeP8ee8sG2ky9nfm9",
     "5F4H97f7nQovyrbiq4ZetaaviNwThSVcFobcA5aGab6167dK"
   ],
-  "contracts_owner": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
-  "gas_price_oracle_owner": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
   "deployer_seed": "//Alice",
   "signature_threshold": 2,
   "pocket_money": 1000000000000,
   "min_gas_price": 60000000,
   "max_gas_price": 450000000,
   "default_gas_price": 180000000,
-  "relay_gas_usage": 450000
+  "relay_gas_usage": 450000,
+  "dev": true,
+  "tokens": [
+    {
+      "symbol": "wETH",
+      "name": "Wrapped Ether",
+      "decimals": 18,
+      "checkAddress": "weth"
+    },
+    {
+      "symbol": "USDT",
+      "name": "Tether",
+      "decimals": 6,
+      "checkAddress": "usdt"
+    }
+  ]
 }

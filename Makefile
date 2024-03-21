@@ -99,6 +99,22 @@ deploy-eth: compile-eth
 	npx hardhat run --network $(NETWORK) scripts/1_deploy_gnosis_safe.js && \
 	npx hardhat run --network $(NETWORK) scripts/2_deploy_bridge_contracts.js
 
+.PHONY: deploy-eth-live
+deploy-eth-live: # Deploy only the MOST contract on a live ethrereum network (tesnet or mainnet)
+deploy-eth-live: compile-eth
+	cd eth && \
+	npx hardhat run --network $(NETWORK) scripts/deploy_bridge_live.js
+
+.PHONY: deploy-live
+deploy-live: # Deploy azero and eth contracts on a live network (testnet or mainnet)
+deploy-live: deploy-azero setup-azero deploy-eth-live
+
+.PHONY: verify-eth
+verify-eth: # Post verified eth sources of a contract to etherscan
+verify-eth:
+	cd eth && \
+	npx hardhat verify --network $(NETWORK) $(CONTRACT)
+
 .PHONY: setup-eth
 setup-eth: # Setup eth contracts
 setup-eth: compile-eth
