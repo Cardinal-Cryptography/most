@@ -326,16 +326,16 @@ contract Most is
         address account,
         uint256 _committeeId
     ) external view returns (bool) {
-      if (!isInCommittee(_committeeId, account)) {
-        return false;
-      }
-      if (processedRequests[requestHash]) {
-        return false;
-      }
-      if (hasSignedRequest(account, requestHash)) {
-        return false;
-      }
-      return true;
+        if (!isInCommittee(_committeeId, account)) {
+            return false;
+        }
+        if (processedRequests[requestHash]) {
+            return false;
+        }
+        if (hasSignedRequest(account, requestHash)) {
+            return false;
+        }
+        return true;
     }
 
     function isInCommittee(
