@@ -111,10 +111,11 @@ if (SEPOLIA_KEY) {
     url: "https://ethereum-sepolia-rpc.publicnode.com",
     accounts: [SEPOLIA_KEY],
     deploymentConfig: {
-      governanceIds: [
+      guardianIds: [
         "0xc4E0B92Df2DE77C077D060e49ec63DC196980716", // sepolia account address corresponding to SEPOLIA_KEY
       ],
-      governanceThreshold: 1,
+      threshold: 1,
+      weth: "0xfff9976782d46cc05630d1f6ebab18b2324d6b14",
     },
   };
 }

@@ -12,11 +12,10 @@ import {
 
 export type Addresses = {
   most: string;
-  weth: string;
-  usdt: string;
   oracle: string;
   advisory: string;
   migrations: string;
+  tokens: [string, string][];
 };
 
 /**
