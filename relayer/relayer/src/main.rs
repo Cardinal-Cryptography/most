@@ -223,10 +223,15 @@ fn run_relayer(
     // Create channels
     // TODO: tweak channel buffers
     let (eth_events_sender, eth_events_receiver) = mpsc::channel::<EthMostEvents>(1);
+    // TODO: mpsc
     let (eth_block_number_sender, _eth_block_number_receiver) = broadcast::channel::<u32>(1);
+    // TODO: block seal channel
 
-    let (azero_events_sender, azero_events_receiver) = mpsc::channel::<AzeroMostEvents>(1);
+    let (azero_events_sender, azero_events_receiver) = mpsc::channel::<AzeroMostEvents>(32);
+    // TODO: mpsc
     let (azero_block_number_sender, _azero_block_number_receiver) = broadcast::channel::<u32>(1);
+
+    let (azero_block_seal_sender, azero_block_seal_receiver) = mpsc::channel::<u32>(1);
 
     let (circuit_breaker_sender, _circuit_breaker_receiver) =
         broadcast::channel::<CircuitBreakerEvent>(1);
@@ -267,7 +272,8 @@ fn run_relayer(
             eth_block_number_sender.clone(),
             eth_block_number_sender.subscribe(),
             azero_block_number_sender.clone(),
-            azero_block_number_sender.subscribe(),
+            // azero_block_number_sender.subscribe(),
+            azero_block_seal_receiver,
             circuit_breaker_sender.subscribe(),
         )
         .map_err(RelayerError::from),
@@ -303,6 +309,7 @@ fn run_relayer(
             azero_events_sender,
             azero_block_number_sender.clone(),
             azero_block_number_sender.subscribe(),
+            azero_block_seal_sender.clone(),
             circuit_breaker_sender.subscribe(),
         )
         .map_err(RelayerError::from),
@@ -313,6 +320,7 @@ fn run_relayer(
             Arc::clone(&config),
             Arc::clone(&eth_signed_connection),
             azero_events_receiver,
+            azero_block_seal_sender.clone(),
             circuit_breaker_sender.clone(),
             circuit_breaker_sender.subscribe(),
         )

@@ -114,8 +114,8 @@ impl EthereumListener {
 
                                 Ok (events) = query.query() => {
                                     if events.is_empty () {
-                                        info!(target: "EthereumListener", "Marking {to_block} as the most recently seen block number");
-                                        // we send + 1 as this is the next block we'd like to see
+                                        info!(target: "EthereumListener", "Marking {} as the next unprocessed block number", to_block +1);
+                                        // we send + 1 to self as this is the next block we'd like to see
                                         last_processed_block_number.send(to_block + 1)?;
                                     } else {
                                         let (events_ack_sender, events_ack_receiver) = oneshot::channel::<()>();
@@ -138,8 +138,8 @@ impl EthereumListener {
                                             ack_result = events_ack_receiver => {
                                                 // ack_result.map_err (|_| EthereumListenerError::AckSenderDropped)?;
                                                 if ack_result.is_ok () {
-                                                    info!(target: "EthereumListener", "Events ack received, marking {to_block} as the most recently seen block number");
-                                                    // we send + 1 as this is the next block we'd like to see
+                                                    info!(target: "EthereumListener", "Events ack received, marking {} as the next unprocessed block number", to_block +1);
+                                                    // we send + 1 to self as this is the next block we'd like to see
                                                     last_processed_block_number.send(to_block + 1)?;
                                                 }
                                             }

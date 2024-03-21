@@ -16,7 +16,9 @@ pub struct EthMostEvents {
 #[derive(Debug)]
 pub struct AzeroMostEvents {
     pub events: Vec<ContractEvent>,
-    pub events_ack_sender: oneshot::Sender<()>,
+    pub from_block: u32,
+    pub to_block: u32,
+    // pub events_ack_sender: oneshot::Sender<()>,
 }
 
 pub use advisory::*;

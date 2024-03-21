@@ -14,7 +14,7 @@ use subxt::utils::H256;
 use thiserror::Error;
 use tokio::{
     select,
-    sync::{broadcast, mpsc},
+    sync::{broadcast, mpsc, oneshot},
     task::{JoinError, JoinSet},
     time::{sleep, Duration},
 };
@@ -165,6 +165,9 @@ pub enum AlephZeroEventsHandlerError {
     #[error("broadcast send error")]
     BroadcastSend(#[from] broadcast::error::SendError<CircuitBreakerEvent>),
 
+    #[error("send error")]
+    Send(#[from] mpsc::error::SendError<u32>),
+
     #[error("Task join error")]
     Join(#[from] JoinError),
 }
@@ -176,6 +179,7 @@ impl AlephZeroEventsHandler {
         config: Arc<Config>,
         eth_signed_connection: Arc<SignedEthConnection>,
         mut azero_events_receiver: mpsc::Receiver<AzeroMostEvents>,
+        block_seal_sender: mpsc::Sender<u32>,
         circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
         mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
     ) -> Result<CircuitBreakerEvent, AlephZeroEventsHandlerError> {
@@ -191,47 +195,86 @@ impl AlephZeroEventsHandler {
                 Some(azero_events) = azero_events_receiver.recv() => {
                     let AzeroMostEvents {
                         events,
-                        events_ack_sender,
+                        to_block,
+                        ..
+                        // events_ack_sender,
                     } = azero_events;
 
                     info!("Received a batch of {} events", events.len());
 
-                    let mut tasks = JoinSet::new();
-                    for event in events {
-                        // spawn each handler in separate task as it's time consuming
-                        tasks.spawn(AlephZeroEventHandler::handle_event(
-                            event,
-                            Arc::clone(&config),
-                            Arc::clone(&eth_signed_connection),
-                        ));
-                    }
+                    let config = Arc::clone(&config);
+                    let eth_signed_connection = Arc::clone(&eth_signed_connection);
+                    let block_seal_sender = block_seal_sender.clone ();
+                    let circuit_breaker_sender = circuit_breaker_sender.clone ();
 
-                    // wait for all concurrent handler tasks to finish
-                    info!("Awaiting all handler tasks to finish");
+                    // spawn non-blocking task to handle all events w-out blocking the events publisher
+                    tokio::spawn(async move {
+                        let mut tasks = JoinSet::new();
+                        for event in events {
+                            // spawn each handler in separate task as it's time consuming
+                            // TODO: subscribe to circuit breaker and kill them faster if needed
+                            tasks.spawn(AlephZeroEventHandler::handle_event(
+                                event,
+                                Arc::clone(&config),
+                                Arc::clone(&eth_signed_connection),
+                            ));
+                        }
 
-                    while !tasks.is_empty() {
-                        select! {
-                            cb_event = circuit_breaker_receiver.recv() => {
-                                warn!("Exiting due to a circuit breaker event {cb_event:?}");
-                                return Ok(cb_event?);
-                            },
+                        // wait for all concurrent handler tasks to finish
+                        info!("Awaiting all handler tasks to finish");
 
-                            Some (result) = tasks.join_next() => {
-                                if let Err (why) = result {
+                        while let Some(result) = tasks.join_next().await {
+                            match result? {
+                                Ok(_) => {},
+                                Err(why) => {
+                                    warn!("Event handler failed {why:?}, opening circuit breaker");
                                     circuit_breaker_sender.send(CircuitBreakerEvent::AlephZeroEventHandlerFailure)?;
-                                    warn!("Event handler failed {why:?}, exiting");
-                                    return Ok(CircuitBreakerEvent::AlephZeroEventHandlerFailure);
-                                }
+                                },
                             }
                         }
-                    }
 
-                    info!("Acknowledging events batch");
-                    // marks the batch as done and releases the listener
-                    events_ack_sender
-                        .send(())
-                        .map_err(|_| AlephZeroEventsHandlerError::EventsAckReceiverDropped)?;
-                    info!("All events acknowledged");
+                        // marks the batch as done and notifies redis manager
+                        info!("Marking all events up to block {to_block} as handled");
+                        block_seal_sender.send (to_block).await?;
+                        Ok::<(), AlephZeroEventsHandlerError> (())
+                    });
+
+                    // let mut tasks = JoinSet::new();
+                    // for event in events {
+                    //     // spawn each handler in separate task as it's time consuming
+                    //     tasks.spawn(AlephZeroEventHandler::handle_event(
+                    //         event,
+                    //         Arc::clone(&config),
+                    //         Arc::clone(&eth_signed_connection),
+                    //     ));
+                    // }
+
+                    // // wait for all concurrent handler tasks to finish
+                    // info!("Awaiting all handler tasks to finish");
+
+                    // while !tasks.is_empty() {
+                    //     select! {
+                    //         cb_event = circuit_breaker_receiver.recv() => {
+                    //             warn!("Exiting due to a circuit breaker event {cb_event:?}");
+                    //             return Ok(cb_event?);
+                    //         },
+
+                    //         Some (result) = tasks.join_next() => {
+                    //             if let Err (why) = result {
+                    //                 circuit_breaker_sender.send(CircuitBreakerEvent::AlephZeroEventHandlerFailure)?;
+                    //                 warn!("Event handler failed {why:?}, exiting");
+                    //                 return Ok(CircuitBreakerEvent::AlephZeroEventHandlerFailure);
+                    //             }
+                    //         }
+                    //     }
+                    // }
+
+                    // info!("Acknowledging events batch");
+                    // // marks the batch as done and releases the listener
+                    // events_ack_sender
+                    //     .send(())
+                    //     .map_err(|_| AlephZeroEventsHandlerError::EventsAckReceiverDropped)?;
+                    // info!("All events acknowledged");
                 }
             }
         }

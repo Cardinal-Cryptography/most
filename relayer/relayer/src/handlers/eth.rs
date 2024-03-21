@@ -34,11 +34,11 @@ dest_receiver_address: {dest_receiver_address:?}\n
 request_nonce: {request_nonce:?}"
     )]
     ReceiveRequestTxFailure {
-        request_hash: [u8; 32],
+        request_hash: String, //[u8; 32],
         committee_id: u128,
-        dest_token_address: [u8; 32],
+        dest_token_address: String, //[u8; 32],
         amount: u128,
-        dest_receiver_address: [u8; 32],
+        dest_receiver_address: String, //[u8; 32],
         request_nonce: u128,
     },
 }
@@ -111,11 +111,11 @@ impl EthereumEventHandler {
                 // default AlephClient error is MBs large and useless, dumps the entire runtime for some reasons
                 // TODO: log hex encoded values for human consumption
                 .map_err(|_| EthereumEventHandlerError::ReceiveRequestTxFailure {
-                    request_hash,
+                    request_hash: hex::encode(request_hash),
                     committee_id,
-                    dest_token_address,
+                    dest_token_address: hex::encode(dest_token_address),
                     amount,
-                    dest_receiver_address,
+                    dest_receiver_address: hex::encode(dest_receiver_address),
                     request_nonce,
                 })?;
         }

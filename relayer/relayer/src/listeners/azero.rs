@@ -10,7 +10,7 @@ use subxt::events::Events;
 use thiserror::Error;
 use tokio::{
     select,
-    sync::{broadcast, mpsc, oneshot},
+    sync::{broadcast, mpsc},
     task::{JoinError, JoinSet},
     time::sleep,
 };
@@ -44,8 +44,11 @@ pub enum AlephZeroListenerError {
     #[error("Task join error")]
     Join(#[from] JoinError),
 
-    #[error("channel send error")]
-    Send(#[from] mpsc::error::SendError<AzeroMostEvents>),
+    #[error("events channel send error")]
+    EventsSend(#[from] mpsc::error::SendError<AzeroMostEvents>),
+
+    #[error("block seal send error")]
+    BlockSealSend(#[from] mpsc::error::SendError<u32>),
 
     #[error("broadcast send error")]
     Broadcast(#[from] broadcast::error::SendError<u32>),
@@ -64,6 +67,7 @@ impl AlephZeroListener {
         azero_events_sender: mpsc::Sender<AzeroMostEvents>,
         last_processed_block_number: broadcast::Sender<u32>,
         mut next_unprocessed_block_number: broadcast::Receiver<u32>,
+        block_seal_sender: mpsc::Sender<u32>,
         mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
     ) -> Result<CircuitBreakerEvent, AlephZeroListenerError> {
         let Config {
@@ -126,13 +130,22 @@ impl AlephZeroListener {
                         .collect::<Vec<ContractEvent>>();
 
                     if filtered_events.is_empty () {
-                        info!(target: "AlephZeroListener", "Marking {to_block} as the most recently seen block number");
-                        // send n+1 as the next block we want to start from
-                        last_processed_block_number.send(to_block + 1)?;
+
+                        select! {
+                            cb_event = circuit_breaker_receiver.recv () => {
+                                warn!(target: "AlephZeroListener", "Exiting before sending block seal request for {to_block} due to a circuit breaker event {cb_event:?}");
+                                return Ok(cb_event?);
+                            },
+
+                            Ok (_)= block_seal_sender.send (to_block) => {
+                                info!("Marking all events up to block {to_block} as handled");
+                            }
+
+                        }
+
                     } else {
 
-                        let (events_ack_sender, events_ack_receiver) = oneshot::channel::<()>();
-
+                        // there are events to handle
                         select! {
                             cb_event = circuit_breaker_receiver.recv () => {
                                 warn!(target: "AlephZeroListener", "Exiting before sending events due to a circuit breaker event {cb_event:?}");
@@ -142,28 +155,17 @@ impl AlephZeroListener {
                             Ok (_) = azero_events_sender
                                 .send(AzeroMostEvents {
                                     events: filtered_events.clone (),
-                                    events_ack_sender,
+                                    from_block: unprocessed_block_number,
+                                    to_block
                                 }) => {
                                     info!(target: "AlephZeroListener", "Sending a batch of {} events", &filtered_events.len());
                                 },
                         }
 
-                        info!(target: "AlephZeroListener", "Awaiting events ack");
-
-                        select! {
-                            cb_event = circuit_breaker_receiver.recv () => {
-                                warn!(target: "AlephZeroListener", "Exiting before sending events due to a circuit breaker event {cb_event:?}");
-                                return Ok(cb_event?);
-                            },
-
-                            ack_result = events_ack_receiver => {
-                                if ack_result.is_ok () {
-                                    info!(target: "AlephZeroListener", "Events ack received, marking {to_block} as the most recently seen block number");
-                                    last_processed_block_number.send(to_block + 1)?;
-                                }
-                            }
-                        }
                     }
+
+                    info!(target: "AlephZeroListener", "Sending {} as the next unprocessed block number", to_block + 1);
+                    last_processed_block_number.send(to_block + 1)?;
                 }
             }
         }
