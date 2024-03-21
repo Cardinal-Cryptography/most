@@ -105,6 +105,10 @@ deploy-eth-live: compile-eth
 	cd eth && \
 	npx hardhat run --network $(NETWORK) scripts/deploy_bridge_live.js
 
+.PHONY: deploy-live
+deploy-live: # Deploy azero and eth contracts on a live network (testnet or mainnet)
+deploy-live: deploy-azero setup-azero deploy-eth-live
+
 .PHONY: verify-eth
 verify-eth: # Post verified eth sources of a contract to etherscan
 verify-eth:
