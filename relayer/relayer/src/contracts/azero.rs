@@ -140,6 +140,23 @@ impl MostInstance {
             .await??)
     }
 
+    pub async fn needs_signature(
+        &self,
+        connection: &Connection,
+        request_hash: [u8; 32],
+        account: AccountId,
+    ) -> Result<bool, AzeroContractError> {
+        let response: Result<bool, _> = self
+            .contract
+            .contract_read(
+                connection,
+                "needs_signature",
+                &[bytes32_to_str(&request_hash), account.to_string()],
+            )
+            .await?;
+        Ok(response?)
+    }
+
     pub fn filter_events(
         &self,
         events: Events<AlephConfig>,

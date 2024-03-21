@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use aleph_client::{AsConnection, SignedConnectionApi};
 use ethers::utils::keccak256;
 use log::{debug, error, info, trace, warn};
 use thiserror::Error;
@@ -34,11 +35,11 @@ dest_receiver_address: {dest_receiver_address:?}\n
 request_nonce: {request_nonce:?}"
     )]
     ReceiveRequestTxFailure {
-        request_hash: String, //[u8; 32],
+        request_hash: String,
         committee_id: u128,
-        dest_token_address: String, //[u8; 32],
+        dest_token_address: String,
         amount: u128,
-        dest_receiver_address: String, //[u8; 32],
+        dest_receiver_address: String,
         request_nonce: u128,
     },
 }
@@ -96,6 +97,19 @@ impl EthereumEventHandler {
             let committee_id = committee_id.as_u128();
             let amount = amount.as_u128();
             let request_nonce = request_nonce.as_u128();
+
+            let signature_needed = contract
+                .needs_signature(
+                    azero_connection.as_connection(),
+                    request_hash,
+                    azero_connection.account_id().clone(),
+                )
+                .await?;
+
+            if !signature_needed {
+                info!("Guardian signature for {request_hash:?} no longer needed");
+                return Ok(());
+            }
 
             contract
                 .receive_request(
