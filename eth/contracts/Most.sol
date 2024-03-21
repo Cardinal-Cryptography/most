@@ -317,8 +317,24 @@ contract Most is
     function hasSignedRequest(
         address guardian,
         bytes32 hash
-    ) external view returns (bool) {
+    ) public view returns (bool) {
         return pendingRequests[hash].signatures[guardian];
+    }
+
+    function needsSignature(
+        bytes32 requestHash,
+        address account
+    ) external view returns (bool) {
+      if (!isInCommittee(committeeId, account)) {
+        return false;
+      }
+      if (processedRequests[requestHash]) {
+        return false;
+      }
+      if (hasSignedRequest(account, requestHash)) {
+        return false;
+      }
+      return true;
     }
 
     function isInCommittee(
