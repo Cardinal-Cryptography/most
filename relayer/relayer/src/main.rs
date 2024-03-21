@@ -221,14 +221,10 @@ fn run_relayer(
 ) {
     // Create channels
     let (eth_events_sender, eth_events_receiver) = mpsc::channel::<EthMostEvents>(1);
-    // TODO: use mpsc if we use seal block channel for eth
     let (eth_block_number_sender, _eth_block_number_receiver) = broadcast::channel::<u32>(1);
-    // TODO: create block seal channel for ethereum
 
     let (azero_events_sender, azero_events_receiver) = mpsc::channel::<AzeroMostEvents>(32);
-    // TODO: this should be mpsc
     let (azero_block_number_sender, _azero_block_number_receiver) = broadcast::channel::<u32>(1);
-
     let (azero_block_seal_sender, azero_block_seal_receiver) = mpsc::channel::<u32>(1);
 
     let (circuit_breaker_sender, _circuit_breaker_receiver) =
