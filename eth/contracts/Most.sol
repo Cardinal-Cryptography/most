@@ -22,7 +22,7 @@ contract Most is
 
     /// @dev This amount of gas should be sufficient for ether transfers
     /// and simple fallback function execution, yet still protecting against reentrancy attack.
-    uint256 private constant GAS_LIMIT = 3500;
+    uint256 public constant GAS_LIMIT = 3500;
 
     uint256 public requestNonce;
     uint256 public committeeId;
