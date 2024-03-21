@@ -221,14 +221,13 @@ fn run_relayer(
     eth_signed_connection: Arc<SignedEthConnection>,
 ) {
     // Create channels
-    // TODO: tweak channel buffers
     let (eth_events_sender, eth_events_receiver) = mpsc::channel::<EthMostEvents>(1);
-    // TODO: mpsc
+    // TODO: use mpsc if we use seal block channel for eth
     let (eth_block_number_sender, _eth_block_number_receiver) = broadcast::channel::<u32>(1);
-    // TODO: block seal channel
+    // TODO: create block seal channel for ethereum
 
     let (azero_events_sender, azero_events_receiver) = mpsc::channel::<AzeroMostEvents>(32);
-    // TODO: mpsc
+    // TODO: this should be mpsc
     let (azero_block_number_sender, _azero_block_number_receiver) = broadcast::channel::<u32>(1);
 
     let (azero_block_seal_sender, azero_block_seal_receiver) = mpsc::channel::<u32>(1);

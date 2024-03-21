@@ -38,7 +38,6 @@ impl RedisManager {
         next_unprocessed_block_number_eth: broadcast::Sender<u32>,
         mut last_processed_block_number_eth: broadcast::Receiver<u32>,
         next_unprocessed_block_number_azero: broadcast::Sender<u32>,
-        // mut last_processed_block_number_azero: broadcast::Receiver<u32>,
         mut block_seal_receiver_azero: mpsc::Receiver<u32>,
         mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
     ) -> Result<CircuitBreakerEvent, RedisManagerError> {
@@ -105,7 +104,6 @@ impl RedisManager {
                 Ok (last_processed_block_number) = last_processed_block_number_eth.recv() => {
 
                     let seal_block_number = last_processed_block_number - 1;
-
                     info!("Caching {seal_block_number} block number for ethereum");
 
                     write_block_number(
@@ -128,17 +126,6 @@ impl RedisManager {
                     )?;
                 }
 
-                // Ok (last_processed_block_number) = last_processed_block_number_azero.recv () => {
-
-                //     info!("Caching {last_processed_block_number} block number for AlephZero");
-
-                //     write_block_number(
-                //         name.clone(),
-                //         ALEPH_BLOCK_KEY.to_string(),
-                //         Arc::clone(&redis_connection),
-                //         last_processed_block_number,
-                //     )?;
-                // }
             }
         }
     }

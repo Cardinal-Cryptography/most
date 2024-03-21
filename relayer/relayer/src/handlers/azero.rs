@@ -14,7 +14,7 @@ use subxt::utils::H256;
 use thiserror::Error;
 use tokio::{
     select,
-    sync::{broadcast, mpsc, oneshot},
+    sync::{broadcast, mpsc},
     task::{JoinError, JoinSet},
     time::{sleep, Duration},
 };
@@ -156,9 +156,6 @@ impl AlephZeroEventHandler {
 #[error(transparent)]
 #[non_exhaustive]
 pub enum AlephZeroEventsHandlerError {
-    #[error("events ack receiver dropped")]
-    EventsAckReceiverDropped,
-
     #[error("broadcast receive error")]
     BroadcastReceive(#[from] broadcast::error::RecvError),
 
@@ -212,7 +209,6 @@ impl AlephZeroEventsHandler {
                         let mut tasks = JoinSet::new();
                         for event in events {
                             // spawn each handler in separate task as it's time consuming
-                            // TODO: subscribe to circuit breaker and kill them faster if needed
                             tasks.spawn(AlephZeroEventHandler::handle_event(
                                 event,
                                 Arc::clone(&config),
@@ -239,42 +235,6 @@ impl AlephZeroEventsHandler {
                         Ok::<(), AlephZeroEventsHandlerError> (())
                     });
 
-                    // let mut tasks = JoinSet::new();
-                    // for event in events {
-                    //     // spawn each handler in separate task as it's time consuming
-                    //     tasks.spawn(AlephZeroEventHandler::handle_event(
-                    //         event,
-                    //         Arc::clone(&config),
-                    //         Arc::clone(&eth_signed_connection),
-                    //     ));
-                    // }
-
-                    // // wait for all concurrent handler tasks to finish
-                    // info!("Awaiting all handler tasks to finish");
-
-                    // while !tasks.is_empty() {
-                    //     select! {
-                    //         cb_event = circuit_breaker_receiver.recv() => {
-                    //             warn!("Exiting due to a circuit breaker event {cb_event:?}");
-                    //             return Ok(cb_event?);
-                    //         },
-
-                    //         Some (result) = tasks.join_next() => {
-                    //             if let Err (why) = result {
-                    //                 circuit_breaker_sender.send(CircuitBreakerEvent::AlephZeroEventHandlerFailure)?;
-                    //                 warn!("Event handler failed {why:?}, exiting");
-                    //                 return Ok(CircuitBreakerEvent::AlephZeroEventHandlerFailure);
-                    //             }
-                    //         }
-                    //     }
-                    // }
-
-                    // info!("Acknowledging events batch");
-                    // // marks the batch as done and releases the listener
-                    // events_ack_sender
-                    //     .send(())
-                    //     .map_err(|_| AlephZeroEventsHandlerError::EventsAckReceiverDropped)?;
-                    // info!("All events acknowledged");
                 }
             }
         }

@@ -41,8 +41,6 @@ pub enum EthereumListenerError {
 
     #[error("channel receive error")]
     Receive(#[from] broadcast::error::RecvError),
-    // #[error("sender dropped before ack was received")]
-    // AckSenderDropped,
 }
 
 impl EthereumListener {
