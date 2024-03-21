@@ -12,7 +12,7 @@ import {
   import_env,
   storeAddresses,
   Addresses,
-  import_eth_addresses
+  import_eth_addresses,
 } from "./utils";
 import "dotenv/config";
 import "@polkadot/api-augment";
@@ -61,7 +61,7 @@ async function main(): Promise<void> {
     max_gas_price,
     default_gas_price,
     tokens,
-    dev
+    dev,
   } = config;
 
   const wsProvider = new WsProvider(ws_node);
@@ -179,9 +179,9 @@ async function main(): Promise<void> {
     const { address } = await deployToken(tokenArgs, api, deployer);
     console.log(token.symbol, "address:", address);
 
-    let ethAddress = token.checkAddress ?
-      ethAddresses[token.checkAddress] :
-      token.ethAddress!;
+    let ethAddress = token.checkAddress
+      ? ethAddresses[token.checkAddress]
+      : token.ethAddress!;
 
     tokenAddresses.push([ethAddress, address]);
   }
