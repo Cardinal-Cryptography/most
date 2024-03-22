@@ -10,7 +10,6 @@ use ethers::{
     utils::keccak256,
 };
 use log::{debug, error, info, warn};
-use subxt::utils::H256;
 use thiserror::Error;
 use tokio::{
     select,
@@ -23,7 +22,7 @@ use crate::{
     config::Config,
     connections::eth::SignedEthConnection,
     contracts::{get_request_event_data, AzeroContractError, CrosschainTransferRequestData, Most},
-    listeners::{get_next_finalized_block_number_eth, AzeroMostEvents, ETH_BLOCK_PROD_TIME_SEC},
+    listeners::{AzeroMostEvents, ETH_BLOCK_PROD_TIME_SEC},
     CircuitBreakerEvent,
 };
 
@@ -252,31 +251,3 @@ impl AlephZeroEventsHandler {
         }
     }
 }
-
-// async fn wait_for_eth_tx_finality(
-//     eth_connection: Arc<SignedEthConnection>,
-//     tx_hash: H256,
-// ) -> Result<(), AlephZeroEventHandlerError> {
-//     info!("Waiting for tx finality: {tx_hash:?}");
-//     loop {
-//         sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
-
-//         let connection_rc = Arc::new(eth_connection.provider().clone());
-//         let finalized_head_number = get_next_finalized_block_number_eth(connection_rc, 0).await;
-
-//         match eth_connection.get_transaction(tx_hash).await {
-//             Ok(Some(tx)) => {
-//                 if let Some(block_number) = tx.block_number {
-//                     if block_number <= finalized_head_number.into() {
-//                         info!("Eth tx {tx_hash:?} finalized");
-//                         return Ok(());
-//                     }
-//                 }
-//             }
-//             Err(err) => {
-//                 error!("Failed to get tx that should be present: {err}");
-//             }
-//             Ok(None) => panic!("Transaction {tx_hash:?} for which finality we were waiting is no longer included in the chain, aborting..."),
-//         };
-//     }
-// }
