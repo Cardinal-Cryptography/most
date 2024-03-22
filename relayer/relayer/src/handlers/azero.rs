@@ -98,13 +98,14 @@ impl AlephZeroEventHandler {
                 debug!("ABI event encoding: 0x{}", hex::encode(bytes.clone()));
 
                 let request_hash = keccak256(bytes);
+                let request_hash_hex = hex::encode(request_hash);
 
-                info!("hashed event encoding: 0x{}", hex::encode(request_hash));
+                info!("hashed event encoding: 0x{}", request_hash_hex);
 
                 let address = eth_contract_address.parse::<Address>()?;
                 let contract = Most::new(address, eth_signed_connection.clone());
 
-                if !contract
+                while contract
                     .needs_signature(
                         request_hash,
                         eth_signed_connection.address(),
@@ -112,52 +113,52 @@ impl AlephZeroEventHandler {
                     )
                     .await?
                 {
-                    info!("Guardian signature for {request_hash:?} no longer needed");
-                    return Ok(());
-                }
+                    // TODO: dry run the tx first
+                    // forward transfer & vote
+                    let call: ContractCall<SignedEthConnection, ()> = contract.receive_request(
+                        request_hash,
+                        committee_id.into(),
+                        dest_token_address,
+                        amount.into(),
+                        dest_receiver_address,
+                        request_nonce.into(),
+                    );
 
-                // TODO: dry run the tx first
-                // forward transfer & vote
-                let call: ContractCall<SignedEthConnection, ()> = contract.receive_request(
-                    request_hash,
-                    committee_id.into(),
-                    dest_token_address,
-                    amount.into(),
-                    dest_receiver_address,
-                    request_nonce.into(),
+                    info!(
+                    "Sending tx with nonce {} to the Ethereum network and waiting for {} confirmations.",
+                    request_nonce,
+                    eth_tx_min_confirmations
                 );
 
-                info!(
-                "Sending tx with request nonce {} to the Ethereum network and waiting for {} confirmations.",
-                request_nonce,
-                eth_tx_min_confirmations
-            );
+                    // This shouldn't fail unless there is something wrong with our config.
+                    // NOTE: this does not check whether the actual tx reverted on-chain. Reverts are only checked on dry-run.
+                    let receipt = call
+                        .gas(config.eth_gas_limit)
+                        .nonce(eth_signed_connection.inner().next())
+                        .send()
+                        .await?
+                        .confirmations(*eth_tx_min_confirmations)
+                        .retries(*eth_tx_submission_retries)
+                        .await?
+                        .ok_or(AlephZeroEventHandlerError::TxNotPresentInBlockOrMempool)?;
 
-                // This shouldn't fail unless there is something wrong with our config.
-                // NOTE: this does not check whether the actual tx reverted on-chain. Reverts are only checked on dry-run.
-                let receipt = call
-                    .gas(config.eth_gas_limit)
-                    .nonce(eth_signed_connection.inner().next())
-                    .send()
-                    .await?
-                    .confirmations(*eth_tx_min_confirmations)
-                    .retries(*eth_tx_submission_retries)
-                    .await?
-                    .ok_or(AlephZeroEventHandlerError::TxNotPresentInBlockOrMempool)?;
+                    let tx_hash = receipt.transaction_hash;
+                    let tx_status = receipt.status;
 
-                let tx_hash = receipt.transaction_hash;
-                let tx_status = receipt.status;
+                    // Check if the tx reverted.
+                    if tx_status == Some(U64::from(0)) {
+                        warn!(
+                        "Tx with nonce {request_nonce} has been sent to the Ethereum network: {tx_hash:?} but it reverted."
+                    );
+                        return Err(AlephZeroEventHandlerError::EthContractReverted);
+                    }
 
-                // Check if the tx reverted.
-                if tx_status == Some(U64::from(0)) {
-                    warn!(
-                    "Tx with nonce {request_nonce} has been sent to the Ethereum network: {tx_hash:?} but it reverted."
-                );
-                    return Err(AlephZeroEventHandlerError::EthContractReverted);
+                    info!("Tx with nonce {request_nonce} has been sent to the Ethereum network: {tx_hash:?} and received {eth_tx_min_confirmations} confirmations.");
+
+                    sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
                 }
 
-                info!("Tx with nonce {request_nonce} has been sent to the Ethereum network: {tx_hash:?} and received {eth_tx_min_confirmations} confirmations.");
-                wait_for_eth_tx_finality(eth_signed_connection, tx_hash).await?;
+                info!("Guardian signature for {request_hash:?} no longer needed");
             }
         }
         Ok(())
@@ -252,30 +253,30 @@ impl AlephZeroEventsHandler {
     }
 }
 
-async fn wait_for_eth_tx_finality(
-    eth_connection: Arc<SignedEthConnection>,
-    tx_hash: H256,
-) -> Result<(), AlephZeroEventHandlerError> {
-    info!("Waiting for tx finality: {tx_hash:?}");
-    loop {
-        sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
+// async fn wait_for_eth_tx_finality(
+//     eth_connection: Arc<SignedEthConnection>,
+//     tx_hash: H256,
+// ) -> Result<(), AlephZeroEventHandlerError> {
+//     info!("Waiting for tx finality: {tx_hash:?}");
+//     loop {
+//         sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
 
-        let connection_rc = Arc::new(eth_connection.provider().clone());
-        let finalized_head_number = get_next_finalized_block_number_eth(connection_rc, 0).await;
+//         let connection_rc = Arc::new(eth_connection.provider().clone());
+//         let finalized_head_number = get_next_finalized_block_number_eth(connection_rc, 0).await;
 
-        match eth_connection.get_transaction(tx_hash).await {
-            Ok(Some(tx)) => {
-                if let Some(block_number) = tx.block_number {
-                    if block_number <= finalized_head_number.into() {
-                        info!("Eth tx {tx_hash:?} finalized");
-                        return Ok(());
-                    }
-                }
-            }
-            Err(err) => {
-                error!("Failed to get tx that should be present: {err}");
-            }
-            Ok(None) => panic!("Transaction {tx_hash:?} for which finality we were waiting is no longer included in the chain, aborting..."),
-        };
-    }
-}
+//         match eth_connection.get_transaction(tx_hash).await {
+//             Ok(Some(tx)) => {
+//                 if let Some(block_number) = tx.block_number {
+//                     if block_number <= finalized_head_number.into() {
+//                         info!("Eth tx {tx_hash:?} finalized");
+//                         return Ok(());
+//                     }
+//                 }
+//             }
+//             Err(err) => {
+//                 error!("Failed to get tx that should be present: {err}");
+//             }
+//             Ok(None) => panic!("Transaction {tx_hash:?} for which finality we were waiting is no longer included in the chain, aborting..."),
+//         };
+//     }
+// }
