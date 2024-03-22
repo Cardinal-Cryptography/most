@@ -8,7 +8,7 @@ edition = "2021"
 ink = { version = "=4.3.0", default-features = false }
 ink_e2e = "=4.3.0"
 most = { path = "../most", package = "most", features = ["ink-as-dependency"] }
-psp22 = "0.2.0"
+psp22 = "0.2.2"
 scale = { package = "parity-scale-codec", version = "3", default-features = false, features = ["derive"] }
 shared = { path = "../shared" }
 subxt = "0.31.0"

@@ -6,7 +6,7 @@ edition = "2021"
 
 [dependencies]
 ink = { version = "=4.3.0", default-features = false }
-psp22 = { version = "0.2.0", default-features = false }
+psp22 = { version = "0.2.2", default-features = false }
 
 scale = { package = "parity-scale-codec", version = "3", default-features = false, features = [
       "derive",
