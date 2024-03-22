@@ -65,17 +65,20 @@ pub mod token {
             minter_burner: AccountId,
         ) -> Self {
             let caller = Self::env().caller();
-            let data = PSP22Data::new(total_supply, caller);
+            let (data, events) = PSP22Data::new(total_supply, caller);
             let ownable_data = Ownable2StepData::new(caller);
 
-            Self {
+            let contract = Self {
                 data,
                 ownable_data,
                 name,
                 symbol,
                 decimals,
                 minter_burner,
-            }
+            };
+
+            contract.emit_events(events);
+            contract
         }
 
         #[ink(message)]
