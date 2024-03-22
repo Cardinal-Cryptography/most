@@ -603,9 +603,9 @@ dependencies = [
 
 [[package]]
 name = "psp22"
-version = "0.2.0"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "701aea3ff70bbecb49f4a664d25292076f13bbe5592406e2ca4bddf448c37fe0"
+checksum = "5a9bdae21c2e17b9501b2c3f8597a679cfbe2f81ec5432091bd8d4b156f66194"
 dependencies = [
  "ink",
  "parity-scale-codec",
