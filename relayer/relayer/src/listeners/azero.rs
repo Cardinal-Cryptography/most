@@ -10,7 +10,7 @@ use subxt::events::Events;
 use thiserror::Error;
 use tokio::{
     select,
-    sync::{broadcast, mpsc},
+    sync::{broadcast, mpsc, oneshot},
     task::{JoinError, JoinSet},
     time::sleep,
 };
@@ -145,6 +145,8 @@ impl AlephZeroListener {
 
                     } else {
 
+                        let (ack_sender, ack_receiver) = oneshot::channel::<()> ();
+
                         // there are events to handle
                         select! {
                             cb_event = circuit_breaker_receiver.recv () => {
@@ -156,10 +158,23 @@ impl AlephZeroListener {
                                 .send(AzeroMostEvents {
                                     events: filtered_events.clone (),
                                     from_block: unprocessed_block_number,
-                                    to_block
+                                    to_block,
+                                    ack: ack_sender
                                 }) => {
                                     info!(target: "AlephZeroListener", "Sending a batch of {} events", &filtered_events.len());
                                 },
+                        }
+
+                        // block until this events batch is handled & notify cache manager
+                        select! {
+                            cb_event = circuit_breaker_receiver.recv () => {
+                                warn!(target: "AlephZeroListener", "Exiting before sealing {to_block} due to a circuit breaker event {cb_event:?}");
+                                return Ok(cb_event?);
+                            },
+                            _ = ack_receiver => {
+                                info!("Marking all events up to block {to_block} as handled");
+                                block_seal_sender.send (to_block) .await?;
+                            }
                         }
 
                     }

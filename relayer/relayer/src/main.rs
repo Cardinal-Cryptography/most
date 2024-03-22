@@ -313,7 +313,6 @@ fn run_relayer(
             Arc::clone(&config),
             Arc::clone(&eth_signed_connection),
             azero_events_receiver,
-            azero_block_seal_sender.clone(),
             circuit_breaker_sender.clone(),
             circuit_breaker_sender.subscribe(),
         )

@@ -188,7 +188,6 @@ impl AlephZeroEventsHandler {
         config: Arc<Config>,
         eth_signed_connection: Arc<SignedEthConnection>,
         mut azero_events_receiver: mpsc::Receiver<AzeroMostEvents>,
-        block_seal_sender: mpsc::Sender<u32>,
         circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
         mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
     ) -> Result<CircuitBreakerEvent, AlephZeroEventsHandlerError> {
@@ -204,15 +203,15 @@ impl AlephZeroEventsHandler {
                 Some(azero_events) = azero_events_receiver.recv() => {
                     let AzeroMostEvents {
                         events,
+                        from_block,
                         to_block,
                         ..
                     } = azero_events;
 
-                    info!("Received a batch of {} events", events.len());
+                    info!("Received a batch of {} events from blocks {from_block} to {to_block}", events.len());
 
                     let config = Arc::clone(&config);
                     let eth_signed_connection = Arc::clone(&eth_signed_connection);
-                    let block_seal_sender = block_seal_sender.clone ();
                     let circuit_breaker_sender = circuit_breaker_sender.clone ();
 
                     // spawn non-blocking task to handle all events w-out blocking the events publisher
@@ -240,9 +239,6 @@ impl AlephZeroEventsHandler {
                             }
                         }
 
-                        // marks the batch as done and notifies redis manager
-                        info!("Marking all events up to block {to_block} as handled");
-                        block_seal_sender.send (to_block).await?;
                         Ok::<(), AlephZeroEventsHandlerError> (())
                     });
 
