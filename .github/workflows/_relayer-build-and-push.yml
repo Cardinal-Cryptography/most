@@ -144,7 +144,7 @@ jobs:
           mkdir -p eth/artifacts/contracts/Most.sol
           cp -rf '${{ env.TMP_ARTIFACT_ETH_MOST_DIR }}'/Most.json eth/artifacts/contracts/Most.sol/Most.json
 
-          docker_tag=${{ steps.get-ref-properties.outputs.sha }}-${{ inputs.environment }}-${{ inputs.frontend-environment }}
+          docker_tag=${{ steps.get-ref-properties.outputs.sha }}
           docker_name=most-relayer-${docker_tag}
 
           make build-docker-relayer \
