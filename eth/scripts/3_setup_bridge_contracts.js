@@ -196,7 +196,7 @@ async function main() {
     console.log("signer0", signer0.address);
     console.log("signer1", signer1.address);
 
-    for (let [ethAddress, azeroAddress] of azeroContracts.tokens) {
+    for (let [_, ethAddress, azeroAddress] of azeroContracts.tokens) {
       await addTokenPair(ethAddress, azeroAddress, most, [safeSdk0, safeSdk1]);
     }
 

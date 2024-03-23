@@ -4,23 +4,30 @@ import Token from "../types/contracts/token";
 import {
   import_env,
   import_azero_addresses,
-  import_eth_addresses,
   accountIdToHex,
   hexToBytes,
 } from "./utils";
 import { ethers } from "ethers";
-import type BN from "bn.js";
 
 const envFile = process.env.AZERO_ENV;
+
+function getTokenAddresses(addresses, tokenName): [string, string] {
+  for (let [_, ethAddress, azeroAddress] of addresses.tokens) {
+    if (tokenName == tokenName) {
+      return [ethAddress, azeroAddress];
+    }
+  }
+}
 
 // bridges (redeems) 1 unit of wETH from AlephZero to Ethereum
 async function main(): Promise<void> {
   const config = await import_env(envFile);
   const { ws_node, deployer_seed } = config;
 
-  const { weth: weth_eth } = await import_eth_addresses();
+  const addresses = await import_azero_addresses();
+  const weth_azero = getTokenAddresses(addresses, "weth")[1];
 
-  const { most: most_azero, weth: weth_azero } = await import_azero_addresses();
+  const { most: most_azero } = await import_azero_addresses();
 
   const wsProvider = new WsProvider(ws_node);
   const keyring = new Keyring({ type: "sr25519" });
@@ -72,10 +79,12 @@ async function main(): Promise<void> {
     ethers.zeroPadValue(ethers.getBytes(receiver), 32),
   );
 
+  const value = 1000000000000000;
   let tx = await most.tx.sendRequest(
     srcTokenAddress,
     amount,
     destReceiverAddress,
+    { value },
   );
 
   console.log(

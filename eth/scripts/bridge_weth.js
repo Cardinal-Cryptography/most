@@ -18,7 +18,8 @@ async function main() {
   const receiver = "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY";
 
   const WETH = artifacts.require("WETH9");
-  const weth = await WETH.at(addresses.weth);
+  const wethAddress = addresses.weth;
+  const weth = await WETH.at(wethAddress);
 
   // check senders balance
   let query = await weth.balanceOf(accounts[0]);
@@ -47,10 +48,7 @@ async function main() {
   // approve Most
   await weth.approve(addresses.most, amount);
 
-  let srcTokenAddress = ethers.zeroPadValue(
-    ethers.getBytes(addresses.weth),
-    32,
-  );
+  let srcTokenAddress = ethers.zeroPadValue(ethers.getBytes(wethAddress), 32);
 
   const destReceiverAddress = u8aToHex(
     new Keyring({ type: "sr25519" }).decodeAddress(receiver),
