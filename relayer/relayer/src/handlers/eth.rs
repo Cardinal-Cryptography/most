@@ -100,7 +100,7 @@ impl EthereumEventHandler {
                     request_nonce,
                 )
                 .await
-                // default AlephClient error is MBs large and useless, dumps the entire runtime for some reasons
+                // default AlephClient error is MBs large and useless, dumps the entire runtime for some reason
                 .map_err(|_| EthereumEventHandlerError::ReceiveRequestTxFailure {
                     request_hash: hex::encode(request_hash),
                     committee_id,
