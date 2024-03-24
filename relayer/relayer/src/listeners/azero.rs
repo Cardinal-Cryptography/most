@@ -65,8 +65,8 @@ impl AlephZeroListener {
         config: Arc<Config>,
         azero_connection: Arc<Connection>,
         azero_events_sender: mpsc::Sender<AzeroMostEvents>,
-        last_processed_block_number: broadcast::Sender<u32>,
-        mut next_unprocessed_block_number: broadcast::Receiver<u32>,
+        next_processed_block_number_send: broadcast::Sender<u32>,
+        mut next_unprocessed_block_number_recv: broadcast::Receiver<u32>,
         block_seal_sender: mpsc::Sender<u32>,
         mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
     ) -> Result<CircuitBreakerEvent, AlephZeroListenerError> {
@@ -95,7 +95,7 @@ impl AlephZeroListener {
                     return Ok(cb_event?);
                 },
 
-                Ok (unprocessed_block_number) = next_unprocessed_block_number.recv() => {
+                Ok (unprocessed_block_number) = next_unprocessed_block_number_recv.recv() => {
 
                     // Query for the next unknown finalized block number, if not present we wait for it
                     let next_finalized_block_number = get_next_finalized_block_number_azero(
@@ -130,7 +130,6 @@ impl AlephZeroListener {
                         .collect::<Vec<ContractEvent>>();
 
                     if filtered_events.is_empty () {
-
                         select! {
                             cb_event = circuit_breaker_receiver.recv () => {
                                 warn!(target: "AlephZeroListener", "Exiting before sending block seal request for {to_block} due to a circuit breaker event {cb_event:?}");
@@ -144,7 +143,6 @@ impl AlephZeroListener {
                         }
 
                     } else {
-
                         let (ack_sender, ack_receiver) = oneshot::channel::<()> ();
 
                         // there are events to handle
@@ -180,7 +178,7 @@ impl AlephZeroListener {
                     }
 
                     info!(target: "AlephZeroListener", "Sending {} as the next unprocessed block number", to_block + 1);
-                    last_processed_block_number.send(to_block + 1)?;
+                    next_processed_block_number_send.send(to_block + 1)?;
                 }
             }
         }

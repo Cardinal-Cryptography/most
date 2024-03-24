@@ -110,7 +110,7 @@ impl RedisManager {
                         name.clone(),
                         ETH_BLOCK_KEY.to_string(),
                         Arc::clone(&redis_connection),
-                        seal_block_number
+                        seal_block_number + 1
                     )?;
                 },
 
@@ -122,7 +122,7 @@ impl RedisManager {
                         name.clone(),
                         ALEPH_BLOCK_KEY.to_string(),
                         Arc::clone(&redis_connection),
-                        seal_block_number,
+                        seal_block_number + 1,
                     )?;
                 }
 

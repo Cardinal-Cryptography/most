@@ -202,6 +202,9 @@ pub enum AlephZeroEventsHandlerError {
 
     #[error("Task join error")]
     Join(#[from] JoinError),
+
+    #[error("Ack")]
+    Ack,
 }
 
 pub struct AlephZeroEventsHandler;
@@ -228,7 +231,7 @@ impl AlephZeroEventsHandler {
                         events,
                         from_block,
                         to_block,
-                        ..
+                        ack,
                     } = azero_events;
 
                     info!("Received a batch of {} events from blocks {from_block} to {to_block}", events.len());
@@ -262,6 +265,9 @@ impl AlephZeroEventsHandler {
                             }
                         }
 
+                        if ack.send(()).is_err() {
+                            return Err(AlephZeroEventsHandlerError::Ack);
+                        }
                         Ok::<(), AlephZeroEventsHandlerError> (())
                     });
 
