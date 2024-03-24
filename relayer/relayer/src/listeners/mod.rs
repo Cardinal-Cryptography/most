@@ -18,7 +18,7 @@ pub struct AzeroMostEvents {
     pub events: Vec<ContractEvent>,
     pub from_block: u32,
     pub to_block: u32,
-    pub ack: oneshot::Sender<()>,
+    pub ack: oneshot::Sender<u32>,
 }
 
 pub use advisory::*;

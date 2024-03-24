@@ -1,13 +1,11 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
-use aleph_client::{AsConnection, SignedConnectionApi};
 use ethers::utils::keccak256;
 use log::{debug, error, info, trace, warn};
 use thiserror::Error;
 use tokio::{
     select,
     sync::{broadcast, mpsc},
-    time::sleep,
 };
 
 use crate::{
@@ -15,7 +13,7 @@ use crate::{
     connections::azero::AzeroConnectionWithSigner,
     contracts::{AzeroContractError, CrosschainTransferRequestFilter, MostEvents, MostInstance},
     helpers::concat_u8_arrays,
-    listeners::{EthMostEvents, ALEPH_BLOCK_PROD_TIME_SEC},
+    listeners::EthMostEvents,
     CircuitBreakerEvent,
 };
 

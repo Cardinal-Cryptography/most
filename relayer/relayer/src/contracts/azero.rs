@@ -173,7 +173,7 @@ impl MostInstance {
             .await??)
     }
 
-    pub async fn needs_signature(
+    pub async fn _needs_signature(
         &self,
         connection: &Connection,
         request_hash: [u8; 32],

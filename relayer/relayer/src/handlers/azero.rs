@@ -253,7 +253,7 @@ impl AlephZeroEventsHandler {
                         }
 
                         // wait for all concurrent handler tasks to finish
-                        info!("Awaiting all handler tasks to finish");
+                        info!("Awaiting all event handler tasks for blocks {}-{} to finish", from_block, to_block);
 
                         while let Some(result) = tasks.join_next().await {
                             match result? {
@@ -265,7 +265,7 @@ impl AlephZeroEventsHandler {
                             }
                         }
 
-                        if ack.send(()).is_err() {
+                        if ack.send(to_block).is_err() {
                             return Err(AlephZeroEventsHandlerError::Ack);
                         }
                         Ok::<(), AlephZeroEventsHandlerError> (())

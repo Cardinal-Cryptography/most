@@ -4,8 +4,10 @@ use ethers::{
     abi::Address,
     core::{types::H256, utils::hash_message},
     prelude::{
-        nonce_manager::NonceManagerError, signer::SignerMiddlewareError, MiddlewareBuilder,
-        NonceManagerMiddleware, SignerMiddleware,
+        gas_escalator::{Frequency, GeometricGasPrice},
+        nonce_manager::NonceManagerError,
+        signer::SignerMiddlewareError,
+        GasEscalatorMiddleware, MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware,
     },
     providers::{Http, Provider, ProviderExt},
     signers::{LocalWallet, Signer},
@@ -19,7 +21,7 @@ use tokio::sync::Mutex;
 
 pub type EthConnection = Provider<Http>;
 pub type SignedEthConnection =
-    SignerMiddleware<NonceManagerMiddleware<EthConnection>, EthereumSigner>;
+    SignerMiddleware<NonceManagerMiddleware<GasEscalatorMiddleware<EthConnection>>, EthereumSigner>;
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -27,11 +29,15 @@ pub type SignedEthConnection =
 pub enum EthConnectionError {
     #[error("Signer error")]
     SignerMiddleware(
-        #[from] SignerMiddlewareError<NonceManagerMiddleware<EthConnection>, EthereumSigner>,
+        #[from]
+        SignerMiddlewareError<
+            NonceManagerMiddleware<GasEscalatorMiddleware<EthConnection>>,
+            EthereumSigner,
+        >,
     ),
 
     #[error("Nonce manager error")]
-    NonceManager(#[from] NonceManagerError<Provider<Http>>),
+    NonceManager(#[from] NonceManagerError<GasEscalatorMiddleware<Provider<Http>>>),
 
     #[error("Join error {0}")]
     Join(#[from] tokio::task::JoinError),
@@ -232,9 +238,15 @@ pub async fn with_signer(
 async fn with_nonce_manager(
     connection: EthConnection,
     address: Address,
-) -> Result<NonceManagerMiddleware<Provider<Http>>, EthConnectionError> {
-    let nonce_manager = connection.nonce_manager(address);
+) -> Result<NonceManagerMiddleware<GasEscalatorMiddleware<EthConnection>>, EthConnectionError> {
+    let escalator = with_gas_escalator(connection).await;
+    let nonce_manager = escalator.nonce_manager(address);
     nonce_manager.initialize_nonce(None).await?;
 
     Ok(nonce_manager)
+}
+
+async fn with_gas_escalator(connection: EthConnection) -> GasEscalatorMiddleware<EthConnection> {
+    let escalator = GeometricGasPrice::new(1.125, 15u64, None::<u64>);
+    GasEscalatorMiddleware::new(connection, escalator, Frequency::PerBlock)
 }
