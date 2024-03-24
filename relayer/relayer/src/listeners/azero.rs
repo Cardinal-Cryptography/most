@@ -69,8 +69,8 @@ impl AlephZeroListener {
         config: Arc<Config>,
         azero_connection: Arc<Connection>,
         azero_events_sender: mpsc::Sender<AzeroMostEvents>,
-        next_block_to_process_send: broadcast::Sender<u32>,
-        mut next_block_to_process_recv: broadcast::Receiver<u32>,
+        next_block_to_process_sender: broadcast::Sender<u32>,
+        mut next_block_to_process_receiver: broadcast::Receiver<u32>,
         block_seal_sender: mpsc::Sender<u32>,
         mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
     ) -> Result<CircuitBreakerEvent, AlephZeroListenerError> {
@@ -101,7 +101,7 @@ impl AlephZeroListener {
                     return Ok(cb_event?);
                 },
 
-                Ok (unprocessed_block_number) = next_block_to_process_recv.recv() => {
+                Ok (unprocessed_block_number) = next_block_to_process_receiver.recv() => {
 
                     // Query for the next unknown finalized block number, if not present we wait for it
                     let next_finalized_block_number = get_next_finalized_block_number_azero(
@@ -156,7 +156,7 @@ impl AlephZeroListener {
                     }
 
                     info!(target: "AlephZeroListener", "Sending {} as the next unprocessed block number", to_block + 1);
-                    next_block_to_process_send.send(to_block + 1)?;
+                    next_block_to_process_sender.send(to_block + 1)?;
                 },
                 Some(processed_block_res) = event_batch_ack_receiver.next() => {
                     let processed_block = processed_block_res?;
