@@ -91,38 +91,26 @@ impl EthereumEventHandler {
             let amount = amount.as_u128();
             let request_nonce = request_nonce.as_u128();
 
-            while contract
-                .needs_signature(
-                    azero_connection.as_connection(),
+            contract
+                .receive_request(
+                    azero_connection,
                     request_hash,
-                    azero_connection.account_id().clone(),
                     committee_id,
+                    dest_token_address,
+                    amount,
+                    dest_receiver_address,
+                    request_nonce,
                 )
-                .await?
-            {
-                contract
-                    .receive_request(
-                        azero_connection,
-                        request_hash,
-                        committee_id,
-                        dest_token_address,
-                        amount,
-                        dest_receiver_address,
-                        request_nonce,
-                    )
-                    .await
-                    // default AlephClient error is MBs large and useless, dumps the entire runtime for some reasons
-                    .map_err(|_| EthereumEventHandlerError::ReceiveRequestTxFailure {
-                        request_hash: hex::encode(request_hash),
-                        committee_id,
-                        dest_token_address: hex::encode(dest_token_address),
-                        amount,
-                        dest_receiver_address: hex::encode(dest_receiver_address),
-                        request_nonce,
-                    })?;
-
-                sleep(Duration::from_secs(ALEPH_BLOCK_PROD_TIME_SEC)).await;
-            }
+                .await
+                // default AlephClient error is MBs large and useless, dumps the entire runtime for some reasons
+                .map_err(|_| EthereumEventHandlerError::ReceiveRequestTxFailure {
+                    request_hash: hex::encode(request_hash),
+                    committee_id,
+                    dest_token_address: hex::encode(dest_token_address),
+                    amount,
+                    dest_receiver_address: hex::encode(dest_receiver_address),
+                    request_nonce,
+                })?;
 
             info!("Guardian signature for {request_hash:?} no longer needed");
         }
