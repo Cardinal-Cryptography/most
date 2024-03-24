@@ -13,11 +13,11 @@ use aleph_client::{
         ContractMessageTranscoder,
         Value::{self, Seq},
     },
-    pallets::contract::ContractsUserApi,
+    pallets::contract::{ContractCallArgs, ContractRpc, ContractsUserApi},
     sp_weights::weight_v2::Weight,
-    AccountId, AlephConfig, Connection, TxInfo, TxStatus,
+    AccountId, AlephConfig, Connection, SignedConnectionApi, TxInfo, TxStatus,
 };
-use log::trace;
+use log::{error, trace};
 use subxt::events::Events;
 use thiserror::Error;
 
@@ -38,6 +38,12 @@ pub enum AzeroContractError {
 
     #[error("Missing or invalid field")]
     MissingOrInvalidField(String),
+
+    #[error("Dry-run reverted")]
+    DryRunReverted(Result<Value, anyhow::Error>),
+
+    #[error("Dispatch error")]
+    DispatchError(String),
 }
 
 pub struct AdvisoryInstance {
@@ -107,6 +113,10 @@ impl MostInstance {
         dest_receiver_address: [u8; 32],
         request_nonce: u128,
     ) -> Result<TxInfo, AzeroContractError> {
+        let gas_limit = Weight {
+            ref_time: self.ref_time_limit,
+            proof_size: self.proof_size_limit,
+        };
         let args = [
             bytes32_to_str(&request_hash),
             committee_id.to_string(),
@@ -115,18 +125,41 @@ impl MostInstance {
             bytes32_to_str(&dest_receiver_address),
             request_nonce.to_string(),
         ];
+        let call_data = self.transcoder.encode("receive_request", args)?;
 
-        let data = self.transcoder.encode("receive_request", args)?;
+        let dry_run_args = ContractCallArgs {
+            origin: signed_connection.account_id().clone(),
+            dest: self.address.clone(),
+            value: 0,
+            gas_limit: Some(gas_limit.clone()),
+            storage_deposit_limit: None,
+            input_data: call_data.clone(),
+        };
+
+        // Dry run to detect potential errors
+        let dry_run_res = match signed_connection.call_and_get(dry_run_args).await?.result {
+            Ok(res) => res,
+            Err(why) => {
+                return Err(AzeroContractError::DispatchError(format!("{:?}", why)));
+            }
+        };
+        if dry_run_res.did_revert() {
+            let decoded_value = self
+                .transcoder
+                .decode_return("receive_request", &mut dry_run_res.data.as_ref());
+
+            error!("Dry run reverted: {:?}", decoded_value);
+
+            return Err(AzeroContractError::DryRunReverted(decoded_value));
+        }
+
         signed_connection
             .call(
                 self.address.clone(),
                 0,
-                Weight {
-                    ref_time: self.ref_time_limit,
-                    proof_size: self.proof_size_limit,
-                },
+                gas_limit,
                 None,
-                data,
+                call_data,
                 TxStatus::Finalized,
             )
             .await
