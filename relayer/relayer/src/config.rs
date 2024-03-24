@@ -79,7 +79,7 @@ pub struct Config {
     #[arg(long, default_value = "10")]
     pub eth_tx_submission_retries: usize,
 
-    #[arg(long, default_value = "2")]
+    #[arg(long, default_value = "8")]
     pub eth_tx_min_confirmations: usize,
 
     #[arg(long, default_value = "1")]
