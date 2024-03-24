@@ -144,11 +144,7 @@ impl AlephZeroEventHandler {
                     debug!("Dry-running tx with nonce {}", request_nonce);
 
                     // Dry-run the tx to check for potential reverts.
-                    call.clone()
-                        .gas(config.eth_gas_limit)
-                        .nonce(eth_signed_connection.inner().next())
-                        .call()
-                        .await?;
+                    call.clone().gas(config.eth_gas_limit).call().await?;
 
                     info!(
                         "Sending tx with nonce {} to the Ethereum network and waiting for {} confirmations.",
