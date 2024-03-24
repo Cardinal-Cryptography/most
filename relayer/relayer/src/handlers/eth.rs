@@ -1,13 +1,11 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
-use aleph_client::{AsConnection, SignedConnectionApi};
 use ethers::utils::keccak256;
 use log::{debug, error, info, trace, warn};
 use thiserror::Error;
 use tokio::{
     select,
     sync::{broadcast, mpsc},
-    time::sleep,
 };
 
 use crate::{
@@ -15,7 +13,7 @@ use crate::{
     connections::azero::AzeroConnectionWithSigner,
     contracts::{AzeroContractError, CrosschainTransferRequestFilter, MostEvents, MostInstance},
     helpers::concat_u8_arrays,
-    listeners::{EthMostEvents, ALEPH_BLOCK_PROD_TIME_SEC},
+    listeners::EthMostEvents,
     CircuitBreakerEvent,
 };
 
@@ -91,39 +89,26 @@ impl EthereumEventHandler {
             let amount = amount.as_u128();
             let request_nonce = request_nonce.as_u128();
 
-            while contract
-                .needs_signature(
-                    azero_connection.as_connection(),
+            contract
+                .receive_request(
+                    azero_connection,
                     request_hash,
-                    azero_connection.account_id().clone(),
                     committee_id,
+                    dest_token_address,
+                    amount,
+                    dest_receiver_address,
+                    request_nonce,
                 )
-                .await?
-            {
-                // TODO: dry run the tx first
-                contract
-                    .receive_request(
-                        azero_connection,
-                        request_hash,
-                        committee_id,
-                        dest_token_address,
-                        amount,
-                        dest_receiver_address,
-                        request_nonce,
-                    )
-                    .await
-                    // default AlephClient error is MBs large and useless, dumps the entire runtime for some reasons
-                    .map_err(|_| EthereumEventHandlerError::ReceiveRequestTxFailure {
-                        request_hash: hex::encode(request_hash),
-                        committee_id,
-                        dest_token_address: hex::encode(dest_token_address),
-                        amount,
-                        dest_receiver_address: hex::encode(dest_receiver_address),
-                        request_nonce,
-                    })?;
-
-                sleep(Duration::from_secs(ALEPH_BLOCK_PROD_TIME_SEC)).await;
-            }
+                .await
+                // default AlephClient error is MBs large and useless, dumps the entire runtime for some reason
+                .map_err(|_| EthereumEventHandlerError::ReceiveRequestTxFailure {
+                    request_hash: hex::encode(request_hash),
+                    committee_id,
+                    dest_token_address: hex::encode(dest_token_address),
+                    amount,
+                    dest_receiver_address: hex::encode(dest_receiver_address),
+                    request_nonce,
+                })?;
 
             info!("Guardian signature for {request_hash:?} no longer needed");
         }

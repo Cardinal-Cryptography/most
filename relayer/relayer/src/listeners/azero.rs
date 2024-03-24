@@ -5,6 +5,7 @@ use aleph_client::{
     utility::BlocksApi,
     AlephConfig, AsConnection, Connection,
 };
+use futures::stream::{FuturesOrdered, StreamExt};
 use log::{debug, error, info, warn};
 use subxt::events::Events;
 use thiserror::Error;
@@ -55,6 +56,9 @@ pub enum AlephZeroListenerError {
 
     #[error("broadcast receive error")]
     Receive(#[from] broadcast::error::RecvError),
+
+    #[error("One-shot receive error")]
+    OneShotReceive(#[from] oneshot::error::RecvError),
 }
 
 #[derive(Copy, Clone)]
@@ -65,8 +69,8 @@ impl AlephZeroListener {
         config: Arc<Config>,
         azero_connection: Arc<Connection>,
         azero_events_sender: mpsc::Sender<AzeroMostEvents>,
-        last_processed_block_number: broadcast::Sender<u32>,
-        mut next_unprocessed_block_number: broadcast::Receiver<u32>,
+        next_block_to_process_sender: broadcast::Sender<u32>,
+        mut next_block_to_process_receiver: broadcast::Receiver<u32>,
         block_seal_sender: mpsc::Sender<u32>,
         mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
     ) -> Result<CircuitBreakerEvent, AlephZeroListenerError> {
@@ -78,6 +82,8 @@ impl AlephZeroListener {
             sync_step,
             ..
         } = &*config;
+
+        let mut event_batch_ack_receiver = FuturesOrdered::new();
 
         let most_azero = MostInstance::new(
             azero_contract_address,
@@ -95,7 +101,7 @@ impl AlephZeroListener {
                     return Ok(cb_event?);
                 },
 
-                Ok (unprocessed_block_number) = next_unprocessed_block_number.recv() => {
+                Ok (unprocessed_block_number) = next_block_to_process_receiver.recv() => {
 
                     // Query for the next unknown finalized block number, if not present we wait for it
                     let next_finalized_block_number = get_next_finalized_block_number_azero(
@@ -129,58 +135,33 @@ impl AlephZeroListener {
                         })
                         .collect::<Vec<ContractEvent>>();
 
-                    if filtered_events.is_empty () {
+                    let (ack_sender, ack_receiver) = oneshot::channel::<u32> ();
+                    event_batch_ack_receiver.push_back(ack_receiver);
 
-                        select! {
-                            cb_event = circuit_breaker_receiver.recv () => {
-                                warn!(target: "AlephZeroListener", "Exiting before sending block seal request for {to_block} due to a circuit breaker event {cb_event:?}");
-                                return Ok(cb_event?);
+                    select! {
+                        cb_event = circuit_breaker_receiver.recv () => {
+                            warn!(target: "AlephZeroListener", "Exiting before sending events due to a circuit breaker event {cb_event:?}");
+                            return Ok(cb_event?);
+                        },
+
+                        Ok (_) = azero_events_sender
+                            .send(AzeroMostEvents {
+                                events: filtered_events.clone (),
+                                from_block: unprocessed_block_number,
+                                to_block,
+                                ack: ack_sender
+                            }) => {
+                                info!(target: "AlephZeroListener", "Sending a batch of {} events", &filtered_events.len());
                             },
-
-                            Ok (_)= block_seal_sender.send (to_block) => {
-                                info!("Marking all events up to block {to_block} as handled");
-                            }
-
-                        }
-
-                    } else {
-
-                        let (ack_sender, ack_receiver) = oneshot::channel::<()> ();
-
-                        // there are events to handle
-                        select! {
-                            cb_event = circuit_breaker_receiver.recv () => {
-                                warn!(target: "AlephZeroListener", "Exiting before sending events due to a circuit breaker event {cb_event:?}");
-                                return Ok(cb_event?);
-                            },
-
-                            Ok (_) = azero_events_sender
-                                .send(AzeroMostEvents {
-                                    events: filtered_events.clone (),
-                                    from_block: unprocessed_block_number,
-                                    to_block,
-                                    ack: ack_sender
-                                }) => {
-                                    info!(target: "AlephZeroListener", "Sending a batch of {} events", &filtered_events.len());
-                                },
-                        }
-
-                        // block until this events batch is handled & notify cache manager
-                        select! {
-                            cb_event = circuit_breaker_receiver.recv () => {
-                                warn!(target: "AlephZeroListener", "Exiting before sealing {to_block} due to a circuit breaker event {cb_event:?}");
-                                return Ok(cb_event?);
-                            },
-                            _ = ack_receiver => {
-                                info!("Marking all events up to block {to_block} as handled");
-                                block_seal_sender.send (to_block) .await?;
-                            }
-                        }
-
                     }
 
                     info!(target: "AlephZeroListener", "Sending {} as the next unprocessed block number", to_block + 1);
-                    last_processed_block_number.send(to_block + 1)?;
+                    next_block_to_process_sender.send(to_block + 1)?;
+                },
+                Some(processed_block_res) = event_batch_ack_receiver.next() => {
+                    let processed_block = processed_block_res?;
+                    info!("Marking all events up to block {processed_block} as handled");
+                    block_seal_sender.send(processed_block).await?;
                 }
             }
         }

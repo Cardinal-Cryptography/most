@@ -6,7 +6,7 @@ use ethers::{
     core::types::Address,
     prelude::{ContractCall, ContractError},
     providers::{Middleware, ProviderError},
-    types::U64,
+    types::{BlockNumber, U64},
     utils::keccak256,
 };
 use log::{debug, error, info, warn};
@@ -22,9 +22,12 @@ use crate::{
     config::Config,
     connections::eth::SignedEthConnection,
     contracts::{get_request_event_data, AzeroContractError, CrosschainTransferRequestData, Most},
-    listeners::{AzeroMostEvents, ETH_BLOCK_PROD_TIME_SEC},
+    listeners::AzeroMostEvents,
     CircuitBreakerEvent,
 };
+
+// Frequency of checking for finality of the transaction
+const ETH_WAIT_FOR_FINALITY_CHECK_SEC: u64 = 60;
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -110,9 +113,24 @@ impl AlephZeroEventHandler {
                         eth_signed_connection.address(),
                         committee_id.into(),
                     )
+                    .block(BlockNumber::Finalized)
                     .await?
                 {
-                    // TODO: dry run the tx first
+                    info!("Request with nonce {} not yet finalized.", request_nonce);
+
+                    if !contract
+                        .needs_signature(
+                            request_hash,
+                            eth_signed_connection.address(),
+                            committee_id.into(),
+                        )
+                        .block(BlockNumber::Latest)
+                        .await?
+                    {
+                        sleep(Duration::from_secs(ETH_WAIT_FOR_FINALITY_CHECK_SEC)).await;
+                        continue;
+                    }
+
                     // forward transfer & vote
                     let call: ContractCall<SignedEthConnection, ()> = contract.receive_request(
                         request_hash,
@@ -123,14 +141,17 @@ impl AlephZeroEventHandler {
                         request_nonce.into(),
                     );
 
-                    info!(
-                    "Sending tx with nonce {} to the Ethereum network and waiting for {} confirmations.",
-                    request_nonce,
-                    eth_tx_min_confirmations
-                );
+                    debug!("Dry-running tx with nonce {}", request_nonce);
 
-                    // This shouldn't fail unless there is something wrong with our config.
-                    // NOTE: this does not check whether the actual tx reverted on-chain. Reverts are only checked on dry-run.
+                    // Dry-run the tx to check for potential reverts.
+                    call.clone().gas(config.eth_gas_limit).call().await?;
+
+                    info!(
+                        "Sending tx with nonce {} to the Ethereum network and waiting for {} confirmations.",
+                        request_nonce,
+                        eth_tx_min_confirmations
+                    );
+
                     let receipt = call
                         .gas(config.eth_gas_limit)
                         .nonce(eth_signed_connection.inner().next())
@@ -153,8 +174,6 @@ impl AlephZeroEventHandler {
                     }
 
                     info!("Tx with nonce {request_nonce} has been sent to the Ethereum network: {tx_hash:?} and received {eth_tx_min_confirmations} confirmations.");
-
-                    sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
                 }
 
                 info!("Guardian signature for {request_hash:?} no longer needed");
@@ -179,6 +198,9 @@ pub enum AlephZeroEventsHandlerError {
 
     #[error("Task join error")]
     Join(#[from] JoinError),
+
+    #[error("Ack")]
+    Ack,
 }
 
 pub struct AlephZeroEventsHandler;
@@ -205,7 +227,7 @@ impl AlephZeroEventsHandler {
                         events,
                         from_block,
                         to_block,
-                        ..
+                        ack,
                     } = azero_events;
 
                     info!("Received a batch of {} events from blocks {from_block} to {to_block}", events.len());
@@ -227,7 +249,7 @@ impl AlephZeroEventsHandler {
                         }
 
                         // wait for all concurrent handler tasks to finish
-                        info!("Awaiting all handler tasks to finish");
+                        info!("Awaiting all event handler tasks for blocks {}-{} to finish", from_block, to_block);
 
                         while let Some(result) = tasks.join_next().await {
                             match result? {
@@ -239,6 +261,9 @@ impl AlephZeroEventsHandler {
                             }
                         }
 
+                        if ack.send(to_block).is_err() {
+                            return Err(AlephZeroEventsHandlerError::Ack);
+                        }
                         Ok::<(), AlephZeroEventsHandlerError> (())
                     });
 

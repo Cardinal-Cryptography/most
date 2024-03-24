@@ -77,7 +77,7 @@ pub async fn azero_to_eth() -> anyhow::Result<()> {
             &azero_signed_connection,
             "send_request",
             &send_request_args,
-            100_000_000_000_000,
+            1_000_000_000_000_000,
         )
         .await?;
     info!("`send_request` tx info: {:?}", send_request_info);
