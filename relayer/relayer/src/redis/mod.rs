@@ -1,7 +1,4 @@
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc, Mutex,
-};
+use std::sync::{Arc, Mutex};
 
 use log::{debug, info, warn};
 use redis::{Client as RedisClient, Commands, Connection, RedisError};
@@ -13,8 +10,8 @@ use tokio::{
 
 use crate::{config::Config, CircuitBreakerEvent};
 
-pub const ETH_BLOCK_KEY: &str = "ethereum_block_number";
-pub const ALEPH_BLOCK_KEY: &str = "alephzero_block_number";
+pub const ETH_BLOCK_KEY: &str = "ethereum_next_block_number";
+pub const ALEPH_BLOCK_KEY: &str = "alephzero_next_block_number";
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -37,7 +34,7 @@ pub struct RedisManager;
 
 impl RedisManager {
     pub async fn run(
-        is_first_run: Arc<AtomicBool>,
+        is_first_run: bool,
         config: Arc<Config>,
         next_unprocessed_block_number_eth: broadcast::Sender<u32>,
         mut last_processed_block_number_eth: broadcast::Receiver<u32>,
@@ -58,7 +55,7 @@ impl RedisManager {
         let client = RedisClient::open(redis_node.clone())?;
         let redis_connection = Arc::new(Mutex::new(client.get_connection()?));
 
-        if *override_azero_cache && is_first_run.load(Ordering::Relaxed) {
+        if *override_azero_cache && is_first_run {
             write_block_number(
                 config.name.clone(),
                 ALEPH_BLOCK_KEY.to_string(),
@@ -67,7 +64,7 @@ impl RedisManager {
             )?;
         }
 
-        if *override_eth_cache && is_first_run.load(Ordering::Relaxed) {
+        if *override_eth_cache && is_first_run {
             write_block_number(
                 config.name.clone(),
                 ETH_BLOCK_KEY.to_string(),

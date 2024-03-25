@@ -1,10 +1,4 @@
-use std::{
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    time::Duration,
-};
+use std::{sync::Arc, time::Duration};
 
 use aleph_client::AccountId;
 use clap::Parser;
@@ -175,10 +169,10 @@ async fn main() -> Result<(), RelayerError> {
 
     let mut tasks = JoinSet::new();
 
-    let first_run = Arc::new(AtomicBool::new(true));
+    let mut first_run = true;
 
     run_relayer(
-        first_run.clone(),
+        first_run,
         &mut tasks,
         config.clone(),
         azero_connection.clone(),
@@ -187,7 +181,7 @@ async fn main() -> Result<(), RelayerError> {
         eth_signed_connection.clone(),
     );
 
-    first_run.store(false, Ordering::Relaxed);
+    first_run = false;
 
     // wait for all tasks to finish and reboot
     let delay = Duration::from_secs(2);
@@ -202,7 +196,7 @@ async fn main() -> Result<(), RelayerError> {
                     sleep(delay).await;
 
                     run_relayer(
-                        first_run.clone(),
+                        first_run,
                         &mut tasks,
                         config.clone(),
                         azero_connection.clone(),
@@ -224,7 +218,7 @@ async fn main() -> Result<(), RelayerError> {
 }
 
 fn run_relayer(
-    first_run: Arc<AtomicBool>,
+    first_run: bool,
     tasks: &mut JoinSet<Result<CircuitBreakerEvent, RelayerError>>,
     config: Arc<Config>,
     azero_connection: Arc<AzeroWsConnection>,
