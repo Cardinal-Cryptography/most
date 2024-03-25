@@ -215,6 +215,16 @@ async fn handle_event(
         )?;
 
         // send vote
+        // [Audit] This may fail because of e.g. "Transaction couldn't enter the pool because of the pool limit",
+        // error, perhaps also in some other rare cases (like reorg and for some reason the transaction was unable
+        // to be added back to tx pool - not sure in this case).
+        // Maybe we can retry a few times, and only then return errors, or try restarting only
+        // the EthListener before exiting from the whole relayer with an error?
+        // My point is that restarting the AZero listener generally can cause
+        // many bridged transactions to be processed and resubmitted again, because of the concurrency,
+        // and if the transaction costs will vary much between the chains, an attacker
+        // could force receive_request resubmission on the other chain many times with
+        // a much smaller cost for them compared to the cost of the resubmission for the guardian.
         contract
             .receive_request(
                 azero_connection,
@@ -246,12 +256,16 @@ pub async fn get_next_finalized_block_number_eth(
                     if best_finalized_block_number >= not_older_than {
                         return best_finalized_block_number;
                     }
+                    // [Nit] To catch infinite loops in case we broke something in the future:
+                    // log::debug!("Best finalized block on Ethereum {best_finalized_block_number} has too small number (waiting for at least {not_older_than}), retrying after some time")
                 }
                 None => {
                     warn!("No finalized block found.");
                 }
             },
             Err(e) => {
+                // [Audit] Potentially infinite loop - once failed, the call will likely start
+                // failing again and again. Maybe try propagating the error.
                 warn!("Client error when getting last finalized block: {e}");
             }
         };

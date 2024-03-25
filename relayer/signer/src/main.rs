@@ -162,6 +162,14 @@ async fn do_handle_client(
             }
 
             Command::SignEthTx { mut tx, chain_id } => {
+                // [Audit] Have we considered checking somehow type of the signed transaction,
+                // or even changing the interface to accept only transactions that are calls
+                // to Most or Advisory contracts? Don't know how enclaves exactly work, but I
+                // assume that if an attacker can broke into the EC2 instance, then they
+                // could create extra connection to the enclave on which the signer is running,
+                // and sing anything they want, including draining all AZero and ETH from the guardian.
+                // This already isn't that bad, compared to having the key compromised, as at least we'd
+                // have some tracks of the incident probably, but maybe we could add that extra layer of security?
                 tx.set_chain_id(chain_id);
                 let signature = eth_wallet.sign_transaction_sync(&tx)?;
                 client
