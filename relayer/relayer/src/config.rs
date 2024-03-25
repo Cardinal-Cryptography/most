@@ -73,19 +73,13 @@ pub struct Config {
     #[arg(long)]
     pub eth_contract_address: String,
 
-    #[arg(long, default_value = "")]
-    pub eth_keystore_password: String,
-
-    #[arg(long, default_value = "")]
-    pub eth_keystore_path: String,
-
     #[arg(long, default_value = "http://127.0.0.1:8545")]
     pub eth_node_http_url: String,
 
     #[arg(long, default_value = "10")]
     pub eth_tx_submission_retries: usize,
 
-    #[arg(long, default_value = "32")]
+    #[arg(long, default_value = "8")]
     pub eth_tx_min_confirmations: usize,
 
     #[arg(long, default_value = "1")]

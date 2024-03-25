@@ -10,7 +10,8 @@
         "predrink-tests": "npm config set script-shell \"/bin/bash\"; ./scripts/predrink_tests.sh",
         "drink-tests": "npm config set script-shell \"/bin/bash\"; ./scripts/drink_tests.sh",
         "deploy": "npm config set script-shell \"/bin/bash\"; ts-node scripts/1_deploy.ts",
-        "setup": "npm config set script-shell \"/bin/bash\"; ts-node scripts/2_setup.ts"
+        "setup": "npm config set script-shell \"/bin/bash\"; ts-node scripts/2_setup.ts",
+        "bridge-weth": "npm config set script-shell \"/bin/bash\"; ts-node scripts/bridge_weth.ts"
     },
     "dependencies": {
         "@727-ventures/typechain-compiler": "^1.1.0",

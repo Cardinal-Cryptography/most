@@ -1,32 +1,30 @@
-use std::{
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    time::Duration,
-};
+use std::{sync::Arc, time::Duration};
 
-use aleph_client::utility::BlocksApi;
 use futures::future::join_all;
-use log::{info, warn};
+use log::{debug, info, warn};
 use thiserror::Error;
-use tokio::time::sleep;
+use tokio::{select, sync::broadcast, time::sleep};
 
+use super::ALEPH_BLOCK_PROD_TIME_SEC;
 use crate::{
     config::Config,
     connections::azero::AzeroWsConnection,
     contracts::{AdvisoryInstance, AzeroContractError},
+    CircuitBreakerEvent,
 };
 
 #[derive(Debug, Error)]
 #[error(transparent)]
 #[non_exhaustive]
 pub enum AdvisoryListenerError {
-    #[error("aleph-client error")]
-    AlephClient(#[from] anyhow::Error),
-
     #[error("azero contract error")]
     AzeroContract(#[from] AzeroContractError),
+
+    #[error("broadcast send error")]
+    BroadcastSend(#[from] broadcast::error::SendError<CircuitBreakerEvent>),
+
+    #[error("broadcast receive error")]
+    BroadcastReceive(#[from] broadcast::error::RecvError),
 }
 
 pub struct AdvisoryListener;
@@ -35,13 +33,16 @@ impl AdvisoryListener {
     pub async fn run(
         config: Arc<Config>,
         azero_connection: Arc<AzeroWsConnection>,
-        emergency: Arc<AtomicBool>,
-    ) -> Result<(), AdvisoryListenerError> {
+        circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
+        mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
+    ) -> Result<CircuitBreakerEvent, AdvisoryListenerError> {
         let Config {
             advisory_contract_metadata,
             advisory_contract_addresses,
             ..
         } = &*config;
+
+        info!("Starting");
 
         let contracts: Vec<AdvisoryInstance> = advisory_contract_addresses
             .clone()
@@ -56,39 +57,40 @@ impl AdvisoryListener {
             )?;
 
         loop {
-            let previous_emergency_state = emergency.load(Ordering::Relaxed);
-            let mut current_emergency_state = false;
+            debug!("Ping");
 
-            let all: Vec<_> = contracts
-                .iter()
-                .map(|advisory| advisory.is_emergency(&azero_connection))
-                .collect();
+            select! {
+                cb_event = circuit_breaker_receiver.recv () => {
+                    warn!("Exiting due to a circuit breaker event {cb_event:?}");
+                    return Ok(cb_event?);
+                },
 
-            for maybe_emergency in join_all(all).await {
-                match maybe_emergency {
-                    Ok((is_emergency, address)) => {
-                        if is_emergency {
-                            current_emergency_state = true;
-                            if current_emergency_state != previous_emergency_state {
-                                let current_block_number =
-                                    azero_connection.get_block_number_opt(None).await?;
-                                warn!("Detected an emergency state at block {current_block_number:?} in an Advisory contract {address}");
+                results = join_all(
+                    contracts
+                        .iter()
+                        .map(|advisory| advisory.is_emergency(&azero_connection))
+                        .collect::<Vec<_>>()) => {
+
+                    debug!("Querying");
+
+                    for maybe_emergency in results {
+                        match maybe_emergency {
+                            Ok((is_emergency, address)) => {
+                                if is_emergency {
+                                    warn!("Exiting due to an emergency state in one of the advisory contracts {address}");
+                                    let status = CircuitBreakerEvent::AdvisoryEmergency(address);
+                                    circuit_breaker_sender.send(status.clone())?;
+                                    return Ok(status.clone());
+                                }
                             }
-                            break;
+                            Err(why) => return Err(AdvisoryListenerError::AzeroContract(why)),
                         }
                     }
-                    Err(why) => return Err(AdvisoryListenerError::AzeroContract(why)),
                 }
+
             }
 
-            if previous_emergency_state && !current_emergency_state {
-                info!("Previously set emergency state has been lifted");
-            }
-
-            emergency.store(current_emergency_state, Ordering::Relaxed);
-
-            // we sleep for about half a block production time before making another round of queries
-            sleep(Duration::from_millis(500)).await;
+            sleep(Duration::from_secs(ALEPH_BLOCK_PROD_TIME_SEC)).await;
         }
     }
 }

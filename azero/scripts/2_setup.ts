@@ -65,6 +65,8 @@ async function main(): Promise<void> {
   const api = await ApiPromise.create({ provider: wsProvider });
   const deployer = keyring.addFromUri(deployer_seed);
 
+  console.log("Using ", deployer.address, "as the transaction signer");
+
   const migrations = new Migrations(migrations_azero, deployer, api);
 
   // check migrations
@@ -78,7 +80,7 @@ async function main(): Promise<void> {
 
   // premint some token for DEV
   if (dev) {
-    for (let [_, azero_address] of tokens) {
+    for (let [_, __, azero_address] of tokens) {
       await mintTokens(
         azero_address,
         1000000000000000,
@@ -92,7 +94,7 @@ async function main(): Promise<void> {
 
   const most = new Most(most_azero, deployer, api);
 
-  for (let [eth_address, azero_address] of tokens) {
+  for (let [_, eth_address, azero_address] of tokens) {
     await addTokenPair(eth_address, azero_address, most);
   }
 

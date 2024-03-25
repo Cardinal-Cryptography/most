@@ -1,234 +1,155 @@
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
+use std::{cmp::min, sync::Arc};
 
 use ethers::{
-    abi::EncodePackedError,
     core::types::Address,
     prelude::ContractError,
-    providers::{Http, Middleware, Provider, ProviderError},
+    providers::{Http, Middleware, Provider},
     types::BlockNumber,
-    utils::keccak256,
 };
-use log::{debug, error, info, trace, warn};
-use redis::{aio::Connection as RedisConnection, RedisError};
+use log::{debug, error, info, warn};
 use thiserror::Error;
 use tokio::{
-    sync::Mutex,
+    select,
+    sync::{broadcast, mpsc, oneshot},
     time::{sleep, Duration},
 };
 
+use super::EthMostEvents;
 use crate::{
-    config::Config,
-    connections::{
-        azero::AzeroConnectionWithSigner,
-        eth::EthConnection,
-        redis_helpers::{read_first_unprocessed_block_number, write_last_processed_block},
-    },
-    contracts::{
-        AzeroContractError, CrosschainTransferRequestFilter, Most, MostEvents, MostInstance,
-    },
-    helpers::concat_u8_arrays,
+    config::Config, connections::eth::EthConnection, contracts::Most, CircuitBreakerEvent,
 };
+
+pub const ETH_BLOCK_PROD_TIME_SEC: u64 = 15;
+
+pub struct EthereumListener;
 
 #[derive(Debug, Error)]
 #[error(transparent)]
 #[non_exhaustive]
-pub enum EthListenerError {
-    #[error("provider error")]
-    Provider(#[from] ProviderError),
-
+pub enum EthereumListenerError {
     #[error("error when parsing ethereum address")]
     FromHex(#[from] rustc_hex::FromHexError),
 
     #[error("contract error")]
     Contract(#[from] ContractError<Provider<Http>>),
 
-    #[error("azero contract error")]
-    AzeroContract(#[from] AzeroContractError),
+    #[error("channel send error")]
+    Send(#[from] mpsc::error::SendError<EthMostEvents>),
 
-    #[error("error when creating an ABI data encoding")]
-    AbiEncode(#[from] EncodePackedError),
+    #[error("channel broadcast error")]
+    Broadcast(#[from] broadcast::error::SendError<u32>),
 
-    #[error("redis connection error")]
-    Redis(#[from] RedisError),
+    #[error("channel receive error")]
+    Receive(#[from] broadcast::error::RecvError),
 }
 
-pub const ETH_BLOCK_PROD_TIME_SEC: u64 = 15;
-pub const ETH_LAST_BLOCK_KEY: &str = "ethereum_last_known_block_number";
-
-pub struct EthListener;
-
-impl EthListener {
+impl EthereumListener {
     pub async fn run(
         config: Arc<Config>,
-        azero_connection: AzeroConnectionWithSigner,
         eth_connection: Arc<EthConnection>,
-        redis_connection: Arc<Mutex<RedisConnection>>,
-        emergency: Arc<AtomicBool>,
-    ) -> Result<(), EthListenerError> {
+        eth_events_sender: mpsc::Sender<EthMostEvents>,
+        last_processed_block_number: broadcast::Sender<u32>,
+        mut next_unprocessed_block_number: broadcast::Receiver<u32>,
+        mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
+    ) -> Result<CircuitBreakerEvent, EthereumListenerError> {
         let Config {
             eth_contract_address,
-            azero_contract_address,
-            azero_contract_metadata,
-            azero_proof_size_limit,
-            azero_ref_time_limit,
-            name,
-            default_sync_from_block_eth,
             sync_step,
             ..
         } = &*config;
 
         let address = eth_contract_address.parse::<Address>()?;
         let most_eth = Most::new(address, Arc::clone(&eth_connection));
-        let most_azero = MostInstance::new(
-            azero_contract_address,
-            azero_contract_metadata,
-            *azero_ref_time_limit,
-            *azero_proof_size_limit,
-        )?;
 
-        let mut first_unprocessed_block_number = read_first_unprocessed_block_number(
-            name.clone(),
-            ETH_LAST_BLOCK_KEY.to_string(),
-            redis_connection.clone(),
-            **default_sync_from_block_eth,
-        )
-        .await;
+        info!(target: "EthereumListener", "Starting");
 
-        // Main Ethereum event loop.
         loop {
-            // Query for the next unknowns finalized block number, if not present we wait for it.
-            let next_finalized_block_number = get_next_finalized_block_number_eth(
-                eth_connection.clone(),
-                first_unprocessed_block_number,
-            )
-            .await;
+            debug!(target: "EthereumListener", "Ping");
 
-            match emergency.load(Ordering::Relaxed) {
-                true => {
-                    warn!("Event handling paused due to an emergency state in one of the Advisory contracts");
-                    sleep(Duration::from_secs(20)).await;
-                }
-                false => {
-                    // Don't query for more than `sync_step` blocks at one time.
-                    let to_block = std::cmp::min(
-                        next_finalized_block_number,
-                        first_unprocessed_block_number + sync_step - 1,
-                    );
+            select! {
+                cb_event = circuit_breaker_receiver.recv() => {
+                    warn!(target: "EthereumListener","Exiting before handling next block due to a circuit breaker event {cb_event:?}");
+                    return Ok(cb_event?);
+                },
 
-                    info!(
-                        "Processing events from blocks {} - {}",
-                        first_unprocessed_block_number, to_block
-                    );
+                Ok (unprocessed_block_number) = next_unprocessed_block_number.recv() => {
+                    // Query for the next unknown finalized block number, if not present we wait for it.
+                    info!(target: "EthereumListener","Waiting for the next finalized block number");
 
-                    // Query for events.
-                    let events = most_eth
-                        .events()
-                        .from_block(first_unprocessed_block_number)
-                        .to_block(to_block)
-                        .query()
-                        .await?;
+                    select! {
+                        cb_event = circuit_breaker_receiver.recv () => {
+                            warn!(target: "EthereumListener","Exiting before sending events due to a circuit breaker event {cb_event:?}");
+                            return Ok(cb_event?);
+                        },
 
-                    // Handle events.
-                    for event in events {
-                        // In case of the halt, we want to retry the event handling after the halt is resolved.
-                        loop {
-                            match handle_event(&event, &config, &azero_connection).await {
-                                Ok(_) => break,
-                                Err(EthListenerError::AzeroContract(e)) => {
-                                    error!("Error when handling event {event:?}: {e}");
-                                    if most_azero.is_halted(&azero_connection).await? {
-                                        warn!("Most contract on Aleph Zero is halted, stopping event handling");
-                                        wait_until_not_halted(&most_azero, &azero_connection)
-                                            .await?;
+                        next_finalized_block_number = get_next_finalized_block_number_eth(
+                            eth_connection.clone(),
+                            unprocessed_block_number,
+                        ) => {
+
+                            // don't query for more than `sync_step` blocks at one time.
+                            let to_block = min(
+                                next_finalized_block_number,
+                                unprocessed_block_number + sync_step - 1,
+                            );
+
+                            info!(target: "EthereumListener",
+                                  "Processing events from blocks {} - {}",
+                                  unprocessed_block_number, to_block
+                            );
+
+                            // listen to events
+                            let query = most_eth
+                                .events()
+                                .from_block(unprocessed_block_number)
+                                .to_block(to_block);
+
+                            select! {
+                                cb_event = circuit_breaker_receiver.recv () => {
+                                    warn!(target: "EthereumListener","Exiting before sending events due to a circuit breaker event {cb_event:?}");
+                                    return Ok(cb_event?);
+                                },
+
+                                Ok (events) = query.query() => {
+                                    if events.is_empty () {
+                                        info!(target: "EthereumListener", "Marking {} as the next unprocessed block number", to_block +1);
+                                        // we send + 1 to self as this is the next block we'd like to see
+                                        last_processed_block_number.send(to_block + 1)?;
                                     } else {
-                                        return Err(EthListenerError::AzeroContract(e));
+                                        let (events_ack_sender, events_ack_receiver) = oneshot::channel::<()>();
+                                        info!(target: "EthereumListener","Sending a batch of {} events", &events.len());
+
+                                        eth_events_sender
+                                            .send(EthMostEvents {
+                                                events: events.clone (),
+                                                events_ack_sender,
+                                            }).await?;
+
+                                        info!(target: "EthereumListener", "Awaiting events ack");
+
+                                        // select between ack and the channel, because the handler could have exited
+                                        select! {
+                                            cb_event = circuit_breaker_receiver.recv () => {
+                                                warn!(target: "EthereumListener", "Exiting before events ack due to a circuit breaker event {cb_event:?}");
+                                                return Ok(cb_event?);
+                                            },
+                                            ack_result = events_ack_receiver => {
+                                                if ack_result.is_ok () {
+                                                    info!(target: "EthereumListener", "Events ack received, marking {} as the next unprocessed block number", to_block +1);
+                                                    // we send + 1 to self as this is the next block we'd like to see
+                                                    last_processed_block_number.send(to_block + 1)?;
+                                                }
+                                            }
+                                        }
                                     }
                                 }
-                                Err(e) => return Err(e),
                             }
                         }
                     }
-
-                    // Update the last block number.
-                    first_unprocessed_block_number = to_block + 1;
-
-                    // Cache the last processed block number.
-                    write_last_processed_block(
-                        name.clone(),
-                        ETH_LAST_BLOCK_KEY.to_string(),
-                        redis_connection.clone(),
-                        to_block,
-                    )
-                    .await?;
-                }
+                },
             }
         }
     }
-}
-
-async fn handle_event(
-    event: &MostEvents,
-    config: &Config,
-    azero_connection: &AzeroConnectionWithSigner,
-) -> Result<(), EthListenerError> {
-    if let MostEvents::CrosschainTransferRequestFilter(
-        crosschain_transfer_event @ CrosschainTransferRequestFilter {
-            committee_id,
-            dest_token_address,
-            amount,
-            dest_receiver_address,
-            request_nonce,
-            ..
-        },
-    ) = event
-    {
-        let Config {
-            azero_contract_address,
-            azero_contract_metadata,
-            ..
-        } = config;
-
-        info!("handling eth contract event: {crosschain_transfer_event:?}");
-
-        // concat bytes
-        let bytes = concat_u8_arrays(vec![
-            &committee_id.as_u128().to_le_bytes(),
-            dest_token_address,
-            &amount.as_u128().to_le_bytes(),
-            dest_receiver_address,
-            &request_nonce.as_u128().to_le_bytes(),
-        ]);
-
-        trace!("event concatenated bytes: {bytes:?}");
-
-        let request_hash = keccak256(bytes);
-        debug!("hashed event encoding: {request_hash:?}");
-
-        let contract = MostInstance::new(
-            azero_contract_address,
-            azero_contract_metadata,
-            config.azero_ref_time_limit,
-            config.azero_proof_size_limit,
-        )?;
-
-        // send vote
-        contract
-            .receive_request(
-                azero_connection,
-                request_hash,
-                committee_id.as_u128(),
-                *dest_token_address,
-                amount.as_u128(),
-                *dest_receiver_address,
-                request_nonce.as_u128(),
-            )
-            .await?;
-    }
-
-    Ok(())
 }
 
 pub async fn get_next_finalized_block_number_eth(
@@ -256,18 +177,70 @@ pub async fn get_next_finalized_block_number_eth(
             }
         };
 
+        debug!("Waiting for a next finalized block");
         sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
     }
 }
 
-async fn wait_until_not_halted(
-    most_azero: &MostInstance,
-    azero_connection: &AzeroConnectionWithSigner,
-) -> Result<(), EthListenerError> {
-    loop {
-        if !most_azero.is_halted(azero_connection).await? {
-            return Ok(());
+#[derive(Debug, Error)]
+#[error(transparent)]
+#[non_exhaustive]
+pub enum EthereumPausedListenerError {
+    #[error("error when parsing ethereum address")]
+    FromHex(#[from] rustc_hex::FromHexError),
+
+    #[error("broadcast send error")]
+    BroadcastSend(#[from] broadcast::error::SendError<CircuitBreakerEvent>),
+
+    #[error("broadcast receive error")]
+    BroadcastReceive(#[from] broadcast::error::RecvError),
+
+    #[error("contract error")]
+    Contract(#[from] ContractError<Provider<Http>>),
+
+    #[error("unexpected error")]
+    Unexpected,
+}
+
+pub struct EthereumPausedListener;
+
+impl EthereumPausedListener {
+    pub async fn run(
+        config: Arc<Config>,
+        eth_connection: Arc<EthConnection>,
+        circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
+        mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
+    ) -> Result<CircuitBreakerEvent, EthereumPausedListenerError> {
+        let Config {
+            eth_contract_address,
+            ..
+        } = &*config;
+
+        info!(target: "EthereumPausedListener", "Starting");
+
+        let address = eth_contract_address.parse::<Address>()?;
+        let most_eth = Most::new(address, Arc::clone(&eth_connection));
+
+        select! {
+            cb_event = circuit_breaker_receiver.recv () => {
+                warn!(target: "EthereumPausedListener", "Exiting due to a circuit breaker event {cb_event:?}");
+                Ok(cb_event?)
+            },
+
+            _ = async {
+                loop {
+                    debug!(target: "EthereumPausedListener", "Querying");
+                    if most_eth.paused().await? {
+                        circuit_breaker_sender.send(CircuitBreakerEvent::BridgeHaltEthereum)?;
+                        warn!(target: "EthereumPausedListener", "Most is paused, exiting");
+                        return Ok::<CircuitBreakerEvent, EthereumPausedListenerError>(CircuitBreakerEvent::BridgeHaltEthereum);
+                    }
+
+                    sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
+                }
+            } => {
+                Err (EthereumPausedListenerError::Unexpected)
+            }
         }
-        sleep(Duration::from_secs(10)).await;
     }
 }

@@ -9,16 +9,19 @@ use aleph_client::{
         event::{translate_events, BlockDetails, ContractEvent},
         ContractInstance,
     },
-    contract_transcode::{ContractMessageTranscoder, Value, Value::Seq},
+    contract_transcode::{
+        ContractMessageTranscoder,
+        Value::{self, Seq},
+    },
     pallets::contract::{ContractCallArgs, ContractRpc, ContractsUserApi},
     sp_weights::weight_v2::Weight,
-    AccountId, AlephConfig, AsConnection, Connection, SignedConnectionApi, TxInfo, TxStatus,
+    AccountId, AlephConfig, Connection, SignedConnectionApi, TxInfo, TxStatus,
 };
-use log::trace;
+use log::{error, trace};
 use subxt::events::Events;
 use thiserror::Error;
 
-use crate::{connections::azero::AzeroConnectionWithSigner, contracts::azero::Value::Tuple};
+use crate::connections::azero::AzeroConnectionWithSigner;
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -36,8 +39,11 @@ pub enum AzeroContractError {
     #[error("Missing or invalid field")]
     MissingOrInvalidField(String),
 
-    #[error("Dry run failed")]
-    DryRunFailed(String),
+    #[error("Dry-run reverted")]
+    DryRunReverted(Result<Value, anyhow::Error>),
+
+    #[error("Dispatch error")]
+    DispatchError(String),
 }
 
 pub struct AdvisoryInstance {
@@ -107,6 +113,10 @@ impl MostInstance {
         dest_receiver_address: [u8; 32],
         request_nonce: u128,
     ) -> Result<TxInfo, AzeroContractError> {
+        let gas_limit = Weight {
+            ref_time: self.ref_time_limit,
+            proof_size: self.proof_size_limit,
+        };
         let args = [
             bytes32_to_str(&request_hash),
             committee_id.to_string(),
@@ -115,71 +125,73 @@ impl MostInstance {
             bytes32_to_str(&dest_receiver_address),
             request_nonce.to_string(),
         ];
+        let call_data = self.transcoder.encode("receive_request", args)?;
 
-        let data = self.transcoder.encode("receive_request", args)?;
+        let dry_run_args = ContractCallArgs {
+            origin: signed_connection.account_id().clone(),
+            dest: self.address.clone(),
+            value: 0,
+            gas_limit: Some(gas_limit.clone()),
+            storage_deposit_limit: None,
+            input_data: call_data.clone(),
+        };
+
+        // Dry run to detect potential errors
+        let dry_run_res = match signed_connection.call_and_get(dry_run_args).await?.result {
+            Ok(res) => res,
+            Err(why) => {
+                return Err(AzeroContractError::DispatchError(format!("{:?}", why)));
+            }
+        };
+        if dry_run_res.did_revert() {
+            let decoded_value = self
+                .transcoder
+                .decode_return("receive_request", &mut dry_run_res.data.as_ref());
+
+            error!("Dry run reverted: {:?}", decoded_value);
+
+            return Err(AzeroContractError::DryRunReverted(decoded_value));
+        }
+
         signed_connection
             .call(
                 self.address.clone(),
                 0,
-                Weight {
-                    ref_time: self.ref_time_limit,
-                    proof_size: self.proof_size_limit,
-                },
+                gas_limit,
                 None,
-                data,
+                call_data,
                 TxStatus::Finalized,
             )
             .await
             .map_err(AzeroContractError::AlephClient)
     }
 
-    pub async fn is_halted(
+    pub async fn is_halted(&self, connection: &Connection) -> Result<bool, AzeroContractError> {
+        Ok(self
+            .contract
+            .contract_read0::<Result<bool, _>, _>(connection, "is_halted")
+            .await??)
+    }
+
+    pub async fn _needs_signature(
         &self,
-        connection: &AzeroConnectionWithSigner,
+        connection: &Connection,
+        request_hash: [u8; 32],
+        account: AccountId,
+        committee_id: u128,
     ) -> Result<bool, AzeroContractError> {
-        let data = self.transcoder.encode::<_, &str>("is_halted", [])?;
-        let args = ContractCallArgs {
-            origin: connection.account_id().clone(),
-            dest: self.address.clone(),
-            value: 0,
-            gas_limit: None,
-            input_data: data,
-            storage_deposit_limit: None,
-        };
-
-        let contract_read_result = connection.as_connection().call_and_get(args).await?;
-
-        if let Ok(res) = &contract_read_result.result {
-            match self
-                .transcoder
-                .decode_return("is_halted", &mut res.data.as_slice())?
-            {
-                Tuple(tuple) => {
-                    if tuple.ident() == Some("Ok".to_string()) {
-                        Ok(decode_bool_from_tuple(
-                            tuple.values().collect::<Vec<_>>()[0],
-                        )?)
-                    } else if tuple.ident() == Some("Err".to_string()) {
-                        Err(AzeroContractError::DryRunFailed(format!(
-                            "{:?}",
-                            tuple.values().collect::<Vec<_>>()
-                        )))
-                    } else {
-                        Err(AzeroContractError::DryRunFailed(
-                            "Invalid response".to_string(),
-                        ))
-                    }
-                }
-                _ => Err(AzeroContractError::DryRunFailed(
-                    "Invalid response".to_string(),
-                )),
-            }
-        } else {
-            Err(AzeroContractError::DryRunFailed(format!(
-                "{:?}",
-                contract_read_result
-            )))
-        }
+        Ok(self
+            .contract
+            .contract_read(
+                connection,
+                "needs_signature",
+                &[
+                    bytes32_to_str(&request_hash),
+                    account.to_string(),
+                    committee_id.to_string(),
+                ],
+            )
+            .await?)
     }
 
     pub fn filter_events(
@@ -271,24 +283,6 @@ fn decode_uint_field(
         Err(AzeroContractError::MissingOrInvalidField(format!(
             "Data field {:?} couldn't be found or has incorrect format",
             field
-        )))
-    }
-}
-
-fn decode_bool_from_tuple(data: &Value) -> Result<bool, AzeroContractError> {
-    if let Tuple(tuple_val) = data {
-        if let Value::Bool(x) = tuple_val.values().collect::<Vec<_>>()[0] {
-            Ok(*x)
-        } else {
-            Err(AzeroContractError::DryRunFailed(format!(
-                "Value {:?} couldn't be decoded as bool",
-                data
-            )))
-        }
-    } else {
-        Err(AzeroContractError::DryRunFailed(format!(
-            "Value {:?} couldn't be decoded as bool",
-            data
         )))
     }
 }

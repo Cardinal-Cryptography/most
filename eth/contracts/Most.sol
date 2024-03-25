@@ -22,7 +22,7 @@ contract Most is
 
     /// @dev This amount of gas should be sufficient for ether transfers
     /// and simple fallback function execution, yet still protecting against reentrancy attack.
-    uint256 constant GAS_LIMIT = 3500;
+    uint256 public constant GAS_LIMIT = 3500;
 
     uint256 public requestNonce;
     uint256 public committeeId;
@@ -317,8 +317,25 @@ contract Most is
     function hasSignedRequest(
         address guardian,
         bytes32 hash
-    ) external view returns (bool) {
+    ) public view returns (bool) {
         return pendingRequests[hash].signatures[guardian];
+    }
+
+    function needsSignature(
+        bytes32 requestHash,
+        address account,
+        uint256 _committeeId
+    ) external view returns (bool) {
+        if (!isInCommittee(_committeeId, account)) {
+            return false;
+        }
+        if (processedRequests[requestHash]) {
+            return false;
+        }
+        if (hasSignedRequest(account, requestHash)) {
+            return false;
+        }
+        return true;
     }
 
     function isInCommittee(

@@ -633,6 +633,12 @@ pub mod most {
             self.committees.contains((committee_id, account))
         }
 
+        /// Returns `true` if the account has signed the request with hash `request_hash`
+        #[ink(message)]
+        pub fn has_signed_request(&self, account: AccountId, request_hash: HashedRequest) -> bool {
+            self.signatures.contains((request_hash, account))
+        }
+
         /// Returns an error (reverts) if account is not in the currently active committee
         #[ink(message)]
         pub fn only_committee_member(
@@ -644,6 +650,30 @@ pub mod most {
                 true => Ok(()),
                 false => Err(MostError::NotInCommittee),
             }
+        }
+
+        #[ink(message)]
+        pub fn needs_signature(
+            &self,
+            request_hash: HashedRequest,
+            account: AccountId,
+            committee_id: CommitteeId,
+        ) -> bool {
+            if !self.is_in_committee(committee_id, account) {
+                // signer not in the current committee
+                return false;
+            }
+
+            if self.processed_requests.contains(request_hash) {
+                // request already processed
+                return false;
+            }
+
+            if self.has_signed_request(account, request_hash) {
+                // request already signed
+                return false;
+            }
+            true
         }
 
         // ---  setter txs

@@ -5,7 +5,6 @@ const { u8aToHex } = require("@polkadot/util");
 const Safe = require("@safe-global/protocol-kit").default;
 const { EthersAdapter } = require("@safe-global/protocol-kit");
 
-// const contracts = require("../addresses.json");
 const azeroContracts = require("../../azero/addresses.json");
 
 async function createSafeInstance(signer, contracts) {
@@ -168,7 +167,7 @@ async function main() {
   const most = await Most.at(addresses.most);
 
   if (network.name == "development" || network.name == "bridgenet") {
-    // NOTE : TEMPorary before devnet is fixed and uses propere genesis that seeds these accounts with funds
+    // NOTE : TEMPorary before devnet is fixed and uses proper genesis that seeds these accounts with funds
     for (const to of signers.slice(1, 4)) {
       await signers[0].sendTransaction({
         to: to.address,
@@ -197,7 +196,7 @@ async function main() {
     console.log("signer0", signer0.address);
     console.log("signer1", signer1.address);
 
-    for (let [ethAddress, azeroAddress] of azeroContracts.tokens) {
+    for (let [_, ethAddress, azeroAddress] of azeroContracts.tokens) {
       await addTokenPair(ethAddress, azeroAddress, most, [safeSdk0, safeSdk1]);
     }
 
@@ -216,5 +215,5 @@ async function main() {
 
 main().catch((error) => {
   console.error(error);
-  process.exitCode = 1;
+  process.exit(1);
 });
