@@ -1,4 +1,10 @@
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 
 use aleph_client::AccountId;
 use clap::Parser;
@@ -169,7 +175,10 @@ async fn main() -> Result<(), RelayerError> {
 
     let mut tasks = JoinSet::new();
 
+    let first_run = Arc::new(AtomicBool::new(true));
+
     run_relayer(
+        first_run.clone(),
         &mut tasks,
         config.clone(),
         azero_connection.clone(),
@@ -177,6 +186,8 @@ async fn main() -> Result<(), RelayerError> {
         eth_connection.clone(),
         eth_signed_connection.clone(),
     );
+
+    first_run.store(false, Ordering::Relaxed);
 
     // wait for all tasks to finish and reboot
     let delay = Duration::from_secs(2);
@@ -191,6 +202,7 @@ async fn main() -> Result<(), RelayerError> {
                     sleep(delay).await;
 
                     run_relayer(
+                        first_run.clone(),
                         &mut tasks,
                         config.clone(),
                         azero_connection.clone(),
@@ -212,6 +224,7 @@ async fn main() -> Result<(), RelayerError> {
 }
 
 fn run_relayer(
+    first_run: Arc<AtomicBool>,
     tasks: &mut JoinSet<Result<CircuitBreakerEvent, RelayerError>>,
     config: Arc<Config>,
     azero_connection: Arc<AzeroWsConnection>,
@@ -262,6 +275,7 @@ fn run_relayer(
 
     tasks.spawn(
         RedisManager::run(
+            first_run,
             Arc::clone(&config),
             eth_block_number_sender.clone(),
             eth_block_number_sender.subscribe(),

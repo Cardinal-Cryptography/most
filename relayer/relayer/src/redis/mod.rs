@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc, Mutex,
+};
 
 use log::{debug, info, warn};
 use redis::{Client as RedisClient, Commands, Connection, RedisError};
@@ -34,6 +37,7 @@ pub struct RedisManager;
 
 impl RedisManager {
     pub async fn run(
+        is_first_run: Arc<AtomicBool>,
         config: Arc<Config>,
         next_unprocessed_block_number_eth: broadcast::Sender<u32>,
         mut last_processed_block_number_eth: broadcast::Receiver<u32>,
@@ -54,7 +58,7 @@ impl RedisManager {
         let client = RedisClient::open(redis_node.clone())?;
         let redis_connection = Arc::new(Mutex::new(client.get_connection()?));
 
-        if *override_azero_cache {
+        if *override_azero_cache && is_first_run.load(Ordering::Relaxed) {
             write_block_number(
                 config.name.clone(),
                 ALEPH_BLOCK_KEY.to_string(),
@@ -63,7 +67,7 @@ impl RedisManager {
             )?;
         }
 
-        if *override_eth_cache {
+        if *override_eth_cache && is_first_run.load(Ordering::Relaxed) {
             write_block_number(
                 config.name.clone(),
                 ETH_BLOCK_KEY.to_string(),
