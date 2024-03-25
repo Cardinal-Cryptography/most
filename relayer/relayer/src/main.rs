@@ -221,10 +221,10 @@ fn run_relayer(
 ) {
     // Create channels
     let (eth_events_sender, eth_events_receiver) = mpsc::channel::<EthMostEvents>(1);
-    let (eth_block_number_sender, _eth_block_number_receiver) = broadcast::channel::<u32>(1);
+    let (eth_block_number_sender, _) = broadcast::channel::<u32>(1);
 
     let (azero_events_sender, azero_events_receiver) = mpsc::channel::<AzeroMostEvents>(32);
-    let (azero_block_number_sender, _azero_block_number_receiver) = broadcast::channel::<u32>(1);
+    let (azero_block_number_sender, _) = broadcast::channel::<u32>(1);
     let (azero_block_seal_sender, azero_block_seal_receiver) = mpsc::channel::<u32>(1);
 
     let (circuit_breaker_sender, _circuit_breaker_receiver) =

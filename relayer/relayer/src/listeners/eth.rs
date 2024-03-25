@@ -134,7 +134,6 @@ impl EthereumListener {
                                                 return Ok(cb_event?);
                                             },
                                             ack_result = events_ack_receiver => {
-                                                // ack_result.map_err (|_| EthereumListenerError::AckSenderDropped)?;
                                                 if ack_result.is_ok () {
                                                     info!(target: "EthereumListener", "Events ack received, marking {} as the next unprocessed block number", to_block +1);
                                                     // we send + 1 to self as this is the next block we'd like to see
