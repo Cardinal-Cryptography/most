@@ -193,14 +193,14 @@ pub enum AlephZeroEventsHandlerError {
     #[error("broadcast send error")]
     BroadcastSend(#[from] broadcast::error::SendError<CircuitBreakerEvent>),
 
-    #[error("send error")]
+    #[error("channel send error")]
     Send(#[from] mpsc::error::SendError<u32>),
 
-    #[error("Task join error")]
+    #[error("task join error")]
     Join(#[from] JoinError),
 
-    #[error("Ack")]
-    Ack,
+    #[error("ack receiver dropped before response could be sent")]
+    AckSend,
 }
 
 pub struct AlephZeroEventsHandler;
@@ -261,9 +261,7 @@ impl AlephZeroEventsHandler {
                             }
                         }
 
-                        if ack.send(to_block).is_err() {
-                            return Err(AlephZeroEventsHandlerError::Ack);
-                        }
+                        ack.send(to_block).map_err(|_| AlephZeroEventsHandlerError::AckSend)?;
                         Ok::<(), AlephZeroEventsHandlerError> (())
                     });
 
