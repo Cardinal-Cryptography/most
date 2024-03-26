@@ -170,8 +170,8 @@ async function main(): Promise<void> {
     const initialSupply = 0;
     const tokenArgs: TokenArgs = [
       initialSupply,
-      token.symbol,
       token.name,
+      token.symbol,
       token.decimals,
       minterBurner,
     ];
