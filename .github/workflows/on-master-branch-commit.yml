@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - master
+      - A0-4214-change-docker-registry
 
 jobs:
   check-vars-and-secrets:
