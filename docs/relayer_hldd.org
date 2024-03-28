@@ -2,7 +2,6 @@
 #+AUTHOR: F. Bielejec
 #+EMAIL: fiip.bielejec@cardinals.cc
 #+TEXINFO_PRINTED_TITLE: MOST relayer: High-Level Design Document
-#+SUBTITLE: version {{{version}}}, {{{updated}}}
 #+OPTIONS: ':t toc:t author:t email:t
 #+LANGUAGE: en
 #+STARTUP: overview
