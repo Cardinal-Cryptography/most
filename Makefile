@@ -187,6 +187,11 @@ deploy-azero: # Deploy azero contracts
 deploy-azero: compile-azero
 	cd azero && AZERO_ENV=$(AZERO_ENV) npm run deploy
 
+.PHONY: upload-azero
+upload-azero: # Upload azero contract code without instantiating (useful for upgrades)
+upload-azero: compile-azero
+	cd azero && AZERO_ENV=$(AZERO_ENV) npm run upload
+
 .PHONY: setup-azero
 setup-azero: # Setup azero contracts
 setup-azero: compile-azero
