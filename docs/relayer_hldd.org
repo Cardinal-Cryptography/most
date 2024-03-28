@@ -72,10 +72,42 @@ while request_needs_signing(@finalized_block)
 
 * IN-PROGRESS Components handling Ethereum -> AlephZero transfer requests
 
+#+BEGIN_SRC plantuml :file eth_azero_components.png
+database "Cache" {
+  [RedisManager] as redis
+}
 
+package "Ethereum events" {
+  [Listener] as eth_listener
+  [Handler] as eth_handler
+}
+
+package "Message queues" {
+  [Next block number] as eth_block_number
+  [Events] as eth_events
+}
+
+cloud {
+  [AlephZero] as a0
+  [Ethereum] as eth
+}
+
+eth_listener <.. eth: events subscription
+eth_listener .up.> eth_events : publish batch
+eth_listener <..> eth_block_number: pub-sub
+eth_handler <.up. eth_events : subsciption
+eth_handler ..> a0 : tx
+redis <.. eth_block_number: subscription
+redis ..> eth_block_number: publish on boot
+#+END_SRC
+[[file:eth_azero_components.png][eth_azero_components.png]]
+
+- *Listener*: maintains a subscription to the Ethereum chain. On boot it receives next block number after the last cached and proceeds to retrieve events in batches coming from consecutive blocks, between the last processed and the last finalized, whichever number is smaller. For each batch *Listener* publishes it on an Events channel for a *Handler* to pick up and process in a blokciing manner, i.e. the *Listener* doe snot process further until the current batch is entirely handed and the ecache is updated.
+- *Handler*: a task which subscribes to the Events channels and acks whenever a given batch of transfer requests is succesfully handled. Each event in a batch is processed sequentially in a FIFO order.
 
 * DONE Additional components
-There are various ancillary components not part of the diagram above:
+There are various ancillary components not part of the diagrams above:
+
 - *Circuit Breaker*: Ciruit Breaker is a multiple-producer multiple-consumer channel, a message pushed to this channels by one of the components makes the remaining components drop all their tasks immediately, which returns control to the main thread. The relayer enters a shutdown/reboot loop, in which state the system tries to handle the next batch of requests, starting from the last succesfully processed block until the condition is removed.
 - *Advisory Listener*: this is a process that listens to none, one or a collection of Advisory smart contracts, which are boolean flag contracts, deployed on the AlephZero chain, where interested parties can publish warnings that shut down the relayer operation. Notice that the smart contracts comprising the MOST do not observe these flags, only the relayer process does. If the Advisory Listener detects a flag it publishes to the circuit breaker channel.
 - *Halted state Listener*: Twin processes that check whether the bridge on ther side has beeen halted by a governance ation. Detecting it means an event is published to the circuit breaker channel.
