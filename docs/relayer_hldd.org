@@ -52,7 +52,8 @@ a0_listener <.down.> a0_handler_n
 a0_handler_1 .down.> eth : tx
 a0_handler_n .down.> eth : tx
 #+END_SRC
-[[file:azero_eth_components.png][azero_eth_components.png]]
+#+RESULTS:
+[[azero_eth_components.png][azero_eth_components.png]]
 
 - *Listener*: maintains a subscription to the AlephZero chain. On boot it will receive the number of the next block to process and filter all the cross-chain transfer request events that occured between this cached number and the last finalized block. After that requests are handled concurrently in chunks of events from consecutive block ranges. Cache is updated as the concurrent event handlers spawned for each batch finish processing them, in the same order the batches arrived and were queued.
 - *Handlers*: independent event handlers that are spawned for each request. After all the events from the batch of blocks acknowledge they have finished cache gets updated with the next block number.
