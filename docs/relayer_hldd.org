@@ -17,7 +17,7 @@ System is composed of various coupled components which comunicate with channels 
 
 Becasue of the vast differences in how these two chains operate and finalize blocks there are some differences in how these two sides operate.
 
-* Components for handling AlephZero -> Ethereum transfer requests
+* DONE Components handling AlephZero -> Ethereum transfer requests
 
 #+BEGIN_SRC plantuml :file azero_eth_components.png
 database "Cache" {
@@ -70,6 +70,11 @@ do:
 while request_needs_signing(@finalized_block)
 #+END_SRC
 
+* IN-PROGRESS Components handling Ethereum -> AlephZero transfer requests
+
+
+
+* DONE Additional components
 There are various ancillary components not part of the diagram above:
 - *Circuit Breaker*: Ciruit Breaker is a multiple-producer multiple-consumer channel, a message pushed to this channels by one of the components makes the remaining components drop all their tasks immediately, which returns control to the main thread. The relayer enters a shutdown/reboot loop, in which state the system tries to handle the next batch of requests, starting from the last succesfully processed block until the condition is removed.
 - *Advisory Listener*: this is a process that listens to none, one or a collection of Advisory smart contracts, which are boolean flag contracts, deployed on the AlephZero chain, where interested parties can publish warnings that shut down the relayer operation. Notice that the smart contracts comprising the MOST do not observe these flags, only the relayer process does. If the Advisory Listener detects a flag it publishes to the circuit breaker channel.
