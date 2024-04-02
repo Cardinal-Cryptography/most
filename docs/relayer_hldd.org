@@ -8,7 +8,7 @@
 
 * DONE Introduction
 
-This document describes conceptual design of a relayer process, designed to listen to, sign and relay cross-chain transfer requests between Ethereum and AlephZero.
+This document describes the conceptual design of a relayer process, designed to listen to, sign and relay cross-chain transfer requests between Ethereum and AlephZero.
 
 System architecture can be divided into components responsible for listening to and handling requests coming from the AlephZero chain and into Ethereum and the ones responsible for handling cross chain transfers in the opposite direction.
 
