@@ -1,0 +1,30 @@
+@startuml
+
+database "Cache" {
+  [RedisManager] as redis
+}
+
+package "Ethereum events" {
+  [Listener] as eth_listener
+  [Handler] as eth_handler
+}
+
+package "Message channels" {
+  [Next block number] as eth_block_number
+  [Events] as eth_events
+}
+
+cloud {
+  [AlephZero] as a0
+  [Ethereum] as eth
+}
+
+eth_listener <.. eth: events subscription
+eth_listener .up.> eth_events : publish batch
+eth_listener <..> eth_block_number: pub-sub
+eth_handler <.up. eth_events : subsciption
+eth_handler ..> a0 : tx
+redis <.. eth_block_number: subscription
+redis ..> eth_block_number: publish on boot
+
+@enduml
