@@ -1,0 +1,36 @@
+@startuml
+
+database "Cache" {
+  [RedisManager] as redis
+}
+
+package "AlephZero events" {
+  [Listener] as a0_listener
+  [Handler 1] as a0_handler_1
+  [...]
+  [Handler n] as a0_handler_n
+}
+
+package "Message channels" {
+  [Next block number] as a0_block_num
+  [Block seal] as a0_block_seal
+}
+
+cloud {
+  [Ethereum] as eth
+  [AlephZero] as a0
+}
+
+a0_listener <.up. a0  : events subscription
+a0_listener <.up. a0_block_num :  next block subscrption
+a0_listener .up.> a0_block_seal : publish last processed block
+redis .down.> a0_block_num : publish next block
+redis <.up. a0_block_seal : last processed block subscription
+
+a0_listener <.down.> a0_handler_1
+a0_listener <.down.> a0_handler_n
+
+a0_handler_1 .down.> eth : tx
+a0_handler_n .down.> eth : tx
+
+@enduml

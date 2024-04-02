@@ -19,39 +19,11 @@ Because of the vast differences in how these two chains operate and finalize blo
 * DONE Components handling AlephZero -> Ethereum transfer requests
 
 #+BEGIN_SRC plantuml :file azero_eth_components.png
-database "Cache" {
-  [RedisManager] as redis
-}
-
-package "AlephZero events" {
-  [Listener] as a0_listener
-  [Handler 1] as a0_handler_1
-  [...]
-  [Handler n] as a0_handler_n
-}
-
-package "Message channels" {
-  [Next block number] as a0_block_num
-  [Block seal] as a0_block_seal
-}
-
-cloud {
-  [Ethereum] as eth
-  [AlephZero] as a0
-}
-
-a0_listener <.up. a0  : events subscription
-a0_listener <.up. a0_block_num :  next block subscrption
-a0_listener .up.> a0_block_seal : publish last processed block
-redis .down.> a0_block_num : publish next block
-redis <.up. a0_block_seal : last processed block subscription
-
-a0_listener <.down.> a0_handler_1
-a0_listener <.down.> a0_handler_n
-
-a0_handler_1 .down.> eth : tx
-a0_handler_n .down.> eth : tx
+@startuml
+!include azero_eth_components.iuml
+@enduml
 #+END_SRC
+
 [[file:azero_eth_components.png][azero_eth_components.png]]
 
 - *Listener*: maintains a subscription to the AlephZero chain. On boot it will receive the number of the next block to process and filter all the cross-chain transfer request events that occurred between this cached number and the last finalized block. After that, requests are handled concurrently in chunks of events from consecutive block ranges. The cache is updated as the concurrent event handlers spawned for each batch finish processing them, in the same order the batches arrived and were queued.
@@ -71,33 +43,11 @@ while request_needs_signing(@finalized_block)
 * DONE Components handling Ethereum -> AlephZero transfer requests
 
 #+BEGIN_SRC plantuml :file eth_azero_components.png
-database "Cache" {
-  [RedisManager] as redis
-}
-
-package "Ethereum events" {
-  [Listener] as eth_listener
-  [Handler] as eth_handler
-}
-
-package "Message channels" {
-  [Next block number] as eth_block_number
-  [Events] as eth_events
-}
-
-cloud {
-  [AlephZero] as a0
-  [Ethereum] as eth
-}
-
-eth_listener <.. eth: events subscription
-eth_listener .up.> eth_events : publish batch
-eth_listener <..> eth_block_number: pub-sub
-eth_handler <.up. eth_events : subsciption
-eth_handler ..> a0 : tx
-redis <.. eth_block_number: subscription
-redis ..> eth_block_number: publish on boot
+@startuml
+!include eth_azero_components.iuml
+@enduml
 #+END_SRC
+
 [[file:eth_azero_components.png][eth_azero_components.png]]
 
 - *Listener*: maintains a subscription to the Ethereum chain. On boot it receives next block number after the last cached and proceeds to retrieve events in batches coming from consecutive blocks, between the last processed and the last finalized, whichever number is smaller. For each batch *Listener* publishes it on an Events channel for a *Handler* to pick up and process in a blokciing manner, i.e. the *Listener* doe snot process further until the current batch is entirely handled and the cache is updated.

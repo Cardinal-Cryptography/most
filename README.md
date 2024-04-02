@@ -250,3 +250,32 @@ Contract: Token
 Method: approve(address,uint256)
 Arguments: Result(2) [ '0x5a344a8721d743393847C17613dd78C7776b2714', 1234n ]
 ```
+
+## Documentation
+
+Additional documentation is written in orgmode, diagrams are written using [plantuml](https://plantuml.com/download).
+
+Orgmode is suported by [VSCode](https://vscode-org-mode.github.io/vscode-org-mode), [Emacs](https://orgmode.org/) and [vim](https://github.com/jceb/vim-orgmode).
+
+### Diagrams
+
+In order to render the diagrams:
+
+```bash
+java -jar plantuml.jar azero_eth_components.iuml eth_azero_components.iuml
+```
+
+In Emcas you can pass the path to the plantuml executable in the orgmode config:
+
+```elisp
+(setq org-plantuml-jar-path
+      (expand-file-name "/path/to/plantuml.jar"))
+```
+
+Then you can use:
+
+```
+C-c C-e l p
+```
+
+to render the whole document and evaluate plantuml code blocks (this will produce png files).
