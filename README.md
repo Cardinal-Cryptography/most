@@ -265,7 +265,10 @@ In order to render the diagrams:
 java -jar plantuml.jar azero_eth_components.iuml eth_azero_components.iuml
 ```
 
-In Emcas you can pass the path to the plantuml executable in the orgmode config:
+There are various online editors for plantuml that can render the format, e.g.:
+- [plantuml-previewer](https://sujoyu.github.io/plantuml-previewer/)
+
+In Emacs you can pass the path to the plantuml executable in the orgmode config:
 
 ```elisp
 (setq org-plantuml-jar-path
