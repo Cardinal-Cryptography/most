@@ -54,7 +54,7 @@ a0_handler_n .down.> eth : tx
 #+END_SRC
 
 - *Listener*: maintains a subscription to the AlephZero chain. On boot it will receive the number of the next block to process and filter all the cross-chain transfer request events that occurred between this cached number and the last finalized block. After that, requests are handled concurrently in chunks of events from consecutive block ranges. The cache is updated as the concurrent event handlers spawned for each batch finish processing them, in the same order the batches arrived and were queued.
-- *Handlers*: independent event handlers that are spawned for each request. After all the events from the batch of blocks acknowledge they have finished cache gets updated with the next block number.
+- *Handlers*: independent event handlers that are spawned for each request. After all the events from the batch of blocks acknowledge they have finished, the cache gets updated with the next block number.
 Handlers sign and submit transactions to the MOST smart contract on the Ethereum chain, first by checking whether a given guardian signature is needed (maybe they already signed it, or maybe the request is already processed, or maybe some previous blocks were yanked). As long as it is needed in the last produced block on Ethereum, the handler will sign it and wait until the transaction appears in the last finalized block. The following pseudo-code is a conceptual representation of the exact logic followed by the handlers before acknowledging a cross-chain transfer request as handled:
 
 #+BEGIN_SRC
