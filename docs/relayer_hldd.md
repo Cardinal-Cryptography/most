@@ -1,4 +1,3 @@
-
 # Table of Contents
 
 1.  [Introduction](#org787ba0a)
@@ -27,8 +26,6 @@ Because of the vast differences in how these two chains operate and finalize blo
 
 ![img](azero_eth_components.png)
 
-[azero<sub>eth</sub><sub>components.png</sub>](azero_eth_components.png)
-
 -   **Listener**: maintains a subscription to the AlephZero chain. On boot it will receive the number of the next block to process and filter all the cross-chain transfer request events that occurred between this cached number and the last finalized block. After that, requests are handled concurrently in chunks of events from consecutive block ranges. The cache is updated as the concurrent event handlers spawned for each batch finish processing them, in the same order the batches arrived and were queued.
 -   **Handlers**: independent event handlers that are spawned for each request. After all the events from the batch of blocks acknowledge they have finished the cache gets updated with the next block number.
 
@@ -49,8 +46,6 @@ Handlers sign and submit transactions to the MOST smart contract on the Ethereum
 
 ![img](eth_azero_components.png)
 
-[eth<sub>azero</sub><sub>components.png</sub>](eth_azero_components.png)
-
 -   **Listener**: maintains a subscription to the Ethereum chain. On boot it receives next block number after the last cached and proceeds to retrieve events in batches coming from consecutive blocks, between the last processed and the last finalized, whichever number is smaller. For each batch **Listener** publishes it on an Events channel for a **Handler** to pick up and process in a blokciing manner, i.e. the **Listener** doe snot process further until the current batch is entirely handled and the cache is updated.
 -   **Handler**: a task which subscribes to the Events channels and acks whenever a given batch of transfer requests is successfully handled. Each event in a batch is processed sequentially in a FIFO order.
 
@@ -65,4 +60,3 @@ There are various ancillary components not part of the diagrams above:
 -   **Advisory Listener**: this is a process that listens to none, one or a collection of Advisory smart contracts, which are boolean flag contracts, deployed on the AlephZero chain, where interested parties can publish warnings that shut down the relayer operation. Notice that the smart contracts comprising the MOST do not observe these flags, only the relayer process does. If the Advisory Listener detects a flag it publishes to the circuit breaker channel.
 -   **Halted state Listener**: Twin processes that check whether the bridge on their side has beeen halted by a governance action. Detecting it means an event is published to the circuit breaker channel.
 -   **Signer**: a separate process responsible for signing cross-chain request transaction payloads with a key stored within a hardware enclave.
-
