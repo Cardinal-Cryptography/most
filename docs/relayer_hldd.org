@@ -101,7 +101,7 @@ redis ..> eth_block_number: publish on boot
 [[file:eth_azero_components.png][eth_azero_components.png]]
 
 - *Listener*: maintains a subscription to the Ethereum chain. On boot it receives next block number after the last cached and proceeds to retrieve events in batches coming from consecutive blocks, between the last processed and the last finalized, whichever number is smaller. For each batch *Listener* publishes it on an Events channel for a *Handler* to pick up and process in a blokciing manner, i.e. the *Listener* doe snot process further until the current batch is entirely handed and the ecache is updated.
-- *Handler*: a task which subscribes to the Events channels and acks whenever a given batch of transfer requests is succesfully handled. Each event in a batch is processed sequentially in a FIFO order.
+- *Handler*: a task which subscribes to the Events channels and acks whenever a given batch of transfer requests is successfully handled. Each event in a batch is processed sequentially in a FIFO order.
 
 * DONE Additional components
 There are various ancillary components not part of the diagrams above:
