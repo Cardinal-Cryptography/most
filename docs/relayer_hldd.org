@@ -10,11 +10,11 @@
 
 This document describes the conceptual design of a relayer process, designed to listen to, sign and relay cross-chain transfer requests between Ethereum and AlephZero.
 
-System architecture can be divided into components responsible for listening to and handling requests coming from the AlephZero chain and into Ethereum and the ones responsible for handling cross chain transfers in the opposite direction.
+System architecture can be divided into components responsible for listening to and handling requests coming from the AlephZero chain and into Ethereum, as well as the ones responsible for handling cross chain transfers in the opposite direction.
 
-The system is composed of various coupled components which communicate via channels.
+The system is composed of various coupled components which communicate via message-passing channels.
 
-Becasue of the vast differences in how these two chains operate and finalize blocks there are some differences in how these two sides operate.
+Because of the vast differences in how these two chains operate and finalize blocks there are some differences in how these two sides operate.
 
 * DONE Components handling AlephZero -> Ethereum transfer requests
 
@@ -52,7 +52,6 @@ a0_listener <.down.> a0_handler_n
 a0_handler_1 .down.> eth : tx
 a0_handler_n .down.> eth : tx
 #+END_SRC
-[[file:azero_eth_components.png][azero_eth_components.png]]
 
 - *Listener*: maintains a subscription to the AlephZero chain. On boot it will receive the number of the next block to process and filter all the cross-chain transfer request events that occurred between this cached number and the last finalized block. After that, requests are handled concurrently in chunks of events from consecutive block ranges. The cache is updated as the concurrent event handlers spawned for each batch finish processing them, in the same order the batches arrived and were queued.
 - *Handlers*: independent event handlers that are spawned for each request. After all the events from the batch of blocks acknowledge they have finished cache gets updated with the next block number.
@@ -80,7 +79,7 @@ package "Ethereum events" {
   [Handler] as eth_handler
 }
 
-package "Message queues" {
+package "Message channels" {
   [Next block number] as eth_block_number
   [Events] as eth_events
 }
@@ -98,7 +97,6 @@ eth_handler ..> a0 : tx
 redis <.. eth_block_number: subscription
 redis ..> eth_block_number: publish on boot
 #+END_SRC
-[[file:eth_azero_components.png][eth_azero_components.png]]
 
 - *Listener*: maintains a subscription to the Ethereum chain. On boot it receives next block number after the last cached and proceeds to retrieve events in batches coming from consecutive blocks, between the last processed and the last finalized, whichever number is smaller. For each batch *Listener* publishes it on an Events channel for a *Handler* to pick up and process in a blokciing manner, i.e. the *Listener* doe snot process further until the current batch is entirely handed and the ecache is updated.
 - *Handler*: a task which subscribes to the Events channels and acks whenever a given batch of transfer requests is successfully handled. Each event in a batch is processed sequentially in a FIFO order.
