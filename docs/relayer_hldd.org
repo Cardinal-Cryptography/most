@@ -12,7 +12,7 @@ This document describes the conceptual design of a relayer process, designed to 
 
 System architecture can be divided into components responsible for listening to and handling requests coming from the AlephZero chain and into Ethereum and the ones responsible for handling cross chain transfers in the opposite direction.
 
-System is composed of various coupled components which comunicate with channels (akin to message passing, albeit much simpler).
+The system is composed of various coupled components which communicate via channels.
 
 Becasue of the vast differences in how these two chains operate and finalize blocks there are some differences in how these two sides operate.
 
