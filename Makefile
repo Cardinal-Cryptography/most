@@ -189,7 +189,7 @@ deploy-azero: compile-azero
 
 .PHONY: upload-azero
 upload-azero: # Upload azero contract code without instantiating (useful for upgrades)
-upload-azero: compile-azero
+upload-azero: compile-azero-docker
 	cd azero && AZERO_ENV=$(AZERO_ENV) npm run upload
 
 .PHONY: setup-azero
