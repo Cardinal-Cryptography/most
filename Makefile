@@ -107,7 +107,7 @@ deploy-eth-live: compile-eth
 
 .PHONY: deploy-live
 deploy-live: # Deploy azero and eth contracts on a live network (testnet or mainnet)
-deploy-live: deploy-azero setup-azero deploy-eth-live
+deploy-live: deploy-azero-docker setup-azero-docker deploy-eth-live
 
 .PHONY: verify-eth
 verify-eth: # Post verified eth sources of a contract to etherscan
@@ -159,6 +159,10 @@ print-azero-codehashes: compile-azero-docker
 deploy-azero-docker: # Deploy azero contracts compiling in docker
 deploy-azero-docker: azero-deps compile-azero-docker
 	cd azero && AZERO_ENV=$(AZERO_ENV) npm run deploy
+
+.PHONY: setup-azero-docker
+setup-azero-docker: # Setup azero contracts compiling in docker
+setup-azero-docker: azero-deps compile-azero-docker
 	cd azero && AZERO_ENV=$(AZERO_ENV) npm run setup
 
 .PHONY: azero-deps

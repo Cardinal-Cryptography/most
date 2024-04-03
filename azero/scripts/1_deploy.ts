@@ -183,7 +183,7 @@ async function main(): Promise<void> {
       ? ethAddresses[token.checkAddress]
       : token.ethAddress!;
 
-    tokenAddresses.push([token.checkAddress, ethAddress, address]);
+    tokenAddresses.push([token.symbol, ethAddress, address]);
   }
 
   const migrations = new Migrations(migrationsAddress, deployer, api);

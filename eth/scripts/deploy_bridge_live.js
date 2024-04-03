@@ -28,7 +28,7 @@ async function main() {
   await most.waitForDeployment();
   console.log("Most deployed to:", most.target);
 
-  for (let [ethAddress, azeroAddress] of azeroContracts.tokens) {
+  for (let [_symbol, ethAddress, azeroAddress] of azeroContracts.tokens) {
     console.log("Adding pair", ethAddress, azeroAddress);
 
     let ethAddressBytes = ethers.zeroPadValue(ethers.getBytes(ethAddress), 32);
