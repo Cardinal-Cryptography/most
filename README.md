@@ -23,7 +23,12 @@ Bring your assets to Aleph Zero and benefit from its scalable privacy-enhancing 
 
 ## Prerequisites
 
-Have docker, docker-compose (`1.29.2`) and cargo-contract (`3.2.0`) installed.
+1. Have docker and docker-compose (`1.29.2`)
+2. Have cargo-contract (`3.2.0`) installed:
+
+```bash
+cargo +nightly install cargo-contract --vers 3.2.0 --force --locked
+```
 
 ## Testing the contracts
 
