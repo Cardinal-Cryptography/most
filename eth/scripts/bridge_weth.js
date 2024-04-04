@@ -49,7 +49,7 @@ async function main() {
   let srcTokenAddress = ethers.zeroPadValue(ethers.getBytes(addresses.weth), 32);
 
   const supported = await most.supportedPairs(srcTokenAddress);
-  console.log("supported pair?", supported);
+  console.log(srcTokenAddress, "supported pair is", supported);
   if (supported == 0x0) {
       console.error("Unsupported pair");
       process.exit(-1)
