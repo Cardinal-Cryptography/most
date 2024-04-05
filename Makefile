@@ -28,7 +28,7 @@ clean-azero:
 clean-eth: # Remove eth node data
 clean-eth:
 	cd devnet-eth && ./clean.sh && echo "Done devnet-eth clean"
-	cd eth && rm -rf .openzeppelin && echo "Done eth clean"
+	cd eth && npx hardhat clean && echo "Done eth clean"
 
 .PHONY: clean
 clean: # Remove all node data

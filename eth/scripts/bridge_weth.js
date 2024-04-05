@@ -18,8 +18,7 @@ async function main() {
   const receiver = "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY";
 
   const WETH = artifacts.require("WETH9");
-  const wethAddress = addresses.weth;
-  const weth = await WETH.at(wethAddress);
+  const weth = await WETH.at(addresses.weth);
 
   // check senders balance
   let query = await weth.balanceOf(accounts[0]);
@@ -44,11 +43,20 @@ async function main() {
   const Most = artifacts.require("Most");
   const most = await Most.at(addresses.most);
 
-  // TODO check approval
   // approve Most
   await weth.approve(addresses.most, amount);
 
-  let srcTokenAddress = ethers.zeroPadValue(ethers.getBytes(wethAddress), 32);
+  let srcTokenAddress = ethers.zeroPadValue(
+    ethers.getBytes(addresses.weth),
+    32,
+  );
+
+  const supported = await most.supportedPairs(srcTokenAddress);
+  console.log(srcTokenAddress, "supported pair is", supported);
+  if (supported == 0x0) {
+    console.error("Unsupported pair");
+    process.exit(-1);
+  }
 
   const destReceiverAddress = u8aToHex(
     new Keyring({ type: "sr25519" }).decodeAddress(receiver),
@@ -62,6 +70,7 @@ async function main() {
     "to",
     receiver,
   );
+
   let tx_response = await most.sendRequest(
     srcTokenAddress,
     amount,
