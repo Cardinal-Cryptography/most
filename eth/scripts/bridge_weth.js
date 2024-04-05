@@ -46,13 +46,16 @@ async function main() {
   // approve Most
   await weth.approve(addresses.most, amount);
 
-  let srcTokenAddress = ethers.zeroPadValue(ethers.getBytes(addresses.weth), 32);
+  let srcTokenAddress = ethers.zeroPadValue(
+    ethers.getBytes(addresses.weth),
+    32,
+  );
 
   const supported = await most.supportedPairs(srcTokenAddress);
   console.log(srcTokenAddress, "supported pair is", supported);
   if (supported == 0x0) {
-      console.error("Unsupported pair");
-      process.exit(-1)
+    console.error("Unsupported pair");
+    process.exit(-1);
   }
 
   const destReceiverAddress = u8aToHex(
