@@ -101,14 +101,10 @@ enum CircuitBreakerEvent {
     AlephClientError,                                 // usually a connection error
 }
 
-#[tokio::main]
-async fn main() -> Result<(), RelayerError> {
-    let config = Arc::new(Config::parse());
-    env_logger::init();
-
-    info!("{:#?}", &config);
-
-    let azero_connection = Arc::new(azero::init(&config.azero_node_wss_url).await);
+async fn create_azero_connections(
+    config: &Config,
+) -> Result<(Arc<AzeroWsConnection>, Arc<AzeroConnectionWithSigner>), connections::azero::Error> {
+    let azero_connection = azero::init(&config.azero_node_wss_url).await;
     let azero_signed_connection = if let Some(cid) = config.signer_cid {
         info!("[AlephZero] Creating signed connection using a Signer client");
         AzeroConnectionWithSigner::with_signer(
@@ -133,7 +129,19 @@ async fn main() -> Result<(), RelayerError> {
     } else {
         panic!("Use dev mode or connect to a signer");
     };
-    let azero_signed_connection = Arc::new(azero_signed_connection);
+
+    Ok((
+        Arc::new(azero_connection),
+        Arc::new(azero_signed_connection),
+    ))
+}
+
+#[tokio::main]
+async fn main() -> Result<(), RelayerError> {
+    let config = Arc::new(Config::parse());
+    env_logger::init();
+
+    info!("{:#?}", &config);
 
     info!("Established connection to Aleph Zero node");
 
@@ -176,11 +184,10 @@ async fn main() -> Result<(), RelayerError> {
         first_run,
         &mut tasks,
         config.clone(),
-        azero_connection.clone(),
-        azero_signed_connection.clone(),
         eth_connection.clone(),
         eth_signed_connection.clone(),
-    );
+    )
+    .await?;
 
     first_run = false;
 
@@ -200,11 +207,10 @@ async fn main() -> Result<(), RelayerError> {
                         first_run,
                         &mut tasks,
                         config.clone(),
-                        azero_connection.clone(),
-                        azero_signed_connection.clone(),
                         eth_connection.clone(),
                         eth_signed_connection.clone(),
-                    );
+                    )
+                    .await?;
                 }
             }
             Err(why) => {
@@ -218,15 +224,16 @@ async fn main() -> Result<(), RelayerError> {
     std::process::exit(1);
 }
 
-fn run_relayer(
+async fn run_relayer(
     first_run: bool,
     tasks: &mut JoinSet<Result<CircuitBreakerEvent, RelayerError>>,
     config: Arc<Config>,
-    azero_connection: Arc<AzeroWsConnection>,
-    azero_signed_connection: Arc<AzeroConnectionWithSigner>,
     eth_connection: Arc<EthConnection>,
     eth_signed_connection: Arc<SignedEthConnection>,
-) {
+) -> Result<(), RelayerError> {
+    // create connections
+    let (azero_connection, azero_signed_connection) = create_azero_connections(&config).await?;
+
     // Create channels
     let (eth_events_sender, eth_events_receiver) = mpsc::channel::<EthMostEvents>(1);
     let (eth_block_number_sender, _) = broadcast::channel::<u32>(1);
@@ -312,7 +319,7 @@ fn run_relayer(
             azero_block_number_sender.clone(),
             azero_block_number_sender.subscribe(),
             azero_block_seal_sender.clone(),
-            circuit_breaker_sender.clone(),            
+            circuit_breaker_sender.clone(),
             circuit_breaker_sender.subscribe(),
         )
         .map_err(RelayerError::from),
@@ -328,4 +335,6 @@ fn run_relayer(
         )
         .map_err(RelayerError::from),
     );
+
+    Ok(())
 }
