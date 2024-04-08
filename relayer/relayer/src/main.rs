@@ -98,6 +98,7 @@ enum CircuitBreakerEvent {
     BridgeHaltAlephZero,
     BridgeHaltEthereum,
     AdvisoryEmergency(#[allow(dead_code)] AccountId), // field is needed for logs
+    AlephClientError,                                 // usually a connection error
 }
 
 #[tokio::main]
@@ -311,6 +312,7 @@ fn run_relayer(
             azero_block_number_sender.clone(),
             azero_block_number_sender.subscribe(),
             azero_block_seal_sender.clone(),
+            circuit_breaker_sender.clone(),            
             circuit_breaker_sender.subscribe(),
         )
         .map_err(RelayerError::from),

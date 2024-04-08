@@ -54,6 +54,9 @@ pub enum AlephZeroListenerError {
     #[error("broadcast send error")]
     Broadcast(#[from] broadcast::error::SendError<u32>),
 
+    #[error("broadcast send error")]
+    BroadcastSend(#[from] broadcast::error::SendError<CircuitBreakerEvent>),
+
     #[error("broadcast receive error")]
     Receive(#[from] broadcast::error::RecvError),
 
@@ -65,6 +68,7 @@ pub enum AlephZeroListenerError {
 pub struct AlephZeroListener;
 
 impl AlephZeroListener {
+    #[allow(clippy::too_many_arguments)]
     pub async fn run(
         config: Arc<Config>,
         azero_connection: Arc<Connection>,
@@ -72,6 +76,7 @@ impl AlephZeroListener {
         next_block_to_process_sender: broadcast::Sender<u32>,
         mut next_block_to_process_receiver: broadcast::Receiver<u32>,
         block_seal_sender: mpsc::Sender<u32>,
+        circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
         mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
     ) -> Result<CircuitBreakerEvent, AlephZeroListenerError> {
         let Config {
@@ -103,12 +108,24 @@ impl AlephZeroListener {
 
                 Ok (unprocessed_block_number) = next_block_to_process_receiver.recv() => {
 
+
                     // Query for the next unknown finalized block number, if not present we wait for it
-                    let next_finalized_block_number = get_next_finalized_block_number_azero(
+                    let next_finalized_block_number = match get_next_finalized_block_number_azero(
                         azero_connection.clone(),
                         unprocessed_block_number,
                     )
-                        .await;
+                        .await {
+                            Ok(number) => number,
+                            Err(AlephZeroListenerError::AlephClient(_)) => {
+
+                                warn!("Aleph client failed when getting next finalized block number opening circuit breaker");
+                                circuit_breaker_sender.send(CircuitBreakerEvent::AlephClientError)?;
+                                return Ok (CircuitBreakerEvent::AlephClientError);
+                            },
+                            Err (why) => {
+                                return Err (why);
+                            }
+                        };
 
                     let to_block = min(
                         next_finalized_block_number,
@@ -216,25 +233,17 @@ async fn fetch_events_in_block_range(
 async fn get_next_finalized_block_number_azero(
     azero_connection: Arc<AzeroWsConnection>,
     not_older_than: u32,
-) -> u32 {
+) -> Result<u32, AlephZeroListenerError> {
     loop {
-        match azero_connection.get_finalized_block_hash().await {
-            Ok(hash) => match azero_connection.get_block_number(hash).await {
-                Ok(number_opt) => {
-                    let best_finalized_block_number =
-                        number_opt.expect("Finalized block has a number.");
-                    if best_finalized_block_number >= not_older_than {
-                        return best_finalized_block_number;
-                    }
-                }
-                Err(err) => {
-                    warn!("Aleph Client error when getting best finalized block number: {err}");
-                }
-            },
-            Err(err) => {
-                warn!("Aleph Client error when getting best finalized block hash: {err}");
-            }
-        };
+        let hash = azero_connection.get_finalized_block_hash().await?;
+        let best_finalized_block_number = azero_connection
+            .get_block_number(hash)
+            .await?
+            .expect("Finalized block has a number.");
+
+        if best_finalized_block_number >= not_older_than {
+            return Ok(best_finalized_block_number);
+        }
 
         // If we are up to date, we can sleep for a longer time.
         sleep(Duration::from_secs(10 * ALEPH_BLOCK_PROD_TIME_SEC)).await;
