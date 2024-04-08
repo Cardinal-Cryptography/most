@@ -32,7 +32,8 @@ clean-eth:
 
 .PHONY: clean
 clean: # Remove all node data
-clean: stop-local-bridgenet clean-azero clean-eth
+clean: stop-local-bridgenet
+	git clean -fdx
 
 .PHONY: bootstrap-azero
 bootstrap-azero: # Bootstrap the node data

@@ -305,11 +305,22 @@ impl AlephZeroHaltedListener {
 
                 is_halted = most_azero.is_halted(&azero_connection) => {
                     debug!(target: "AlephZeroHaltedListener", "Querying");
-                    if is_halted? {
-                        circuit_breaker_sender.send(CircuitBreakerEvent::BridgeHaltAlephZero)?;
-                        warn!(target: "AlephZeroHaltedListener",
-                              "Most is halted, exiting");
-                        return Ok(CircuitBreakerEvent::BridgeHaltAlephZero);
+                    match is_halted {
+                        Ok(is_halted) => {
+                            if is_halted {
+                                circuit_breaker_sender.send(CircuitBreakerEvent::BridgeHaltAlephZero)?;
+                                warn!(target: "AlephZeroHaltedListener",
+                                      "Most is halted, exiting");
+                                return Ok(CircuitBreakerEvent::BridgeHaltAlephZero);
+                            }
+                        },
+
+                        Err(why) => {
+                            warn!("Exiting due to a connection error {why:?}");
+                            let status = CircuitBreakerEvent::AlephClientError;
+                            circuit_breaker_sender.send(status.clone())?;
+                            return Ok(status.clone());
+                        }
                     }
 
                     // sleep before making another query
