@@ -41,13 +41,17 @@ jobs:
         shell: bash
         run: make deploy-eth NETWORK=bridgenet
 
-      - name: Deploy and setup azero contracts
+      - name: Deploy azero contracts
         shell: bash
         run: AZERO_ENV=bridgenet make deploy-azero-docker
 
       - name: Setup eth contracts
         shell: bash
         run: make setup-eth NETWORK=bridgenet
+
+      - name: Setup azero contracts
+        shell: bash
+        run: AZERO_ENV=bridgenet make setup-azero-docker
 
       - uses: actions/upload-artifact@v4
         with:
