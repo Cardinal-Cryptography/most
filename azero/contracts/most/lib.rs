@@ -416,7 +416,7 @@ pub mod most {
 
             let signature_threshold = self
                 .signature_thresholds
-                .get(data.committee_id)
+                .get(committee_id)
                 .ok_or(MostError::InvalidThreshold)?;
 
             if request.signature_count >= signature_threshold {

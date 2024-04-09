@@ -229,6 +229,14 @@ pub mod most {
     pub fn get_base_fee(session: &mut Session, most: &Most) -> Result<u128, MostError> {
         handle_ink_error(session.query(most::Instance::get_base_fee(&most)).unwrap())
     }
+
+    pub fn get_current_committee_id(session: &mut Session, most: &Most) -> Result<u128, MostError> {
+        handle_ink_error(
+            session
+                .query(most::Instance::get_current_committee_id(&most))
+                .unwrap(),
+        )
+    }
 }
 
 pub mod token {
