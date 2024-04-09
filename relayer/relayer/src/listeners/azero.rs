@@ -115,13 +115,13 @@ impl AlephZeroListener {
                         .await {
                             Ok(number) => number,
                             Err(AlephZeroListenerError::AlephClient(_)) => {
-                                warn!("Aleph client failed when getting next finalized block number opening circuit breaker");
+                                warn!("Aleph client failed when getting next finalized block number. Opening circuit breaker");
                                 let status = CircuitBreakerEvent::AlephClientError;
                                 circuit_breaker_sender.send(status.clone ())?;
                                 return Ok (status);
                             },
-                            Err (why) => {
-                                return Err (why);
+                            Err (other) => {
+                                return Err (other);
                             }
                         };
 
