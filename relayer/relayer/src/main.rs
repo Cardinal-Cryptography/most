@@ -5,9 +5,9 @@ use clap::Parser;
 use config::Config;
 use connections::{
     azero::{AzeroConnectionWithSigner, AzeroWsConnection},
-    eth::{EthConnection, SignedEthConnection},
+    eth::{EthConnection, EthConnectionError, SignedEthConnection},
 };
-use ethers::signers::{coins_bip39::English, MnemonicBuilder, Signer, WalletError};
+use ethers::signers::{coins_bip39::English, MnemonicBuilder, Signer};
 use futures::TryFutureExt;
 use handlers::{AlephZeroEventsHandlerError, EthereumEventsHandlerError};
 use listeners::{
@@ -54,9 +54,6 @@ enum RelayerError {
     #[error("Ethereum node connection error")]
     EthereumConnection(#[from] connections::eth::EthConnectionError),
 
-    #[error("Ethereum wallet error")]
-    EthWallet(#[from] WalletError),
-
     #[error("Task join error")]
     Join(#[from] JoinError),
 
@@ -98,7 +95,7 @@ enum CircuitBreakerEvent {
     BridgeHaltAlephZero,
     BridgeHaltEthereum,
     AdvisoryEmergency(#[allow(dead_code)] AccountId), // field is needed for logs
-    AlephClientError,                                 // usually a connection error
+    AlephClientError,                                 // signifies a connection error
 }
 
 async fn create_azero_connections(
@@ -136,15 +133,9 @@ async fn create_azero_connections(
     ))
 }
 
-#[tokio::main]
-async fn main() -> Result<(), RelayerError> {
-    let config = Arc::new(Config::parse());
-    env_logger::init();
-
-    info!("{:#?}", &config);
-
-    info!("Established connection to Aleph Zero node");
-
+async fn create_eth_connections(
+    config: &Config,
+) -> Result<(Arc<EthConnection>, Arc<SignedEthConnection>), EthConnectionError> {
     let eth_signed_connection = if let Some(cid) = config.signer_cid {
         info!("Creating signed connection using a Signer client");
         eth::with_signer(
@@ -170,24 +161,23 @@ async fn main() -> Result<(), RelayerError> {
         panic!("Use dev mode or connect to a signer");
     };
 
-    let eth_signed_connection = Arc::new(eth_signed_connection);
+    Ok((
+        Arc::new(eth::connect(&config.eth_node_http_url).await),
+        Arc::new(eth_signed_connection),
+    ))
+}
 
-    let eth_connection = Arc::new(eth::connect(&config.eth_node_http_url).await);
+#[tokio::main]
+async fn main() -> Result<(), RelayerError> {
+    let config = Arc::new(Config::parse());
+    env_logger::init();
 
-    debug!("Established connection to the Ethereum node");
+    info!("{:#?}", &config);
 
     let mut tasks = JoinSet::new();
-
     let mut first_run = true;
 
-    run_relayer(
-        first_run,
-        &mut tasks,
-        config.clone(),
-        eth_connection.clone(),
-        eth_signed_connection.clone(),
-    )
-    .await?;
+    run_relayer(first_run, &mut tasks, config.clone()).await?;
 
     first_run = false;
 
@@ -202,15 +192,7 @@ async fn main() -> Result<(), RelayerError> {
                 if tasks.is_empty() {
                     info!("Relayer exited. Waiting {delay:?} before rebooting.");
                     sleep(delay).await;
-
-                    run_relayer(
-                        first_run,
-                        &mut tasks,
-                        config.clone(),
-                        eth_connection.clone(),
-                        eth_signed_connection.clone(),
-                    )
-                    .await?;
+                    run_relayer(first_run, &mut tasks, config.clone()).await?;
                 }
             }
             Err(why) => {
@@ -228,11 +210,13 @@ async fn run_relayer(
     first_run: bool,
     tasks: &mut JoinSet<Result<CircuitBreakerEvent, RelayerError>>,
     config: Arc<Config>,
-    eth_connection: Arc<EthConnection>,
-    eth_signed_connection: Arc<SignedEthConnection>,
 ) -> Result<(), RelayerError> {
     // create connections
     let (azero_connection, azero_signed_connection) = create_azero_connections(&config).await?;
+    info!("Established connection to Aleph Zero node");
+
+    let (eth_connection, eth_signed_connection) = create_eth_connections(&config).await?;
+    info!("Established connection to the Ethereum node");
 
     // Create channels
     let (eth_events_sender, eth_events_receiver) = mpsc::channel::<EthMostEvents>(1);
