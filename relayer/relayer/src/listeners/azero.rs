@@ -107,8 +107,6 @@ impl AlephZeroListener {
                 },
 
                 Ok (unprocessed_block_number) = next_block_to_process_receiver.recv() => {
-
-
                     // Query for the next unknown finalized block number, if not present we wait for it
                     let next_finalized_block_number = match get_next_finalized_block_number_azero(
                         azero_connection.clone(),
@@ -117,10 +115,10 @@ impl AlephZeroListener {
                         .await {
                             Ok(number) => number,
                             Err(AlephZeroListenerError::AlephClient(_)) => {
-
                                 warn!("Aleph client failed when getting next finalized block number opening circuit breaker");
-                                circuit_breaker_sender.send(CircuitBreakerEvent::AlephClientError)?;
-                                return Ok (CircuitBreakerEvent::AlephClientError);
+                                let status = CircuitBreakerEvent::AlephClientError;
+                                circuit_breaker_sender.send(status.clone ())?;
+                                return Ok (status);
                             },
                             Err (why) => {
                                 return Err (why);
