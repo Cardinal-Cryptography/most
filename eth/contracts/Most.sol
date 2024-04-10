@@ -91,6 +91,7 @@ contract Most is
         address owner,
         address payable _wethAddress
     ) public initializer {
+        requestNonce = 0;
         committeeId = 0;
         wethAddress = _wethAddress;
 
