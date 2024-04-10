@@ -747,6 +747,8 @@ pub mod most {
 
             self.committees = committee_set;
             data.committee_id = committee_id;
+            data.committee_sizes
+                .insert(committee_id, &(committee.len() as u128));
 
             self.data.set(&data);
 
