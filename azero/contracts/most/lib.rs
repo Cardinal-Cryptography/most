@@ -281,6 +281,7 @@ pub mod most {
                 supported_pairs: Mapping::new(),
                 collected_committee_rewards: Mapping::new(),
                 paid_out_member_rewards: Mapping::new(),
+                payout_accounts: Mapping::new(),
             })
         }
 
@@ -481,7 +482,7 @@ pub mod most {
                 self.get_outstanding_member_rewards(committee_id, member_id)?;
 
             if outstanding_rewards.gt(&0) {
-                let payout_account = self.payout_accounts.get(&member_id).unwrap_or(member_id);
+                let payout_account = self.payout_accounts.get(member_id).unwrap_or(member_id);
                 self.env().transfer(payout_account, outstanding_rewards)?;
 
                 self.paid_out_member_rewards.insert(
@@ -733,7 +734,7 @@ pub mod most {
         ) -> Result<(), MostError> {
             let caller = self.env().caller();
             self.only_committee_member(committee_id, caller)?;
-            self.payout_accounts.insert(&caller, &account);
+            self.payout_accounts.insert(caller, &account);
 
             self.env().emit_event(PayoutAccountSet {
                 member: caller,
