@@ -44,6 +44,9 @@ pub enum EthConnectionError {
 
     #[error("Signer client error {0}")]
     SignerClient(#[from] signer_client::Error),
+
+    #[error("Local wallet error {0}")]
+    LocalWallet(#[from] ethers::signers::WalletError),
 }
 
 #[derive(Debug, Error)]
