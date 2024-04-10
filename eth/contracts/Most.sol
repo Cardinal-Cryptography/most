@@ -80,6 +80,11 @@ contract Most is
     error UnwrappingEth();
     error EthTransfer();
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(
         address[] calldata _committee,
         uint256 _signatureThreshold,
