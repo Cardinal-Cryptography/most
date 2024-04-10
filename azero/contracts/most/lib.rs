@@ -721,11 +721,11 @@ pub mod most {
             Ok(())
         }
 
-        /// Sets address of the account that receives rewards
+        /// Sets address of the account that receives rewards on behalf of the committee member.
         ///
         /// Can only be called by an account that was a committee member in `committee_id`.
         /// All the unpaid rewards will then be paid out to this account address when `payout_request` is called.
-        /// Comittee members that have set the `payout_account` do not need to call this method again when the committee changes.
+        /// Comittee members that have set the `payout_account` do not need to call this method again when the committee changes, unless they want to change the payouts account.
         #[ink(message)]
         pub fn set_payout_account(
             &mut self,
