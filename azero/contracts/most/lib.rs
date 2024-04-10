@@ -106,6 +106,7 @@ pub mod most {
     #[derive(Debug)]
     #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
     pub struct PayoutAccountSet {
+        #[ink(topic)]
         pub member: AccountId,
         #[ink(topic)]
         pub account: AccountId,
