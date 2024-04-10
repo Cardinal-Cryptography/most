@@ -102,6 +102,15 @@ pub mod most {
         pub signer: AccountId,
     }
 
+    #[ink(event)]
+    #[derive(Debug)]
+    #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
+    pub struct PayoutAccountSet {
+        pub member: AccountId,
+        #[ink(topic)]
+        pub account: AccountId,
+    }
+
     #[derive(Default, Debug, Encode, Decode, Clone, Copy, PartialEq, Eq)]
     #[cfg_attr(
         feature = "std",
@@ -168,6 +177,8 @@ pub mod most {
         collected_committee_rewards: Mapping<CommitteeId, u128, ManualKey<0x434F4C4C>>,
         /// rewards collected by the individual commitee members for relaying cross-chain transfer requests
         paid_out_member_rewards: Mapping<(AccountId, CommitteeId), u128, ManualKey<0x50414944>>,
+        /// committe members can specify a special account for collecting the rewards, different from the one used for signing
+        payout_accounts: Mapping<AccountId, AccountId>,
     }
 
     #[derive(Debug, PartialEq, Eq, Encode, Decode)]
@@ -470,7 +481,8 @@ pub mod most {
                 self.get_outstanding_member_rewards(committee_id, member_id)?;
 
             if outstanding_rewards.gt(&0) {
-                self.env().transfer(member_id, outstanding_rewards)?;
+                let payout_account = self.payout_accounts.get(&member_id).unwrap_or(member_id);
+                self.env().transfer(payout_account, outstanding_rewards)?;
 
                 self.paid_out_member_rewards.insert(
                     (member_id, committee_id),
@@ -705,6 +717,29 @@ pub mod most {
             }
 
             self.supported_pairs.insert(from, &to);
+            Ok(())
+        }
+
+        /// Sets address of the account that receives rewards
+        ///
+        /// Can only be called by an account that was a committee member at with `committee_id`
+        /// All the unpaid rewards will then be paid out to this account upon payout_request.
+        /// Comitte members that have set the payout_account do not need to call this method again on committee changes if their are mombers of both the past and the current committee.
+        #[ink(message)]
+        pub fn set_payout_account(
+            &mut self,
+            committee_id: CommitteeId,
+            account: AccountId,
+        ) -> Result<(), MostError> {
+            let caller = self.env().caller();
+            self.only_committee_member(committee_id, caller)?;
+            self.payout_accounts.insert(&caller, &account);
+
+            self.env().emit_event(PayoutAccountSet {
+                member: caller,
+                account,
+            });
+
             Ok(())
         }
 
