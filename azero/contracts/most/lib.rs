@@ -638,6 +638,7 @@ pub mod most {
             Ok(base_fee)
         }
 
+        #[allow(clippy::too_many_arguments)]
         #[ink(message)]
         pub fn set_base_fee_constraints(
             &mut self,
