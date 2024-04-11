@@ -72,6 +72,9 @@ pub const MAX_GAS_PRICE: u128 = 150 * APPROX_GWEI_PRICE;
 pub const DEFAULT_GAS_PRICE: u128 = 60 * APPROX_GWEI_PRICE;
 pub const POCKET_MONEY: u128 = 1000000000000;
 pub const RELAY_GAS_USAGE: u128 = 450000;
+pub const GAS_ORACLE_MAX_AGE: u64 = 86400000;
+pub const ORACLE_CALL_GAS_LIMIT: u64 = 2000000000;
+pub const BASE_FEE_BUFFER_PERCENTAGE: u128 = 20;
 
 pub mod most {
     use super::*;
@@ -87,6 +90,9 @@ pub mod most {
         min_gas_price: u128,
         max_gas_price: u128,
         default_gas_price: u128,
+        gas_oracle_max_age: u64,
+        oracle_call_gas_limit: u64,
+        base_fee_buffer_percentage: u128,
         gas_price_oracle: Option<AccountId>,
         owner: AccountId,
         caller: drink::AccountId32,
@@ -103,6 +109,9 @@ pub mod most {
             min_gas_price,
             max_gas_price,
             default_gas_price,
+            gas_oracle_max_age,
+            oracle_call_gas_limit,
+            base_fee_buffer_percentage,
             gas_price_oracle,
             owner,
         );
