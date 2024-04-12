@@ -530,6 +530,12 @@ pub mod most {
 
         // ---  getter txs
 
+        /// Query payout_account for a committee member (if any)
+        #[ink(message)]
+        pub fn get_payout_account(&self, member_id: AccountId) -> Option<AccountId> {
+            self.payout_accounts.get(member_id)
+        }
+
         /// Query request nonce
         ///
         /// Nonce is incremented with every request
