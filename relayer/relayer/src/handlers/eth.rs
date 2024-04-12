@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use aleph_client::{AsConnection, SignedConnectionApi};
 use ethers::utils::keccak256;
 use log::{debug, error, info, trace, warn};
 use thiserror::Error;
@@ -89,6 +90,11 @@ impl EthereumEventHandler {
             let amount = amount.as_u128();
             let request_nonce = request_nonce.as_u128();
 
+            if past_request(&contract, azero_connection, committee_id).await? {
+                info!("Guardian signature for {request_hash:?} not needed - request from a past committee");
+                return Ok(());
+            }
+
             contract
                 .receive_request(
                     azero_connection,
@@ -115,6 +121,33 @@ impl EthereumEventHandler {
 
         Ok(())
     }
+}
+
+async fn past_request(
+    most: &MostInstance,
+    connection: &AzeroConnectionWithSigner,
+    committee_id: u128,
+) -> Result<bool, EthereumEventHandlerError> {
+    if most
+        .is_in_committee(
+            connection.as_connection(),
+            committee_id,
+            connection.account_id().clone(),
+        )
+        .await?
+    {
+        return Ok(false);
+    }
+
+    if committee_id
+        > most
+            .current_committee_id(connection.as_connection())
+            .await?
+    {
+        error!("Request from a future committee {committee_id} - this likely indicates MOST contracts misconfiguration");
+        return Ok(false);
+    }
+    Ok(true)
 }
 
 #[derive(Debug, Error)]

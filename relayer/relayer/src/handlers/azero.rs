@@ -6,7 +6,7 @@ use ethers::{
     core::types::Address,
     prelude::{ContractCall, ContractError},
     providers::{Middleware, ProviderError},
-    types::{BlockNumber, U64},
+    types::{BlockNumber, U256, U64},
     utils::keccak256,
 };
 use log::{debug, error, info, warn};
@@ -107,6 +107,17 @@ impl AlephZeroEventHandler {
                 let address = eth_contract_address.parse::<Address>()?;
                 let contract = Most::new(address, eth_signed_connection.clone());
 
+                if past_request(
+                    &contract,
+                    committee_id.into(),
+                    eth_signed_connection.address(),
+                )
+                .await?
+                {
+                    info!("Guardian signature for {request_hash:?} not needed - request from a past committee");
+                    return Ok(());
+                }
+
                 while contract
                     .needs_signature(
                         request_hash,
@@ -181,6 +192,22 @@ impl AlephZeroEventHandler {
         }
         Ok(())
     }
+}
+
+async fn past_request(
+    most: &Most<SignedEthConnection>,
+    committee_id: U256,
+    address: Address,
+) -> Result<bool, AlephZeroEventHandlerError> {
+    if most.is_in_committee(committee_id, address).await? {
+        return Ok(false);
+    }
+
+    if committee_id > most.committee_id().await? {
+        error!("Request from a future committee {committee_id} - this likely indicates MOST contracts misconfiguration");
+        return Ok(false);
+    }
+    Ok(true)
 }
 
 #[derive(Debug, Error)]
