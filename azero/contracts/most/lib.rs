@@ -23,9 +23,6 @@ pub mod most {
 
     type CommitteeId = u128;
 
-    const GAS_ORACLE_MAX_AGE: u64 = 24 * 60 * 60 * 1000; // 1 day
-    const ORACLE_CALL_GAS_LIMIT: u64 = 2_000_000_000;
-    const BASE_FEE_BUFFER_PERCENTAGE: u128 = 20;
     const ETH_ZERO_ADDRESS: [u8; 32] = [0; 32];
 
     #[ink(event)]
@@ -139,6 +136,12 @@ pub mod most {
         max_gas_price: u128,
         /// default gas price used to calculate the fee that is charged for a cross-chain transfer request if the gas price oracle is not available/malfunctioning
         default_gas_price: u128,
+        /// maximum time in milliseconds since last oracle update
+        gas_oracle_max_age: u64,
+        /// maximum limit on gas for call to oracle
+        oracle_call_gas_limit: u64,
+        /// percentage buffer over the estimated cost
+        base_fee_buffer_percentage: u128,
         /// gas price oracle that is used to calculate the fee for a cross-chain transfer request
         gas_price_oracle: Option<AccountId>,
         /// Is the bridge in a halted state
@@ -220,9 +223,12 @@ pub mod most {
             signature_threshold: u128,
             pocket_money: Balance,
             relay_gas_usage: u128,
-            min_gas_price: Balance,
-            max_gas_price: Balance,
-            default_gas_price: Balance,
+            min_gas_price: u128,
+            max_gas_price: u128,
+            default_gas_price: u128,
+            gas_oracle_max_age: u64,
+            oracle_call_gas_limit: u64,
+            base_fee_buffer_percentage: u128,
             gas_price_oracle: Option<AccountId>,
             owner: AccountId,
         ) -> Result<Self, MostError> {
@@ -251,6 +257,9 @@ pub mod most {
                 min_gas_price,
                 max_gas_price,
                 default_gas_price,
+                gas_oracle_max_age,
+                oracle_call_gas_limit,
+                base_fee_buffer_percentage,
                 gas_price_oracle,
                 is_halted: true,
             });
@@ -597,11 +606,13 @@ pub mod most {
                 match gas_price_oracle
                     .call()
                     .get_price()
-                    .gas_limit(ORACLE_CALL_GAS_LIMIT)
+                    .gas_limit(self.data()?.oracle_call_gas_limit)
                     .try_invoke()
                 {
                     Ok(Ok((gas_price, timestamp))) => {
-                        if timestamp + GAS_ORACLE_MAX_AGE < self.env().block_timestamp() {
+                        if timestamp + self.data()?.gas_oracle_max_age
+                            < self.env().block_timestamp()
+                        {
                             self.data()?.default_gas_price
                         } else if gas_price < self.data()?.min_gas_price {
                             self.data()?.min_gas_price
@@ -620,11 +631,36 @@ pub mod most {
             let base_fee = gas_price
                 .checked_mul(self.data()?.relay_gas_usage)
                 .ok_or(MostError::Arithmetic)?
-                .checked_mul(100u128 + BASE_FEE_BUFFER_PERCENTAGE)
+                .checked_mul(100u128 + self.data()?.base_fee_buffer_percentage)
                 .ok_or(MostError::Arithmetic)?
                 .checked_div(100u128)
                 .ok_or(MostError::Arithmetic)?;
             Ok(base_fee)
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        #[ink(message)]
+        pub fn set_base_fee_constraints(
+            &mut self,
+            relay_gas_usage: u128,
+            min_gas_price: u128,
+            max_gas_price: u128,
+            default_gas_price: u128,
+            gas_oracle_max_age: u64,
+            oracle_call_gas_limit: u64,
+            base_fee_buffer_percentage: u128,
+        ) -> Result<(), MostError> {
+            self.ensure_owner()?;
+            let mut data = self.data()?;
+            data.relay_gas_usage = relay_gas_usage;
+            data.min_gas_price = min_gas_price;
+            data.max_gas_price = max_gas_price;
+            data.default_gas_price = default_gas_price;
+            data.gas_oracle_max_age = gas_oracle_max_age;
+            data.oracle_call_gas_limit = oracle_call_gas_limit;
+            data.base_fee_buffer_percentage = base_fee_buffer_percentage;
+            self.data.set(&data);
+            Ok(())
         }
 
         /// Returns whether an account is in the committee with `committee_id`
@@ -953,6 +989,9 @@ pub mod most {
         const MIN_FEE: Balance = 1000000000000;
         const MAX_FEE: Balance = 100000000000000;
         const DEFAULT_FEE: Balance = 30000000000000;
+        const GAS_ORACLE_MAX_AGE: u64 = 86400000;
+        const ORACLE_CALL_GAS_LIMIT: u64 = 2000000000;
+        const BASE_FEE_BUFFER_PERCENTAGE: u128 = 20;
 
         type DefEnv = DefaultEnvironment;
         type AccountId = <DefEnv as Environment>::AccountId;
@@ -982,6 +1021,9 @@ pub mod most {
                     MIN_FEE,
                     MAX_FEE,
                     DEFAULT_FEE,
+                    GAS_ORACLE_MAX_AGE,
+                    ORACLE_CALL_GAS_LIMIT,
+                    BASE_FEE_BUFFER_PERCENTAGE,
                     None,
                     alice
                 )
@@ -1004,6 +1046,9 @@ pub mod most {
                     MIN_FEE,
                     MAX_FEE,
                     DEFAULT_FEE,
+                    GAS_ORACLE_MAX_AGE,
+                    ORACLE_CALL_GAS_LIMIT,
+                    BASE_FEE_BUFFER_PERCENTAGE,
                     None,
                     alice
                 )
@@ -1025,6 +1070,9 @@ pub mod most {
                 MIN_FEE,
                 MAX_FEE,
                 DEFAULT_FEE,
+                GAS_ORACLE_MAX_AGE,
+                ORACLE_CALL_GAS_LIMIT,
+                BASE_FEE_BUFFER_PERCENTAGE,
                 None,
                 alice,
             )
@@ -1051,6 +1099,9 @@ pub mod most {
                 MIN_FEE,
                 MAX_FEE,
                 DEFAULT_FEE,
+                GAS_ORACLE_MAX_AGE,
+                ORACLE_CALL_GAS_LIMIT,
+                BASE_FEE_BUFFER_PERCENTAGE,
                 None,
                 accounts.alice,
             )
@@ -1075,6 +1126,9 @@ pub mod most {
                 MIN_FEE,
                 MAX_FEE,
                 DEFAULT_FEE,
+                GAS_ORACLE_MAX_AGE,
+                ORACLE_CALL_GAS_LIMIT,
+                BASE_FEE_BUFFER_PERCENTAGE,
                 None,
                 accounts.alice,
             )
@@ -1116,6 +1170,9 @@ pub mod most {
                 MIN_FEE,
                 MAX_FEE,
                 DEFAULT_FEE,
+                GAS_ORACLE_MAX_AGE,
+                ORACLE_CALL_GAS_LIMIT,
+                BASE_FEE_BUFFER_PERCENTAGE,
                 None,
                 accounts.alice,
             )
@@ -1138,6 +1195,9 @@ pub mod most {
                 MIN_FEE,
                 MAX_FEE,
                 DEFAULT_FEE,
+                GAS_ORACLE_MAX_AGE,
+                ORACLE_CALL_GAS_LIMIT,
+                BASE_FEE_BUFFER_PERCENTAGE,
                 None,
                 accounts.alice,
             )

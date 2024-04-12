@@ -8,10 +8,13 @@
   "deployer_seed": "//Alice",
   "signature_threshold": 2,
   "pocket_money": 1000000000000,
-  "min_gas_price": 60000000,
-  "max_gas_price": 450000000,
-  "default_gas_price": 180000000,
+  "min_gas_price": 600000000,
+  "max_gas_price": 20000000000,
+  "default_gas_price": 8000000000,
   "relay_gas_usage": 450000,
+  "gas_oracle_max_age": 86400000,
+  "oracle_call_gas_limit": 2000000000,
+  "base_fee_buffer_percentage": 20,
   "dev": true,
   "tokens": [
     {
