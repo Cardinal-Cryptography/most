@@ -468,7 +468,7 @@ pub mod most {
 
         /// Request payout of rewards for signing & relaying cross-chain transfers.
         ///
-        /// Can be called by anyone on behalf of the committee member.
+        /// Reverts if `member_id` account is not in the committee with `committee_id`
         #[ink(message)]
         pub fn payout_rewards(
             &mut self,
@@ -476,6 +476,7 @@ pub mod most {
             member_id: AccountId,
         ) -> Result<(), MostError> {
             self.ensure_not_halted()?;
+            self.only_committee_member(committee_id, member_id)?;
 
             let paid_out_rewards = self.get_paid_out_member_rewards(committee_id, member_id);
 
@@ -578,27 +579,28 @@ pub mod most {
         ///
         /// The amount that can still be requested.
         /// Denominated in AZERO
-        /// Returns an error (reverts) if the `member_id` account is not in the committee with `committee_id`
+        /// Returns 0 if the `member_id` account is not in the committee with `committee_id`
         #[ink(message)]
         pub fn get_outstanding_member_rewards(
             &self,
             committee_id: CommitteeId,
             member_id: AccountId,
         ) -> Result<u128, MostError> {
-            self.only_committee_member(committee_id, member_id)?;
+            if self.is_in_committee(committee_id, member_id) {
+                let total_amount = self
+                    .get_collected_committee_rewards(committee_id)
+                    .checked_div(
+                        self.committee_sizes
+                            .get(committee_id)
+                            .ok_or(MostError::NoSuchCommittee)?,
+                    )
+                    .ok_or(MostError::Arithmetic)?;
 
-            let total_amount = self
-                .get_collected_committee_rewards(committee_id)
-                .checked_div(
-                    self.committee_sizes
-                        .get(committee_id)
-                        .ok_or(MostError::NoSuchCommittee)?,
-                )
-                .ok_or(MostError::Arithmetic)?;
+                let collected_amount = self.get_paid_out_member_rewards(committee_id, member_id);
 
-            let collected_amount = self.get_paid_out_member_rewards(committee_id, member_id);
-
-            Ok(total_amount.saturating_sub(collected_amount))
+                return Ok(total_amount.saturating_sub(collected_amount));
+            }
+            Ok(0)
         }
 
         /// Queries a gas price oracle and returns the current base_fee charged per cross chain transfer denominated in AZERO
