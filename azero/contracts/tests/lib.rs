@@ -59,6 +59,9 @@ mod e2e {
     const DEFAULT_RELAY_GAS_USAGE: u128 = 50000;
 
     const DEFAULT_COMMITTEE_ID: CommitteeId = 0;
+    const GAS_ORACLE_MAX_AGE: u64 = 86400000;
+    const ORACLE_CALL_GAS_LIMIT: u64 = 2000000000;
+    const BASE_FEE_BUFFER_PERCENTAGE: u128 = 20;
 
     #[ink_e2e::test]
     fn simple_deploy_works(mut client: ink_e2e::Client<C, E>) {
@@ -72,6 +75,9 @@ mod e2e {
             MIN_GAS_PRICE,
             MAX_GAS_PRICE,
             DEFAULT_GAS_PRICE,
+            GAS_ORACLE_MAX_AGE,
+            ORACLE_CALL_GAS_LIMIT,
+            BASE_FEE_BUFFER_PERCENTAGE,
             account_id(AccountKeyring::Alice),
         )
         .await;
@@ -1080,6 +1086,9 @@ mod e2e {
         min_fee: u128,
         max_fee: u128,
         default_fee: u128,
+        gas_oracle_max_age: u64,
+        oracle_call_gas_limit: u64,
+        base_fee_buffer_percentage: u128,
         owner: AccountId,
     ) -> AccountId {
         let most_constructor = MostRef::new(
@@ -1090,6 +1099,9 @@ mod e2e {
             min_fee,
             max_fee,
             default_fee,
+            gas_oracle_max_age,
+            oracle_call_gas_limit,
+            base_fee_buffer_percentage,
             None,
             owner,
         );
@@ -1142,6 +1154,9 @@ mod e2e {
             MIN_GAS_PRICE,
             MAX_GAS_PRICE,
             DEFAULT_GAS_PRICE,
+            GAS_ORACLE_MAX_AGE,
+            ORACLE_CALL_GAS_LIMIT,
+            BASE_FEE_BUFFER_PERCENTAGE,
             account_id(AccountKeyring::Alice),
         )
         .await;
