@@ -82,8 +82,14 @@ impl AdvisoryListener {
                                     circuit_breaker_sender.send(status.clone())?;
                                     return Ok(status.clone());
                                 }
+                            },
+
+                            Err(why) => {
+                                warn!("Exiting due to a connection error {why:?}");
+                                let status = CircuitBreakerEvent::AlephClientError;
+                                circuit_breaker_sender.send(status.clone())?;
+                                return Ok(status.clone());
                             }
-                            Err(why) => return Err(AdvisoryListenerError::AzeroContract(why)),
                         }
                     }
                 }

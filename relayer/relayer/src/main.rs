@@ -5,9 +5,9 @@ use clap::Parser;
 use config::Config;
 use connections::{
     azero::{AzeroConnectionWithSigner, AzeroWsConnection},
-    eth::{EthConnection, SignedEthConnection},
+    eth::{EthConnection, EthConnectionError, SignedEthConnection},
 };
-use ethers::signers::{coins_bip39::English, MnemonicBuilder, Signer, WalletError};
+use ethers::signers::{coins_bip39::English, MnemonicBuilder, Signer};
 use futures::TryFutureExt;
 use handlers::{AlephZeroEventsHandlerError, EthereumEventsHandlerError};
 use listeners::{
@@ -54,9 +54,6 @@ enum RelayerError {
     #[error("Ethereum node connection error")]
     EthereumConnection(#[from] connections::eth::EthConnectionError),
 
-    #[error("Ethereum wallet error")]
-    EthWallet(#[from] WalletError),
-
     #[error("Task join error")]
     Join(#[from] JoinError),
 
@@ -98,16 +95,13 @@ enum CircuitBreakerEvent {
     BridgeHaltAlephZero,
     BridgeHaltEthereum,
     AdvisoryEmergency(#[allow(dead_code)] AccountId), // field is needed for logs
+    AlephClientError,                                 // signifies a connection error
 }
 
-#[tokio::main]
-async fn main() -> Result<(), RelayerError> {
-    let config = Arc::new(Config::parse());
-    env_logger::init();
-
-    info!("{:#?}", &config);
-
-    let azero_connection = Arc::new(azero::init(&config.azero_node_wss_url).await);
+async fn create_azero_connections(
+    config: &Config,
+) -> Result<(Arc<AzeroWsConnection>, Arc<AzeroConnectionWithSigner>), connections::azero::Error> {
+    let azero_connection = azero::init(&config.azero_node_wss_url).await;
     let azero_signed_connection = if let Some(cid) = config.signer_cid {
         info!("[AlephZero] Creating signed connection using a Signer client");
         AzeroConnectionWithSigner::with_signer(
@@ -132,10 +126,16 @@ async fn main() -> Result<(), RelayerError> {
     } else {
         panic!("Use dev mode or connect to a signer");
     };
-    let azero_signed_connection = Arc::new(azero_signed_connection);
 
-    info!("Established connection to Aleph Zero node");
+    Ok((
+        Arc::new(azero_connection),
+        Arc::new(azero_signed_connection),
+    ))
+}
 
+async fn create_eth_connections(
+    config: &Config,
+) -> Result<(Arc<EthConnection>, Arc<SignedEthConnection>), EthConnectionError> {
     let eth_signed_connection = if let Some(cid) = config.signer_cid {
         info!("Creating signed connection using a Signer client");
         eth::with_signer(
@@ -161,25 +161,23 @@ async fn main() -> Result<(), RelayerError> {
         panic!("Use dev mode or connect to a signer");
     };
 
-    let eth_signed_connection = Arc::new(eth_signed_connection);
+    Ok((
+        Arc::new(eth::connect(&config.eth_node_http_url).await),
+        Arc::new(eth_signed_connection),
+    ))
+}
 
-    let eth_connection = Arc::new(eth::connect(&config.eth_node_http_url).await);
+#[tokio::main]
+async fn main() -> Result<(), RelayerError> {
+    let config = Arc::new(Config::parse());
+    env_logger::init();
 
-    debug!("Established connection to the Ethereum node");
+    info!("{:#?}", &config);
 
     let mut tasks = JoinSet::new();
-
     let mut first_run = true;
 
-    run_relayer(
-        first_run,
-        &mut tasks,
-        config.clone(),
-        azero_connection.clone(),
-        azero_signed_connection.clone(),
-        eth_connection.clone(),
-        eth_signed_connection.clone(),
-    );
+    run_relayer(first_run, &mut tasks, config.clone()).await?;
 
     first_run = false;
 
@@ -194,16 +192,7 @@ async fn main() -> Result<(), RelayerError> {
                 if tasks.is_empty() {
                     info!("Relayer exited. Waiting {delay:?} before rebooting.");
                     sleep(delay).await;
-
-                    run_relayer(
-                        first_run,
-                        &mut tasks,
-                        config.clone(),
-                        azero_connection.clone(),
-                        azero_signed_connection.clone(),
-                        eth_connection.clone(),
-                        eth_signed_connection.clone(),
-                    );
+                    run_relayer(first_run, &mut tasks, config.clone()).await?;
                 }
             }
             Err(why) => {
@@ -217,15 +206,18 @@ async fn main() -> Result<(), RelayerError> {
     std::process::exit(1);
 }
 
-fn run_relayer(
+async fn run_relayer(
     first_run: bool,
     tasks: &mut JoinSet<Result<CircuitBreakerEvent, RelayerError>>,
     config: Arc<Config>,
-    azero_connection: Arc<AzeroWsConnection>,
-    azero_signed_connection: Arc<AzeroConnectionWithSigner>,
-    eth_connection: Arc<EthConnection>,
-    eth_signed_connection: Arc<SignedEthConnection>,
-) {
+) -> Result<(), RelayerError> {
+    // create connections
+    let (azero_connection, azero_signed_connection) = create_azero_connections(&config).await?;
+    info!("Established connection to Aleph Zero node");
+
+    let (eth_connection, eth_signed_connection) = create_eth_connections(&config).await?;
+    info!("Established connection to the Ethereum node");
+
     // Create channels
     let (eth_events_sender, eth_events_receiver) = mpsc::channel::<EthMostEvents>(1);
     let (eth_block_number_sender, _) = broadcast::channel::<u32>(1);
@@ -311,6 +303,7 @@ fn run_relayer(
             azero_block_number_sender.clone(),
             azero_block_number_sender.subscribe(),
             azero_block_seal_sender.clone(),
+            circuit_breaker_sender.clone(),
             circuit_breaker_sender.subscribe(),
         )
         .map_err(RelayerError::from),
@@ -326,4 +319,6 @@ fn run_relayer(
         )
         .map_err(RelayerError::from),
     );
+
+    Ok(())
 }

@@ -59,6 +59,9 @@ async function main(): Promise<void> {
     min_gas_price,
     max_gas_price,
     default_gas_price,
+    gas_oracle_max_age,
+    oracle_call_gas_limit,
+    base_fee_buffer_percentage,
     tokens,
     dev,
   } = config;
@@ -124,6 +127,9 @@ async function main(): Promise<void> {
       min_gas_price!,
       max_gas_price!,
       default_gas_price!,
+      gas_oracle_max_age!,
+      oracle_call_gas_limit!,
+      base_fee_buffer_percentage!,
       oracleAddress,
       deployer.address,
     ],
@@ -137,6 +143,9 @@ async function main(): Promise<void> {
     min_gas_price!,
     max_gas_price!,
     default_gas_price!,
+    gas_oracle_max_age!,
+    oracle_call_gas_limit!,
+    base_fee_buffer_percentage!,
     oracleAddress,
     deployer.address,
     { gasLimit: estimatedGasMost },
@@ -163,7 +172,7 @@ async function main(): Promise<void> {
       ? ethAddresses[token.checkAddress]
       : token.ethAddress!;
 
-    tokenAddresses.push([token.checkAddress, ethAddress, address]);
+    tokenAddresses.push([token.symbol, ethAddress, address]);
   }
 
   const migrations = new Migrations(migrationsAddress, deployer, api);

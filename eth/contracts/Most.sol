@@ -79,6 +79,12 @@ contract Most is
     error WrappingEth();
     error UnwrappingEth();
     error EthTransfer();
+    error ZeroAddress();
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
 
     function initialize(
         address[] calldata _committee,
@@ -86,6 +92,7 @@ contract Most is
         address owner,
         address payable _wethAddress
     ) public initializer {
+        requestNonce = 0;
         committeeId = 0;
         wethAddress = _wethAddress;
 
@@ -111,6 +118,7 @@ contract Most is
             revert NotEnoughGuardians();
 
         for (uint256 i; i < _committee.length; ++i) {
+            if (_committee[i] == address(0)) revert ZeroAddress();
             bytes32 committeeMemberId = keccak256(
                 abi.encodePacked(committeeId, _committee[i])
             );
@@ -137,6 +145,7 @@ contract Most is
         bytes32 destReceiverAddress
     ) external whenNotPaused {
         if (amount == 0) revert ZeroAmount();
+        if (destReceiverAddress == bytes32(0)) revert ZeroAddress();
 
         IERC20 token = IERC20(bytes32ToAddress(srcTokenAddress));
 
@@ -169,6 +178,7 @@ contract Most is
     ) external payable whenNotPaused {
         uint256 amount = msg.value;
         if (amount == 0) revert ZeroAmount();
+        if (destReceiverAddress == bytes32(0)) revert ZeroAddress();
 
         bytes32 destTokenAddress = supportedPairs[
             addressToBytes32(wethAddress)

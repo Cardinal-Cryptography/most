@@ -6,8 +6,11 @@ contract Migrations {
     address public immutable owner;
     uint256 public last_completed_migration;
 
+    error CallerNotOwner(address);
+
     modifier restricted() {
-        if (msg.sender == owner) _;
+        if (msg.sender != owner) revert CallerNotOwner(msg.sender);
+        _;
     }
 
     constructor() {
@@ -16,10 +19,5 @@ contract Migrations {
 
     function setCompleted(uint256 completed) public restricted {
         last_completed_migration = completed;
-    }
-
-    function upgrade(address new_address) public restricted {
-        Migrations upgraded = Migrations(new_address);
-        upgraded.setCompleted(last_completed_migration);
     }
 }
