@@ -34,8 +34,8 @@ describe("Most", function () {
           {
             initializer: "initialize",
             kind: "uups",
-          },
-        ),
+          }
+        )
       ).to.be.revertedWithCustomError(Most, "ZeroSignatureTreshold");
     });
     it("Reverts if threshold is greater than number of guardians", async () => {
@@ -53,8 +53,8 @@ describe("Most", function () {
           {
             initializer: "initialize",
             kind: "uups",
-          },
-        ),
+          }
+        )
       ).to.be.revertedWithCustomError(Most, "NotEnoughGuardians");
     });
     it("Reverts if duplicate guardians", async () => {
@@ -77,8 +77,8 @@ describe("Most", function () {
           {
             initializer: "initialize",
             kind: "uups",
-          },
-        ),
+          }
+        )
       ).to.be.revertedWithCustomError(Most, "DuplicateCommitteeMember");
     });
   });
@@ -98,7 +98,7 @@ describe("Most", function () {
       {
         initializer: "initialize",
         kind: "uups",
-      },
+      }
     );
     const mostAddress = await most.getAddress();
     await most.unpause();
@@ -108,7 +108,7 @@ describe("Most", function () {
       "10000000000000000000000000",
       "18",
       "TestToken",
-      "TEST",
+      "TEST"
     );
     const tokenAddressBytes32 = addressToBytes32(await token.getAddress());
 
@@ -129,20 +129,20 @@ describe("Most", function () {
 
       await token.approve(mostAddress, TOKEN_AMOUNT);
       await expect(
-        most.sendRequest(tokenAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT),
+        most.sendRequest(tokenAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT)
       ).to.be.revertedWithCustomError(most, "UnsupportedPair");
     });
 
     it("Reverts if token transfer is not approved", async () => {
       const { most, tokenAddressBytes32 } = await loadFixture(
-        deployEightGuardianMostFixture,
+        deployEightGuardianMostFixture
       );
 
       await most.pause();
       await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
       await most.unpause();
       await expect(
-        most.sendRequest(tokenAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT),
+        most.sendRequest(tokenAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT)
       ).to.be.reverted;
     });
 
@@ -168,7 +168,7 @@ describe("Most", function () {
       await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
       await most.unpause();
       await expect(
-        most.sendRequest(tokenAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT),
+        most.sendRequest(tokenAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT)
       )
         .to.emit(most, "CrosschainTransferRequest")
         .withArgs(0, WRAPPED_TOKEN_ADDRESS, TOKEN_AMOUNT, ALEPH_ACCOUNT, 0);
@@ -180,13 +180,13 @@ describe("Most", function () {
       const { most } = await loadFixture(deployEightGuardianMostFixture);
 
       await expect(
-        most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
+        most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT })
       ).to.be.revertedWithCustomError(most, "UnsupportedPair");
     });
 
     it("Transfers tokens to Most", async () => {
       const { most, mostAddress, wethAddress, weth } = await loadFixture(
-        deployEightGuardianMostFixture,
+        deployEightGuardianMostFixture
       );
       await most.pause();
       await most.addPair(addressToBytes32(wethAddress), WRAPPED_TOKEN_ADDRESS);
@@ -198,13 +198,13 @@ describe("Most", function () {
 
     it("Emits correct event", async () => {
       const { most, wethAddress } = await loadFixture(
-        deployEightGuardianMostFixture,
+        deployEightGuardianMostFixture
       );
       await most.pause();
       await most.addPair(addressToBytes32(wethAddress), WRAPPED_TOKEN_ADDRESS);
       await most.unpause();
       await expect(
-        most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
+        most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT })
       )
         .to.emit(most, "CrosschainTransferRequest")
         .withArgs(0, WRAPPED_TOKEN_ADDRESS, TOKEN_AMOUNT, ALEPH_ACCOUNT, 0);
@@ -214,13 +214,13 @@ describe("Most", function () {
   describe("receiveRequest", function () {
     it("Reverts if caller is not a guardian", async () => {
       const { most, tokenAddressBytes32 } = await loadFixture(
-        deployEightGuardianMostFixture,
+        deployEightGuardianMostFixture
       );
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
       const requestHash = ethers.solidityPackedKeccak256(
         ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
-        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
+        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0]
       );
 
       await expect(
@@ -232,20 +232,20 @@ describe("Most", function () {
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
-            0,
-          ),
+            0
+          )
       ).to.be.revertedWithCustomError(most, "NotInCommittee");
     });
 
     it("Ignores consecutive signatures", async () => {
       const { most, tokenAddressBytes32 } = await loadFixture(
-        deployEightGuardianMostFixture,
+        deployEightGuardianMostFixture
       );
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
       const requestHash = ethers.solidityPackedKeccak256(
         ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
-        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
+        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0]
       );
 
       await most
@@ -256,7 +256,7 @@ describe("Most", function () {
           tokenAddressBytes32,
           TOKEN_AMOUNT,
           ethAddress,
-          0,
+          0
         );
       await expect(
         most
@@ -267,8 +267,8 @@ describe("Most", function () {
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
-            0,
-          ),
+            0
+          )
       )
         .to.emit(most, "RequestAlreadySigned")
         .withArgs(requestHash, accounts[1].address);
@@ -276,13 +276,13 @@ describe("Most", function () {
 
     it("Ignores already executed requests", async () => {
       const { most, token, tokenAddressBytes32 } = await loadFixture(
-        deployEightGuardianMostFixture,
+        deployEightGuardianMostFixture
       );
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
       const requestHash = ethers.solidityPackedKeccak256(
         ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
-        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
+        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0]
       );
 
       // Provide funds for Most
@@ -297,7 +297,7 @@ describe("Most", function () {
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
-            0,
+            0
           );
       }
 
@@ -310,8 +310,8 @@ describe("Most", function () {
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
-            0,
-          ),
+            0
+          )
       )
         .to.emit(most, "ProcessedRequestSigned")
         .withArgs(requestHash, accounts[6].address);
@@ -319,13 +319,13 @@ describe("Most", function () {
 
     it("Unlocks tokens for the user", async () => {
       const { most, token, tokenAddressBytes32 } = await loadFixture(
-        deployEightGuardianMostFixture,
+        deployEightGuardianMostFixture
       );
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
       const requestHash = ethers.solidityPackedKeccak256(
         ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
-        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
+        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0]
       );
 
       // Provide funds for Most
@@ -340,24 +340,24 @@ describe("Most", function () {
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
-            0,
+            0
           );
       }
 
       expect(await token.balanceOf(accounts[10].address)).to.equal(
-        TOKEN_AMOUNT,
+        TOKEN_AMOUNT
       );
     });
 
     it("Reverts on non-matching hash", async () => {
       const { most, token, tokenAddressBytes32 } = await loadFixture(
-        deployEightGuardianMostFixture,
+        deployEightGuardianMostFixture
       );
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
       const requestHash = ethers.solidityPackedKeccak256(
         ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
-        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 1],
+        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 1]
       );
 
       // Provide funds for Most
@@ -372,24 +372,24 @@ describe("Most", function () {
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
-            0,
-          ),
+            0
+          )
       ).to.be.revertedWithCustomError(most, "DataHashMismatch");
     });
 
     it("Committee rotation", async () => {
       const { most, token, tokenAddressBytes32 } = await loadFixture(
-        deployEightGuardianMostFixture,
+        deployEightGuardianMostFixture
       );
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
       const requestHashOld = ethers.solidityPackedKeccak256(
         ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
-        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
+        [0, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0]
       );
       const requestHashNew = ethers.solidityPackedKeccak256(
         ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
-        [1, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
+        [1, tokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0]
       );
 
       // Provide funds for Most
@@ -408,7 +408,7 @@ describe("Most", function () {
           tokenAddressBytes32,
           TOKEN_AMOUNT,
           ethAddress,
-          0,
+          0
         );
 
       await most
@@ -419,7 +419,7 @@ describe("Most", function () {
           tokenAddressBytes32,
           TOKEN_AMOUNT,
           ethAddress,
-          0,
+          0
         );
 
       await expect(
@@ -431,8 +431,8 @@ describe("Most", function () {
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
-            0,
-          ),
+            0
+          )
       ).to.be.revertedWithCustomError(most, "NotInCommittee");
 
       await expect(
@@ -444,8 +444,8 @@ describe("Most", function () {
             tokenAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
-            0,
-          ),
+            0
+          )
       ).to.be.revertedWithCustomError(most, "NotInCommittee");
     });
   });
@@ -453,14 +453,14 @@ describe("Most", function () {
   describe("receiveRequestNative", function () {
     it("Unlocks tokens for the user", async () => {
       const { most, weth, wethAddress, mostAddress } = await loadFixture(
-        deployEightGuardianMostFixture,
+        deployEightGuardianMostFixture
       );
       const token_amount = ethToWei(TOKEN_AMOUNT);
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
       const requestHash = ethers.solidityPackedKeccak256(
         ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
-        [0, addressToBytes32(wethAddress), token_amount, ethAddress, 0],
+        [0, addressToBytes32(wethAddress), token_amount, ethAddress, 0]
       );
 
       const provider = await hre.ethers.provider;
@@ -482,7 +482,7 @@ describe("Most", function () {
             addressToBytes32(wethAddress),
             token_amount,
             ethAddress,
-            0,
+            0
           );
       }
       const balanceAfter = await provider.getBalance(accounts[10].address);
@@ -496,7 +496,7 @@ describe("Most", function () {
 
     it("Unsuccessful transfer to a contract fails with event", async () => {
       const { most, weth, wethAddress, mostAddress, token } = await loadFixture(
-        deployEightGuardianMostFixture,
+        deployEightGuardianMostFixture
       );
       const token_amount = ethToWei(TOKEN_AMOUNT);
       const accounts = await ethers.getSigners();
@@ -510,7 +510,7 @@ describe("Most", function () {
           token_amount,
           addressToBytes32(ethAddress),
           0,
-        ],
+        ]
       );
       await most.pause();
       await most.addPair(addressToBytes32(wethAddress), WRAPPED_TOKEN_ADDRESS);
@@ -534,7 +534,7 @@ describe("Most", function () {
             addressToBytes32(wethAddress),
             token_amount,
             addressToBytes32(ethAddress),
-            0,
+            0
           );
       }
 
@@ -547,8 +547,8 @@ describe("Most", function () {
             addressToBytes32(wethAddress),
             token_amount,
             addressToBytes32(ethAddress),
-            0,
-          ),
+            0
+          )
       );
       await res.to.emit(most, "EthTransferFailed").withArgs(requestHash);
 
@@ -579,9 +579,24 @@ describe("Most", function () {
               console.log("exec error: " + error);
             }
 
-            const { most, mostAddress } = await loadFixture(
-              deployEightGuardianMostFixture,
-            );
+            const {
+              most,
+              mostAddress,
+              token,
+              tokenAddressBytes32,
+            } = await loadFixture(deployEightGuardianMostFixture);
+
+            await token.approve(mostAddress, TOKEN_AMOUNT);
+            await most.pause();
+            await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
+            await most.unpause();
+
+            // sending request works before the upgrade
+            await expect(
+              most.sendRequest(tokenAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT)
+            )
+              .to.emit(most, "CrosschainTransferRequest")
+              .withArgs(0, WRAPPED_TOKEN_ADDRESS, TOKEN_AMOUNT, ALEPH_ACCOUNT, 0);
 
             const accounts = await ethers.getSigners();
             let committee = accounts.slice(2, 9).map((x) => x.address);
@@ -600,7 +615,15 @@ describe("Most", function () {
 
             // no state overwrite
             expect(most.test()).to.be.equal(0);
-          },
+
+            // sending request works after the upgrade
+            await token.approve(mostAddress, TOKEN_AMOUNT);
+            await expect(
+              most.sendRequest(tokenAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT)
+            )
+              .to.emit(most, "CrosschainTransferRequest")
+              .withArgs(0, WRAPPED_TOKEN_ADDRESS, TOKEN_AMOUNT, ALEPH_ACCOUNT, 1);
+          }
         );
       });
 
