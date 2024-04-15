@@ -84,7 +84,7 @@ impl EthereumEventHandler {
 
             if let Some(blacklist) = blacklisted_requests {
                 if blacklist.contains(&H256::from_str(&request_hash_hex)?) {
-                    warn!("Skipping blacklisted request: {request_hash_hex}");
+                    warn!("Skipping blacklisted request: 0x{request_hash_hex}");
                     return Ok(());
                 }
             }
