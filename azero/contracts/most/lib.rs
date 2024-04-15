@@ -99,6 +99,16 @@ pub mod most {
         pub signer: AccountId,
     }
 
+    #[ink(event)]
+    #[derive(Debug)]
+    #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
+    pub struct PayoutAccountSet {
+        #[ink(topic)]
+        pub member: AccountId,
+        #[ink(topic)]
+        pub account: AccountId,
+    }
+
     #[derive(Default, Debug, Encode, Decode, Clone, Copy, PartialEq, Eq)]
     #[cfg_attr(
         feature = "std",
@@ -171,6 +181,8 @@ pub mod most {
         collected_committee_rewards: Mapping<CommitteeId, u128, ManualKey<0x434F4C4C>>,
         /// rewards collected by the individual commitee members for relaying cross-chain transfer requests
         paid_out_member_rewards: Mapping<(AccountId, CommitteeId), u128, ManualKey<0x50414944>>,
+        /// committe members can specify a special account for collecting the rewards, different from the one used for signing
+        payout_accounts: Mapping<AccountId, AccountId>,
     }
 
     #[derive(Debug, PartialEq, Eq, Encode, Decode)]
@@ -279,6 +291,7 @@ pub mod most {
                 supported_pairs: Mapping::new(),
                 collected_committee_rewards: Mapping::new(),
                 paid_out_member_rewards: Mapping::new(),
+                payout_accounts: Mapping::new(),
             })
         }
 
@@ -377,8 +390,6 @@ pub mod most {
             let caller = self.env().caller();
             self.only_committee_member(committee_id, caller)?;
 
-            let mut data = self.data()?;
-
             // Don't revert if the request has already been processed as
             // such a call can be made during regular guardian operation.
             if self.processed_requests.contains(request_hash) {
@@ -435,16 +446,21 @@ pub mod most {
                     amount,
                 )?;
 
+                let mut data = self.data()?;
                 // bootstrap account with pocket money
                 if data.pocket_money_balance >= data.pocket_money {
                     // don't revert if the transfer fails
-                    _ = self
+                    if self
                         .env()
-                        .transfer(dest_receiver_address.into(), data.pocket_money);
-                    data.pocket_money_balance = data
-                        .pocket_money_balance
-                        .checked_sub(data.pocket_money)
-                        .ok_or(MostError::Arithmetic)?;
+                        .transfer(dest_receiver_address.into(), data.pocket_money)
+                        .is_ok()
+                    {
+                        data.pocket_money_balance = data
+                            .pocket_money_balance
+                            .checked_sub(data.pocket_money)
+                            .ok_or(MostError::Arithmetic)?;
+                        self.data.set(&data);
+                    }
                 }
 
                 // mark it as processed
@@ -464,7 +480,7 @@ pub mod most {
 
         /// Request payout of rewards for signing & relaying cross-chain transfers.
         ///
-        /// Can be called by anyone on behalf of the committee member.
+        /// Reverts if `member_id` account is not in the committee with `committee_id`
         #[ink(message)]
         pub fn payout_rewards(
             &mut self,
@@ -472,6 +488,7 @@ pub mod most {
             member_id: AccountId,
         ) -> Result<(), MostError> {
             self.ensure_not_halted()?;
+            self.only_committee_member(committee_id, member_id)?;
 
             let paid_out_rewards = self.get_paid_out_member_rewards(committee_id, member_id);
 
@@ -479,7 +496,8 @@ pub mod most {
                 self.get_outstanding_member_rewards(committee_id, member_id)?;
 
             if outstanding_rewards.gt(&0) {
-                self.env().transfer(member_id, outstanding_rewards)?;
+                let payout_account = self.payout_accounts.get(member_id).unwrap_or(member_id);
+                self.env().transfer(payout_account, outstanding_rewards)?;
 
                 self.paid_out_member_rewards.insert(
                     (member_id, committee_id),
@@ -514,6 +532,12 @@ pub mod most {
         }
 
         // ---  getter txs
+
+        /// Query payout_account for a committee member (if any)
+        #[ink(message)]
+        pub fn get_payout_account(&self, member_id: AccountId) -> Option<AccountId> {
+            self.payout_accounts.get(member_id)
+        }
 
         /// Query request nonce
         ///
@@ -573,27 +597,28 @@ pub mod most {
         ///
         /// The amount that can still be requested.
         /// Denominated in AZERO
-        /// Returns an error (reverts) if the `member_id` account is not in the committee with `committee_id`
+        /// Returns 0 if the `member_id` account is not in the committee with `committee_id`
         #[ink(message)]
         pub fn get_outstanding_member_rewards(
             &self,
             committee_id: CommitteeId,
             member_id: AccountId,
         ) -> Result<u128, MostError> {
-            self.only_committee_member(committee_id, member_id)?;
+            if self.is_in_committee(committee_id, member_id) {
+                let total_amount = self
+                    .get_collected_committee_rewards(committee_id)
+                    .checked_div(
+                        self.committee_sizes
+                            .get(committee_id)
+                            .ok_or(MostError::NoSuchCommittee)?,
+                    )
+                    .ok_or(MostError::Arithmetic)?;
 
-            let total_amount = self
-                .get_collected_committee_rewards(committee_id)
-                .checked_div(
-                    self.committee_sizes
-                        .get(committee_id)
-                        .ok_or(MostError::NoSuchCommittee)?,
-                )
-                .ok_or(MostError::Arithmetic)?;
+                let collected_amount = self.get_paid_out_member_rewards(committee_id, member_id);
 
-            let collected_amount = self.get_paid_out_member_rewards(committee_id, member_id);
-
-            Ok(total_amount.saturating_sub(collected_amount))
+                return Ok(total_amount.saturating_sub(collected_amount));
+            }
+            Ok(0)
         }
 
         /// Queries a gas price oracle and returns the current base_fee charged per cross chain transfer denominated in AZERO
@@ -744,6 +769,29 @@ pub mod most {
             Ok(())
         }
 
+        /// Sets address of the account that receives rewards on behalf of the committee member.
+        ///
+        /// Can only be called by an account that was a committee member in `committee_id`.
+        /// All the unpaid rewards will then be paid out to this account address when `payout_request` is called.
+        /// Comittee members that have set the `payout_account` do not need to call this method again when the committee changes, unless they want to change the payouts account.
+        #[ink(message)]
+        pub fn set_payout_account(
+            &mut self,
+            committee_id: CommitteeId,
+            account: AccountId,
+        ) -> Result<(), MostError> {
+            let caller = self.env().caller();
+            self.only_committee_member(committee_id, caller)?;
+            self.payout_accounts.insert(caller, &account);
+
+            self.env().emit_event(PayoutAccountSet {
+                member: caller,
+                account,
+            });
+
+            Ok(())
+        }
+
         /// Sets address of the gas price oracle
         ///
         /// Can only be called by the contracts owner
@@ -776,6 +824,8 @@ pub mod most {
             let mut data = self.data()?;
 
             let committee_id = data.committee_id + 1;
+            self.committee_sizes
+                .insert(committee_id, &(committee.len() as u128));
             let mut committee_set = Mapping::new();
             committee.into_iter().for_each(|account| {
                 committee_set.insert((committee_id, account), &());
@@ -1179,7 +1229,9 @@ pub mod most {
             .expect("Threshold is valid.");
 
             assert!(!most.is_in_committee(most.get_current_committee_id().unwrap(), accounts.alice));
+            assert_eq!(most.committee_sizes.get(0), Some(5));
             assert_eq!(most.set_committee(vec![accounts.alice], 1), Ok(()));
+            assert_eq!(most.committee_sizes.get(1), Some(1));
             assert!(most.is_in_committee(most.get_current_committee_id().unwrap(), accounts.alice));
         }
 
@@ -1204,7 +1256,9 @@ pub mod most {
             .expect("Threshold is valid.");
 
             assert!(most.is_in_committee(most.get_current_committee_id().unwrap(), accounts.bob));
+            assert_eq!(most.committee_sizes.get(0), Some(5));
             assert_eq!(most.set_committee(vec![accounts.alice], 1), Ok(()));
+            assert_eq!(most.committee_sizes.get(1), Some(1));
             assert!(!most.is_in_committee(most.get_current_committee_id().unwrap(), accounts.bob));
         }
     }
