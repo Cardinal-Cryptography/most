@@ -1184,7 +1184,9 @@ pub mod most {
             .expect("Threshold is valid.");
 
             assert!(!most.is_in_committee(most.get_current_committee_id().unwrap(), accounts.alice));
+            assert_eq!(most.committee_sizes.get(0), Some(5));
             assert_eq!(most.set_committee(vec![accounts.alice], 1), Ok(()));
+            assert_eq!(most.committee_sizes.get(1), Some(1));
             assert!(most.is_in_committee(most.get_current_committee_id().unwrap(), accounts.alice));
         }
 
@@ -1209,7 +1211,9 @@ pub mod most {
             .expect("Threshold is valid.");
 
             assert!(most.is_in_committee(most.get_current_committee_id().unwrap(), accounts.bob));
+            assert_eq!(most.committee_sizes.get(0), Some(5));
             assert_eq!(most.set_committee(vec![accounts.alice], 1), Ok(()));
+            assert_eq!(most.committee_sizes.get(1), Some(1));
             assert!(!most.is_in_committee(most.get_current_committee_id().unwrap(), accounts.bob));
         }
     }
