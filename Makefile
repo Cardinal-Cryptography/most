@@ -106,11 +106,11 @@ deploy-eth-live: compile-eth
 	cd eth && \
 	npx hardhat run --network $(NETWORK) scripts/deploy_bridge_live.js
 
-.PHONY: upgrade-eth-live
-upgrade-eth-live: # Upgrade the MOST contract on a live ethereum network (testnet or mainnet)
-upgrade-eth-live: compile-eth
+.PHONY: upload-eth
+upload-eth: # Upload the MOST contract to a live ethereum network (testnet or mainnet) for an upgrade
+upload-eth: compile-eth
 	cd eth && \
-	npx hardhat run --network $(NETWORK) scripts/upgrade_bridge_live.js
+	npx hardhat run --network $(NETWORK) scripts/upload_bridge.js
 
 .PHONY: deploy-live
 deploy-live: # Deploy azero and eth contracts on a live network (testnet or mainnet)
