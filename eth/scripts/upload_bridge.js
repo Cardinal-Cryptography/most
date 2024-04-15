@@ -13,9 +13,9 @@ async function main() {
   const most = await Most.deploy();
   console.log("Upgrade for Most deployed to:", most.target);
 
-  addresses = { most: most.target };
+  addresses = { most_implementation: most.target };
   console.log("\n", addresses, "\n");
-  fs.writeFileSync("addresses.json", JSON.stringify(addresses));
+  fs.writeFileSync("upload.json", JSON.stringify(addresses));
 
   console.log("Done");
   // NOTE: neccessary because script hangs in CI

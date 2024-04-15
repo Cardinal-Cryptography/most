@@ -1,3 +1,5 @@
+import fs from "fs";
+
 import { ApiPromise, WsProvider, Keyring } from "@polkadot/api";
 import {
     uploadCode,
@@ -51,6 +53,11 @@ async function main(): Promise<void> {
     };
 
     console.log("Current code hashes: ", code_hashes);
+
+    fs.writeFileSync(
+      __dirname + "/../code_hashes.json",
+      JSON.stringify(code_hashes, null, 2),
+    );
 
     await api.disconnect();
     console.log("Done");
