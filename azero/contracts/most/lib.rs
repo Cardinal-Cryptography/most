@@ -390,8 +390,6 @@ pub mod most {
             let caller = self.env().caller();
             self.only_committee_member(committee_id, caller)?;
 
-            let mut data = self.data()?;
-
             // Don't revert if the request has already been processed as
             // such a call can be made during regular guardian operation.
             if self.processed_requests.contains(request_hash) {
@@ -448,16 +446,21 @@ pub mod most {
                     amount,
                 )?;
 
+                let mut data = self.data()?;
                 // bootstrap account with pocket money
                 if data.pocket_money_balance >= data.pocket_money {
                     // don't revert if the transfer fails
-                    _ = self
+                    if self
                         .env()
-                        .transfer(dest_receiver_address.into(), data.pocket_money);
-                    data.pocket_money_balance = data
-                        .pocket_money_balance
-                        .checked_sub(data.pocket_money)
-                        .ok_or(MostError::Arithmetic)?;
+                        .transfer(dest_receiver_address.into(), data.pocket_money)
+                        .is_ok()
+                    {
+                        data.pocket_money_balance = data
+                            .pocket_money_balance
+                            .checked_sub(data.pocket_money)
+                            .ok_or(MostError::Arithmetic)?;
+                        self.data.set(&data);
+                    }
                 }
 
                 // mark it as processed
@@ -821,6 +824,8 @@ pub mod most {
             let mut data = self.data()?;
 
             let committee_id = data.committee_id + 1;
+            self.committee_sizes
+                .insert(committee_id, &(committee.len() as u128));
             let mut committee_set = Mapping::new();
             committee.into_iter().for_each(|account| {
                 committee_set.insert((committee_id, account), &());
@@ -1224,7 +1229,9 @@ pub mod most {
             .expect("Threshold is valid.");
 
             assert!(!most.is_in_committee(most.get_current_committee_id().unwrap(), accounts.alice));
+            assert_eq!(most.committee_sizes.get(0), Some(5));
             assert_eq!(most.set_committee(vec![accounts.alice], 1), Ok(()));
+            assert_eq!(most.committee_sizes.get(1), Some(1));
             assert!(most.is_in_committee(most.get_current_committee_id().unwrap(), accounts.alice));
         }
 
@@ -1249,7 +1256,9 @@ pub mod most {
             .expect("Threshold is valid.");
 
             assert!(most.is_in_committee(most.get_current_committee_id().unwrap(), accounts.bob));
+            assert_eq!(most.committee_sizes.get(0), Some(5));
             assert_eq!(most.set_committee(vec![accounts.alice], 1), Ok(()));
+            assert_eq!(most.committee_sizes.get(1), Some(1));
             assert!(!most.is_in_committee(most.get_current_committee_id().unwrap(), accounts.bob));
         }
     }

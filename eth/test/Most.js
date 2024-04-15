@@ -395,10 +395,16 @@ describe("Most", function () {
       // Provide funds for Most
       await token.transfer(await most.getAddress(), TOKEN_AMOUNT * 2);
 
+      // Check committee size
+      expect(await most.committeeSize(0)).to.be.equal(8);
+
       // Rotate committee
       await most.connect(accounts[0]).pause();
       await most.connect(accounts[0]).setCommittee(accounts.slice(3, 10), 5);
       await most.connect(accounts[0]).unpause();
+
+      // Check new committee size
+      expect(await most.committeeSize(1)).to.be.equal(7);
 
       await most
         .connect(accounts[2])
@@ -579,9 +585,30 @@ describe("Most", function () {
               console.log("exec error: " + error);
             }
 
-            const { most, mostAddress } = await loadFixture(
-              deployEightGuardianMostFixture,
-            );
+            const { most, mostAddress, token, tokenAddressBytes32 } =
+              await loadFixture(deployEightGuardianMostFixture);
+
+            await token.approve(mostAddress, TOKEN_AMOUNT);
+            await most.pause();
+            await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
+            await most.unpause();
+
+            // sending request works before the upgrade
+            await expect(
+              most.sendRequest(
+                tokenAddressBytes32,
+                TOKEN_AMOUNT,
+                ALEPH_ACCOUNT,
+              ),
+            )
+              .to.emit(most, "CrosschainTransferRequest")
+              .withArgs(
+                0,
+                WRAPPED_TOKEN_ADDRESS,
+                TOKEN_AMOUNT,
+                ALEPH_ACCOUNT,
+                0,
+              );
 
             const accounts = await ethers.getSigners();
             let committee = accounts.slice(2, 9).map((x) => x.address);
@@ -600,6 +627,24 @@ describe("Most", function () {
 
             // no state overwrite
             expect(most.test()).to.be.equal(0);
+
+            // sending request works after the upgrade
+            await token.approve(mostAddress, TOKEN_AMOUNT);
+            await expect(
+              most.sendRequest(
+                tokenAddressBytes32,
+                TOKEN_AMOUNT,
+                ALEPH_ACCOUNT,
+              ),
+            )
+              .to.emit(most, "CrosschainTransferRequest")
+              .withArgs(
+                0,
+                WRAPPED_TOKEN_ADDRESS,
+                TOKEN_AMOUNT,
+                ALEPH_ACCOUNT,
+                1,
+              );
           },
         );
       });

@@ -285,7 +285,7 @@ pub mod token {
             let new_owner = self.env().caller();
             self.ownable_data.accept_ownership(new_owner)?;
             self.env()
-                .emit_event(TransferOwnershipInitiated { new_owner });
+                .emit_event(TransferOwnershipAccepted { new_owner });
             Ok(())
         }
 
