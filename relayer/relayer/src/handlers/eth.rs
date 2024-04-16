@@ -34,6 +34,9 @@ pub enum EthereumEventHandlerError {
         dest_receiver_address: String,
         request_nonce: u128,
     },
+
+    #[error("Bridge misconfiguration: committee id mismatch")]
+    CommitteeIdMismatch,
 }
 
 pub struct EthereumEventHandler;
@@ -90,7 +93,7 @@ impl EthereumEventHandler {
             let amount = amount.as_u128();
             let request_nonce = request_nonce.as_u128();
 
-            if past_request(&contract, azero_connection, committee_id).await? {
+            if not_in_committee(&contract, azero_connection, committee_id).await? {
                 info!("Guardian signature for {request_hash:?} not needed - request from a past committee");
                 return Ok(());
             }
@@ -123,7 +126,7 @@ impl EthereumEventHandler {
     }
 }
 
-async fn past_request(
+async fn not_in_committee(
     most: &MostInstance,
     connection: &AzeroConnectionWithSigner,
     committee_id: u128,
@@ -145,7 +148,7 @@ async fn past_request(
             .await?
     {
         error!("Request from a future committee {committee_id} - this likely indicates MOST contracts misconfiguration");
-        return Ok(false);
+        return Err(EthereumEventHandlerError::CommitteeIdMismatch);
     }
     Ok(true)
 }

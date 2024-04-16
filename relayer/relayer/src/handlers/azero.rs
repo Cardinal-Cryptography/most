@@ -50,6 +50,9 @@ pub enum AlephZeroEventHandlerError {
 
     #[error("Contract reverted")]
     EthContractReverted,
+
+    #[error("Bridge misconfiguration: committee id mismatch")]
+    CommitteeIdMismatch,
 }
 
 pub struct AlephZeroEventHandler;
@@ -107,7 +110,7 @@ impl AlephZeroEventHandler {
                 let address = eth_contract_address.parse::<Address>()?;
                 let contract = Most::new(address, eth_signed_connection.clone());
 
-                if past_request(
+                if not_in_committee(
                     &contract,
                     committee_id.into(),
                     eth_signed_connection.address(),
@@ -194,7 +197,7 @@ impl AlephZeroEventHandler {
     }
 }
 
-async fn past_request(
+async fn not_in_committee(
     most: &Most<SignedEthConnection>,
     committee_id: U256,
     address: Address,
@@ -205,7 +208,7 @@ async fn past_request(
 
     if committee_id > most.committee_id().await? {
         error!("Request from a future committee {committee_id} - this likely indicates MOST contracts misconfiguration");
-        return Ok(false);
+        return Err(AlephZeroEventHandlerError::CommitteeIdMismatch);
     }
     Ok(true)
 }
