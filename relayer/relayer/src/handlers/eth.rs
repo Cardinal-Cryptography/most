@@ -94,7 +94,7 @@ impl EthereumEventHandler {
             let request_nonce = request_nonce.as_u128();
 
             if not_in_committee(&contract, azero_connection, committee_id).await? {
-                info!("Guardian signature for {request_hash:?} not needed - request from a past committee");
+                info!("Guardian signature for {request_hash:?} not needed - request from a different committee");
                 return Ok(());
             }
 
