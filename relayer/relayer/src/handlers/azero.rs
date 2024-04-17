@@ -6,7 +6,7 @@ use ethers::{
     core::types::{Address, H256},
     prelude::{ContractCall, ContractError},
     providers::{Middleware, ProviderError},
-    types::{BlockNumber, U64},
+    types::{BlockNumber, U256, U64},
     utils::keccak256,
 };
 use log::{debug, error, info, warn};
@@ -50,6 +50,9 @@ pub enum AlephZeroEventHandlerError {
 
     #[error("Contract reverted")]
     EthContractReverted,
+
+    #[error("Bridge misconfiguration: committee id mismatch")]
+    CommitteeIdMismatch,
 }
 
 pub struct AlephZeroEventHandler;
@@ -114,6 +117,17 @@ impl AlephZeroEventHandler {
 
                 let address = eth_contract_address.parse::<Address>()?;
                 let contract = Most::new(address, eth_signed_connection.clone());
+
+                if not_in_committee(
+                    &contract,
+                    committee_id.into(),
+                    eth_signed_connection.address(),
+                )
+                .await?
+                {
+                    info!("Guardian signature for {request_hash:?} not needed - request from a past committee");
+                    return Ok(());
+                }
 
                 while contract
                     .needs_signature(
@@ -189,6 +203,22 @@ impl AlephZeroEventHandler {
         }
         Ok(())
     }
+}
+
+async fn not_in_committee(
+    most: &Most<SignedEthConnection>,
+    committee_id: U256,
+    address: Address,
+) -> Result<bool, AlephZeroEventHandlerError> {
+    if most.is_in_committee(committee_id, address).await? {
+        return Ok(false);
+    }
+
+    if committee_id > most.committee_id().await? {
+        error!("Request from a future committee {committee_id} - this likely indicates MOST contracts misconfiguration");
+        return Err(AlephZeroEventHandlerError::CommitteeIdMismatch);
+    }
+    Ok(true)
 }
 
 #[derive(Debug, Error)]

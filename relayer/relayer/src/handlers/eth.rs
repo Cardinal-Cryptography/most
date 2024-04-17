@@ -1,5 +1,6 @@
 use std::{str::FromStr, sync::Arc};
 
+use aleph_client::{AsConnection, SignedConnectionApi};
 use ethers::{core::types::H256, utils::keccak256};
 use log::{debug, error, info, trace, warn};
 use rustc_hex::FromHexError;
@@ -37,6 +38,9 @@ pub enum EthereumEventHandlerError {
 
     #[error("error when decoding a hex encoded string")]
     FromHex(#[from] FromHexError),
+
+    #[error("Bridge misconfiguration: committee id mismatch")]
+    CommitteeIdMismatch,
 }
 
 pub struct EthereumEventHandler;
@@ -102,6 +106,11 @@ impl EthereumEventHandler {
             let amount = amount.as_u128();
             let request_nonce = request_nonce.as_u128();
 
+            if not_in_committee(&contract, azero_connection, committee_id).await? {
+                info!("Guardian signature for {request_hash:?} not needed - request from a different committee");
+                return Ok(());
+            }
+
             contract
                 .receive_request(
                     azero_connection,
@@ -128,6 +137,33 @@ impl EthereumEventHandler {
 
         Ok(())
     }
+}
+
+async fn not_in_committee(
+    most: &MostInstance,
+    connection: &AzeroConnectionWithSigner,
+    committee_id: u128,
+) -> Result<bool, EthereumEventHandlerError> {
+    if most
+        .is_in_committee(
+            connection.as_connection(),
+            committee_id,
+            connection.account_id().clone(),
+        )
+        .await?
+    {
+        return Ok(false);
+    }
+
+    if committee_id
+        > most
+            .current_committee_id(connection.as_connection())
+            .await?
+    {
+        error!("Request from a future committee {committee_id} - this likely indicates MOST contracts misconfiguration");
+        return Err(EthereumEventHandlerError::CommitteeIdMismatch);
+    }
+    Ok(true)
 }
 
 #[derive(Debug, Error)]
