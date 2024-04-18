@@ -9,6 +9,8 @@ mod eth;
 
 #[derive(Debug)]
 pub struct EthMostEvents {
+    pub from_block: u32,
+    pub to_block: u32,
     pub events: Vec<MostEvents>,
     pub events_ack_sender: oneshot::Sender<()>,
 }

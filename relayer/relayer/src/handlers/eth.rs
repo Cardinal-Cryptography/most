@@ -213,8 +213,11 @@ impl EthereumEventsHandler {
                     let EthMostEvents {
                         events,
                         events_ack_sender,
+                        from_block,
+                        to_block
                     } = eth_events;
-                    info!("Received a batch of {} events", events.len());
+
+                    info!("Received a batch of {} events from blocks {from_block} to {to_block}", events.len());
 
                     for event in events {
                         select! {
@@ -241,7 +244,6 @@ impl EthereumEventsHandler {
                         .map_err(|_| EthereumEventsHandlerError::EventsAckReceiverDropped)?;
 
                 }
-
             }
         }
     }
