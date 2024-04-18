@@ -9,7 +9,7 @@ use ethers::{
     types::{BlockNumber, U256, U64},
     utils::keccak256,
 };
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 use thiserror::Error;
 use tokio::{
     select,
@@ -76,7 +76,7 @@ impl AlephZeroEventHandler {
                 let data = event.data;
 
                 // decode event data
-                let CrosschainTransferRequestData {
+                let crosschain_transfer_event @ CrosschainTransferRequestData {
                     committee_id,
                     dest_token_address,
                     amount,
@@ -84,8 +84,10 @@ impl AlephZeroEventHandler {
                     request_nonce,
                 } = get_request_event_data(&data)?;
 
+                debug!("Handling azero contract event: {crosschain_transfer_event:?}");
+
                 info!(
-                    "Decoded event data: [dest_token_address: 0x{}, amount: {amount}, dest_receiver_address: 0x{}, request_nonce: {request_nonce}]",
+                    "Decoded event data: [dest_token_address: 0x{}, amount: {amount}, dest_receiver_address: 0x{}, request_nonce: {request_nonce}, committee_id: {committee_id}]",
                     hex::encode(dest_token_address),
                     hex::encode(dest_receiver_address)
                 );
@@ -101,12 +103,13 @@ impl AlephZeroEventHandler {
                     Token::Uint(request_nonce.into()),
                 ]);
 
-                debug!("ABI event encoding: 0x{}", hex::encode(bytes.clone()));
+                trace!("ABI compliant concatenated event bytes {bytes:?}");
 
                 let request_hash = keccak256(bytes);
-                let request_hash_hex = hex::encode(request_hash);
+                debug!("Hashed event data: {request_hash:?}");
 
-                info!("hashed event encoding: 0x{}", request_hash_hex);
+                let request_hash_hex = hex::encode(request_hash);
+                info!("Request hash hex encoding: 0x{}", request_hash_hex);
 
                 if let Some(blacklist) = blacklisted_requests {
                     if blacklist.contains(&H256::from_str(&request_hash_hex)?) {
@@ -125,7 +128,7 @@ impl AlephZeroEventHandler {
                 )
                 .await?
                 {
-                    info!("Guardian signature for {request_hash:?} not needed - request from a past committee");
+                    info!("Guardian signature for 0x{request_hash_hex} not needed - request from a past committee");
                     return Ok(());
                 }
 
@@ -138,7 +141,7 @@ impl AlephZeroEventHandler {
                     .block(BlockNumber::Finalized)
                     .await?
                 {
-                    info!("Request with nonce {} not yet finalized.", request_nonce);
+                    info!("Request 0x{request_hash_hex} not yet finalized.");
 
                     if !contract
                         .needs_signature(
@@ -163,15 +166,13 @@ impl AlephZeroEventHandler {
                         request_nonce.into(),
                     );
 
-                    debug!("Dry-running tx with nonce {}", request_nonce);
+                    debug!("Dry-running tx for request 0x{request_hash_hex}");
 
                     // Dry-run the tx to check for potential reverts.
                     call.clone().gas(config.eth_gas_limit).call().await?;
 
                     info!(
-                        "Sending tx with nonce {} to the Ethereum network and waiting for {} confirmations.",
-                        request_nonce,
-                        eth_tx_min_confirmations
+                        "Sending tx for request 0x{request_hash_hex} to the Ethereum network and waiting for {eth_tx_min_confirmations} confirmations."
                     );
 
                     let receipt = call
@@ -190,15 +191,15 @@ impl AlephZeroEventHandler {
                     // Check if the tx reverted.
                     if tx_status == Some(U64::from(0)) {
                         warn!(
-                        "Tx with nonce {request_nonce} has been sent to the Ethereum network: {tx_hash:?} but it reverted."
+                        "Tx for request 0x{request_hash_hex} has been sent to the Ethereum network: {tx_hash:?} but it reverted."
                     );
                         return Err(AlephZeroEventHandlerError::EthContractReverted);
                     }
 
-                    info!("Tx with nonce {request_nonce} has been sent to the Ethereum network: {tx_hash:?} and received {eth_tx_min_confirmations} confirmations.");
+                    info!("Tx for request 0x{request_hash_hex} has been sent to the Ethereum network: {tx_hash:?} and received {eth_tx_min_confirmations} confirmations.");
                 }
 
-                info!("Guardian signature for {request_hash:?} no longer needed");
+                info!("Guardian signature for 0x{request_hash_hex} no longer needed");
             }
         }
         Ok(())
