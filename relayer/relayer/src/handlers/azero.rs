@@ -87,7 +87,7 @@ impl AlephZeroEventHandler {
                 debug!("Handling azero contract event: {crosschain_transfer_event:?}");
 
                 info!(
-                    "Decoded event data: [dest_token_address: 0x{}, amount: {amount}, dest_receiver_address: 0x{}, request_nonce: {request_nonce}, committee_id: {committee_id}]",
+                    "Decoded event data: [dest_token_address: {}, amount: {amount}, dest_receiver_address: {}, request_nonce: {request_nonce}, committee_id: {committee_id}]",
                     hex::encode(dest_token_address),
                     hex::encode(dest_receiver_address)
                 );
