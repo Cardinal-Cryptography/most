@@ -96,6 +96,7 @@ enum CircuitBreakerEvent {
     BridgeHaltEthereum,
     AdvisoryEmergency(#[allow(dead_code)] AccountId), // field is needed for logs
     AlephClientError,                                 // signifies a connection error
+    EthConnectionError,
 }
 
 async fn create_azero_connections(
