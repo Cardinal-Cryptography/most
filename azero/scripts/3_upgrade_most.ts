@@ -63,6 +63,8 @@ async function main(): Promise<void> {
     );
   }
 
+  await migrations.tx.setCompleted(3);
+
   await api.disconnect();
   console.log("Done");
 }
