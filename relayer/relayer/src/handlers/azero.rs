@@ -1,9 +1,9 @@
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use aleph_client::contract::event::ContractEvent;
 use ethers::{
     abi::{self, Token},
-    core::types::Address,
+    core::types::{Address, H256},
     prelude::{ContractCall, ContractError},
     providers::{Middleware, ProviderError},
     types::{BlockNumber, U256, U64},
@@ -67,6 +67,7 @@ impl AlephZeroEventHandler {
             eth_contract_address,
             eth_tx_min_confirmations,
             eth_tx_submission_retries,
+            blacklisted_requests,
             ..
         } = &*config;
 
@@ -106,6 +107,13 @@ impl AlephZeroEventHandler {
                 let request_hash_hex = hex::encode(request_hash);
 
                 info!("hashed event encoding: 0x{}", request_hash_hex);
+
+                if let Some(blacklist) = blacklisted_requests {
+                    if blacklist.contains(&H256::from_str(&request_hash_hex)?) {
+                        warn!("Skipping blacklisted request: 0x{request_hash_hex}");
+                        return Ok(());
+                    }
+                }
 
                 let address = eth_contract_address.parse::<Address>()?;
                 let contract = Most::new(address, eth_signed_connection.clone());

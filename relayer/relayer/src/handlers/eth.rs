@@ -1,8 +1,9 @@
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use aleph_client::{AsConnection, SignedConnectionApi};
-use ethers::utils::keccak256;
+use ethers::{core::types::H256, utils::keccak256};
 use log::{debug, error, info, trace, warn};
+use rustc_hex::FromHexError;
 use thiserror::Error;
 use tokio::{
     select,
@@ -35,6 +36,9 @@ pub enum EthereumEventHandlerError {
         request_nonce: u128,
     },
 
+    #[error("error when decoding a hex encoded string")]
+    FromHex(#[from] FromHexError),
+
     #[error("Bridge misconfiguration: committee id mismatch")]
     CommitteeIdMismatch,
 }
@@ -50,6 +54,7 @@ impl EthereumEventHandler {
         let Config {
             azero_contract_address,
             azero_contract_metadata,
+            blacklisted_requests,
             ..
         } = config;
 
@@ -78,7 +83,15 @@ impl EthereumEventHandler {
             trace!("event concatenated bytes: {bytes:?}");
 
             let request_hash = keccak256(bytes);
-            info!("hashed event encoding: {request_hash:?}");
+            let request_hash_hex = hex::encode(request_hash);
+            info!("hashed event encoding: 0x{}", request_hash_hex);
+
+            if let Some(blacklist) = blacklisted_requests {
+                if blacklist.contains(&H256::from_str(&request_hash_hex)?) {
+                    warn!("Skipping blacklisted request: 0x{request_hash_hex}");
+                    return Ok(());
+                }
+            }
 
             let contract = MostInstance::new(
                 azero_contract_address,
