@@ -69,7 +69,7 @@ async function main(): Promise<void> {
   let srcTokenAddress = hexToBytes(accountIdToHex(weth_azero));
 
   const supported = await most.query.getSupportedPair(srcTokenAddress);
-  console.log(srcTokenAddress, "supported pair is", supported.value.ok);
+  console.log(weth_azero, "supported pair is", supported.value.ok);
   if (supported.value.ok == undefined) {
     console.error("Unsupported pair");
     process.exit(-1);
