@@ -127,7 +127,7 @@ impl AlephZeroListener {
 
                     let to_block = min(
                         next_finalized_block_number,
-                        unprocessed_block_number + (*sync_step) - 1,
+                        unprocessed_block_number + sync_step - 1,
                     );
 
                     info!(target: "AlephZeroListener",
