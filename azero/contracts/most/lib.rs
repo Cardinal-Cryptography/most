@@ -533,6 +533,12 @@ pub mod most {
 
         // ---  getter txs
 
+        /// Query token pair
+        #[ink(message)]
+        pub fn get_supported_pair(&self, src_token: [u8; 32]) -> Option<[u8; 32]> {
+            self.supported_pairs.get(src_token)
+        }
+
         /// Query payout_account for a committee member (if any)
         #[ink(message)]
         pub fn get_payout_account(&self, member_id: AccountId) -> Option<AccountId> {
