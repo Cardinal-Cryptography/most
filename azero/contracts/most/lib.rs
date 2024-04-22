@@ -156,6 +156,8 @@ pub mod most {
         gas_price_oracle: Option<AccountId>,
         /// Is the bridge in a halted state
         is_halted: bool,
+        /// Wrapped ethereum (azero) address. Necessary to perform bridging weth(azero) -> ether(eth).
+        weth: Option<AccountId>,
     }
 
     #[ink(storage)]
@@ -274,6 +276,7 @@ pub mod most {
                 base_fee_buffer_percentage,
                 gas_price_oracle,
                 is_halted: true,
+                weth: None,
             });
 
             let mut ownable_data = Lazy::new();
@@ -366,6 +369,79 @@ pub mod most {
             self.env().emit_event(CrosschainTransferRequest {
                 committee_id: data.committee_id,
                 dest_token_address,
+                amount,
+                dest_receiver_address,
+                request_nonce,
+            });
+
+            Ok(())
+        }
+
+        /// Invoke this tx to initiate weth -> ether transfer to the destination chain.
+        ///
+        /// Upon checking basic conditions the contract will burn the `amount` number of weth tokens from the caller
+        /// and emit an event which is to be picked up & acted on up by the bridge guardians.
+        #[ink(message, payable)]
+        pub fn send_request_native_ether(
+            &mut self,
+            amount: u128,
+            dest_receiver_address: [u8; 32],
+        ) -> Result<(), MostError> {
+            self.ensure_not_halted()?;
+
+            let mut data = self.data()?;
+
+            let src_token_address = data.weth.ok_or(MostError::UnsupportedPair)?;
+
+            if dest_receiver_address == ETH_ZERO_ADDRESS {
+                return Err(MostError::ZeroAddress);
+            }
+
+            if amount == 0 {
+                return Err(MostError::ZeroTransferAmount);
+            }
+
+            let current_base_fee = self.get_base_fee()?;
+            let transferred_fee = self.env().transferred_value();
+
+            if transferred_fee.lt(&current_base_fee) {
+                return Err(MostError::BaseFeeTooLow);
+            }
+
+            let sender = self.env().caller();
+
+            // burn the weth psp22 tokens
+            self.burn_from(src_token_address, sender, amount)?;
+
+            // NOTE: this allows the committee members to take a payout for requests that are not neccessarily finished
+            // by that time (no signature threshold reached yet).
+            // We could be recording the base fee when the request collects quorum, but it could change in the meantime
+            // which is potentially even worse
+            let base_fee_total = self
+                .collected_committee_rewards
+                .get(data.committee_id)
+                .unwrap_or(0)
+                .checked_add(current_base_fee)
+                .ok_or(MostError::Arithmetic)?;
+
+            self.collected_committee_rewards
+                .insert(data.committee_id, &base_fee_total);
+
+            let request_nonce = data.request_nonce;
+            data.request_nonce = request_nonce.checked_add(1).ok_or(MostError::Arithmetic)?;
+
+            self.data.set(&data);
+
+            // return surplus if any
+            if let Some(surplus) = transferred_fee.checked_sub(current_base_fee) {
+                if surplus > 0 {
+                    self.env().transfer(sender, surplus)?;
+                }
+            };
+
+            self.env().emit_event(CrosschainTransferRequest {
+                committee_id: data.committee_id,
+                dest_token_address: [0u8; 32], // zero address indicating ether transfer
                 amount,
                 dest_receiver_address,
                 request_nonce,
@@ -766,6 +842,20 @@ pub mod most {
             }
 
             self.supported_pairs.insert(from, &to);
+            Ok(())
+        }
+
+        /// Set weth(azero) psp22 token contract
+        ///
+        /// Can only be called by the contracts owner
+        #[ink(message)]
+        pub fn set_weth(&mut self, weth: Option<AccountId>) -> Result<(), MostError> {
+            self.ensure_owner()?;
+
+            let mut data = self.data()?;
+            data.weth = weth;
+            self.data.set(&data);
+
             Ok(())
         }
 
