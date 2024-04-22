@@ -117,5 +117,13 @@ if [[ -n "${SIGNER_CID}" ]]; then
   ARGS+=(--signer-cid=${SIGNER_CID})
 fi
 
+if [[ -n "${SYNC_STEP}" ]]; then
+  ARGS+=(--sync-step=${SYNC_STEP})
+fi
+
+if [[ -n "${ETH_POLL_INTERVAL}" ]]; then
+  ARGS+=(--eth-poll-interval=${ETH_POLL_INTERVAL})
+fi
+
 # --- RUN
 xargs most-relayer "${ARGS[@]}"
