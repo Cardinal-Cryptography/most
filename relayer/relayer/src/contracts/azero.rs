@@ -239,6 +239,7 @@ impl MostInstance {
     }
 }
 
+#[derive(Debug)]
 pub struct CrosschainTransferRequestData {
     pub committee_id: u128,
     pub dest_token_address: [u8; 32],

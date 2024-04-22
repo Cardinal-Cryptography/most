@@ -122,6 +122,8 @@ impl EthereumListener {
                                         eth_events_sender
                                             .send(EthMostEvents {
                                                 events: events.clone (),
+                                                from_block: unprocessed_block_number,
+                                                to_block,
                                                 events_ack_sender,
                                             }).await?;
 
