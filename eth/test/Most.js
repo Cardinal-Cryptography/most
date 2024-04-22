@@ -461,12 +461,13 @@ describe("Most", function () {
       const { most, weth, wethAddress, mostAddress } = await loadFixture(
         deployEightGuardianMostFixture,
       );
+      const zeroAddress = "0x0000000000000000000000000000000000000000";
       const token_amount = ethToWei(TOKEN_AMOUNT);
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
       const requestHash = ethers.solidityPackedKeccak256(
         ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
-        [0, addressToBytes32(wethAddress), token_amount, ethAddress, 0],
+        [0, addressToBytes32(zeroAddress), token_amount, ethAddress, 0],
       );
 
       const provider = await hre.ethers.provider;
@@ -485,7 +486,7 @@ describe("Most", function () {
           .receiveRequest(
             requestHash,
             0,
-            addressToBytes32(wethAddress),
+            addressToBytes32(zeroAddress),
             token_amount,
             ethAddress,
             0,
@@ -504,6 +505,7 @@ describe("Most", function () {
       const { most, weth, wethAddress, mostAddress, token } = await loadFixture(
         deployEightGuardianMostFixture,
       );
+      const zeroAddress = "0x0000000000000000000000000000000000000000";
       const token_amount = ethToWei(TOKEN_AMOUNT);
       const accounts = await ethers.getSigners();
       // token contract doesn't accept ether so any native ether transfer to it will fail
@@ -512,15 +514,13 @@ describe("Most", function () {
         ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
         [
           0,
-          addressToBytes32(wethAddress),
+          addressToBytes32(zeroAddress),
           token_amount,
           addressToBytes32(ethAddress),
           0,
         ],
       );
-      await most.pause();
-      await most.addPair(addressToBytes32(wethAddress), WRAPPED_TOKEN_ADDRESS);
-      await most.unpause();
+
       const provider = await hre.ethers.provider;
       // Provide funds for Most
       await weth.deposit({ value: token_amount });
@@ -537,7 +537,7 @@ describe("Most", function () {
           .receiveRequest(
             requestHash,
             0,
-            addressToBytes32(wethAddress),
+            addressToBytes32(zeroAddress),
             token_amount,
             addressToBytes32(ethAddress),
             0,
@@ -550,7 +550,7 @@ describe("Most", function () {
           .receiveRequest(
             requestHash,
             0,
-            addressToBytes32(wethAddress),
+            addressToBytes32(zeroAddress),
             token_amount,
             addressToBytes32(ethAddress),
             0,
