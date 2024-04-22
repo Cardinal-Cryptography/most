@@ -101,10 +101,16 @@ deploy-eth: compile-eth
 	npx hardhat run --network $(NETWORK) scripts/2_deploy_bridge_contracts.js
 
 .PHONY: deploy-eth-live
-deploy-eth-live: # Deploy only the MOST contract on a live ethrereum network (tesnet or mainnet)
+deploy-eth-live: # Deploy only the MOST contract on a live ethereum network (testnet or mainnet)
 deploy-eth-live: compile-eth
 	cd eth && \
 	npx hardhat run --network $(NETWORK) scripts/deploy_bridge_live.js
+
+.PHONY: upload-eth
+upload-eth: # Upload the MOST contract to a live ethereum network (testnet or mainnet) for an upgrade
+upload-eth: compile-eth
+	cd eth && \
+	npx hardhat run --network $(NETWORK) scripts/upload_bridge.js
 
 .PHONY: deploy-live
 deploy-live: # Deploy azero and eth contracts on a live network (testnet or mainnet)
@@ -185,6 +191,11 @@ compile-azero: azero-deps
 deploy-azero: # Deploy azero contracts
 deploy-azero: compile-azero
 	cd azero && AZERO_ENV=$(AZERO_ENV) npm run deploy
+
+.PHONY: upload-azero
+upload-azero: # Upload azero contract code without instantiating (useful for upgrades)
+upload-azero: compile-azero-docker
+	cd azero && AZERO_ENV=$(AZERO_ENV) npm run upload
 
 .PHONY: setup-azero
 setup-azero: # Setup azero contracts

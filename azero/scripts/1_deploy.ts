@@ -7,7 +7,6 @@ import TokenConstructors from "../types/constructors/token";
 import OracleConstructors from "../types/constructors/oracle";
 import AdvisoryConstructors from "../types/constructors/advisory";
 import {
-  uploadCode,
   estimateContractInit,
   import_env,
   storeAddresses,
@@ -60,6 +59,9 @@ async function main(): Promise<void> {
     min_gas_price,
     max_gas_price,
     default_gas_price,
+    gas_oracle_max_age,
+    oracle_call_gas_limit,
+    base_fee_buffer_percentage,
     tokens,
     dev,
   } = config;
@@ -70,25 +72,6 @@ async function main(): Promise<void> {
   const api = await ApiPromise.create({ provider: wsProvider });
   const deployer = keyring.addFromUri(deployer_seed);
   console.log("Using", deployer.address, "as the deployer");
-
-  const migrationsCodeHash = await uploadCode(
-    api,
-    deployer,
-    "migrations.contract",
-  );
-  console.log("migrations code hash:", migrationsCodeHash);
-
-  const tokenCodeHash = await uploadCode(api, deployer, "token.contract");
-  console.log("token code hash:", tokenCodeHash);
-
-  const mostCodeHash = await uploadCode(api, deployer, "most.contract");
-  console.log("most code hash:", mostCodeHash);
-
-  const oracleCodeHash = await uploadCode(api, deployer, "oracle.contract");
-  console.log("oracle code hash:", oracleCodeHash);
-
-  const advisoryCodeHash = await uploadCode(api, deployer, "advisory.contract");
-  console.log("advisory code hash:", advisoryCodeHash);
 
   const migrationsConstructors = new MigrationsConstructors(api, deployer);
   const mostConstructors = new MostConstructors(api, deployer);
@@ -144,6 +127,9 @@ async function main(): Promise<void> {
       min_gas_price!,
       max_gas_price!,
       default_gas_price!,
+      gas_oracle_max_age!,
+      oracle_call_gas_limit!,
+      base_fee_buffer_percentage!,
       oracleAddress,
       deployer.address,
     ],
@@ -157,6 +143,9 @@ async function main(): Promise<void> {
     min_gas_price!,
     max_gas_price!,
     default_gas_price!,
+    gas_oracle_max_age!,
+    oracle_call_gas_limit!,
+    base_fee_buffer_percentage!,
     oracleAddress,
     deployer.address,
     { gasLimit: estimatedGasMost },

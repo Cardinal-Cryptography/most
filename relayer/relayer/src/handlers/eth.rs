@@ -1,8 +1,9 @@
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use aleph_client::{waiting::BlockStatus, AsConnection, SignedConnectionApi};
-use ethers::utils::keccak256;
+use ethers::{core::types::H256, utils::keccak256};
 use log::{debug, error, info, trace, warn};
+use rustc_hex::FromHexError;
 use thiserror::Error;
 use tokio::{
     select,
@@ -38,6 +39,12 @@ pub enum EthereumEventHandlerError {
         dest_receiver_address: String,
         request_nonce: u128,
     },
+
+    #[error("error when decoding a hex encoded string")]
+    FromHex(#[from] FromHexError),
+
+    #[error("Bridge misconfiguration: committee id mismatch")]
+    CommitteeIdMismatch,
 }
 
 pub struct EthereumEventHandler;
@@ -51,6 +58,7 @@ impl EthereumEventHandler {
         let Config {
             azero_contract_address,
             azero_contract_metadata,
+            blacklisted_requests,
             ..
         } = config;
 
@@ -65,7 +73,13 @@ impl EthereumEventHandler {
             },
         ) = event
         {
-            info!("handling eth contract event: {crosschain_transfer_event:?}");
+            debug!("Handling eth contract event: {crosschain_transfer_event:?}");
+
+            info!(
+                    "Decoded event data: [dest_token_address: 0x{}, amount: {amount}, dest_receiver_address: 0x{}, request_nonce: {request_nonce}, committee_id: {committee_id}]",
+                    AccountId::from(dest_token_address),
+                    AccountId::from(dest_receiver_address)
+                );
 
             // concat bytes
             let bytes = concat_u8_arrays(vec![
@@ -76,10 +90,20 @@ impl EthereumEventHandler {
                 &request_nonce.as_u128().to_le_bytes(),
             ]);
 
-            trace!("event concatenated bytes: {bytes:?}");
+            trace!("Concatenated event bytes: {bytes:?}");
 
             let request_hash = keccak256(bytes);
-            info!("hashed event encoding: {request_hash:?}");
+            debug!("Hashed event data: {request_hash:?}");
+
+            let request_hash_hex = hex::encode(request_hash);
+            info!("Request hash hex encoding: 0x{}", request_hash_hex);
+
+            if let Some(blacklist) = blacklisted_requests {
+                if blacklist.contains(&H256::from_str(&request_hash_hex)?) {
+                    warn!("Skipping blacklisted request: 0x{request_hash_hex}");
+                    return Ok(());
+                }
+            }
 
             let contract = MostInstance::new(
                 azero_contract_address,
@@ -91,6 +115,11 @@ impl EthereumEventHandler {
             let committee_id = committee_id.as_u128();
             let amount = amount.as_u128();
             let request_nonce = request_nonce.as_u128();
+
+            if not_in_committee(&contract, azero_connection, committee_id).await? {
+                info!("Guardian signature for 0x{request_hash_hex} not needed - request from a different committee");
+                return Ok(());
+            }
 
             while contract
                 .needs_signature(
@@ -139,11 +168,38 @@ impl EthereumEventHandler {
                         request_nonce,
                     })?;
             }
-            info!("Guardian signature for {request_hash:?} no longer needed");
+            info!("Guardian signature for 0x{request_hash_hex} no longer needed");
         }
 
         Ok(())
     }
+}
+
+async fn not_in_committee(
+    most: &MostInstance,
+    connection: &AzeroConnectionWithSigner,
+    committee_id: u128,
+) -> Result<bool, EthereumEventHandlerError> {
+    if most
+        .is_in_committee(
+            connection.as_connection(),
+            committee_id,
+            connection.account_id().clone(),
+        )
+        .await?
+    {
+        return Ok(false);
+    }
+
+    if committee_id
+        > most
+            .current_committee_id(connection.as_connection())
+            .await?
+    {
+        error!("Request from a future committee {committee_id} - this likely indicates MOST contracts misconfiguration");
+        return Err(EthereumEventHandlerError::CommitteeIdMismatch);
+    }
+    Ok(true)
 }
 
 #[derive(Debug, Error)]
@@ -185,8 +241,11 @@ impl EthereumEventsHandler {
                     let EthMostEvents {
                         events,
                         events_ack_sender,
+                        from_block,
+                        to_block
                     } = eth_events;
-                    info!("Received a batch of {} events", events.len());
+
+                    info!("Received a batch of {} events from blocks {from_block} to {to_block}", events.len());
 
                     for event in events {
                         select! {
@@ -213,7 +272,6 @@ impl EthereumEventsHandler {
                         .map_err(|_| EthereumEventsHandlerError::EventsAckReceiverDropped)?;
 
                 }
-
             }
         }
     }

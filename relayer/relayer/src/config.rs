@@ -1,5 +1,7 @@
 use std::{cmp::max, ops::Deref, str::FromStr};
 
+use ethers::core::types::H256;
+
 #[derive(Debug, Clone)]
 pub struct SyncFromBlock(u32);
 
@@ -36,6 +38,10 @@ pub struct Config {
 
     #[arg(long)]
     pub override_eth_cache: bool,
+
+    /// Optional list of hex encoded request hashes to skip from processing
+    #[arg(long, use_value_delimiter = true, value_delimiter = ',')]
+    pub blacklisted_requests: Option<Vec<H256>>,
 
     #[arg(long, use_value_delimiter = true, value_delimiter = ',')]
     pub advisory_contract_addresses: Option<Vec<String>>,

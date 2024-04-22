@@ -122,6 +122,8 @@ impl EthereumListener {
                                         eth_events_sender
                                             .send(EthMostEvents {
                                                 events: events.clone (),
+                                                from_block: unprocessed_block_number,
+                                                to_block,
                                                 events_ack_sender,
                                             }).await?;
 
@@ -197,9 +199,6 @@ pub enum EthereumPausedListenerError {
 
     #[error("contract error")]
     Contract(#[from] ContractError<Provider<Http>>),
-
-    #[error("unexpected error")]
-    Unexpected,
 }
 
 pub struct EthereumPausedListener;
@@ -221,25 +220,40 @@ impl EthereumPausedListener {
         let address = eth_contract_address.parse::<Address>()?;
         let most_eth = Most::new(address, Arc::clone(&eth_connection));
 
-        select! {
-            cb_event = circuit_breaker_receiver.recv () => {
-                warn!(target: "EthereumPausedListener", "Exiting due to a circuit breaker event {cb_event:?}");
-                Ok(cb_event?)
-            },
+        loop {
+            debug!(target: "EthereumPausedListener", "Ping");
 
-            _ = async {
-                loop {
+            let is_paused_call = most_eth.paused();
+
+            select! {
+                cb_event = circuit_breaker_receiver.recv () => {
+                    warn!(target: "EthereumPausedListener","Exiting due to a circuit breaker event {cb_event:?}");
+                    return Ok(cb_event?);
+                },
+
+                is_paused = is_paused_call.call() => {
                     debug!(target: "EthereumPausedListener", "Querying");
-                    if most_eth.paused().await? {
-                        circuit_breaker_sender.send(CircuitBreakerEvent::BridgeHaltEthereum)?;
-                        warn!(target: "EthereumPausedListener", "Most is paused, exiting");
-                        return Ok::<CircuitBreakerEvent, EthereumPausedListenerError>(CircuitBreakerEvent::BridgeHaltEthereum);
+                    match is_paused {
+                        Ok(is_paused) => {
+                            if is_paused {
+                                circuit_breaker_sender.send(CircuitBreakerEvent::BridgeHaltEthereum)?;
+                                warn!(target: "EthereumPausedListener",
+                                      "Most is paused, exiting");
+                                return Ok(CircuitBreakerEvent::BridgeHaltEthereum);
+                            }
+                        },
+
+                        Err(why) => {
+                            warn!("Exiting due to a connection error {why:?}");
+                            let status = CircuitBreakerEvent::EthConnectionError;
+                            circuit_breaker_sender.send(status.clone())?;
+                            return Ok(status.clone());
+                        }
                     }
 
+                    // sleep before making another query
                     sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
                 }
-            } => {
-                Err (EthereumPausedListenerError::Unexpected)
             }
         }
     }

@@ -197,6 +197,32 @@ impl MostInstance {
             .await?)
     }
 
+    pub async fn current_committee_id(
+        &self,
+        connection: &Connection,
+    ) -> Result<u128, AzeroContractError> {
+        Ok(self
+            .contract
+            .contract_read0::<Result<u128, _>, _>(connection, "current_committee_id")
+            .await??)
+    }
+
+    pub async fn is_in_committee(
+        &self,
+        connection: &Connection,
+        committee_id: u128,
+        account: AccountId,
+    ) -> Result<bool, AzeroContractError> {
+        Ok(self
+            .contract
+            .contract_read(
+                connection,
+                "is_in_committee",
+                &[committee_id.to_string(), account.to_string()],
+            )
+            .await?)
+    }
+
     pub fn filter_events(
         &self,
         events: Events<AlephConfig>,
@@ -216,6 +242,7 @@ impl MostInstance {
     }
 }
 
+#[derive(Debug)]
 pub struct CrosschainTransferRequestData {
     pub committee_id: u128,
     pub dest_token_address: [u8; 32],
