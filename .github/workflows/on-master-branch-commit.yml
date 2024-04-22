@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - master
+      - kz/eth-request-frequency
 
 jobs:
   check-vars-and-secrets:
