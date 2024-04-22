@@ -15,6 +15,7 @@ use aleph_client::{
     },
     pallets::contract::{ContractCallArgs, ContractRpc, ContractsUserApi},
     sp_weights::weight_v2::Weight,
+    waiting::BlockStatus,
     AccountId, AlephConfig, Connection, SignedConnectionApi, TxInfo, TxStatus,
 };
 use log::{error, trace};
@@ -173,13 +174,15 @@ impl MostInstance {
             .await??)
     }
 
-    pub async fn _needs_signature(
+    pub async fn needs_signature(
         &self,
         connection: &Connection,
         request_hash: [u8; 32],
         account: AccountId,
         committee_id: u128,
+        block: BlockStatus,
     ) -> Result<bool, AzeroContractError> {
+        if let
         Ok(self
             .contract
             .contract_read(
