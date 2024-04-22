@@ -65,26 +65,35 @@ async function main(): Promise<void> {
 
   // send request
   const most = new Most(most_azero, signer, api);
+
+  let srcTokenAddress = hexToBytes(accountIdToHex(weth_azero));
+
+  let destReceiverAddress = hexToBytes(
+    ethers.zeroPadValue(ethers.getBytes(receiver), 32),
+  );
+
+  const fee = 1000000000000000;
+
   console.log(
     "Requesting transfer of",
     amount,
     "units of",
     weth_azero,
+    "[",
+    accountIdToHex(weth_azero),
+    "]",
     "to",
     receiver,
-  );
-
-  let srcTokenAddress = hexToBytes(accountIdToHex(weth_azero));
-  let destReceiverAddress = hexToBytes(
+    "[",
     ethers.zeroPadValue(ethers.getBytes(receiver), 32),
+    "]",
   );
 
-  const value = 1000000000000000;
   let tx = await most.tx.sendRequest(
     srcTokenAddress,
     amount,
     destReceiverAddress,
-    { value },
+    { value: fee },
   );
 
   console.log(

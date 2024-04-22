@@ -1,6 +1,6 @@
 use std::{str::FromStr, sync::Arc};
 
-use aleph_client::{AsConnection, SignedConnectionApi};
+use aleph_client::{AccountId, AsConnection, SignedConnectionApi};
 use ethers::{core::types::H256, utils::keccak256};
 use log::{debug, error, info, trace, warn};
 use rustc_hex::FromHexError;
@@ -69,7 +69,13 @@ impl EthereumEventHandler {
             },
         ) = event
         {
-            info!("handling eth contract event: {crosschain_transfer_event:?}");
+            debug!("Handling eth contract event: {crosschain_transfer_event:?}");
+
+            info!(
+                    "Decoded event data: [dest_token_address: 0x{}, amount: {amount}, dest_receiver_address: 0x{}, request_nonce: {request_nonce}, committee_id: {committee_id}]",
+                    AccountId::from(dest_token_address),
+                    AccountId::from(dest_receiver_address)
+                );
 
             // concat bytes
             let bytes = concat_u8_arrays(vec![
@@ -80,11 +86,13 @@ impl EthereumEventHandler {
                 &request_nonce.as_u128().to_le_bytes(),
             ]);
 
-            trace!("event concatenated bytes: {bytes:?}");
+            trace!("Concatenated event bytes: {bytes:?}");
 
             let request_hash = keccak256(bytes);
+            debug!("Hashed event data: {request_hash:?}");
+
             let request_hash_hex = hex::encode(request_hash);
-            info!("hashed event encoding: 0x{}", request_hash_hex);
+            info!("Request hash hex encoding: 0x{}", request_hash_hex);
 
             if let Some(blacklist) = blacklisted_requests {
                 if blacklist.contains(&H256::from_str(&request_hash_hex)?) {
@@ -107,7 +115,7 @@ impl EthereumEventHandler {
             let request_nonce = request_nonce.as_u128();
 
             if not_in_committee(&contract, azero_connection, committee_id).await? {
-                info!("Guardian signature for {request_hash:?} not needed - request from a different committee");
+                info!("Guardian signature for 0x{request_hash_hex} not needed - request from a different committee");
                 return Ok(());
             }
 
@@ -132,7 +140,7 @@ impl EthereumEventHandler {
                     request_nonce,
                 })?;
 
-            info!("Guardian signature for {request_hash:?} no longer needed");
+            info!("Guardian signature for 0x{request_hash_hex} no longer needed");
         }
 
         Ok(())
@@ -205,8 +213,11 @@ impl EthereumEventsHandler {
                     let EthMostEvents {
                         events,
                         events_ack_sender,
+                        from_block,
+                        to_block
                     } = eth_events;
-                    info!("Received a batch of {} events", events.len());
+
+                    info!("Received a batch of {} events from blocks {from_block} to {to_block}", events.len());
 
                     for event in events {
                         select! {
@@ -233,7 +244,6 @@ impl EthereumEventsHandler {
                         .map_err(|_| EthereumEventsHandlerError::EventsAckReceiverDropped)?;
 
                 }
-
             }
         }
     }
