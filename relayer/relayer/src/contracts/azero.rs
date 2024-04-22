@@ -17,7 +17,7 @@ use aleph_client::{
     sp_weights::weight_v2::Weight,
     AccountId, AlephConfig, Connection, SignedConnectionApi, TxInfo, TxStatus,
 };
-use log::{error, trace, info};
+use log::{error, info, trace};
 use subxt::events::Events;
 use thiserror::Error;
 
@@ -140,7 +140,7 @@ impl MostInstance {
         let dry_run_res = match signed_connection.call_and_get(dry_run_args).await?.result {
             Ok(res) => res,
             Err(why) => {
-                error!("Dry run failed: {:?}", why);    
+                error!("Dry run failed: {:?}", why);
                 return Err(AzeroContractError::DispatchError(format!("{:?}", why)));
             }
         };

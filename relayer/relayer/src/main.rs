@@ -139,12 +139,7 @@ async fn create_eth_connections(
 ) -> Result<(Arc<EthConnection>, Arc<SignedEthConnection>), EthConnectionError> {
     let eth_signed_connection = if let Some(cid) = config.signer_cid {
         info!("Creating signed connection using a Signer client");
-        eth::with_signer(
-            eth::connect(config).await,
-            cid,
-            config.signer_port,
-        )
-        .await?
+        eth::with_signer(eth::connect(config).await, cid, config.signer_port).await?
     } else if config.dev {
         let wallet =
             // use the default development mnemonic

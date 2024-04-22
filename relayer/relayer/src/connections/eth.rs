@@ -207,7 +207,9 @@ impl Signer for EthVsockSigner {
 }
 
 pub async fn connect(config: &Config) -> EthConnection {
-    Provider::<Http>::connect(&config.eth_node_http_url).await.interval(Duration::from_secs(config.eth_poll_interval))
+    Provider::<Http>::connect(&config.eth_node_http_url)
+        .await
+        .interval(Duration::from_secs(config.eth_poll_interval))
 }
 
 pub async fn with_local_wallet(
