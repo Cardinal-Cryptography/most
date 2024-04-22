@@ -140,7 +140,7 @@ async fn create_eth_connections(
     let eth_signed_connection = if let Some(cid) = config.signer_cid {
         info!("Creating signed connection using a Signer client");
         eth::with_signer(
-            eth::connect(&config.eth_node_http_url).await,
+            eth::connect(config).await,
             cid,
             config.signer_port,
         )
@@ -157,13 +157,13 @@ async fn create_eth_connections(
             "Creating signed connection using a development key {}",
             &wallet.address()
         );
-        eth::with_local_wallet(eth::connect(&config.eth_node_http_url).await, wallet).await?
+        eth::with_local_wallet(eth::connect(config).await, wallet).await?
     } else {
         panic!("Use dev mode or connect to a signer");
     };
 
     Ok((
-        Arc::new(eth::connect(&config.eth_node_http_url).await),
+        Arc::new(eth::connect(config).await),
         Arc::new(eth_signed_connection),
     ))
 }
