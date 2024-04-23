@@ -156,8 +156,6 @@ pub mod most {
         gas_price_oracle: Option<AccountId>,
         /// Is the bridge in a halted state
         is_halted: bool,
-        /// Wrapped ethereum (azero) address. Necessary to perform bridging weth(azero) -> ether(eth).
-        weth: Option<AccountId>,
     }
 
     #[ink(storage)]
@@ -185,6 +183,8 @@ pub mod most {
         paid_out_member_rewards: Mapping<(AccountId, CommitteeId), u128, ManualKey<0x50414944>>,
         /// committe members can specify a special account for collecting the rewards, different from the one used for signing
         payout_accounts: Mapping<AccountId, AccountId>,
+        /// Wrapped ethereum (azero) address. Necessary to perform bridging weth(azero) -> ether(eth).
+        weth: Lazy<AccountId, ManualKey<0x7CD95FED>>,
     }
 
     #[derive(Debug, PartialEq, Eq, Encode, Decode)]
@@ -276,11 +276,11 @@ pub mod most {
                 base_fee_buffer_percentage,
                 gas_price_oracle,
                 is_halted: true,
-                weth: None,
             });
 
             let mut ownable_data = Lazy::new();
             ownable_data.set(&Ownable2StepData::new(owner));
+            let mut weth = Lazy::new();
 
             Ok(Self {
                 data,
@@ -295,6 +295,7 @@ pub mod most {
                 collected_committee_rewards: Mapping::new(),
                 paid_out_member_rewards: Mapping::new(),
                 payout_accounts: Mapping::new(),
+                weth,
             })
         }
 
@@ -391,7 +392,7 @@ pub mod most {
 
             let mut data = self.data()?;
 
-            let src_token_address = data.weth.ok_or(MostError::UnsupportedPair)?;
+            let src_token_address = self.weth.get().ok_or(MostError::UnsupportedPair)?;
 
             if dest_receiver_address == ETH_ZERO_ADDRESS {
                 return Err(MostError::ZeroAddress);
@@ -871,13 +872,9 @@ pub mod most {
         ///
         /// Can only be called by the contracts owner
         #[ink(message)]
-        pub fn set_weth(&mut self, weth: Option<AccountId>) -> Result<(), MostError> {
+        pub fn set_weth(&mut self, weth_address: AccountId) -> Result<(), MostError> {
             self.ensure_owner()?;
-
-            let mut data = self.data()?;
-            data.weth = weth;
-            self.data.set(&data);
-
+            self.weth.set(&weth_address);
             Ok(())
         }
 
