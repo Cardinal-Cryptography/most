@@ -7,7 +7,7 @@ use std::{
 use aleph_client::{
     contract::{
         event::{translate_events, BlockDetails, ContractEvent},
-        ContractInstance,
+        ContractInstance, ReadonlyCallParams,
     },
     contract_transcode::{
         ContractMessageTranscoder,
@@ -15,6 +15,7 @@ use aleph_client::{
     },
     pallets::contract::{ContractCallArgs, ContractRpc, ContractsUserApi},
     sp_weights::weight_v2::Weight,
+    utility::BlocksApi,
     waiting::BlockStatus,
     AccountId, AlephConfig, Connection, SignedConnectionApi, TxInfo, TxStatus,
 };
@@ -68,7 +69,7 @@ impl AdvisoryInstance {
     ) -> Result<(bool, AccountId), AzeroContractError> {
         match self
             .contract
-            .contract_read0::<bool, _>(connection, "is_emergency")
+            .read0::<bool, _>(connection, "is_emergency", Default::default())
             .await
         {
             Ok(is_emergency) => Ok((is_emergency, self.address.clone())),
@@ -138,7 +139,11 @@ impl MostInstance {
         };
 
         // Dry run to detect potential errors
-        let dry_run_res = match signed_connection.call_and_get(dry_run_args).await?.result {
+        let dry_run_res = match signed_connection
+            .call_and_get(dry_run_args, None)
+            .await?
+            .result
+        {
             Ok(res) => res,
             Err(why) => {
                 return Err(AzeroContractError::DispatchError(format!("{:?}", why)));
@@ -170,7 +175,7 @@ impl MostInstance {
     pub async fn is_halted(&self, connection: &Connection) -> Result<bool, AzeroContractError> {
         Ok(self
             .contract
-            .contract_read0::<Result<bool, _>, _>(connection, "is_halted")
+            .read0::<Result<bool, _>, _>(connection, "is_halted", Default::default())
             .await??)
     }
 
@@ -182,10 +187,16 @@ impl MostInstance {
         committee_id: u128,
         block: BlockStatus,
     ) -> Result<bool, AzeroContractError> {
-        if let
+        let params = match block {
+            BlockStatus::Best => ReadonlyCallParams::new(),
+            BlockStatus::Finalized => {
+                let finalized_hash = connection.get_finalized_block_hash().await?;
+                ReadonlyCallParams::new().at(finalized_hash)
+            }
+        };
         Ok(self
             .contract
-            .contract_read(
+            .read(
                 connection,
                 "needs_signature",
                 &[
@@ -193,6 +204,7 @@ impl MostInstance {
                     account.to_string(),
                     committee_id.to_string(),
                 ],
+                params,
             )
             .await?)
     }
@@ -203,7 +215,7 @@ impl MostInstance {
     ) -> Result<u128, AzeroContractError> {
         Ok(self
             .contract
-            .contract_read0::<Result<u128, _>, _>(connection, "current_committee_id")
+            .read0::<Result<u128, _>, _>(connection, "current_committee_id", Default::default())
             .await??)
     }
 
@@ -215,10 +227,11 @@ impl MostInstance {
     ) -> Result<bool, AzeroContractError> {
         Ok(self
             .contract
-            .contract_read(
+            .read(
                 connection,
                 "is_in_committee",
                 &[committee_id.to_string(), account.to_string()],
+                Default::default(),
             )
             .await?)
     }

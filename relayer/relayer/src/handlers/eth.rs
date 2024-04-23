@@ -17,7 +17,7 @@ use crate::{
     contracts::{AzeroContractError, CrosschainTransferRequestFilter, MostEvents, MostInstance},
     helpers::concat_u8_arrays,
     listeners::EthMostEvents,
-    CircuitBreakerEvent,
+    AccountId, CircuitBreakerEvent,
 };
 
 // Frequency of checking for finality of the transaction
