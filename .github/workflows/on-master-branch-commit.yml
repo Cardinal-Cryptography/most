@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - master
+      - feature/backoff
 
 jobs:
   check-vars-and-secrets:
