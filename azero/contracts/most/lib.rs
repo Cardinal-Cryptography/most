@@ -280,7 +280,7 @@ pub mod most {
 
             let mut ownable_data = Lazy::new();
             ownable_data.set(&Ownable2StepData::new(owner));
-            let mut weth = Lazy::new();
+            let weth = Lazy::new();
 
             Ok(Self {
                 data,
@@ -300,20 +300,13 @@ pub mod most {
         }
 
         // --- business logic
-
-        /// Invoke this tx to initiate funds transfer to the destination chain.
-        ///
-        /// Upon checking basic conditions the contract will burn the `amount` number of `src_token_address` tokens from the caller
-        /// and emit an event which is to be picked up & acted on up by the bridge guardians.
-        #[ink(message, payable)]
-        pub fn send_request(
+        fn _send_request(
             &mut self,
-            src_token_address: [u8; 32],
+            src_token_address: AccountId,
+            dest_token_address: [u8; 32],
             amount: u128,
             dest_receiver_address: [u8; 32],
         ) -> Result<(), MostError> {
-            self.ensure_not_halted()?;
-
             if dest_receiver_address == ETH_ZERO_ADDRESS {
                 return Err(MostError::ZeroAddress);
             }
@@ -321,13 +314,6 @@ pub mod most {
             if amount == 0 {
                 return Err(MostError::ZeroTransferAmount);
             }
-
-            let mut data = self.data()?;
-
-            let dest_token_address = self
-                .supported_pairs
-                .get(src_token_address)
-                .ok_or(MostError::UnsupportedPair)?;
 
             let current_base_fee = self.get_base_fee()?;
             let transferred_fee = self.env().transferred_value();
@@ -339,8 +325,9 @@ pub mod most {
             let sender = self.env().caller();
 
             // burn the psp22 tokens
-            self.burn_from(src_token_address.into(), sender, amount)?;
+            self.burn_from(src_token_address, sender, amount)?;
 
+            let mut data = self.data()?;
             // NOTE: this allows the committee members to take a payout for requests that are not neccessarily finished
             // by that time (no signature threshold reached yet).
             // We could be recording the base fee when the request collects quorum, but it could change in the meantime
@@ -378,6 +365,32 @@ pub mod most {
             Ok(())
         }
 
+        /// Invoke this tx to initiate funds transfer to the destination chain.
+        ///
+        /// Upon checking basic conditions the contract will burn the `amount` number of `src_token_address` tokens from the caller
+        /// and emit an event which is to be picked up & acted on up by the bridge guardians.
+        #[ink(message, payable)]
+        pub fn send_request(
+            &mut self,
+            src_token_address: [u8; 32],
+            amount: u128,
+            dest_receiver_address: [u8; 32],
+        ) -> Result<(), MostError> {
+            self.ensure_not_halted()?;
+
+            let dest_token_address = self
+                .supported_pairs
+                .get(src_token_address)
+                .ok_or(MostError::UnsupportedPair)?;
+
+            self._send_request(
+                src_token_address.into(),
+                dest_token_address,
+                amount,
+                dest_receiver_address,
+            )
+        }
+
         /// Invoke this tx to initiate weth -> ether transfer to the destination chain.
         ///
         /// Upon checking basic conditions the contract will burn the `amount` number of weth tokens from the caller
@@ -390,65 +403,15 @@ pub mod most {
         ) -> Result<(), MostError> {
             self.ensure_not_halted()?;
 
-            let mut data = self.data()?;
-
             let src_token_address = self.weth.get().ok_or(MostError::UnsupportedPair)?;
 
-            if dest_receiver_address == ETH_ZERO_ADDRESS {
-                return Err(MostError::ZeroAddress);
-            }
-
-            if amount == 0 {
-                return Err(MostError::ZeroTransferAmount);
-            }
-
-            let current_base_fee = self.get_base_fee()?;
-            let transferred_fee = self.env().transferred_value();
-
-            if transferred_fee.lt(&current_base_fee) {
-                return Err(MostError::BaseFeeTooLow);
-            }
-
-            let sender = self.env().caller();
-
-            // burn the weth psp22 tokens
-            self.burn_from(src_token_address, sender, amount)?;
-
-            // NOTE: this allows the committee members to take a payout for requests that are not neccessarily finished
-            // by that time (no signature threshold reached yet).
-            // We could be recording the base fee when the request collects quorum, but it could change in the meantime
-            // which is potentially even worse
-            let base_fee_total = self
-                .collected_committee_rewards
-                .get(data.committee_id)
-                .unwrap_or(0)
-                .checked_add(current_base_fee)
-                .ok_or(MostError::Arithmetic)?;
-
-            self.collected_committee_rewards
-                .insert(data.committee_id, &base_fee_total);
-
-            let request_nonce = data.request_nonce;
-            data.request_nonce = request_nonce.checked_add(1).ok_or(MostError::Arithmetic)?;
-
-            self.data.set(&data);
-
-            // return surplus if any
-            if let Some(surplus) = transferred_fee.checked_sub(current_base_fee) {
-                if surplus > 0 {
-                    self.env().transfer(sender, surplus)?;
-                }
-            };
-
-            self.env().emit_event(CrosschainTransferRequest {
-                committee_id: data.committee_id,
-                dest_token_address: [0u8; 32], // zero address indicating ether transfer
+            // ETH_ZERO_ADDRESS as `dest_token_address` indicates native ether transfer
+            self._send_request(
+                src_token_address,
+                ETH_ZERO_ADDRESS,
                 amount,
                 dest_receiver_address,
-                request_nonce,
-            });
-
-            Ok(())
+            )
         }
 
         /// Aggregates request votes cast by guardians and mints/burns tokens
