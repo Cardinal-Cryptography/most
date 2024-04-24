@@ -209,6 +209,7 @@ pub mod most {
         HaltRequired,
         NoMintPermission,
         ZeroAddress,
+        WrappedEthNotSet,
     }
 
     impl From<InkEnvError> for MostError {
@@ -403,7 +404,7 @@ pub mod most {
         ) -> Result<(), MostError> {
             self.ensure_not_halted()?;
 
-            let src_token_address = self.weth.get().ok_or(MostError::UnsupportedPair)?;
+            let src_token_address = self.weth.get().ok_or(MostError::WrappedEthNotSet)?;
 
             // ETH_ZERO_ADDRESS as `dest_token_address` indicates native ether transfer
             self._send_request(
