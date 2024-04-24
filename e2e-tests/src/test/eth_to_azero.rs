@@ -69,10 +69,11 @@ pub async fn eth_to_azero() -> anyhow::Result<()> {
     let azero_account = azero_account_keypair.account_id();
 
     let balance_pre_transfer: u128 = weth_azero
-        .contract_read(
+        .read(
             &azero_connection,
             "PSP22::balance_of",
             &[azero_account.to_string()],
+            Default::default(),
         )
         .await?;
     info!(
@@ -100,10 +101,11 @@ pub async fn eth_to_azero() -> anyhow::Result<()> {
 
     let get_current_balance = || async {
         let balance_current: u128 = weth_azero
-            .contract_read(
+            .read(
                 &azero_connection,
                 "PSP22::balance_of",
                 &[azero_account.to_string()],
+                Default::default(),
             )
             .await?;
         Ok(balance_current)
