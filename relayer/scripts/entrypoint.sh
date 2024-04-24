@@ -125,5 +125,9 @@ if [[ -n "${ETH_POLL_INTERVAL}" ]]; then
   ARGS+=(--eth-poll-interval=${ETH_POLL_INTERVAL})
 fi
 
+if [[ -n "${ETH_MIN_CONFIRMATIONS}" ]]; then
+  ARGS+=(--eth-tx-min-confirmations=${ETH_MIN_CONFIRMATIONS})
+fi
+
 # --- RUN
 xargs most-relayer "${ARGS[@]}"
