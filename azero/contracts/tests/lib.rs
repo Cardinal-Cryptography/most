@@ -277,6 +277,64 @@ mod e2e {
     }
 
     #[ink_e2e::test]
+    fn correct_request_native_ether(mut client: ink_e2e::Client<C, E>) {
+        let (most_address, weth_address) = setup_default_most_and_token(&mut client, true).await;
+
+        let amount_to_send = 1000;
+
+        let base_fee = most_base_fee(&mut client, most_address)
+            .await
+            .expect("should return base fee");
+
+        psp22_approve(
+            &mut client,
+            &alice(),
+            weth_address,
+            most_address,
+            amount_to_send,
+        )
+        .await
+        .expect("approval should succeed");
+
+        most_set_weth(&mut client, &alice(), most_address, weth_address)
+            .await
+            .expect("Setting weth should succeed");
+
+        let send_request_res = most_send_request_native_ether(
+            &mut client,
+            &alice(),
+            most_address,
+            amount_to_send,
+            REMOTE_RECEIVER,
+            base_fee,
+        )
+        .await;
+
+        match send_request_res {
+            Ok(call_res) => {
+                assert_eq!(call_res.events.len(), 4);
+
+                let request_events =
+                    filter_decode_events_as::<CrosschainTransferRequest>(call_res.events);
+
+                // `CrosschainTransferRequest` event
+                assert_eq!(request_events.len(), 1);
+                assert_eq!(
+                    request_events[0],
+                    CrosschainTransferRequest {
+                        committee_id: 0,
+                        dest_token_address: [0u8; 32],
+                        amount: amount_to_send,
+                        dest_receiver_address: REMOTE_RECEIVER,
+                        request_nonce: 0,
+                    }
+                );
+            }
+            Err(e) => panic!("Request should succeed: {:?}", e),
+        }
+    }
+
+    #[ink_e2e::test]
     fn receive_request_can_only_be_called_by_guardians(mut client: ink_e2e::Client<C, E>) {
         let (most_address, token_address) = setup_default_most_and_token(&mut client, false).await;
 
@@ -1250,6 +1308,22 @@ mod e2e {
         .await
     }
 
+    async fn most_set_weth(
+        client: &mut E2EClient,
+        caller: &Keypair,
+        most: AccountId,
+        weth_address: AccountId,
+    ) -> CallResult<(), MostError> {
+        call_message::<MostRef, _, _, _, _>(
+            client,
+            caller,
+            most,
+            |most| most.set_weth(weth_address),
+            None,
+        )
+        .await
+    }
+
     async fn most_send_request(
         client: &mut E2EClient,
         caller: &Keypair,
@@ -1264,6 +1338,24 @@ mod e2e {
             caller,
             most,
             |most| most.send_request(*token.as_ref(), amount, receiver_address),
+            Some(base_fee),
+        )
+        .await
+    }
+
+    async fn most_send_request_native_ether(
+        client: &mut E2EClient,
+        caller: &Keypair,
+        most: AccountId,
+        amount: u128,
+        receiver_address: [u8; 32],
+        base_fee: u128,
+    ) -> CallResult<(), MostError> {
+        call_message::<MostRef, (), _, _, _>(
+            client,
+            caller,
+            most,
+            |most| most.send_request_native_ether(amount, receiver_address),
             Some(base_fee),
         )
         .await
