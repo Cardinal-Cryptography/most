@@ -7,17 +7,16 @@ use std::{
 use aleph_client::{
     contract::{
         event::{translate_events, BlockDetails, ContractEvent},
-        ContractInstance, ReadonlyCallParams,
+        ContractInstance, ExecCallParams, ReadonlyCallParams,
     },
     contract_transcode::{
         ContractMessageTranscoder,
         Value::{self, Seq},
     },
-    pallets::contract::{ContractCallArgs, ContractRpc, ContractsUserApi},
     sp_weights::weight_v2::Weight,
     utility::BlocksApi,
     waiting::BlockStatus,
-    AccountId, AlephConfig, Connection, SignedConnectionApi, TxInfo, TxStatus,
+    AccountId, AlephConfig, Connection, TxInfo,
 };
 use log::{error, trace};
 use subxt::events::Events;
@@ -40,12 +39,6 @@ pub enum AzeroContractError {
 
     #[error("Missing or invalid field")]
     MissingOrInvalidField(String),
-
-    #[error("Dry-run reverted")]
-    DryRunReverted(Result<Value, anyhow::Error>),
-
-    #[error("Dispatch error")]
-    DispatchError(String),
 }
 
 pub struct AdvisoryInstance {
@@ -127,47 +120,11 @@ impl MostInstance {
             bytes32_to_str(&dest_receiver_address),
             request_nonce.to_string(),
         ];
-        let call_data = self.transcoder.encode("receive_request", args)?;
+        let params = ExecCallParams::new().gas_limit(gas_limit);
 
-        let dry_run_args = ContractCallArgs {
-            origin: signed_connection.account_id().clone(),
-            dest: self.address.clone(),
-            value: 0,
-            gas_limit: Some(gas_limit.clone()),
-            storage_deposit_limit: None,
-            input_data: call_data.clone(),
-        };
-
-        // Dry run to detect potential errors
-        let dry_run_res = match signed_connection
-            .call_and_get(dry_run_args, None)
-            .await?
-            .result
-        {
-            Ok(res) => res,
-            Err(why) => {
-                return Err(AzeroContractError::DispatchError(format!("{:?}", why)));
-            }
-        };
-        if dry_run_res.did_revert() {
-            let decoded_value = self
-                .transcoder
-                .decode_return("receive_request", &mut dry_run_res.data.as_ref());
-
-            error!("Dry run reverted: {:?}", decoded_value);
-
-            return Err(AzeroContractError::DryRunReverted(decoded_value));
-        }
-
-        signed_connection
-            .call(
-                self.address.clone(),
-                0,
-                gas_limit,
-                None,
-                call_data,
-                TxStatus::Finalized,
-            )
+        // Exec does dry run first, so there's no need to repeat it here
+        self.contract
+            .exec(signed_connection, "receive_request", &args, params)
             .await
             .map_err(AzeroContractError::AlephClient)
     }
