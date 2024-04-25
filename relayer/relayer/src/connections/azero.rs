@@ -1,6 +1,4 @@
-use std::{
-    sync::{Arc, Mutex as StdMutex},
-};
+use std::sync::{Arc, Mutex as StdMutex};
 
 use aleph_client::{
     sp_runtime::{MultiAddress, MultiSignature},
