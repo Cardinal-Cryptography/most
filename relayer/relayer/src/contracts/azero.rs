@@ -17,7 +17,7 @@ use aleph_client::{
     sp_weights::weight_v2::Weight,
     AccountId, AlephConfig, Connection, SignedConnectionApi, TxInfo, TxStatus,
 };
-use log::{error, trace};
+use log::{error, info, trace};
 use subxt::events::Events;
 use thiserror::Error;
 
@@ -140,6 +140,7 @@ impl MostInstance {
         let dry_run_res = match signed_connection.call_and_get(dry_run_args).await?.result {
             Ok(res) => res,
             Err(why) => {
+                error!("Dry run failed: {:?}", why);
                 return Err(AzeroContractError::DispatchError(format!("{:?}", why)));
             }
         };
@@ -153,7 +154,7 @@ impl MostInstance {
             return Err(AzeroContractError::DryRunReverted(decoded_value));
         }
 
-        signed_connection
+        let call_result = signed_connection
             .call(
                 self.address.clone(),
                 0,
@@ -163,7 +164,9 @@ impl MostInstance {
                 TxStatus::Finalized,
             )
             .await
-            .map_err(AzeroContractError::AlephClient)
+            .map_err(AzeroContractError::AlephClient);
+        info!("receive_request: {:?}", call_result);
+        call_result
     }
 
     pub async fn is_halted(&self, connection: &Connection) -> Result<bool, AzeroContractError> {

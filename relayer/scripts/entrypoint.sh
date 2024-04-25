@@ -117,5 +117,17 @@ if [[ -n "${SIGNER_CID}" ]]; then
   ARGS+=(--signer-cid=${SIGNER_CID})
 fi
 
+if [[ -n "${SYNC_STEP}" ]]; then
+  ARGS+=(--sync-step=${SYNC_STEP})
+fi
+
+if [[ -n "${ETH_POLL_INTERVAL}" ]]; then
+  ARGS+=(--eth-poll-interval=${ETH_POLL_INTERVAL})
+fi
+
+if [[ -n "${ETH_MIN_CONFIRMATIONS}" ]]; then
+  ARGS+=(--eth-tx-min-confirmations=${ETH_MIN_CONFIRMATIONS})
+fi
+
 # --- RUN
 xargs most-relayer "${ARGS[@]}"
