@@ -663,31 +663,6 @@ pub mod most {
             Ok(base_fee)
         }
 
-        #[allow(clippy::too_many_arguments)]
-        #[ink(message)]
-        pub fn set_base_fee_constraints(
-            &mut self,
-            relay_gas_usage: u128,
-            min_gas_price: u128,
-            max_gas_price: u128,
-            default_gas_price: u128,
-            gas_oracle_max_age: u64,
-            oracle_call_gas_limit: u64,
-            base_fee_buffer_percentage: u128,
-        ) -> Result<(), MostError> {
-            self.ensure_owner()?;
-            let mut data = self.data()?;
-            data.relay_gas_usage = relay_gas_usage;
-            data.min_gas_price = min_gas_price;
-            data.max_gas_price = max_gas_price;
-            data.default_gas_price = default_gas_price;
-            data.gas_oracle_max_age = gas_oracle_max_age;
-            data.oracle_call_gas_limit = oracle_call_gas_limit;
-            data.base_fee_buffer_percentage = base_fee_buffer_percentage;
-            self.data.set(&data);
-            Ok(())
-        }
-
         /// Returns whether an account is in the committee with `committee_id`
         #[ink(message)]
         pub fn is_in_committee(&self, committee_id: CommitteeId, account: AccountId) -> bool {
@@ -737,7 +712,54 @@ pub mod most {
             true
         }
 
+        /// Is the bridge halted?
+        #[ink(message)]
+        pub fn is_halted(&self) -> Result<bool, MostError> {
+            Ok(self.data()?.is_halted)
+        }
+
+        /// Returns the status of a given cross-chain transfer request
+        #[ink(message)]
+        pub fn request_status(&self, hashed_request: HashedRequest) -> RequestStatus {
+            if self.processed_requests.contains(hashed_request) {
+                RequestStatus::Processed
+            } else if let Some(Request { signature_count }) =
+                self.pending_requests.get(hashed_request)
+            {
+                RequestStatus::Pending {
+                    collected_signatures: signature_count as u32,
+                }
+            } else {
+                RequestStatus::RequestHashNotKnown
+            }
+        }
+
         // ---  setter txs
+
+        #[allow(clippy::too_many_arguments)]
+        #[ink(message)]
+        pub fn set_base_fee_constraints(
+            &mut self,
+            relay_gas_usage: u128,
+            min_gas_price: u128,
+            max_gas_price: u128,
+            default_gas_price: u128,
+            gas_oracle_max_age: u64,
+            oracle_call_gas_limit: u64,
+            base_fee_buffer_percentage: u128,
+        ) -> Result<(), MostError> {
+            self.ensure_owner()?;
+            let mut data = self.data()?;
+            data.relay_gas_usage = relay_gas_usage;
+            data.min_gas_price = min_gas_price;
+            data.max_gas_price = max_gas_price;
+            data.default_gas_price = default_gas_price;
+            data.gas_oracle_max_age = gas_oracle_max_age;
+            data.oracle_call_gas_limit = oracle_call_gas_limit;
+            data.base_fee_buffer_percentage = base_fee_buffer_percentage;
+            self.data.set(&data);
+            Ok(())
+        }
 
         /// Removes a supported pair from bridging
         ///
@@ -896,28 +918,6 @@ pub mod most {
 
             self.env().transfer(receiver, amount)?;
             Ok(())
-        }
-
-        /// Is the bridge halted?
-        #[ink(message)]
-        pub fn is_halted(&self) -> Result<bool, MostError> {
-            Ok(self.data()?.is_halted)
-        }
-
-        /// Returns the status of a given cross-chain transfer request
-        #[ink(message)]
-        pub fn request_status(&self, hashed_request: HashedRequest) -> RequestStatus {
-            if self.processed_requests.contains(hashed_request) {
-                RequestStatus::Processed
-            } else if let Some(Request { signature_count }) =
-                self.pending_requests.get(hashed_request)
-            {
-                RequestStatus::Pending {
-                    collected_signatures: signature_count as u32,
-                }
-            } else {
-                RequestStatus::RequestHashNotKnown
-            }
         }
 
         // ---  helper functions

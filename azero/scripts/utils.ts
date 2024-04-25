@@ -79,6 +79,10 @@ export function hexToBytes(hex: string): number[] {
   return Array.from(u8array);
 }
 
+export function bytesToHex(bytes: number[]): string {
+  return u8aToHex(new Uint8Array(bytes));
+}
+
 export function accountIdToHex(accountId: string): string {
   return u8aToHex(new Keyring({ type: "sr25519" }).decodeAddress(accountId));
 }
