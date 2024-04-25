@@ -94,7 +94,7 @@ pub struct Config {
     #[arg(long, default_value = "200000")]
     pub eth_gas_limit: u32,
 
-    #[arg(long, default_value = "30")]
+    #[arg(long, default_value = "90")]
     pub eth_poll_interval: u64,
 
     #[arg(long, default_value = "100")]
