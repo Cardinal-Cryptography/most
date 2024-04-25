@@ -94,8 +94,11 @@ async function main(): Promise<void> {
 
   const most = new Most(most_azero, deployer, api);
 
-  for (let [_, eth_address, azero_address] of tokens) {
+  for (let [symbol, eth_address, azero_address] of tokens) {
     await addTokenPair(eth_address, azero_address, most);
+    if (symbol == "wETH") {
+      await most.tx.setWeth(azero_address);
+    }
   }
 
   if (dev) {
