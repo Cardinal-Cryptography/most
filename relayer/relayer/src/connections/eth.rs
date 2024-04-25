@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, time::Duration};
 
 use ethers::{
     abi::Address,
@@ -18,6 +18,8 @@ use ethers::{
 };
 use thiserror::Error;
 use tokio::sync::Mutex;
+
+use crate::config::Config;
 
 pub type EthConnection = Provider<Http>;
 pub type SignedEthConnection =
@@ -204,8 +206,10 @@ impl Signer for EthVsockSigner {
     }
 }
 
-pub async fn connect(url: &str) -> EthConnection {
-    Provider::<Http>::connect(url).await
+pub async fn connect(config: &Config) -> EthConnection {
+    Provider::<Http>::connect(&config.eth_node_http_url)
+        .await
+        .interval(Duration::from_secs(config.eth_poll_interval))
 }
 
 pub async fn with_local_wallet(
