@@ -252,6 +252,8 @@ impl AlephZeroEventsHandler {
         circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
         mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
     ) -> Result<CircuitBreakerEvent, AlephZeroEventsHandlerError> {
+        let mut event_handler_tasks = JoinSet::new();
+
         loop {
             debug!("Ping");
 
@@ -276,7 +278,7 @@ impl AlephZeroEventsHandler {
                     let circuit_breaker_sender = circuit_breaker_sender.clone ();
 
                     // spawn non-blocking task to handle all events w-out blocking the events publisher
-                    tokio::spawn(async move {
+                    event_handler_tasks.spawn(async move {
                         let mut tasks = JoinSet::new();
                         for event in events {
                             // spawn each handler in separate task as it's time consuming
@@ -304,6 +306,10 @@ impl AlephZeroEventsHandler {
                         Ok::<(), AlephZeroEventsHandlerError> (())
                     });
 
+                },
+
+                Some(task_result) = event_handler_tasks.join_next() => {
+                    debug!("Event handler task finished with result {task_result:?}");
                 }
             }
         }
