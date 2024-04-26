@@ -104,14 +104,13 @@ impl RedisManager {
 
                 Ok (last_processed_block_number) = last_processed_block_number_eth.recv() => {
 
-                    let seal_block_number = last_processed_block_number - 1;
-                    info!("Caching {seal_block_number} block number for ethereum");
+                    info!("Caching {last_processed_block_number} block number for ethereum");
 
                     write_block_number(
                         name.clone(),
                         ETH_BLOCK_KEY.to_string(),
                         Arc::clone(&redis_connection),
-                        seal_block_number + 1
+                        last_processed_block_number
                     )?;
                 },
 

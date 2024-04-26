@@ -19,7 +19,7 @@ use crate::{
     config::Config, connections::eth::EthConnection, contracts::Most, CircuitBreakerEvent,
 };
 
-pub const ETH_BLOCK_PROD_TIME_SEC: u64 = 15;
+pub const ETH_BLOCK_PROD_TIME_SEC: u64 = 12;
 
 pub struct EthereumListener;
 
