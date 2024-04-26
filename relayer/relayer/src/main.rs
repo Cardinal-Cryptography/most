@@ -135,6 +135,7 @@ async fn create_azero_connections(
             azero::init(&config.azero_node_wss_url).await,
             keypair,
         )
+        .await?
     } else {
         panic!("Use dev mode or connect to a signer");
     };
