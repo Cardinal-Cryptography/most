@@ -24,3 +24,6 @@ subxt = { workspace = true }
 thiserror = "1.0.48"
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "test-util", "sync"] }
 tracing = { workspace = true, features = ["log", "log-always"] }
+
+[profile.release]
+overflow-checks = true
