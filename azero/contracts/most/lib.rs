@@ -183,6 +183,8 @@ pub mod most {
         paid_out_member_rewards: Mapping<(AccountId, CommitteeId), u128, ManualKey<0x50414944>>,
         /// committe members can specify a special account for collecting the rewards, different from the one used for signing
         payout_accounts: Mapping<AccountId, AccountId>,
+        /// Wrapped ethereum (azero) address. Necessary to perform bridging weth(azero) -> ether(eth).
+        weth: Lazy<AccountId, ManualKey<0x7CD95FED>>,
     }
 
     #[derive(Debug, PartialEq, Eq, Encode, Decode)]
@@ -207,6 +209,7 @@ pub mod most {
         HaltRequired,
         NoMintPermission,
         ZeroAddress,
+        WrappedEthNotSet,
     }
 
     impl From<InkEnvError> for MostError {
@@ -278,6 +281,7 @@ pub mod most {
 
             let mut ownable_data = Lazy::new();
             ownable_data.set(&Ownable2StepData::new(owner));
+            let weth = Lazy::new();
 
             Ok(Self {
                 data,
@@ -292,24 +296,18 @@ pub mod most {
                 collected_committee_rewards: Mapping::new(),
                 paid_out_member_rewards: Mapping::new(),
                 payout_accounts: Mapping::new(),
+                weth,
             })
         }
 
         // --- business logic
-
-        /// Invoke this tx to initiate funds transfer to the destination chain.
-        ///
-        /// Upon checking basic conditions the contract will burn the `amount` number of `src_token_address` tokens from the caller
-        /// and emit an event which is to be picked up & acted on up by the bridge guardians.
-        #[ink(message, payable)]
-        pub fn send_request(
+        fn _send_request(
             &mut self,
-            src_token_address: [u8; 32],
+            src_token_address: AccountId,
+            dest_token_address: [u8; 32],
             amount: u128,
             dest_receiver_address: [u8; 32],
         ) -> Result<(), MostError> {
-            self.ensure_not_halted()?;
-
             if dest_receiver_address == ETH_ZERO_ADDRESS {
                 return Err(MostError::ZeroAddress);
             }
@@ -317,13 +315,6 @@ pub mod most {
             if amount == 0 {
                 return Err(MostError::ZeroTransferAmount);
             }
-
-            let mut data = self.data()?;
-
-            let dest_token_address = self
-                .supported_pairs
-                .get(src_token_address)
-                .ok_or(MostError::UnsupportedPair)?;
 
             let current_base_fee = self.get_base_fee()?;
             let transferred_fee = self.env().transferred_value();
@@ -335,8 +326,9 @@ pub mod most {
             let sender = self.env().caller();
 
             // burn the psp22 tokens
-            self.burn_from(src_token_address.into(), sender, amount)?;
+            self.burn_from(src_token_address, sender, amount)?;
 
+            let mut data = self.data()?;
             // NOTE: this allows the committee members to take a payout for requests that are not neccessarily finished
             // by that time (no signature threshold reached yet).
             // We could be recording the base fee when the request collects quorum, but it could change in the meantime
@@ -372,6 +364,55 @@ pub mod most {
             });
 
             Ok(())
+        }
+
+        /// Invoke this tx to initiate funds transfer to the destination chain.
+        ///
+        /// Upon checking basic conditions the contract will burn the `amount` number of `src_token_address` tokens from the caller
+        /// and emit an event which is to be picked up & acted on up by the bridge guardians.
+        #[ink(message, payable)]
+        pub fn send_request(
+            &mut self,
+            src_token_address: [u8; 32],
+            amount: u128,
+            dest_receiver_address: [u8; 32],
+        ) -> Result<(), MostError> {
+            self.ensure_not_halted()?;
+
+            let dest_token_address = self
+                .supported_pairs
+                .get(src_token_address)
+                .ok_or(MostError::UnsupportedPair)?;
+
+            self._send_request(
+                src_token_address.into(),
+                dest_token_address,
+                amount,
+                dest_receiver_address,
+            )
+        }
+
+        /// Invoke this tx to initiate weth -> ether transfer to the destination chain.
+        ///
+        /// Upon checking basic conditions the contract will burn the `amount` number of weth tokens from the caller
+        /// and emit an event which is to be picked up & acted on up by the bridge guardians.
+        #[ink(message, payable)]
+        pub fn send_request_native_ether(
+            &mut self,
+            amount: u128,
+            dest_receiver_address: [u8; 32],
+        ) -> Result<(), MostError> {
+            self.ensure_not_halted()?;
+
+            let src_token_address = self.weth.get().ok_or(MostError::WrappedEthNotSet)?;
+
+            // ETH_ZERO_ADDRESS as `dest_token_address` indicates native ether transfer
+            self._send_request(
+                src_token_address,
+                ETH_ZERO_ADDRESS,
+                amount,
+                dest_receiver_address,
+            )
         }
 
         /// Aggregates request votes cast by guardians and mints/burns tokens
@@ -794,6 +835,16 @@ pub mod most {
             }
 
             self.supported_pairs.insert(from, &to);
+            Ok(())
+        }
+
+        /// Set weth(azero) psp22 token contract
+        ///
+        /// Can only be called by the contracts owner
+        #[ink(message)]
+        pub fn set_weth(&mut self, weth_address: AccountId) -> Result<(), MostError> {
+            self.ensure_owner()?;
+            self.weth.set(&weth_address);
             Ok(())
         }
 
