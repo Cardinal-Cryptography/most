@@ -201,7 +201,6 @@ async fn main() -> Result<(), RelayerError> {
                     let tock = tick.elapsed();
                     info!("Relayer exited after {tock:?}. ");
 
-                    // if relayed worked for over 60 minutes reset the delay
                     if tock >= MINIMUM_TASK_LENGHT {
                         delay = DEFAULT_BACKOFF_DURATION;
                     } else {
