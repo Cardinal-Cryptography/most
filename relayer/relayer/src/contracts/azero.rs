@@ -18,7 +18,7 @@ use aleph_client::{
     waiting::BlockStatus,
     AccountId, AlephConfig, Connection, TxInfo,
 };
-use log::{error, trace};
+use log::{error, info, trace};
 use subxt::events::Events;
 use thiserror::Error;
 
@@ -126,7 +126,9 @@ impl MostInstance {
         self.contract
             .exec(signed_connection, "receive_request", &args, params)
             .await
-            .map_err(AzeroContractError::AlephClient)
+            .map_err(AzeroContractError::AlephClient);
+        info!("receive_request: {:?}", call_result);
+        call_result
     }
 
     pub async fn is_halted(&self, connection: &Connection) -> Result<bool, AzeroContractError> {
