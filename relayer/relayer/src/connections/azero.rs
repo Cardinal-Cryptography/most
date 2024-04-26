@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex as SyncMutex};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use aleph_client::{
     sp_runtime::{MultiAddress, MultiSignature},
@@ -75,10 +75,22 @@ impl AzeroSigner {
 pub struct AzeroConnectionWithSigner {
     connection: AzeroWsConnection,
     signer: AzeroSigner,
-    nonce: Arc<SyncMutex<u64>>,
+    nonce: AtomicU64,
 }
 
 impl AzeroConnectionWithSigner {
+    async fn new(connection: AzeroWsConnection, signer: AzeroSigner) -> Result<Self, Error> {
+        let nonce = connection
+            .as_client()
+            .tx()
+            .account_nonce(signer.account_id())
+            .await?;
+        Ok(Self {
+            connection,
+            signer,
+            nonce: AtomicU64::new(nonce),
+        })
+    }
     pub async fn with_signer(
         connection: AzeroWsConnection,
         cid: u32,
@@ -86,16 +98,8 @@ impl AzeroConnectionWithSigner {
     ) -> Result<Self, Error> {
         let client = AzeroSignerClient::new(cid, port).await?;
         let signer = AzeroSigner::Signer(client);
-        let nonce = connection
-            .as_client()
-            .tx()
-            .account_nonce(signer.account_id())
-            .await?;
-        Ok(Self {
-            connection,
-            signer,
-            nonce: Arc::new(SyncMutex::new(nonce)),
-        })
+
+        Self::new(connection, signer).await
     }
 
     pub async fn with_keypair(
@@ -103,25 +107,12 @@ impl AzeroConnectionWithSigner {
         keypair: KeyPair,
     ) -> Result<Self, Error> {
         let signer = AzeroSigner::Dev(Box::new(keypair));
-        let nonce = connection
-            .as_client()
-            .tx()
-            .account_nonce(signer.account_id())
-            .await?;
-        Ok(Self {
-            connection,
-            signer,
-            nonce: Arc::new(SyncMutex::new(nonce)),
-        })
+
+        Self::new(connection, signer).await
     }
 
-    fn get_nonce(&self) -> u64 {
-        *self.nonce.lock().unwrap()
-    }
-
-    fn inc_nonce(&self) {
-        let mut nonce = self.nonce.lock().unwrap();
-        *nonce += 1;
+    fn get_and_inc_nonce(&self) -> u64 {
+        self.nonce.fetch_add(1, Ordering::Relaxed)
     }
 }
 
@@ -159,7 +150,7 @@ impl SignedConnectionApi for AzeroConnectionWithSigner {
             .as_connection()
             .as_client()
             .tx()
-            .create_partial_signed_with_nonce(&tx, self.get_nonce(), params)?;
+            .create_partial_signed_with_nonce(&tx, self.get_and_inc_nonce(), params)?;
         let signature = self.signer.sign(&tx.signer_payload()).await?;
         let address = MultiAddress::Id(self.account_id().clone());
         let tx = tx.sign_with_address_and_signature(&address, &signature);
@@ -185,9 +176,6 @@ impl SignedConnectionApi for AzeroConnectionWithSigner {
                 })
             }
         };
-
-        // increment the nonce after success - if we fail we recreate the connection anyway.
-        self.inc_nonce();
 
         debug!(
             "tx with hash {:?} included in block {:?}",
