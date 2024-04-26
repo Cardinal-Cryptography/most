@@ -255,7 +255,8 @@ contract Most is
                 destReceiverAddress
             );
             // return the locked tokens
-            if (_destTokenAddress == wethAddress) {
+            // address(0) indicates bridging native ether
+            if (_destTokenAddress == address(0)) {
                 (bool unwrapSuccess, ) = wethAddress.call(
                     abi.encodeCall(IWETH9.withdraw, (amount))
                 );
