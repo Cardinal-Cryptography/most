@@ -12,8 +12,8 @@ import { ethers } from "ethers";
 const envFile = process.env.AZERO_ENV;
 
 function getTokenAddresses(addresses, tokenName): [string, string] {
-  for (let [_, ethAddress, azeroAddress] of addresses.tokens) {
-    if (tokenName == tokenName) {
+  for (let [_tokenName, ethAddress, azeroAddress] of addresses.tokens) {
+    if (tokenName == _tokenName) {
       return [ethAddress, azeroAddress];
     }
   }
@@ -25,7 +25,7 @@ async function main(): Promise<void> {
   const { ws_node, deployer_seed } = config;
 
   const addresses = await import_azero_addresses();
-  const weth_azero = getTokenAddresses(addresses, "weth")[1];
+  const weth_azero = getTokenAddresses(addresses, "wETH")[1];
 
   const { most: most_azero } = await import_azero_addresses();
 
