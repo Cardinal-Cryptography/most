@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex as StdMutex};
+use std::sync::{Arc, Mutex as SyncMutex};
 
 use aleph_client::{
     sp_runtime::{MultiAddress, MultiSignature},
@@ -75,7 +75,7 @@ impl AzeroSigner {
 pub struct AzeroConnectionWithSigner {
     connection: AzeroWsConnection,
     signer: AzeroSigner,
-    nonce: Arc<StdMutex<u64>>,
+    nonce: Arc<SyncMutex<u64>>,
 }
 
 impl AzeroConnectionWithSigner {
@@ -94,7 +94,7 @@ impl AzeroConnectionWithSigner {
         Ok(Self {
             connection,
             signer,
-            nonce: Arc::new(StdMutex::new(nonce)),
+            nonce: Arc::new(SyncMutex::new(nonce)),
         })
     }
 
@@ -111,7 +111,7 @@ impl AzeroConnectionWithSigner {
         Ok(Self {
             connection,
             signer,
-            nonce: Arc::new(StdMutex::new(nonce)),
+            nonce: Arc::new(SyncMutex::new(nonce)),
         })
     }
 
