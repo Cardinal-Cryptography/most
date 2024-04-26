@@ -32,7 +32,7 @@ pub enum Error {
     Signer(#[from] signer_client::Error),
 
     #[error("Rpc error: {0}")]
-    RPC(#[from] subxt::error::Error),
+    Rpc(#[from] subxt::error::Error),
 }
 
 impl AzeroSignerClient {
