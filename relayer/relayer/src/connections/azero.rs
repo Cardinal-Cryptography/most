@@ -6,7 +6,7 @@ use aleph_client::{
     SignedConnectionApi, TxInfo, TxStatus,
 };
 use anyhow::anyhow;
-use log::{debug, error};
+use log::debug;
 use signer_client::Client;
 use subxt::tx::TxPayload;
 use tokio::sync::Mutex;
