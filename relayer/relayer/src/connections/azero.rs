@@ -26,13 +26,13 @@ struct AzeroSignerClient {
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("Join error: {0}")]
-    JoinError(#[from] tokio::task::JoinError),
+    Join(#[from] tokio::task::JoinError),
 
     #[error("Signer error: {0}")]
-    SignerError(#[from] signer_client::Error),
+    Signer(#[from] signer_client::Error),
 
     #[error("Rpc error: {0}")]
-    RpcError(#[from] subxt::error::Error),
+    RPC(#[from] subxt::error::Error),
 }
 
 impl AzeroSignerClient {
