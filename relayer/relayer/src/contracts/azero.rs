@@ -123,7 +123,8 @@ impl MostInstance {
         let params = ExecCallParams::new().gas_limit(gas_limit);
 
         // Exec does dry run first, so there's no need to repeat it here
-        self.contract
+        let call_result = self
+            .contract
             .exec(signed_connection, "receive_request", &args, params)
             .await
             .map_err(AzeroContractError::AlephClient);
