@@ -3,7 +3,7 @@ members = ["relayer", "signer_client", "signer", "signer_tester"]
 resolver = "2"
 
 [workspace.dependencies]
-aleph_client = { git = "https://github.com/Cardinal-Cryptography/aleph-node", rev = "c3c6d8b37d586b6b050d1e40675dd6b4ab6adcdb" }
+aleph_client = { git = "https://github.com/Cardinal-Cryptography/aleph-node", rev = "268bd7eec6a98843674b7a909cec2c0ca8a8f719" }
 ethers = { version = "2.0.9" }
 subxt = { version = "0.30.1", features = ["substrate-compat"] }
 tokio = { version = "1.36" }
