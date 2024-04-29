@@ -44,6 +44,7 @@ mod handlers;
 mod helpers;
 mod listeners;
 mod redis;
+mod trader;
 
 const DEV_MNEMONIC: &str =
     "harsh master island dirt equip search awesome double turn crush wool grant";
