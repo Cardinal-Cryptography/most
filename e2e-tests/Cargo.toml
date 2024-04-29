@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-aleph_client = { git = "https://github.com/Cardinal-Cryptography/aleph-node/", rev = "268bd7eec6a98843674b7a909cec2c0ca8a8f719" }
+aleph_client = { git = "https://github.com/Cardinal-Cryptography/aleph-node/", rev = "378efabbf831b213fd0ca2838cd9e8b11fbdd013" }
 anyhow = "1.0.80"
 env_logger = "0.11.2"
 ethers = "2.0.13"
