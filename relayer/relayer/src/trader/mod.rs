@@ -25,6 +25,9 @@ use crate::{
     CircuitBreakerEvent,
 };
 
+// trader component will sell the surplus
+pub const AZERO_SURPLUS_LIMIT: u128 = 1_000_000_000_000; // 1 AZERO
+
 #[derive(Debug, Error)]
 #[error(transparent)]
 #[non_exhaustive]
@@ -72,8 +75,17 @@ impl Trader {
             // TODO wrap Azero
             let whoami = azero_connection.account_id();
 
+            let balance = azero_connection
+                .get_free_balance(whoami.to_owned(), None)
+                .await;
 
-            // azero_connection.get_free_balance(account, at)
+            if balance > AZERO_SURPLUS_LIMIT {
+                let surplus = balance.saturating_sub(AZERO_SURPLUS_LIMIT);
+                info!("{whoami} has {surplus} A0 above the set limit of {AZERO_SURPLUS_LIMIT} A0 that will be swapped");
+
+
+
+            }
 
             // TODO swap wAzero to wETH
             // TODO bridge wETH to ETHEREUM

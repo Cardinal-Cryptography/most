@@ -46,6 +46,62 @@ pub enum AzeroContractError {
     DispatchError(String),
 }
 
+pub struct wAzeroInstance {
+    pub contract: ContractInstance,
+    pub address: AccountId,
+    pub transcoder: ContractMessageTranscoder,
+    pub ref_time_limit: u64,
+    pub proof_size_limit: u64,
+}
+
+impl wAzeroInstance {
+    pub fn new(
+        address: &str,
+        metadata_path: &str,
+        ref_time_limit: u64,
+        proof_size_limit: u64,
+    ) -> Result<Self, AzeroContractError> {
+        let address = AccountId::from_str(address)
+            .map_err(|why| AzeroContractError::NotAccountId(why.to_string()))?;
+        Ok(Self {
+            address: address.clone(),
+            contract: ContractInstance::new(address, metadata_path)?,
+            transcoder: ContractMessageTranscoder::load(metadata_path)?,
+            ref_time_limit,
+            proof_size_limit,
+        })
+    }
+
+    // TODO
+    pub async fn deposit(
+        &self,
+        signed_connection: &AzeroConnectionWithSigner,
+        amount: u128,
+    ) -> Result<TxInfo, AzeroContractError> {
+        let gas_limit = Weight {
+            ref_time: self.ref_time_limit,
+            proof_size: self.proof_size_limit,
+        };
+
+        let args: Vec<String> = vec![];
+        let call_data = self.transcoder.encode("WrappedAZERO::deposit", &args)?;
+
+        let call_result = signed_connection
+            .call(
+                self.address.clone(),
+                amount,
+                gas_limit,
+                None,
+                call_data,
+                TxStatus::Finalized,
+            )
+            .await
+            .map_err(AzeroContractError::AlephClient);
+        info!("WrappedAZERO::deposit: {:?}", call_result);
+        call_result
+    }
+}
+
 pub struct AdvisoryInstance {
     pub contract: ContractInstance,
     pub address: AccountId,
@@ -71,25 +127,6 @@ impl AdvisoryInstance {
             .await
         {
             Ok(is_emergency) => Ok((is_emergency, self.address.clone())),
-            Err(why) => Err(AzeroContractError::AlephClient(why)),
-        }
-    }
-
-    pub async fn get_payout_account(
-        &self,
-        connection: &Connection,
-        member_id: AccountId,
-    ) -> Result<Option<AccountId>, AzeroContractError> {
-        match self
-            .contract
-            .contract_read::<Option<AccountId>, _>(
-                connection,
-                "get_payout_account",
-                [member_id.to_string()],
-            )
-            .await
-        {
-            Ok(result) => Ok(result),
             Err(why) => Err(AzeroContractError::AlephClient(why)),
         }
     }
