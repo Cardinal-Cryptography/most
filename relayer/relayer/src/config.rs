@@ -43,11 +43,33 @@ pub struct Config {
     #[arg(long, use_value_delimiter = true, value_delimiter = ',')]
     pub blacklisted_requests: Option<Vec<H256>>,
 
+    /// Whether to include trading component that makes periodic swaps from A0 -> Ethereum
+    #[arg(
+        long,
+        default_value = "false",
+        requires("azero_wrapped_azero_address"),
+        requires("azero_wrapped_ether_address"),
+        requires("eth_wrapped_ether_address")
+    )]
+    pub run_trader_component: bool,
+
     #[arg(long)]
     pub azero_wrapped_azero_address: Option<String>,
 
     #[arg(long, default_value = "../azero/artifacts/wrapped_azero.json")]
-    pub azero_wrapped_azero_metadata: Option<String>,
+    pub azero_wrapped_azero_metadata: String,
+
+    #[arg(long)]
+    pub azero_wrapped_ether_address: Option<String>,
+
+    #[arg(long, default_value = "../azero/artifacts/token.json")]
+    pub azero_wrapped_ether_metadata: String,
+
+    #[arg(long)]
+    pub azero_pair_contract_address: Option<String>,
+
+    #[arg(long, default_value = "../azero/artifacts/pair_contract.json")]
+    pub azero_pair_contract_metadata: String,
 
     #[arg(long, use_value_delimiter = true, value_delimiter = ',')]
     pub advisory_contract_addresses: Option<Vec<String>>,
@@ -81,6 +103,9 @@ pub struct Config {
 
     #[arg(long, default_value = "1")]
     pub default_sync_from_block_azero: SyncFromBlock,
+
+    #[arg(long)]
+    pub eth_wrapped_ether_address: Option<String>,
 
     #[arg(long)]
     pub eth_contract_address: String,

@@ -8,7 +8,7 @@ use aleph_client::{
 };
 use futures::stream::{FuturesOrdered, StreamExt};
 use log::{debug, error, info, warn};
-use subxt::events::Events;
+use subxt::{events::Events, storage::address};
 use thiserror::Error;
 use tokio::{
     select,
@@ -21,7 +21,7 @@ use super::AzeroMostEvents;
 use crate::{
     config::Config,
     connections::azero::{AzeroConnectionWithSigner, AzeroWsConnection},
-    contracts::{AzeroContractError, MostInstance},
+    contracts::{AzeroContractError, MostInstance, WrappedAzeroInstance},
     CircuitBreakerEvent,
 };
 
@@ -39,6 +39,9 @@ pub enum TraderError {
     // BroadcastSend(#[from] broadcast::error::SendError<CircuitBreakerEvent>),
     #[error("broadcast receive error {0}")]
     BroadcastReceive(#[from] broadcast::error::RecvError),
+
+    #[error("missing required arg {0}")]
+    MissingRequired(String),
 }
 
 #[derive(Copy, Clone)]
@@ -56,8 +59,8 @@ impl Trader {
             azero_contract_address,
             azero_ref_time_limit,
             azero_proof_size_limit,
-azero_wrapped_azero_address,
-azero_wrapped_azero_metadata
+            azero_wrapped_azero_address,
+            azero_wrapped_azero_metadata,
             ..
         } = &*config;
         // let mut tasks = JoinSet::new();
@@ -65,6 +68,19 @@ azero_wrapped_azero_metadata
         let most_azero = MostInstance::new(
             azero_contract_address,
             azero_contract_metadata,
+            *azero_ref_time_limit,
+            *azero_proof_size_limit,
+        )?;
+
+        let address = &azero_wrapped_azero_address
+            .clone()
+            .ok_or(TraderError::MissingRequired(
+                "azero_wrapped_azero_address".to_owned(),
+            ))?;
+
+        let wrapped_azero = WrappedAzeroInstance::new(
+            address,
+            azero_wrapped_azero_metadata,
             *azero_ref_time_limit,
             *azero_proof_size_limit,
         )?;

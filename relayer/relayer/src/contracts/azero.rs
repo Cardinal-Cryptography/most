@@ -46,7 +46,7 @@ pub enum AzeroContractError {
     DispatchError(String),
 }
 
-pub struct wAzeroInstance {
+pub struct WrappedAzeroInstance {
     pub contract: ContractInstance,
     pub address: AccountId,
     pub transcoder: ContractMessageTranscoder,
@@ -54,7 +54,7 @@ pub struct wAzeroInstance {
     pub proof_size_limit: u64,
 }
 
-impl wAzeroInstance {
+impl WrappedAzeroInstance {
     pub fn new(
         address: &str,
         metadata_path: &str,
@@ -72,7 +72,6 @@ impl wAzeroInstance {
         })
     }
 
-    // TODO
     pub async fn deposit(
         &self,
         signed_connection: &AzeroConnectionWithSigner,
