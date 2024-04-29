@@ -90,9 +90,7 @@ impl Trader {
         loop {
             debug!("Ping");
 
-            // TODO wrap Azero
             let whoami = azero_connection.account_id();
-
             let balance = azero_connection
                 .get_free_balance(whoami.to_owned(), None)
                 .await;
@@ -101,7 +99,9 @@ impl Trader {
                 let surplus = balance.saturating_sub(AZERO_SURPLUS_LIMIT);
                 info!("{whoami} has {surplus} A0 above the set limit of {AZERO_SURPLUS_LIMIT} A0 that will be swapped");
 
-                // _ =
+                if let Err(why) = wrapped_azero.deposit(azero_connection, surplus).await {
+                    warn!("Failed to wrap {surplus} A0 as wrappedAzero: {why:?}");
+                }
             }
 
             // TODO swap wAzero to wETH
