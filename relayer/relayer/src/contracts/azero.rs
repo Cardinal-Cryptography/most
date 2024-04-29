@@ -74,6 +74,25 @@ impl AdvisoryInstance {
             Err(why) => Err(AzeroContractError::AlephClient(why)),
         }
     }
+
+    pub async fn get_payout_account(
+        &self,
+        connection: &Connection,
+        member_id: AccountId,
+    ) -> Result<Option<AccountId>, AzeroContractError> {
+        match self
+            .contract
+            .contract_read::<Option<AccountId>, _>(
+                connection,
+                "get_payout_account",
+                [member_id.to_string()],
+            )
+            .await
+        {
+            Ok(result) => Ok(result),
+            Err(why) => Err(AzeroContractError::AlephClient(why)),
+        }
+    }
 }
 
 pub struct MostInstance {
