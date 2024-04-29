@@ -1,6 +1,6 @@
 use std::{str::FromStr, sync::Arc};
 
-use aleph_client::{AccountId, AsConnection, SignedConnectionApi};
+use aleph_client::{waiting::BlockStatus, AsConnection, SignedConnectionApi};
 use ethers::{core::types::H256, utils::keccak256};
 use log::{debug, error, info, trace, warn};
 use rustc_hex::FromHexError;
@@ -8,6 +8,7 @@ use thiserror::Error;
 use tokio::{
     select,
     sync::{broadcast, mpsc},
+    time::{sleep, Duration},
 };
 
 use crate::{
@@ -16,8 +17,11 @@ use crate::{
     contracts::{AzeroContractError, CrosschainTransferRequestFilter, MostEvents, MostInstance},
     helpers::concat_u8_arrays,
     listeners::EthMostEvents,
-    CircuitBreakerEvent,
+    AccountId, CircuitBreakerEvent,
 };
+
+// Frequency of checking for finality of the transaction
+const AZERO_WAIT_FOR_FINALITY_CHECK: Duration = Duration::from_millis(1000);
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -108,8 +112,6 @@ impl EthereumEventHandler {
                 config.azero_proof_size_limit,
             )?;
 
-            // send vote
-
             let committee_id = committee_id.as_u128();
             let amount = amount.as_u128();
             let request_nonce = request_nonce.as_u128();
@@ -119,27 +121,53 @@ impl EthereumEventHandler {
                 return Ok(());
             }
 
-            contract
-                .receive_request(
-                    azero_connection,
+            while contract
+                .needs_signature(
+                    azero_connection.as_connection(),
                     request_hash,
+                    azero_connection.account_id().clone(),
                     committee_id,
-                    dest_token_address,
-                    amount,
-                    dest_receiver_address,
-                    request_nonce,
+                    BlockStatus::Finalized,
                 )
-                .await
-                // default AlephClient error is MBs large and useless, dumps the entire runtime for some reason
-                .map_err(|_| EthereumEventHandlerError::ReceiveRequestTxFailure {
-                    request_hash: hex::encode(request_hash),
-                    committee_id,
-                    dest_token_address: hex::encode(dest_token_address),
-                    amount,
-                    dest_receiver_address: hex::encode(dest_receiver_address),
-                    request_nonce,
-                })?;
+                .await?
+            {
+                debug!("Azero: request with nonce {request_nonce} not yet finalized.");
 
+                if !contract
+                    .needs_signature(
+                        azero_connection.as_connection(),
+                        request_hash,
+                        azero_connection.account_id().clone(),
+                        committee_id,
+                        BlockStatus::Best,
+                    )
+                    .await?
+                {
+                    sleep(AZERO_WAIT_FOR_FINALITY_CHECK).await;
+                    continue;
+                }
+                // send vote
+                contract
+                    .receive_request(
+                        azero_connection,
+                        request_hash,
+                        committee_id,
+                        dest_token_address,
+                        amount,
+                        dest_receiver_address,
+                        request_nonce,
+                    )
+                    .await
+                    // default AlephClient error is MBs large and useless, dumps the entire runtime for some reason
+                    .map_err(|_| EthereumEventHandlerError::ReceiveRequestTxFailure {
+                        request_hash: hex::encode(request_hash),
+                        committee_id,
+                        dest_token_address: hex::encode(dest_token_address),
+                        amount,
+                        dest_receiver_address: hex::encode(dest_receiver_address),
+                        request_nonce,
+                    })?;
+            }
             info!("Guardian signature for 0x{request_hash_hex} no longer needed");
         }
 
