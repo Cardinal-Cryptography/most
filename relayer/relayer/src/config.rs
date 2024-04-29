@@ -43,6 +43,12 @@ pub struct Config {
     #[arg(long, use_value_delimiter = true, value_delimiter = ',')]
     pub blacklisted_requests: Option<Vec<H256>>,
 
+    #[arg(long)]
+    pub azero_wrapped_azero_address: Option<String>,
+
+    #[arg(long, default_value = "../azero/artifacts/wrapped_azero.json")]
+    pub azero_wrapped_azero_metadata: Option<String>,
+
     #[arg(long, use_value_delimiter = true, value_delimiter = ',')]
     pub advisory_contract_addresses: Option<Vec<String>>,
 

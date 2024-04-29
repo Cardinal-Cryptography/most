@@ -56,6 +56,8 @@ impl Trader {
             azero_contract_address,
             azero_ref_time_limit,
             azero_proof_size_limit,
+azero_wrapped_azero_address,
+azero_wrapped_azero_metadata
             ..
         } = &*config;
         // let mut tasks = JoinSet::new();
@@ -83,8 +85,7 @@ impl Trader {
                 let surplus = balance.saturating_sub(AZERO_SURPLUS_LIMIT);
                 info!("{whoami} has {surplus} A0 above the set limit of {AZERO_SURPLUS_LIMIT} A0 that will be swapped");
 
-
-
+                // _ =
             }
 
             // TODO swap wAzero to wETH
