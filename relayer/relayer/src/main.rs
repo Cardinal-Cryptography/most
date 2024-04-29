@@ -1,4 +1,8 @@
-use std::{sync::Arc, time::Duration};
+use std::{
+    cmp::min,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use aleph_client::AccountId;
 use clap::Parser;
@@ -43,6 +47,13 @@ mod redis;
 
 const DEV_MNEMONIC: &str =
     "harsh master island dirt equip search awesome double turn crush wool grant";
+
+/// minimum amount of time the relayer should run healthy to reset the backoff duration to the default value
+const MINIMUM_TASK_LENGHT: Duration = Duration::from_millis(600000); // 10 minutes
+/// starting backoff value
+const DEFAULT_BACKOFF_DURATION: Duration = Duration::from_millis(2000); // 2 seconds
+/// maximal backoff value
+const MAX_BACKOFF_DURATION: Duration = Duration::from_millis(600000); // 10 minutes
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -124,6 +135,7 @@ async fn create_azero_connections(
             azero::init(&config.azero_node_wss_url).await,
             keypair,
         )
+        .await?
     } else {
         panic!("Use dev mode or connect to a signer");
     };
@@ -178,17 +190,28 @@ async fn main() -> Result<(), RelayerError> {
     first_run = false;
 
     // wait for all tasks to finish and reboot
-    let delay = Duration::from_secs(2);
+    let mut delay = DEFAULT_BACKOFF_DURATION;
+    let mut tick = Instant::now();
+
     while let Some(result) = tasks.join_next().await {
         match result? {
             Ok(result) => {
                 debug!("One of the core components exited gracefully due to : {result:?}, remaining: {}", &tasks.len());
 
-                // TODO: restart with backoff
                 if tasks.is_empty() {
-                    info!("Relayer exited. Waiting {delay:?} before rebooting.");
+                    let tock = tick.elapsed();
+                    info!("Relayer exited after {tock:?}. ");
+
+                    if tock >= MINIMUM_TASK_LENGHT {
+                        delay = DEFAULT_BACKOFF_DURATION;
+                    } else {
+                        delay = min(MAX_BACKOFF_DURATION, delay + delay / 10);
+                    }
+                    info!("Waiting {delay:?} before rebooting.");
+
                     sleep(delay).await;
                     run_relayer(first_run, &mut tasks, config.clone()).await?;
+                    tick = Instant::now();
                 }
             }
             Err(why) => {

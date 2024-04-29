@@ -1,3 +1,5 @@
+use std::sync::atomic::{AtomicU64, Ordering};
+
 use aleph_client::{
     sp_runtime::{MultiAddress, MultiSignature},
     AccountId, AlephConfig, AsConnection, Connection, KeyPair, Pair, RootConnection,
@@ -24,10 +26,13 @@ struct AzeroSignerClient {
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("Join error: {0}")]
-    JoinError(#[from] tokio::task::JoinError),
+    Join(#[from] tokio::task::JoinError),
 
     #[error("Signer error: {0}")]
-    SignerError(#[from] signer_client::Error),
+    Signer(#[from] signer_client::Error),
+
+    #[error("Rpc error: {0}")]
+    Rpc(#[from] subxt::error::Error),
 }
 
 impl AzeroSignerClient {
@@ -70,9 +75,22 @@ impl AzeroSigner {
 pub struct AzeroConnectionWithSigner {
     connection: AzeroWsConnection,
     signer: AzeroSigner,
+    nonce: AtomicU64,
 }
 
 impl AzeroConnectionWithSigner {
+    async fn new(connection: AzeroWsConnection, signer: AzeroSigner) -> Result<Self, Error> {
+        let nonce = connection
+            .as_client()
+            .tx()
+            .account_nonce(signer.account_id())
+            .await?;
+        Ok(Self {
+            connection,
+            signer,
+            nonce: AtomicU64::new(nonce),
+        })
+    }
     pub async fn with_signer(
         connection: AzeroWsConnection,
         cid: u32,
@@ -80,12 +98,21 @@ impl AzeroConnectionWithSigner {
     ) -> Result<Self, Error> {
         let client = AzeroSignerClient::new(cid, port).await?;
         let signer = AzeroSigner::Signer(client);
-        Ok(Self { connection, signer })
+
+        Self::new(connection, signer).await
     }
 
-    pub fn with_keypair(connection: AzeroWsConnection, keypair: KeyPair) -> Self {
+    pub async fn with_keypair(
+        connection: AzeroWsConnection,
+        keypair: KeyPair,
+    ) -> Result<Self, Error> {
         let signer = AzeroSigner::Dev(Box::new(keypair));
-        Self { connection, signer }
+
+        Self::new(connection, signer).await
+    }
+
+    fn get_and_inc_nonce(&self) -> u64 {
+        self.nonce.fetch_add(1, Ordering::Relaxed)
     }
 }
 
@@ -123,8 +150,7 @@ impl SignedConnectionApi for AzeroConnectionWithSigner {
             .as_connection()
             .as_client()
             .tx()
-            .create_partial_signed(&tx, self.account_id(), params)
-            .await?;
+            .create_partial_signed_with_nonce(&tx, self.get_and_inc_nonce(), params)?;
         let signature = self.signer.sign(&tx.signer_payload()).await?;
         let address = MultiAddress::Id(self.account_id().clone());
         let tx = tx.sign_with_address_and_signature(&address, &signature);
@@ -150,6 +176,7 @@ impl SignedConnectionApi for AzeroConnectionWithSigner {
                 })
             }
         };
+
         debug!(
             "tx with hash {:?} included in block {:?}",
             info.tx_hash, info.block_hash
