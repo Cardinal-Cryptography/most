@@ -1,10 +1,10 @@
-use std::{cmp::min, sync::Arc, time::Duration};
+use std::{cmp::min, str::FromStr, sync::Arc, time::Duration};
 
 use aleph_client::{
     contract::event::{BlockDetails, ContractEvent},
     pallets::system::SystemApi,
     utility::BlocksApi,
-    AlephConfig, AsConnection, Connection, SignedConnectionApi,
+    AccountId, AlephConfig, AsConnection, Connection, SignedConnectionApi,
 };
 use futures::stream::{FuturesOrdered, StreamExt};
 use log::{debug, error, info, warn};
@@ -21,7 +21,7 @@ use super::AzeroMostEvents;
 use crate::{
     config::Config,
     connections::azero::{AzeroConnectionWithSigner, AzeroWsConnection},
-    contracts::{AzeroContractError, MostInstance, WrappedAzeroInstance},
+    contracts::{AzeroContractError, MostInstance, RouterInstance},
     CircuitBreakerEvent,
 };
 
@@ -42,6 +42,9 @@ pub enum TraderError {
 
     #[error("missing required arg {0}")]
     MissingRequired(String),
+
+    #[error("flabbergasted {0}")]
+    Unexpected(String),
 }
 
 #[derive(Copy, Clone)]
@@ -59,11 +62,13 @@ impl Trader {
             azero_contract_address,
             azero_ref_time_limit,
             azero_proof_size_limit,
+            router_address,
+            router_metadata,
             azero_wrapped_azero_address,
-            azero_wrapped_azero_metadata,
+            azero_ether_address,
+            eth_wrapped_ether_address,
             ..
         } = &*config;
-        // let mut tasks = JoinSet::new();
 
         let most_azero = MostInstance::new(
             azero_contract_address,
@@ -72,15 +77,13 @@ impl Trader {
             *azero_proof_size_limit,
         )?;
 
-        let address = &azero_wrapped_azero_address
-            .clone()
-            .ok_or(TraderError::MissingRequired(
-                "azero_wrapped_azero_address".to_owned(),
-            ))?;
+        let router_address = &router_address.clone().ok_or(TraderError::MissingRequired(
+            "azero_wrapped_azero_address".to_owned(),
+        ))?;
 
-        let wrapped_azero = WrappedAzeroInstance::new(
-            address,
-            azero_wrapped_azero_metadata,
+        let router = RouterInstance::new(
+            router_address,
+            router_metadata,
             *azero_ref_time_limit,
             *azero_proof_size_limit,
         )?;
@@ -91,21 +94,83 @@ impl Trader {
             debug!("Ping");
 
             let whoami = azero_connection.account_id();
-            let balance = azero_connection
+            let azero_balance = azero_connection
                 .get_free_balance(whoami.to_owned(), None)
                 .await;
 
-            if balance > AZERO_SURPLUS_LIMIT {
-                let surplus = balance.saturating_sub(AZERO_SURPLUS_LIMIT);
+            // check Azero balance
+            if azero_balance > AZERO_SURPLUS_LIMIT {
+                let surplus = azero_balance.saturating_sub(AZERO_SURPLUS_LIMIT);
                 info!("{whoami} has {surplus} A0 above the set limit of {AZERO_SURPLUS_LIMIT} A0 that will be swapped");
 
-                if let Err(why) = wrapped_azero.deposit(azero_connection, surplus).await {
-                    warn!("Failed to wrap {surplus} A0 as wrappedAzero: {why:?}");
-                }
+                let path0 =
+                    azero_wrapped_azero_address
+                        .clone()
+                        .ok_or(TraderError::MissingRequired(
+                            "azero_wrapped_azero_address".to_owned(),
+                        ))?;
+                let path1 = azero_ether_address
+                    .clone()
+                    .ok_or(TraderError::MissingRequired(
+                        "azero_ether_address".to_owned(),
+                    ))?;
+
+                let amounts_out = match router
+                    .calculate_amounts_out(
+                        azero_connection.as_connection(),
+                        surplus,
+                        &[
+                            AccountId::from_str(&path0)
+                                .map_err(|err| TraderError::Unexpected(err.to_owned()))?,
+                            AccountId::from_str(&path1)
+                                .map_err(|err| TraderError::Unexpected(err.to_owned()))?,
+                        ],
+                    )
+                    .await
+                {
+                    Ok(amounts) => amounts,
+                    Err(why) => {
+                        warn!("Cannot calculate amounts_out: {why:?}");
+                        continue;
+                    }
+                };
+
+                let weth_amount_out = match amounts_out.last() {
+                    Some(_) => todo!(),
+                    None => {
+                        warn!("Query returned an empty result");
+                        continue;
+                    }
+                };
+
+                // 0.5 percent slippage
+                let min_weth_amount_out = weth_amount_out.saturating_mul(995).saturating_div(1000);
+
+                // fn swap_exact_native_for_tokens(
+                //     &mut self,
+                //     amount_out_min: u128,
+                //     path: Vec<AccountId>,
+                //     to: AccountId,
+                //     deadline: u64,
+                // )
+
+                // if let Err(why) = wrapped_azero.deposit(azero_connection, surplus).await {
+                //     warn!("Failed to wrap {surplus} A0 as wrappedAzero: {why:?}");
+                // }
             }
 
-            // TODO swap wAzero to wETH
+            // check wAzero balance
+            // let wazero_balance = wrapped_azero
+            //     .balance_of(azero_connection.as_connection(), whoami.to_owned())
+            //     .await?;
+
+            // TODO approve
+            // TODO swap all wAzero to wETH
+
+            // swap_exact_native_for_tokens
+
             // TODO bridge wETH to ETHEREUM
+
             // TODO unwrap 0xWETH -> ETH
 
             // select! {

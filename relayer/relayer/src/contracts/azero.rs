@@ -46,7 +46,7 @@ pub enum AzeroContractError {
     DispatchError(String),
 }
 
-pub struct WrappedAzeroInstance {
+pub struct RouterInstance {
     pub contract: ContractInstance,
     pub address: AccountId,
     pub transcoder: ContractMessageTranscoder,
@@ -54,7 +54,7 @@ pub struct WrappedAzeroInstance {
     pub proof_size_limit: u64,
 }
 
-impl WrappedAzeroInstance {
+impl RouterInstance {
     pub fn new(
         address: &str,
         metadata_path: &str,
@@ -72,32 +72,56 @@ impl WrappedAzeroInstance {
         })
     }
 
-    pub async fn deposit(
+    pub async fn calculate_amounts_out(
         &self,
-        signed_connection: &AzeroConnectionWithSigner,
-        amount: u128,
-    ) -> Result<TxInfo, AzeroContractError> {
-        let gas_limit = Weight {
-            ref_time: self.ref_time_limit,
-            proof_size: self.proof_size_limit,
-        };
+        connection: &Connection,
+        amount_in: u128,
+        path: &[AccountId],
+    ) -> Result<Vec<u128>, AzeroContractError> {
+        let mut coll: String = "[ ".to_owned();
+        for i in 0..path.len() - 1 {
+            coll.push_str(&path[i].to_string());
+            if i < (path.len() - 1) {
+                coll.push(',')
+            }
+        }
+        coll.push(',');
 
-        let args: Vec<String> = vec![];
-        let call_data = self.transcoder.encode("WrappedAZERO::deposit", &args)?;
-
-        let call_result = signed_connection
-            .call(
-                self.address.clone(),
-                amount,
-                gas_limit,
-                None,
-                call_data,
-                TxStatus::Finalized,
+        Ok(self
+            .contract
+            .contract_read(
+                connection,
+                "calculate_amounts_out",
+                &[amount_in.to_string(), coll],
             )
-            .await
-            .map_err(AzeroContractError::AlephClient);
-        info!("WrappedAZERO::deposit: {:?}", call_result);
-        call_result
+            .await?)
+    }
+}
+
+pub struct AzeroEtherInstance {
+    pub contract: ContractInstance,
+    pub address: AccountId,
+}
+
+impl AzeroEtherInstance {
+    pub fn new(address: &str, metadata_path: &str) -> Result<Self, AzeroContractError> {
+        let address = AccountId::from_str(address)
+            .map_err(|why| AzeroContractError::NotAccountId(why.to_string()))?;
+        Ok(Self {
+            address: address.clone(),
+            contract: ContractInstance::new(address, metadata_path)?,
+        })
+    }
+
+    pub async fn balance_of(
+        &self,
+        connection: &Connection,
+        owner: AccountId,
+    ) -> Result<u128, AzeroContractError> {
+        Ok(self
+            .contract
+            .contract_read(connection, "PSP22::balance_of", &[owner.to_string()])
+            .await?)
     }
 }
 

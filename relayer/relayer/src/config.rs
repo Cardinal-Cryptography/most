@@ -47,30 +47,31 @@ pub struct Config {
     #[arg(
         long,
         default_value = "false",
+        requires("router_address"),
         requires("azero_wrapped_azero_address"),
-        requires("azero_wrapped_ether_address"),
+        requires("azero_ether_address"),
         requires("eth_wrapped_ether_address")
     )]
     pub run_trader_component: bool,
 
     #[arg(long)]
-    pub azero_wrapped_azero_address: Option<String>,
+    pub router_address: Option<String>,
 
-    #[arg(long, default_value = "../azero/artifacts/wrapped_azero.json")]
-    pub azero_wrapped_azero_metadata: String,
+    #[arg(long, default_value = "../azero/artifacts/router_contract.json")]
+    pub router_metadata: String,
 
+    /// Ethereum PSP22 token on the AlephZero
     #[arg(long)]
-    pub azero_wrapped_ether_address: Option<String>,
+    pub azero_ether_address: Option<String>,
 
     #[arg(long, default_value = "../azero/artifacts/token.json")]
-    pub azero_wrapped_ether_metadata: String,
+    pub azero_ether_metadata: String,
 
     #[arg(long)]
-    pub azero_pair_contract_address: Option<String>,
+    pub azero_wrapped_azero_address: Option<String>,
 
-    #[arg(long, default_value = "../azero/artifacts/pair_contract.json")]
-    pub azero_pair_contract_metadata: String,
-
+    // #[arg(long, default_value = "../azero/artifacts/pair_contract.json")]
+    // pub azero_pair_contract_metadata: String,
     #[arg(long, use_value_delimiter = true, value_delimiter = ',')]
     pub advisory_contract_addresses: Option<Vec<String>>,
 
