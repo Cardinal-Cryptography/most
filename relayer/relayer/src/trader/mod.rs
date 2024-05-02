@@ -229,18 +229,17 @@ impl Trader {
                         if let Err(why) = wrapped_ether
                             .withdraw(wrapped_ether_balance)
                             .block(BlockNumber::Finalized)
-                            .await
-                        {
-                            warn!("Unwrapping WETH failed : {why:?}");
-                            continue;
-                        }
+                            .await {
+                                warn!("Unwrapping WETH failed : {why:?}");
+                                continue;
+                            }
                     }
 
                     sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
                 }
 
             } => {
-                 Err(TraderError::Unexpected)
+                Err(TraderError::Unexpected)
             }
 
         }
