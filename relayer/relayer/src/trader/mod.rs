@@ -25,8 +25,8 @@ use tokio::{
 use super::AzeroMostEvents;
 use crate::{
     config::Config,
-    connections::azero::{AzeroConnectionWithSigner, AzeroWsConnection},
-    contracts::{AzeroContractError, MostInstance, RouterInstance},
+    connections::azero::{self, AzeroConnectionWithSigner, AzeroWsConnection},
+    contracts::{AzeroContractError, AzeroEtherInstance, MostInstance, RouterInstance},
     CircuitBreakerEvent,
 };
 
@@ -72,6 +72,7 @@ impl Trader {
             router_metadata,
             azero_wrapped_azero_address,
             azero_ether_address,
+            azero_ether_metadata,
             eth_wrapped_ether_address,
             ..
         } = &*config;
@@ -83,15 +84,22 @@ impl Trader {
             *azero_proof_size_limit,
         )?;
 
-        let router_address = &router_address.clone().ok_or(TraderError::MissingRequired(
-            "azero_wrapped_azero_address".to_owned(),
-        ))?;
-
         let router = RouterInstance::new(
-            router_address,
+            &router_address.clone().ok_or(TraderError::MissingRequired(
+                "azero_wrapped_azero_address".to_owned(),
+            ))?,
             router_metadata,
             *azero_ref_time_limit,
             *azero_proof_size_limit,
+        )?;
+
+        let azero_ether = AzeroEtherInstance::new(
+            &azero_ether_address
+                .clone()
+                .ok_or(TraderError::MissingRequired(
+                    "azero ether_address".to_owned(),
+                ))?,
+            azero_ether_metadata,
         )?;
 
         info!("Starting");
@@ -163,8 +171,11 @@ impl Trader {
             }
 
             // check azero Eth balance
+            let azero_eth_balance = azero_ether
+                .balance_of(azero_connection.as_connection(), whoami.clone())
+                .await?;
 
-            // TODO bridge wETH to ETHEREUM
+            // TODO bridge A0ETH to ETHEREUM
 
             // TODO unwrap 0xWETH -> ETH
         }

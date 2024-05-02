@@ -70,8 +70,6 @@ pub struct Config {
     #[arg(long)]
     pub azero_wrapped_azero_address: Option<String>,
 
-    // #[arg(long, default_value = "../azero/artifacts/pair_contract.json")]
-    // pub azero_pair_contract_metadata: String,
     #[arg(long, use_value_delimiter = true, value_delimiter = ',')]
     pub advisory_contract_addresses: Option<Vec<String>>,
 
