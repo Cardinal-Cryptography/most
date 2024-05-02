@@ -18,7 +18,7 @@ use aleph_client::{
     waiting::BlockStatus,
     AccountId, AlephConfig, Connection, TxInfo,
 };
-use log::{debug, error, info, trace};
+use log::{debug, error, trace};
 use subxt::events::Events;
 use thiserror::Error;
 
@@ -88,22 +88,19 @@ impl RouterInstance {
             to.to_string(),
             deadline.to_string(),
         ];
-        let call_data = self
-            .transcoder
-            .encode("Router::swap_exact_native_for_tokens", &args)?;
 
-        let call_result = signed_connection
-            .call(
-                self.address.clone(),
-                amount_in,
-                gas_limit,
-                None,
-                call_data,
-                TxStatus::Finalized,
+        let params = ExecCallParams::new().gas_limit(gas_limit);
+        let call_result = self
+            .contract
+            .exec(
+                signed_connection,
+                "Router::swap_exact_native_for_tokens",
+                &args,
+                params,
             )
             .await
             .map_err(AzeroContractError::AlephClient);
-        debug!("swap_exact_native_for_tokens: {:?}", call_result);
+        debug!("receive_request: {:?}", call_result);
         call_result
     }
 
@@ -116,12 +113,13 @@ impl RouterInstance {
         let path_encoding = self.encode_vec(path);
         Ok(self
             .contract
-            .contract_read::<_, Result<Vec<u128>, _>, _>(
+            .read(
                 connection,
                 "Router::get_amounts_out",
                 &[amount_in.to_string(), path_encoding],
+                Default::default(),
             )
-            .await??)
+            .await?)
     }
 
     fn encode_vec<T>(&self, coll: &[T]) -> String
@@ -162,7 +160,12 @@ impl AzeroEtherInstance {
     ) -> Result<u128, AzeroContractError> {
         Ok(self
             .contract
-            .contract_read(connection, "PSP22::balance_of", &[owner.to_string()])
+            .read(
+                connection,
+                "PSP22::balance_of",
+                &[owner.to_string()],
+                Default::default(),
+            )
             .await?)
     }
 }
@@ -239,20 +242,16 @@ impl MostInstance {
             amount.to_string(),
             bytes32_to_str(&dest_receiver_address),
         ];
-        let call_data = self.transcoder.encode("send_request", args)?;
 
-        let call_result = signed_connection
-            .call(
-                self.address.clone(),
-                0,
-                gas_limit,
-                None,
-                call_data,
-                TxStatus::Finalized,
-            )
+        let params = ExecCallParams::new().gas_limit(gas_limit);
+
+        // Exec does dry run first, so there's no need to repeat it here
+        let call_result = self
+            .contract
+            .exec(signed_connection, "send_request", &args, params)
             .await
             .map_err(AzeroContractError::AlephClient);
-        debug!("send_request: {:?}", call_result);
+        debug!("receive_request: {:?}", call_result);
         call_result
     }
 
@@ -287,7 +286,7 @@ impl MostInstance {
             .exec(signed_connection, "receive_request", &args, params)
             .await
             .map_err(AzeroContractError::AlephClient);
-        info!("receive_request: {:?}", call_result);
+        debug!("receive_request: {:?}", call_result);
         call_result
     }
 
