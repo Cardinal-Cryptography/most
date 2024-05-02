@@ -112,6 +112,7 @@ impl RouterInstance {
         call_result
     }
 
+    // TODO
     pub async fn get_amounts_out(
         &self,
         connection: &Connection,
@@ -120,14 +121,23 @@ impl RouterInstance {
     ) -> Result<Vec<u128>, AzeroContractError> {
         let path_encoding = self.encode_vec(path);
 
+        // Ok(self
+        //     .contract
+        //     .contract_read(
+        //         connection,
+        //         "Router::get_amounts_out",
+        //         &[amount_in.to_string(), path_encoding],
+        //     )
+        //     .await?)
+
         Ok(self
             .contract
-            .contract_read(
+            .contract_read::<_, Result<Vec<u128>, _>, _>(
                 connection,
                 "Router::get_amounts_out",
                 &[amount_in.to_string(), path_encoding],
             )
-            .await?)
+            .await??)
     }
 
     fn encode_vec<T>(&self, coll: &[T]) -> String
