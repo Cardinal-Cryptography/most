@@ -17,7 +17,7 @@ use aleph_client::{
     sp_weights::weight_v2::Weight,
     AccountId, AlephConfig, Connection, SignedConnectionApi, TxInfo, TxStatus,
 };
-use log::{error, info, trace};
+use log::{debug, error, info, trace};
 use subxt::events::Events;
 use thiserror::Error;
 
@@ -72,29 +72,79 @@ impl RouterInstance {
         })
     }
 
+    // TODOs
+    pub async fn swap_exact_native_for_tokens(
+        &self,
+        signed_connection: &AzeroConnectionWithSigner,
+        amount_in: u128,
+        amount_out_min: u128,
+        path: &[AccountId],
+        to: AccountId,
+        deadline: u64,
+    ) -> Result<TxInfo, AzeroContractError> {
+        let gas_limit = Weight {
+            ref_time: self.ref_time_limit,
+            proof_size: self.proof_size_limit,
+        };
+
+        let path_encoding = self.encode_vec(path);
+        let args: Vec<String> = vec![
+            amount_out_min.to_string(),
+            path_encoding,
+            to.to_string(),
+            deadline.to_string(),
+        ];
+        let call_data = self
+            .transcoder
+            .encode("swap_exact_native_for_tokens", &args)?;
+
+        let call_result = signed_connection
+            .call(
+                self.address.clone(),
+                amount_in,
+                gas_limit,
+                None,
+                call_data,
+                TxStatus::Finalized,
+            )
+            .await
+            .map_err(AzeroContractError::AlephClient);
+        debug!("swap_exact_native_for_tokens: {:?}", call_result);
+        call_result
+    }
+
     pub async fn calculate_amounts_out(
         &self,
         connection: &Connection,
         amount_in: u128,
         path: &[AccountId],
     ) -> Result<Vec<u128>, AzeroContractError> {
-        let mut coll: String = "[ ".to_owned();
-        for i in 0..path.len() - 1 {
-            coll.push_str(&path[i].to_string());
-            if i < (path.len() - 1) {
-                coll.push(',')
-            }
-        }
-        coll.push(',');
+        let path_encoding = self.encode_vec(path);
 
         Ok(self
             .contract
             .contract_read(
                 connection,
                 "calculate_amounts_out",
-                &[amount_in.to_string(), coll],
+                &[amount_in.to_string(), path_encoding],
             )
             .await?)
+    }
+
+    fn encode_vec<T>(&self, coll: &[T]) -> String
+    where
+        T: ToString,
+    {
+        let mut encoding: String = "[".to_owned();
+        for i in 0..coll.len() - 1 {
+            encoding.push_str(&coll[i].to_string());
+            if i < (coll.len() - 1) {
+                encoding.push(',')
+            }
+        }
+        encoding.push_str("]");
+
+        encoding
     }
 }
 
