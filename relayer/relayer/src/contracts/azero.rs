@@ -120,16 +120,6 @@ impl RouterInstance {
         path: &[AccountId],
     ) -> Result<Vec<u128>, AzeroContractError> {
         let path_encoding = self.encode_vec(path);
-
-        // Ok(self
-        //     .contract
-        //     .contract_read(
-        //         connection,
-        //         "Router::get_amounts_out",
-        //         &[amount_in.to_string(), path_encoding],
-        //     )
-        //     .await?)
-
         Ok(self
             .contract
             .contract_read::<_, Result<Vec<u128>, _>, _>(
