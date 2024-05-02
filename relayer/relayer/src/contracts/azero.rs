@@ -72,7 +72,6 @@ impl RouterInstance {
         })
     }
 
-    // TODOs
     pub async fn swap_exact_native_for_tokens(
         &self,
         signed_connection: &AzeroConnectionWithSigner,
@@ -113,7 +112,7 @@ impl RouterInstance {
         call_result
     }
 
-    pub async fn calculate_amounts_out(
+    pub async fn get_amounts_out(
         &self,
         connection: &Connection,
         amount_in: u128,
@@ -125,7 +124,7 @@ impl RouterInstance {
             .contract
             .contract_read(
                 connection,
-                "calculate_amounts_out",
+                "get_amounts_out",
                 &[amount_in.to_string(), path_encoding],
             )
             .await?)
@@ -142,7 +141,7 @@ impl RouterInstance {
                 encoding.push(',')
             }
         }
-        encoding.push_str("]");
+        encoding.push(']');
 
         encoding
     }

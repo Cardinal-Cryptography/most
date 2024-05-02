@@ -1,4 +1,9 @@
-use std::{cmp::min, str::FromStr, sync::Arc, time::Duration};
+use std::{
+    cmp::min,
+    str::FromStr,
+    sync::Arc,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
 use aleph_client::{
     contract::event::{BlockDetails, ContractEvent},
@@ -32,18 +37,19 @@ pub const AZERO_SURPLUS_LIMIT: u128 = 1_000_000_000_000; // 1 AZERO
 #[error(transparent)]
 #[non_exhaustive]
 pub enum TraderError {
+    #[error("AlephClient error {0}")]
+    AlephClient(#[from] anyhow::Error),
+
     #[error("Azero contract error {0}")]
     AzeroContract(#[from] AzeroContractError),
 
-    // #[error("broadcast send error")]
-    // BroadcastSend(#[from] broadcast::error::SendError<CircuitBreakerEvent>),
-    #[error("broadcast receive error {0}")]
+    #[error("Broadcast receive error {0}")]
     BroadcastReceive(#[from] broadcast::error::RecvError),
 
-    #[error("missing required arg {0}")]
+    #[error("Missing required arg {0}")]
     MissingRequired(String),
 
-    #[error("flabbergasted {0}")]
+    #[error("Flabbergasted {0}")]
     Unexpected(String),
 }
 
@@ -54,7 +60,7 @@ impl Trader {
     pub async fn run(
         config: Arc<Config>,
         azero_connection: &AzeroConnectionWithSigner,
-        circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
+        // circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
         mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
     ) -> Result<CircuitBreakerEvent, TraderError> {
         let Config {
@@ -103,29 +109,21 @@ impl Trader {
                 let surplus = azero_balance.saturating_sub(AZERO_SURPLUS_LIMIT);
                 info!("{whoami} has {surplus} A0 above the set limit of {AZERO_SURPLUS_LIMIT} A0 that will be swapped");
 
-                let path0 =
-                    azero_wrapped_azero_address
-                        .clone()
-                        .ok_or(TraderError::MissingRequired(
-                            "azero_wrapped_azero_address".to_owned(),
-                        ))?;
-                let path1 = azero_ether_address
-                    .clone()
-                    .ok_or(TraderError::MissingRequired(
-                        "azero_ether_address".to_owned(),
-                    ))?;
+                let wrapped_azero_address =
+                    AccountId::from_str(&azero_wrapped_azero_address.clone().ok_or(
+                        TraderError::MissingRequired("azero_wrapped_azero_address".to_owned()),
+                    )?)
+                    .map_err(|err| TraderError::Unexpected(err.to_owned()))?;
+
+                let azero_ether_address = AccountId::from_str(&azero_ether_address.clone().ok_or(
+                    TraderError::MissingRequired("azero_ether_address".to_owned()),
+                )?)
+                .map_err(|err| TraderError::Unexpected(err.to_owned()))?;
+
+                let path = [wrapped_azero_address.clone(), azero_ether_address.clone()];
 
                 let amounts_out = match router
-                    .calculate_amounts_out(
-                        azero_connection.as_connection(),
-                        surplus,
-                        &[
-                            AccountId::from_str(&path0)
-                                .map_err(|err| TraderError::Unexpected(err.to_owned()))?,
-                            AccountId::from_str(&path1)
-                                .map_err(|err| TraderError::Unexpected(err.to_owned()))?,
-                        ],
-                    )
+                    .get_amounts_out(azero_connection.as_connection(), surplus, &path)
                     .await
                 {
                     Ok(amounts) => amounts,
@@ -135,51 +133,40 @@ impl Trader {
                     }
                 };
 
-                let weth_amount_out = match amounts_out.last() {
-                    Some(_) => todo!(),
+                let min_weth_amount_out = match amounts_out.last() {
+                    Some(amount) => amount.saturating_mul(995).saturating_div(1000), // 0.5 percent slippage
                     None => {
-                        warn!("Query returned an empty result");
+                        warn!("Query to `calculate_amounts_out` returned an empty result");
                         continue;
                     }
                 };
 
-                // 0.5 percent slippage
-                let min_weth_amount_out = weth_amount_out.saturating_mul(995).saturating_div(1000);
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("unix timestamp")
+                    .as_millis();
 
-                // fn swap_exact_native_for_tokens(
-                //     &mut self,
-                //     amount_out_min: u128,
-                //     path: Vec<AccountId>,
-                //     to: AccountId,
-                //     deadline: u64,
-                // )
-
-                // if let Err(why) = wrapped_azero.deposit(azero_connection, surplus).await {
-                //     warn!("Failed to wrap {surplus} A0 as wrappedAzero: {why:?}");
-                // }
+                if let Err(why) = router
+                    .swap_exact_native_for_tokens(
+                        azero_connection,
+                        surplus,
+                        min_weth_amount_out,
+                        &path,
+                        whoami.clone(),
+                        now.saturating_add(3600000) as u64, // one hour
+                    )
+                    .await
+                {
+                    warn!("Could not perform the swap: {why:?}");
+                    continue;
+                }
             }
 
-            // check wAzero balance
-            // let wazero_balance = wrapped_azero
-            //     .balance_of(azero_connection.as_connection(), whoami.to_owned())
-            //     .await?;
-
-            // TODO approve
-            // TODO swap all wAzero to wETH
-
-            // swap_exact_native_for_tokens
+            // check azero Eth balance
 
             // TODO bridge wETH to ETHEREUM
 
             // TODO unwrap 0xWETH -> ETH
-
-            // select! {
-            //     cb_event = circuit_breaker_receiver.recv () => {
-            //         warn!("Exiting due to a circuit breaker event {cb_event:?}");
-            //         return Ok(cb_event?);
-            //     },
-
-            // }
         }
     }
 }
