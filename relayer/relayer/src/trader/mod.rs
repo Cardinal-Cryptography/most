@@ -219,7 +219,7 @@ impl Trader {
                         }
 
                     } else {
-                        info!("{whoami_azero} has a balance of: {azero_eth_balance} Azero ETH that is too low to be bridged.");
+                        info!("{whoami_azero} has a balance of: {azero_eth_balance} Azero ETH (too low to be bridged).");
                     }
 
                     // check 0xwETH balance
