@@ -1,6 +1,10 @@
 use std::str::FromStr;
 
-use aleph_client::{contract::ContractInstance, keypair_from_string, sp_runtime::AccountId32};
+use aleph_client::{
+    contract::{ContractInstance, ExecCallParams},
+    keypair_from_string,
+    sp_runtime::AccountId32,
+};
 use ethers::{
     middleware::Middleware,
     signers::{coins_bip39::English, MnemonicBuilder, Signer},
@@ -44,7 +48,12 @@ pub async fn azero_to_eth() -> anyhow::Result<()> {
     let approve_args = [most_address.to_string(), transfer_amount.to_string()];
 
     let approve_info = weth_azero
-        .contract_exec(&azero_signed_connection, "PSP22::approve", &approve_args)
+        .exec(
+            &azero_signed_connection,
+            "PSP22::approve",
+            &approve_args,
+            Default::default(),
+        )
         .await?;
     info!("`approve` tx info: {:?}", approve_info);
 
@@ -73,11 +82,11 @@ pub async fn azero_to_eth() -> anyhow::Result<()> {
     ];
 
     let send_request_info = most
-        .contract_exec_value(
+        .exec(
             &azero_signed_connection,
             "send_request",
             &send_request_args,
-            1_000_000_000_000_000,
+            ExecCallParams::new().value(10_000_000_000_000_000),
         )
         .await?;
     info!("`send_request` tx info: {:?}", send_request_info);
