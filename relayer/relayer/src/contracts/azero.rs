@@ -16,7 +16,7 @@ use aleph_client::{
     sp_weights::weight_v2::Weight,
     utility::BlocksApi,
     waiting::BlockStatus,
-    AccountId, AlephConfig, Connection, TxInfo,
+    AccountId, AlephConfig, AsConnection, Connection, TxInfo,
 };
 use log::{debug, error, trace};
 use subxt::events::Events;
@@ -39,6 +39,14 @@ pub enum AzeroContractError {
 
     #[error("Missing or invalid field")]
     MissingOrInvalidField(String),
+
+    #[error("send_request tx has failed")]
+    SendRequestTxFailure {
+        src_token_address: String,
+        amount: u128,
+        dest_receiver_address: String,
+        base_fee: u128,
+    },
 }
 
 pub struct RouterInstance {
@@ -113,13 +121,13 @@ impl RouterInstance {
         let path_encoding = self.encode_vec(path);
         Ok(self
             .contract
-            .read(
+            .read::<_, Result<Vec<u128>, _>, _>(
                 connection,
                 "Router::get_amounts_out",
                 &[amount_in.to_string(), path_encoding],
                 Default::default(),
             )
-            .await?)
+            .await??)
     }
 
     fn encode_vec<T>(&self, coll: &[T]) -> String
@@ -226,12 +234,20 @@ impl MostInstance {
         })
     }
 
+    pub async fn get_base_fee(&self, connection: &Connection) -> Result<u128, AzeroContractError> {
+        Ok(self
+            .contract
+            .read0::<Result<u128, _>, _>(connection, "get_base_fee", Default::default())
+            .await??)
+    }
+
     pub async fn send_request(
         &self,
         signed_connection: &AzeroConnectionWithSigner,
         src_token_address: [u8; 32],
         amount: u128,
         dest_receiver_address: [u8; 32],
+        base_fee: u128,
     ) -> Result<TxInfo, AzeroContractError> {
         let gas_limit = Weight {
             ref_time: self.ref_time_limit,
@@ -243,14 +259,19 @@ impl MostInstance {
             bytes32_to_str(&dest_receiver_address),
         ];
 
-        let params = ExecCallParams::new().gas_limit(gas_limit);
+        let params = ExecCallParams::new().gas_limit(gas_limit).value(base_fee);
 
         // Exec does dry run first, so there's no need to repeat it here
         let call_result = self
             .contract
             .exec(signed_connection, "send_request", &args, params)
             .await
-            .map_err(AzeroContractError::AlephClient);
+            .map_err(|_| AzeroContractError::SendRequestTxFailure {
+                src_token_address: hex::encode(src_token_address),
+                amount,
+                dest_receiver_address: hex::encode(dest_receiver_address),
+                base_fee,
+            });
         debug!("receive_request: {:?}", call_result);
         call_result
     }

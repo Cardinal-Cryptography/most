@@ -135,9 +135,18 @@ impl Trader {
 
                     info!("{whoami_azero} has a balance of: {azero_balance} Azero.");
 
+                    let current_base_fee = match most_azero.get_base_fee(azero_signed_connection.as_connection()).await {
+                        Ok(amount) => amount,
+                        Err(why) => {
+                            warn!("Query to `get_base_fee` has failed {why:?}.");
+                            continue;
+
+                        },
+                    };
+
                     // check azero balance
-                    if azero_balance > ONE_AZERO {
-                        let surplus = azero_balance.saturating_sub(ONE_AZERO);
+                    if azero_balance > current_base_fee {
+                        let surplus = azero_balance.saturating_sub(current_base_fee);
                         info!("{whoami_azero} has {surplus} A0 above the set limit of {ONE_AZERO} A0 that will be swapped.");
 
                         let path = [wrapped_azero_address.clone(), azero_ether.address.clone()];
@@ -186,40 +195,43 @@ impl Trader {
                             warn!("Could not perform swap: {why:?}.");
                             continue;
                         }
-                    }
 
-                    // check azero Eth balance
-                    let azero_eth_balance = match azero_ether
-                        .balance_of(azero_signed_connection.as_connection(), whoami_azero.clone())
-                        .await {
-                            Ok(balance) => balance,
-                            Err(why) => {
-                                warn!("Error when querying for Azero ETH balance: {why:?}.");
+
+                        // check azero Eth balance
+                        let azero_eth_balance = match azero_ether
+                            .balance_of(azero_signed_connection.as_connection(), whoami_azero.clone())
+                            .await {
+                                Ok(balance) => balance,
+                                Err(why) => {
+                                    warn!("Error when querying for Azero ETH balance: {why:?}.");
+                                    continue;
+                                },
+                            };
+
+                        if azero_eth_balance > 0 {
+                            info!("Requesting a cross chain transfer of {azero_eth_balance} units of Azero ETH [{azero_ether_address}] to {whoami_eth}.");
+
+                            let mut receiver: [u8; 32] = [0; 32];
+                            receiver.copy_from_slice(&left_pad(eth_signed_connection.address().0.to_vec(), 32));
+
+                            if let Err(why) = most_azero
+                                .send_request(
+                                    &azero_signed_connection,
+                                    *azero_ether.address.clone().as_ref(),
+                                    azero_eth_balance,
+                                    receiver,
+                                    current_base_fee
+                                )
+                                .await
+                            {
+                                warn!("Could not send the cross-chain transfer request: {why:?}.");
                                 continue;
-                            },
-                        };
+                            }
 
-                    if azero_eth_balance > ONE_ETHER {
-                        info!("Requesting a cross chain transfer of {azero_eth_balance} units of Azero ETH [{azero_ether_address}] to {whoami_eth}.");
-
-                        let mut receiver: [u8; 32] = [0; 32];
-                        receiver.copy_from_slice(&left_pad(eth_signed_connection.address().0.to_vec(), 32));
-
-                        if let Err(why) = most_azero
-                            .send_request(
-                                &azero_signed_connection,
-                                *azero_ether.address.clone().as_ref(),
-                                azero_eth_balance,
-                                receiver,
-                            )
-                            .await
-                        {
-                            warn!("Could not send the cross-chain transfer request: {why:?}.");
-                            continue;
                         }
 
                     } else {
-                        info!("{whoami_azero} has a balance of: {azero_eth_balance} Azero ETH (too low to be bridged).");
+                        warn!("{whoami_azero} has A0 balance lower than the current fee for bridging: {current_base_fee} A0");
                     }
 
                     // check 0xwETH balance
