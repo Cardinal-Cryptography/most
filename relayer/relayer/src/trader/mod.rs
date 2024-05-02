@@ -27,7 +27,7 @@ pub const ONE_ETHER: u128 = 1_000_000_000_000_000_000;
 #[error(transparent)]
 #[non_exhaustive]
 pub enum TraderError {
-    #[error("Error when parsing ethereum address")]
+    #[error("Error when parsing ethereum address {0}")]
     FromHex(#[from] rustc_hex::FromHexError),
 
     #[error("AlephClient error {0}")]
@@ -133,28 +133,29 @@ impl Trader {
                         .get_free_balance(whoami.to_owned(), None)
                         .await;
 
-                    // check Azero balance
+                    // check azero balance
                     if azero_balance > ONE_AZERO {
                         let surplus = azero_balance.saturating_sub(ONE_AZERO);
                         info!("{whoami} has {surplus} A0 above the set limit of {ONE_AZERO} A0 that will be swapped");
 
                         let path = [wrapped_azero_address.clone(), azero_ether.address.clone()];
 
-                        let amounts_out = match router
+                        let min_weth_amount_out = match router
                             .get_amounts_out(azero_signed_connection.as_connection(), surplus, &path)
                             .await
                         {
-                            Ok(amounts) => amounts,
-                            Err(why) => {
-                                warn!("Cannot calculate amounts_out: {why:?}");
-                                continue;
-                            }
-                        };
+                            Ok(amounts) => {
+                                match amounts.last() {
+                                    Some(amount) => amount.saturating_mul(995).saturating_div(1000), // 0.5 percent slippage
+                                    None => {
+                                        warn!("Query to `calculate_amounts_out` returned an empty result");
+                                        continue;
+                                    }
+                                }
+                            },
 
-                        let min_weth_amount_out = match amounts_out.last() {
-                            Some(amount) => amount.saturating_mul(995).saturating_div(1000), // 0.5 percent slippage
-                            None => {
-                                warn!("Query to `calculate_amounts_out` returned an empty result");
+                            Err(why) => {
+                                warn!("Cannot `get_amounts_out`: {why:?}");
                                 continue;
                             }
                         };
@@ -171,7 +172,7 @@ impl Trader {
                                 min_weth_amount_out,
                                 &path,
                                 whoami.clone(),
-                                now.saturating_add(3600000) as u64, // one hour
+                                now.saturating_add(3600000) as u64, // within one hour
                             )
                             .await
                         {
@@ -211,7 +212,7 @@ impl Trader {
                     }
 
                     // check 0xwETH balance
-                    let balance = match wrapped_ether
+                    let wrapped_ether_balance = match wrapped_ether
                         .balance_of(eth_signed_connection.address())
                         .block(BlockNumber::Finalized)
                         .await
@@ -224,9 +225,9 @@ impl Trader {
                     };
 
                     // withdraw 0xwETH -> ETH
-                    if !balance.is_zero() {
+                    if !wrapped_ether_balance.is_zero() {
                         if let Err(why) = wrapped_ether
-                            .withdraw(balance)
+                            .withdraw(wrapped_ether_balance)
                             .block(BlockNumber::Finalized)
                             .await
                         {
