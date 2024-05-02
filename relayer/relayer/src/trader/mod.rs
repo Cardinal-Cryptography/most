@@ -81,9 +81,9 @@ impl Trader {
         )?;
 
         let router = RouterInstance::new(
-            &router_address.clone().ok_or(TraderError::MissingRequired(
-                "azero_wrapped_azero_address".to_owned(),
-            ))?,
+            &router_address
+                .clone()
+                .ok_or(TraderError::MissingRequired("router_address".to_owned()))?,
             router_metadata,
             *azero_ref_time_limit,
             *azero_proof_size_limit,
