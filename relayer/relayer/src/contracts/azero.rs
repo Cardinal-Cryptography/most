@@ -16,9 +16,9 @@ use aleph_client::{
     sp_weights::weight_v2::Weight,
     utility::BlocksApi,
     waiting::BlockStatus,
-    AccountId, AlephConfig, AsConnection, Connection, TxInfo,
+    AccountId, AlephConfig, Connection, TxInfo,
 };
-use log::{debug, error, info, trace};
+use log::{debug, error, trace};
 use subxt::events::Events;
 use thiserror::Error;
 
