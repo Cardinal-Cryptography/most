@@ -25,8 +25,12 @@ use tokio::{
 use super::AzeroMostEvents;
 use crate::{
     config::Config,
-    connections::azero::{self, AzeroConnectionWithSigner, AzeroWsConnection},
+    connections::{
+        azero::{self, AzeroConnectionWithSigner, AzeroWsConnection},
+        eth::SignedEthConnection,
+    },
     contracts::{AzeroContractError, AzeroEtherInstance, MostInstance, RouterInstance},
+    helpers::left_pad,
     CircuitBreakerEvent,
 };
 
@@ -63,8 +67,8 @@ pub struct Trader;
 impl Trader {
     pub async fn run(
         config: Arc<Config>,
-        azero_connection: &AzeroConnectionWithSigner,
-        // circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
+        azero_signed_connection: &AzeroConnectionWithSigner,
+        eth_signed_connection: SignedEthConnection,
         mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
     ) -> Result<CircuitBreakerEvent, TraderError> {
         let Config {
@@ -117,8 +121,8 @@ impl Trader {
         loop {
             debug!("Ping");
 
-            let whoami = azero_connection.account_id();
-            let azero_balance = azero_connection
+            let whoami = azero_signed_connection.account_id();
+            let azero_balance = azero_signed_connection
                 .get_free_balance(whoami.to_owned(), None)
                 .await;
 
@@ -127,10 +131,10 @@ impl Trader {
                 let surplus = azero_balance.saturating_sub(ONE_AZERO);
                 info!("{whoami} has {surplus} A0 above the set limit of {ONE_AZERO} A0 that will be swapped");
 
-                let path = [wrapped_azero_address.clone(), azero_ether.address];
+                let path = [wrapped_azero_address.clone(), azero_ether.address.clone()];
 
                 let amounts_out = match router
-                    .get_amounts_out(azero_connection.as_connection(), surplus, &path)
+                    .get_amounts_out(azero_signed_connection.as_connection(), surplus, &path)
                     .await
                 {
                     Ok(amounts) => amounts,
@@ -155,7 +159,7 @@ impl Trader {
 
                 if let Err(why) = router
                     .swap_exact_native_for_tokens(
-                        azero_connection,
+                        azero_signed_connection,
                         surplus,
                         min_weth_amount_out,
                         &path,
@@ -171,16 +175,20 @@ impl Trader {
 
             // check azero Eth balance
             let azero_eth_balance = azero_ether
-                .balance_of(azero_connection.as_connection(), whoami.clone())
+                .balance_of(azero_signed_connection.as_connection(), whoami.clone())
                 .await?;
+
+            let mut receiver: [u8; 32] = [0; 32];
+
+            receiver.copy_from_slice(&left_pad(eth_signed_connection.address().0.to_vec(), 32));
 
             if azero_eth_balance > ONE_ETHER {
                 if let Err(why) = most_azero
                     .send_request(
-                        azero_connection,
-                        *azero_ether.address.as_ref(),
+                        azero_signed_connection,
+                        *azero_ether.address.clone().as_ref(),
                         azero_eth_balance,
-                        dest_receiver_address,
+                        receiver,
                     )
                     .await
                 {
