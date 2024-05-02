@@ -149,16 +149,47 @@ impl RouterInstance {
 pub struct AzeroEtherInstance {
     pub contract: ContractInstance,
     pub address: AccountId,
+    pub transcoder: ContractMessageTranscoder,
+    pub ref_time_limit: u64,
+    pub proof_size_limit: u64,
 }
 
 impl AzeroEtherInstance {
-    pub fn new(address: &str, metadata_path: &str) -> Result<Self, AzeroContractError> {
+    pub fn new(
+        address: &str,
+        metadata_path: &str,
+        ref_time_limit: u64,
+        proof_size_limit: u64,
+    ) -> Result<Self, AzeroContractError> {
         let address = AccountId::from_str(address)
             .map_err(|why| AzeroContractError::NotAccountId(why.to_string()))?;
         Ok(Self {
             address: address.clone(),
             contract: ContractInstance::new(address, metadata_path)?,
+            transcoder: ContractMessageTranscoder::load(metadata_path)?,
+            ref_time_limit,
+            proof_size_limit,
         })
+    }
+
+    pub async fn approve(
+        &self,
+        signed_connection: &AzeroConnectionWithSigner,
+        spender: AccountId,
+        value: u128,
+    ) -> Result<TxInfo, AzeroContractError> {
+        let gas_limit = Weight {
+            ref_time: self.ref_time_limit,
+            proof_size: self.proof_size_limit,
+        };
+        let args = [spender.to_string(), value.to_string()];
+        let params = ExecCallParams::new().gas_limit(gas_limit);
+
+        // Exec does dry run first, so there's no need to repeat it here
+        self.contract
+            .exec(signed_connection, "PSP22::approve", &args, params)
+            .await
+            .map_err(AzeroContractError::AlephClient)
     }
 
     pub async fn balance_of(

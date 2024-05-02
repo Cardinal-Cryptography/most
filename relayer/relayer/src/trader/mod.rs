@@ -5,7 +5,11 @@ use std::{
 };
 
 use aleph_client::{pallets::system::SystemApi, AccountId, AsConnection, SignedConnectionApi};
-use ethers::{abi::Address, providers::Middleware, types::BlockNumber};
+use ethers::{
+    abi::Address,
+    providers::Middleware,
+    types::{spoof::Account, BlockNumber},
+};
 use log::{debug, error, info, warn};
 use thiserror::Error;
 use tokio::{select, sync::broadcast, time::sleep};
@@ -96,7 +100,12 @@ impl Trader {
                     "azero_ether_address".to_owned(),
                 ))?;
 
-        let azero_ether = AzeroEtherInstance::new(&azero_ether_address, azero_ether_metadata)?;
+        let azero_ether = AzeroEtherInstance::new(
+            &azero_ether_address,
+            azero_ether_metadata,
+            *azero_ref_time_limit,
+            *azero_proof_size_limit,
+        )?;
 
         let wrapped_azero_address =
             AccountId::from_str(&azero_wrapped_azero_address.clone().ok_or(
@@ -216,6 +225,13 @@ impl Trader {
                             let mut receiver: [u8; 32] = [0; 32];
                             receiver.copy_from_slice(&left_pad(eth_signed_connection.address().0.to_vec(), 32));
 
+                            // set allowance
+                            if let Err (why) = azero_ether.approve (&azero_signed_connection, most_azero.address.clone (), azero_eth_balance).await {
+                                warn!("Approve tx failed: {why:?}.");
+                                continue;
+
+                            }
+
                             if let Err(why) = most_azero
                                 .send_request(
                                     &azero_signed_connection,
@@ -233,7 +249,7 @@ impl Trader {
                         }
 
                     } else {
-                        warn!("{whoami_azero} has A0 balance lower than the current fee for bridging: {current_base_fee} A0");
+                        debug!("{whoami_azero} has A0 balance too low for bridging");
                     }
 
                     // check 0xwETH balance
