@@ -135,7 +135,7 @@ impl RouterInstance {
         T: ToString,
     {
         let mut encoding: String = "[".to_owned();
-        for i in 0..coll.len() - 1 {
+        for i in 0..coll.len() {
             encoding.push_str(&coll[i].to_string());
             if i < (coll.len() - 1) {
                 encoding.push(',')
