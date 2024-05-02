@@ -120,7 +120,7 @@ impl Trader {
 
         select! {
             cb_event = circuit_breaker_receiver.recv() => {
-                warn!("Exiting due to a circuit breaker event {cb_event:?}");
+                warn!("Exiting due to a circuit breaker event {cb_event:?}.");
                 Ok(cb_event?)
             },
 
@@ -133,12 +133,12 @@ impl Trader {
                         .get_free_balance(whoami_azero.to_owned(), None)
                         .await;
 
-                    debug!("{whoami_azero} A0 balance: {azero_balance}");
+                    info!("{whoami_azero} has a balance of: {azero_balance} Azero.");
 
                     // check azero balance
                     if azero_balance > ONE_AZERO {
                         let surplus = azero_balance.saturating_sub(ONE_AZERO);
-                        info!("{whoami_azero} has {surplus} A0 above the set limit of {ONE_AZERO} A0 that will be swapped");
+                        info!("{whoami_azero} has {surplus} A0 above the set limit of {ONE_AZERO} A0 that will be swapped.");
 
                         let path = [wrapped_azero_address.clone(), azero_ether.address.clone()];
 
@@ -148,12 +148,12 @@ impl Trader {
                         {
                             Ok(amounts) => {
 
-                                debug!("Amounts out {amounts:?}");
+                                debug!("Amounts out {amounts:?}.");
 
                                 match amounts.last() {
                                     Some(amount) => amount.saturating_mul(995).saturating_div(1000), // 0.5 percent slippage
                                     None => {
-                                        warn!("Query to `calculate_amounts_out` returned an empty result");
+                                        warn!("Query to `calculate_amounts_out` returned an empty result.");
                                         continue;
                                     }
                                 }
@@ -170,7 +170,7 @@ impl Trader {
                             .expect("unix timestamp")
                             .as_millis();
 
-                        info!("Requesting a swap of {surplus} Azero to at least {min_weth_amount_out} Azero ETH");
+                        info!("Requesting a swap of {surplus} Azero to at least {min_weth_amount_out} Azero ETH.");
 
                         if let Err(why) = router
                             .swap_exact_native_for_tokens(
@@ -183,7 +183,7 @@ impl Trader {
                             )
                             .await
                         {
-                            warn!("Could not perform swap: {why:?}");
+                            warn!("Could not perform swap: {why:?}.");
                             continue;
                         }
                     }
@@ -194,20 +194,16 @@ impl Trader {
                         .await {
                             Ok(balance) => balance,
                             Err(why) => {
-                                warn!("Error when querying for Azero ETH balance: {why:?}");
+                                warn!("Error when querying for Azero ETH balance: {why:?}.");
                                 continue;
-
                             },
                         };
 
-                    debug!("Azero ETH balance: {azero_eth_balance}");
-
-                    let mut receiver: [u8; 32] = [0; 32];
-                    receiver.copy_from_slice(&left_pad(eth_signed_connection.address().0.to_vec(), 32));
-
                     if azero_eth_balance > ONE_ETHER {
+                        info!("Requesting a cross chain transfer of {azero_eth_balance} units of Azero ETH [{azero_ether_address}] to {whoami_eth}.");
 
-                        info!("Requesting a cross chain transfer of {azero_eth_balance} units of Azero ETH [{azero_ether_address}] to {whoami_eth}");
+                        let mut receiver: [u8; 32] = [0; 32];
+                        receiver.copy_from_slice(&left_pad(eth_signed_connection.address().0.to_vec(), 32));
 
                         if let Err(why) = most_azero
                             .send_request(
@@ -218,9 +214,12 @@ impl Trader {
                             )
                             .await
                         {
-                            warn!("Could not send the cross chain transfer request: {why:?}");
+                            warn!("Could not send the cross-chain transfer request: {why:?}.");
                             continue;
                         }
+
+                    } else {
+                        info!("{whoami_azero} has a balance of: {azero_eth_balance} Azero ETH that is too low to be bridged.");
                     }
 
                     // check 0xwETH balance
@@ -231,35 +230,35 @@ impl Trader {
                     {
                         Ok(balance) => balance,
                         Err(why) => {
-                            warn!("Query for WETH balance failed : {why:?}");
+                            warn!("Query for WETH balance failed : {why:?}.");
                             continue;
                         }
                     };
 
-                    debug!("{whoami_eth} has a WETH9 balance of: {wrapped_ether_balance:?}");
+                    debug!("{whoami_eth} has a balance of: {wrapped_ether_balance:?} WETH9.");
 
                     // withdraw 0xwETH -> ETH
                     if !wrapped_ether_balance.is_zero() {
 
-                        info!("{whoami_eth} has a balance of wrapped_ether_balance WETH9 that will be unwrapped");
+                        info!("{whoami_eth} has a positive balance of {wrapped_ether_balance} WETH9 that will be unwrapped.");
 
                         if let Err(why) = wrapped_ether
                             .withdraw(wrapped_ether_balance)
                             .block(BlockNumber::Finalized)
                             .await {
-                                warn!("Unwrapping WETH failed : {why:?}");
+                                warn!("Unwrapping WETH failed : {why:?}.");
                                 continue;
                             }
                     }
 
                     // check ETH balance
                     if let Ok (eth_balance) = eth_signed_connection.get_balance(eth_signed_connection.address(), None).await {
-                        info!("{whoami_eth} has a balance of {eth_balance} ETH");
                         // warning if the balance drops too low
                         if eth_balance < ONE_ETHER.into () {
-                            warn!("{whoami_eth} has a low ETH balance of {eth_balance} ETH");
+                            warn!("{whoami_eth} has a low ETH balance: {eth_balance} ETH.");
+                        } else {
+                            info!("{whoami_eth} has a balance of {eth_balance} ETH.");
                         }
-
                     }
 
                     sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
