@@ -31,7 +31,8 @@ use crate::{
 };
 
 // trader component will sell the surplus
-pub const AZERO_SURPLUS_LIMIT: u128 = 1_000_000_000_000; // 1 AZERO
+pub const ONE_AZERO: u128 = 1_000_000_000_000;
+pub const ONE_ETHER: u128 = 1_000_000_000_000_000_000;
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -113,9 +114,9 @@ impl Trader {
                 .await;
 
             // check Azero balance
-            if azero_balance > AZERO_SURPLUS_LIMIT {
-                let surplus = azero_balance.saturating_sub(AZERO_SURPLUS_LIMIT);
-                info!("{whoami} has {surplus} A0 above the set limit of {AZERO_SURPLUS_LIMIT} A0 that will be swapped");
+            if azero_balance > ONE_AZERO {
+                let surplus = azero_balance.saturating_sub(ONE_AZERO);
+                info!("{whoami} has {surplus} A0 above the set limit of {ONE_AZERO} A0 that will be swapped");
 
                 let wrapped_azero_address =
                     AccountId::from_str(&azero_wrapped_azero_address.clone().ok_or(
@@ -175,7 +176,9 @@ impl Trader {
                 .balance_of(azero_connection.as_connection(), whoami.clone())
                 .await?;
 
-            // TODO bridge A0ETH to ETHEREUM
+            if azero_eth_balance > ONE_ETHER {
+                // TODO bridge A0ETH to ETHEREUM
+            }
 
             // TODO unwrap 0xWETH -> ETH
         }
