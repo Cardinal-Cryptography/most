@@ -141,7 +141,6 @@ impl RouterInstance {
             }
         }
         encoding.push(']');
-
         encoding
     }
 }
