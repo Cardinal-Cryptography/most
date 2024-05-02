@@ -50,6 +50,9 @@ pub enum TraderError {
     #[error("Missing required arg {0}")]
     MissingRequired(String),
 
+    #[error("Address is not an AccountId {0}")]
+    NotAccountId(String),
+
     #[error("Flabbergasted {0}")]
     Unexpected(String),
 }
@@ -94,14 +97,20 @@ impl Trader {
             *azero_proof_size_limit,
         )?;
 
-        let azero_ether = AzeroEtherInstance::new(
-            &azero_ether_address
+        let azero_ether_address =
+            azero_ether_address
                 .clone()
                 .ok_or(TraderError::MissingRequired(
-                    "azero ether_address".to_owned(),
-                ))?,
-            azero_ether_metadata,
-        )?;
+                    "azero_ether_address".to_owned(),
+                ))?;
+
+        let azero_ether = AzeroEtherInstance::new(&azero_ether_address, azero_ether_metadata)?;
+
+        let wrapped_azero_address =
+            AccountId::from_str(&azero_wrapped_azero_address.clone().ok_or(
+                TraderError::MissingRequired("azero_wrapped_azero_address".to_owned()),
+            )?)
+            .map_err(|err| TraderError::NotAccountId(err.to_owned()))?;
 
         info!("Starting");
 
@@ -118,18 +127,7 @@ impl Trader {
                 let surplus = azero_balance.saturating_sub(ONE_AZERO);
                 info!("{whoami} has {surplus} A0 above the set limit of {ONE_AZERO} A0 that will be swapped");
 
-                let wrapped_azero_address =
-                    AccountId::from_str(&azero_wrapped_azero_address.clone().ok_or(
-                        TraderError::MissingRequired("azero_wrapped_azero_address".to_owned()),
-                    )?)
-                    .map_err(|err| TraderError::Unexpected(err.to_owned()))?;
-
-                let azero_ether_address = AccountId::from_str(&azero_ether_address.clone().ok_or(
-                    TraderError::MissingRequired("azero_ether_address".to_owned()),
-                )?)
-                .map_err(|err| TraderError::Unexpected(err.to_owned()))?;
-
-                let path = [wrapped_azero_address.clone(), azero_ether_address.clone()];
+                let path = [wrapped_azero_address.clone(), azero_ether.address];
 
                 let amounts_out = match router
                     .get_amounts_out(azero_connection.as_connection(), surplus, &path)
@@ -177,10 +175,22 @@ impl Trader {
                 .await?;
 
             if azero_eth_balance > ONE_ETHER {
-                // TODO bridge A0ETH to ETHEREUM
+                if let Err(why) = most_azero
+                    .send_request(
+                        azero_connection,
+                        *azero_ether.address.as_ref(),
+                        azero_eth_balance,
+                        dest_receiver_address,
+                    )
+                    .await
+                {
+                    warn!("Could not request cross chain transfer: {why:?}");
+                    continue;
+                }
             }
 
-            // TODO unwrap 0xWETH -> ETH
+            // TODO: check 0xwETH balance
+            // TODO unwrap 0xwETH -> ETH
         }
     }
 }

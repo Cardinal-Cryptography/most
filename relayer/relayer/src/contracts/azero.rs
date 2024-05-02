@@ -230,6 +230,39 @@ impl MostInstance {
         })
     }
 
+    pub async fn send_request(
+        &self,
+        signed_connection: &AzeroConnectionWithSigner,
+        src_token_address: [u8; 32],
+        amount: u128,
+        dest_receiver_address: [u8; 32],
+    ) -> Result<TxInfo, AzeroContractError> {
+        let gas_limit = Weight {
+            ref_time: self.ref_time_limit,
+            proof_size: self.proof_size_limit,
+        };
+        let args = [
+            bytes32_to_str(&src_token_address),
+            amount.to_string(),
+            bytes32_to_str(&dest_receiver_address),
+        ];
+        let call_data = self.transcoder.encode("send_request", args)?;
+
+        let call_result = signed_connection
+            .call(
+                self.address.clone(),
+                0,
+                gas_limit,
+                None,
+                call_data,
+                TxStatus::Finalized,
+            )
+            .await
+            .map_err(AzeroContractError::AlephClient);
+        debug!("send_request: {:?}", call_result);
+        call_result
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub async fn receive_request(
         &self,
