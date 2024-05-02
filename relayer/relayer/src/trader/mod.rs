@@ -136,7 +136,9 @@ impl Trader {
                     info!("{whoami_azero} has a balance of: {azero_balance} Azero.");
 
                     let current_base_fee = match most_azero.get_base_fee(azero_signed_connection.as_connection()).await {
-                        Ok(amount) => amount,
+                        Ok(amount) => {
+                            info!("Current base fee: {amount} pA0");
+                            amount},
                         Err(why) => {
                             warn!("Query to `get_base_fee` has failed {why:?}.");
                             continue;
@@ -145,9 +147,10 @@ impl Trader {
                     };
 
                     // check azero balance
-                    if azero_balance > current_base_fee {
-                        let surplus = azero_balance.saturating_sub(current_base_fee);
-                        info!("{whoami_azero} has {surplus} A0 above the set limit of {ONE_AZERO} A0 that will be swapped.");
+                    if azero_balance > current_base_fee + ONE_AZERO  {
+                        // swap everything above base fee plus one A0
+                        let surplus = azero_balance.saturating_sub(current_base_fee).saturating_sub(ONE_AZERO);
+                        info!("{surplus} A0 above the safe limit will be swapped.");
 
                         let path = [wrapped_azero_address.clone(), azero_ether.address.clone()];
 
@@ -195,7 +198,6 @@ impl Trader {
                             warn!("Could not perform swap: {why:?}.");
                             continue;
                         }
-
 
                         // check azero Eth balance
                         let azero_eth_balance = match azero_ether

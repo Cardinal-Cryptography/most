@@ -266,7 +266,7 @@ impl MostInstance {
             .exec(signed_connection, "send_request", &args, params)
             .await
             .map_err(|why| {
-                error!("receive_request falure: {why:?}");
+                error!("receive_request failure: {why:?}");
                 AzeroContractError::SendRequestTxFailure {
                     src_token_address: hex::encode(src_token_address),
                     amount,
