@@ -11,6 +11,11 @@ use aleph_client::{
     utility::BlocksApi,
     AccountId, AlephConfig, AsConnection, Connection, SignedConnectionApi,
 };
+use ethers::{
+    abi::Address,
+    core::k256::{elliptic_curve::bigint::Zero, U256},
+    types::BlockNumber,
+};
 use futures::stream::{FuturesOrdered, StreamExt};
 use log::{debug, error, info, warn};
 use subxt::{events::Events, storage::address};
@@ -29,7 +34,7 @@ use crate::{
         azero::{self, AzeroConnectionWithSigner, AzeroWsConnection},
         eth::SignedEthConnection,
     },
-    contracts::{AzeroContractError, AzeroEtherInstance, MostInstance, RouterInstance},
+    contracts::{AzeroContractError, AzeroEtherInstance, MostInstance, RouterInstance, WETH9},
     helpers::left_pad,
     CircuitBreakerEvent,
 };
@@ -42,6 +47,9 @@ pub const ONE_ETHER: u128 = 1_000_000_000_000_000_000;
 #[error(transparent)]
 #[non_exhaustive]
 pub enum TraderError {
+    #[error("Error when parsing ethereum address")]
+    FromHex(#[from] rustc_hex::FromHexError),
+
     #[error("AlephClient error {0}")]
     AlephClient(#[from] anyhow::Error),
 
@@ -68,7 +76,7 @@ impl Trader {
     pub async fn run(
         config: Arc<Config>,
         azero_signed_connection: &AzeroConnectionWithSigner,
-        eth_signed_connection: SignedEthConnection,
+        eth_signed_connection: Arc<SignedEthConnection>,
         mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
     ) -> Result<CircuitBreakerEvent, TraderError> {
         let Config {
@@ -115,6 +123,15 @@ impl Trader {
                 TraderError::MissingRequired("azero_wrapped_azero_address".to_owned()),
             )?)
             .map_err(|err| TraderError::NotAccountId(err.to_owned()))?;
+
+        let wrapped_ether_address = eth_wrapped_ether_address
+            .clone()
+            .ok_or(TraderError::MissingRequired(
+                "eth_wrapped_ether_address".to_owned(),
+            ))?
+            .parse::<Address>()?;
+
+        let wrapped_ether = WETH9::new(wrapped_ether_address, eth_signed_connection.clone());
 
         info!("Starting");
 
@@ -197,8 +214,22 @@ impl Trader {
                 }
             }
 
-            // TODO: check 0xwETH balance
-            // TODO unwrap 0xwETH -> ETH
+            // check 0xwETH balance
+            let balance = match wrapped_ether
+                .balance_of(eth_signed_connection.address())
+                .block(BlockNumber::Finalized)
+                .await
+            {
+                Ok(balance) => balance,
+                Err(why) => {
+                    warn!("Query for WETH balance failed : {why:?}");
+                    continue;
+                }
+            };
+
+            if !balance.is_zero() {
+                // TODO withdraw 0xwETH -> ETH
+            }
         }
     }
 }
