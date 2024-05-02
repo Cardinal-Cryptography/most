@@ -166,8 +166,16 @@ async fn create_eth_connections(
                 .index(config.dev_account_index)?
                 .build()?;
 
+        let private_key = wallet
+            .signer()
+            .to_bytes()
+            .iter()
+            .map(|&i| format!("{:X}", i))
+            .collect::<Vec<String>>()
+            .join("");
+
         info!(
-            "Creating signed connection using a development key {}",
+            "Creating signed connection using a development key {} [{private_key}]",
             &wallet.address()
         );
         eth::with_local_wallet(eth::connect(config).await, wallet).await?
