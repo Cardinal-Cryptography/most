@@ -229,7 +229,6 @@ impl Trader {
                             if let Err (why) = azero_ether.approve (&azero_signed_connection, most_azero.address.clone (), azero_eth_balance).await {
                                 warn!("Approve tx failed: {why:?}.");
                                 continue;
-
                             }
 
                             if let Err(why) = most_azero

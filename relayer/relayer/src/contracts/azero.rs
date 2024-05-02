@@ -98,8 +98,7 @@ impl RouterInstance {
         ];
 
         let params = ExecCallParams::new().gas_limit(gas_limit).value(amount_in);
-        let call_result = self
-            .contract
+        self.contract
             .exec(
                 signed_connection,
                 "Router::swap_exact_native_for_tokens",
@@ -107,9 +106,7 @@ impl RouterInstance {
                 params,
             )
             .await
-            .map_err(AzeroContractError::AlephClient);
-        debug!("receive_request: {:?}", call_result);
-        call_result
+            .map_err(AzeroContractError::AlephClient)
     }
 
     pub async fn get_amounts_out(
@@ -297,7 +294,7 @@ impl MostInstance {
             .exec(signed_connection, "send_request", &args, params)
             .await
             .map_err(|why| {
-                error!("receive_request failure: {why:?}");
+                error!("send_request failure: {why:?}");
                 AzeroContractError::SendRequestTxFailure {
                     src_token_address: hex::encode(src_token_address),
                     amount,
