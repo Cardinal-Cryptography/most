@@ -1,39 +1,18 @@
 use std::{
-    cmp::min,
     str::FromStr,
     sync::Arc,
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
-use aleph_client::{
-    contract::event::{BlockDetails, ContractEvent},
-    pallets::system::SystemApi,
-    utility::BlocksApi,
-    AccountId, AlephConfig, AsConnection, Connection, SignedConnectionApi,
-};
-use ethers::{
-    abi::Address,
-    core::k256::{elliptic_curve::bigint::Zero, U256},
-    types::BlockNumber,
-};
-use futures::stream::{FuturesOrdered, StreamExt};
+use aleph_client::{pallets::system::SystemApi, AccountId, AsConnection, SignedConnectionApi};
+use ethers::{abi::Address, types::BlockNumber};
 use log::{debug, error, info, warn};
-use subxt::{events::Events, storage::address};
 use thiserror::Error;
-use tokio::{
-    select,
-    sync::{broadcast, mpsc, oneshot},
-    task::{JoinError, JoinSet},
-    time::sleep,
-};
+use tokio::{select, sync::broadcast, time::sleep};
 
-use super::AzeroMostEvents;
 use crate::{
     config::Config,
-    connections::{
-        azero::{self, AzeroConnectionWithSigner, AzeroWsConnection},
-        eth::SignedEthConnection,
-    },
+    connections::{azero::AzeroConnectionWithSigner, eth::SignedEthConnection},
     contracts::{AzeroContractError, AzeroEtherInstance, MostInstance, RouterInstance, WETH9},
     helpers::left_pad,
     CircuitBreakerEvent,
@@ -64,9 +43,6 @@ pub enum TraderError {
 
     #[error("Address is not an AccountId {0}")]
     NotAccountId(String),
-
-    #[error("Flabbergasted {0}")]
-    Unexpected(String),
 }
 
 #[derive(Copy, Clone)]
@@ -75,7 +51,7 @@ pub struct Trader;
 impl Trader {
     pub async fn run(
         config: Arc<Config>,
-        azero_signed_connection: &AzeroConnectionWithSigner,
+        azero_signed_connection: Arc<AzeroConnectionWithSigner>,
         eth_signed_connection: Arc<SignedEthConnection>,
         mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
     ) -> Result<CircuitBreakerEvent, TraderError> {
@@ -133,12 +109,13 @@ impl Trader {
 
         let wrapped_ether = WETH9::new(wrapped_ether_address, eth_signed_connection.clone());
 
+        let whoami = azero_signed_connection.account_id();
+
         info!("Starting");
 
         loop {
             debug!("Ping");
 
-            let whoami = azero_signed_connection.account_id();
             let azero_balance = azero_signed_connection
                 .get_free_balance(whoami.to_owned(), None)
                 .await;
@@ -176,7 +153,7 @@ impl Trader {
 
                 if let Err(why) = router
                     .swap_exact_native_for_tokens(
-                        azero_signed_connection,
+                        &azero_signed_connection,
                         surplus,
                         min_weth_amount_out,
                         &path,
@@ -202,7 +179,7 @@ impl Trader {
             if azero_eth_balance > ONE_ETHER {
                 if let Err(why) = most_azero
                     .send_request(
-                        azero_signed_connection,
+                        &azero_signed_connection,
                         *azero_ether.address.clone().as_ref(),
                         azero_eth_balance,
                         receiver,

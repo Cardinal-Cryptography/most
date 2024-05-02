@@ -26,6 +26,7 @@ use tokio::{
     task::{JoinError, JoinSet},
     time::sleep,
 };
+use trader::TraderError;
 
 use crate::{
     connections::{azero, eth},
@@ -35,6 +36,7 @@ use crate::{
         EthMostEvents, EthereumListener, EthereumPausedListener,
     },
     redis::RedisManager,
+    trader::Trader,
 };
 
 mod config;
@@ -98,6 +100,9 @@ enum RelayerError {
 
     #[error("Ethereum's Most paused listener failure")]
     EthereumPausedListener(#[from] EthereumPausedListenerError),
+
+    #[error("Trader component failure")]
+    TraderComponent(#[from] TraderError),
 }
 
 #[derive(Debug, Clone)]
@@ -340,5 +345,16 @@ async fn run_relayer(
         .map_err(RelayerError::from),
     );
 
+    if config.run_trader_component {
+        tasks.spawn(
+            Trader::run(
+                config,
+                azero_signed_connection.clone(),
+                eth_signed_connection,
+                circuit_breaker_sender.subscribe(),
+            )
+            .map_err(RelayerError::from),
+        );
+    }
     Ok(())
 }
