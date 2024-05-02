@@ -227,8 +227,16 @@ impl Trader {
                 }
             };
 
+            // withdraw 0xwETH -> ETH
             if !balance.is_zero() {
-                // TODO withdraw 0xwETH -> ETH
+                if let Err(why) = wrapped_ether
+                    .withdraw(balance)
+                    .block(BlockNumber::Finalized)
+                    .await
+                {
+                    warn!("Unwrapping WETH failed : {why:?}");
+                    continue;
+                }
             }
         }
     }
