@@ -89,7 +89,7 @@ impl RouterInstance {
             deadline.to_string(),
         ];
 
-        let params = ExecCallParams::new().gas_limit(gas_limit);
+        let params = ExecCallParams::new().gas_limit(gas_limit).value(amount_in);
         let call_result = self
             .contract
             .exec(
