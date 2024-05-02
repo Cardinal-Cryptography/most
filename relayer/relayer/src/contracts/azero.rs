@@ -18,7 +18,7 @@ use aleph_client::{
     waiting::BlockStatus,
     AccountId, AlephConfig, AsConnection, Connection, TxInfo,
 };
-use log::{debug, error, trace};
+use log::{debug, error, info, trace};
 use subxt::events::Events;
 use thiserror::Error;
 
@@ -262,18 +262,18 @@ impl MostInstance {
         let params = ExecCallParams::new().gas_limit(gas_limit).value(base_fee);
 
         // Exec does dry run first, so there's no need to repeat it here
-        let call_result = self
-            .contract
+        self.contract
             .exec(signed_connection, "send_request", &args, params)
             .await
-            .map_err(|_| AzeroContractError::SendRequestTxFailure {
-                src_token_address: hex::encode(src_token_address),
-                amount,
-                dest_receiver_address: hex::encode(dest_receiver_address),
-                base_fee,
-            });
-        debug!("receive_request: {:?}", call_result);
-        call_result
+            .map_err(|why| {
+                error!("receive_request falure: {why:?}");
+                AzeroContractError::SendRequestTxFailure {
+                    src_token_address: hex::encode(src_token_address),
+                    amount,
+                    dest_receiver_address: hex::encode(dest_receiver_address),
+                    base_fee,
+                }
+            })
     }
 
     #[allow(clippy::too_many_arguments)]
