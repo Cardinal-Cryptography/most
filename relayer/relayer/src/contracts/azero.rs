@@ -112,7 +112,6 @@ impl RouterInstance {
         call_result
     }
 
-    // TODO
     pub async fn get_amounts_out(
         &self,
         connection: &Connection,

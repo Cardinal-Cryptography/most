@@ -113,7 +113,8 @@ impl Trader {
 
         let wrapped_ether = WETH9::new(wrapped_ether_address, eth_signed_connection.clone());
 
-        let whoami = azero_signed_connection.account_id();
+        let whoami_azero = azero_signed_connection.account_id();
+        let whoami_eth = eth_signed_connection.address().to_string();
 
         info!("Starting");
 
@@ -129,15 +130,15 @@ impl Trader {
                     debug!("Ping");
 
                     let azero_balance = azero_signed_connection
-                        .get_free_balance(whoami.to_owned(), None)
+                        .get_free_balance(whoami_azero.to_owned(), None)
                         .await;
 
-                    debug!("{whoami} A0 balance: {azero_balance}");
+                    debug!("{whoami_azero} A0 balance: {azero_balance}");
 
                     // check azero balance
                     if azero_balance > ONE_AZERO {
                         let surplus = azero_balance.saturating_sub(ONE_AZERO);
-                        info!("{whoami} has {surplus} A0 above the set limit of {ONE_AZERO} A0 that will be swapped");
+                        info!("{whoami_azero} has {surplus} A0 above the set limit of {ONE_AZERO} A0 that will be swapped");
 
                         let path = [wrapped_azero_address.clone(), azero_ether.address.clone()];
 
@@ -177,7 +178,7 @@ impl Trader {
                                 surplus,
                                 min_weth_amount_out,
                                 &path,
-                                whoami.clone(),
+                                whoami_azero.clone(),
                                 now.saturating_add(3600000) as u64, // within one hour
                             )
                             .await
@@ -189,7 +190,7 @@ impl Trader {
 
                     // check azero Eth balance
                     let azero_eth_balance = match azero_ether
-                        .balance_of(azero_signed_connection.as_connection(), whoami.clone())
+                        .balance_of(azero_signed_connection.as_connection(), whoami_azero.clone())
                         .await {
                             Ok(balance) => balance,
                             Err(why) => {
@@ -206,7 +207,7 @@ impl Trader {
 
                     if azero_eth_balance > ONE_ETHER {
 
-                        info!("Requesting a cross chain transfer of {azero_eth_balance} units of Azero ETH [{azero_ether_address}] to {}", eth_signed_connection.address());
+                        info!("Requesting a cross chain transfer of {azero_eth_balance} units of Azero ETH [{azero_ether_address}] to {whoami_eth}");
 
                         if let Err(why) = most_azero
                             .send_request(
@@ -235,12 +236,12 @@ impl Trader {
                         }
                     };
 
-                    debug!("{} has a WETH9 balance of: {wrapped_ether_balance:?}", eth_signed_connection.address());
+                    debug!("{whoami_eth} has a WETH9 balance of: {wrapped_ether_balance:?}");
 
                     // withdraw 0xwETH -> ETH
                     if !wrapped_ether_balance.is_zero() {
 
-                        info!("{} has a balance of wrapped_ether_balance WETH9 that will be unwrapped", eth_signed_connection.address());
+                        info!("{whoami_eth} has a balance of wrapped_ether_balance WETH9 that will be unwrapped");
 
                         if let Err(why) = wrapped_ether
                             .withdraw(wrapped_ether_balance)
@@ -252,9 +253,13 @@ impl Trader {
                     }
 
                     // check ETH balance
-                    if let Ok (eth_balance)  = eth_signed_connection.get_balance(eth_signed_connection.address(), None).await {
-                        info!("{} has a balance of {eth_balance} ETH", eth_signed_connection.address());
-                        // TODO: warn if balance to low
+                    if let Ok (eth_balance) = eth_signed_connection.get_balance(eth_signed_connection.address(), None).await {
+                        info!("{whoami_eth} has a balance of {eth_balance} ETH");
+                        // warning if the balance drops too low
+                        if eth_balance < ONE_ETHER.into () {
+                            warn!("{whoami_eth} has a low ETH balance of {eth_balance} ETH");
+                        }
+
                     }
 
                     sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
