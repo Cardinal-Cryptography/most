@@ -1,20 +1,21 @@
 use std::{
     str::FromStr,
     sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use aleph_client::{pallets::system::SystemApi, AccountId, AsConnection, SignedConnectionApi};
 use ethers::{abi::Address, types::BlockNumber};
 use log::{debug, error, info, warn};
 use thiserror::Error;
-use tokio::{select, sync::broadcast};
+use tokio::{select, sync::broadcast, time::sleep};
 
 use crate::{
     config::Config,
     connections::{azero::AzeroConnectionWithSigner, eth::SignedEthConnection},
     contracts::{AzeroContractError, AzeroEtherInstance, MostInstance, RouterInstance, WETH9},
     helpers::left_pad,
+    listeners::ETH_BLOCK_PROD_TIME_SEC,
     CircuitBreakerEvent,
 };
 
@@ -192,7 +193,6 @@ impl Trader {
                         };
 
                     let mut receiver: [u8; 32] = [0; 32];
-
                     receiver.copy_from_slice(&left_pad(eth_signed_connection.address().0.to_vec(), 32));
 
                     if azero_eth_balance > ONE_ETHER {
@@ -234,6 +234,8 @@ impl Trader {
                             continue;
                         }
                     }
+
+                    sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
                 }
 
             } => {
