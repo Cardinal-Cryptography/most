@@ -95,7 +95,7 @@ impl RouterInstance {
         ];
         let call_data = self
             .transcoder
-            .encode("swap_exact_native_for_tokens", &args)?;
+            .encode("Router::swap_exact_native_for_tokens", &args)?;
 
         let call_result = signed_connection
             .call(
@@ -124,7 +124,7 @@ impl RouterInstance {
             .contract
             .contract_read(
                 connection,
-                "get_amounts_out",
+                "Router::get_amounts_out",
                 &[amount_in.to_string(), path_encoding],
             )
             .await?)
