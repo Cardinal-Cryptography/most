@@ -50,8 +50,8 @@ pub enum TraderError {
     #[error("Address is not an AccountId {0}")]
     NotAccountId(String),
 
-    #[error("Trader has encountered an unexpected error")]
-    Unexpected,
+    #[error("Trader has exited unexpectedly - this should never happen")]
+    TraderExited,
 }
 
 #[derive(Copy, Clone)]
@@ -134,8 +134,7 @@ impl Trader {
                 Ok(cb_event?)
             },
 
-            _ = async {
-
+            () = async {
                 loop {
                     debug!("Ping");
 
@@ -293,9 +292,8 @@ impl Trader {
                 }
 
             } => {
-                Err(TraderError::Unexpected)
+                Err(TraderError::TraderExited)
             }
-
         }
     }
 }
