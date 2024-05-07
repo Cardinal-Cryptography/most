@@ -290,7 +290,7 @@ impl Trader {
                         }
                     }
 
-                    sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
+                    sleep(Duration::from_millis(HOUR_IN_MILLIS)).await;
                 }
 
             } => {
