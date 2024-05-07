@@ -15,7 +15,6 @@ use crate::{
     connections::{azero::AzeroConnectionWithSigner, eth::SignedEthConnection},
     contracts::{AzeroContractError, AzeroEtherInstance, MostInstance, RouterInstance, WETH9},
     helpers::left_pad,
-    listeners::ETH_BLOCK_PROD_TIME_SEC,
     CircuitBreakerEvent,
 };
 
@@ -159,12 +158,15 @@ impl Trader {
                     let azero_available_for_swap = azero_balance.saturating_sub(current_base_fee + ETH_TO_AZERO_RELAYING_BUFFER);
                     let swap_path = [wrapped_azero_address.clone(), azero_ether.address.clone()];
 
+                    let mut receiver: [u8; 32] = [0; 32];
+                    receiver.copy_from_slice(&left_pad(eth_signed_connection.address().0.to_vec(), 32));
+
                     // check azero balance
                     if azero_available_for_swap > current_base_fee * TRADED_AZERO_FEE_MULTIPLIER {
                         info!("{azero_available_for_swap} A0 above the safe limit will be swapped.");
 
                         let min_weth_amount_out = match router
-                            .get_amounts_out(azero_signed_connection.as_connection(), surplus, &path)
+                            .get_amounts_out(azero_signed_connection.as_connection(), azero_available_for_swap, &swap_path)
                             .await
                         {
                             Ok(amounts) => {
@@ -191,16 +193,16 @@ impl Trader {
                             .expect("unix timestamp")
                             .as_millis();
 
-                        info!("Requesting a swap of {surplus} Azero to at least {min_weth_amount_out} Azero ETH.");
+                        info!("Requesting a swap of {azero_available_for_swap} Azero to at least {min_weth_amount_out} Azero ETH.");
 
                         if let Err(why) = router
                             .swap_exact_native_for_tokens(
                                 &azero_signed_connection,
-                                surplus,
+                                azero_available_for_swap,
                                 min_weth_amount_out,
-                                &path,
+                                &swap_path,
                                 whoami_azero.clone(),
-                                now.saturating_add(HOUR_IN_MILLIS) as u64, // within one hour
+                                now.saturating_add(HOUR_IN_MILLIS.into()) as u64, // within one hour
                             )
                             .await
                         {
@@ -221,9 +223,6 @@ impl Trader {
 
                         if azero_eth_balance > 0 {
                             info!("Requesting a cross chain transfer of {azero_eth_balance} units of Azero ETH [{azero_ether_address}] to {whoami_eth}.");
-
-                            let mut receiver: [u8; 32] = [0; 32];
-                            receiver.copy_from_slice(&left_pad(eth_signed_connection.address().0.to_vec(), 32));
 
                             // set allowance
                             if let Err (why) = azero_ether.approve (&azero_signed_connection, most_azero.address.clone (), azero_eth_balance).await {
