@@ -5,11 +5,7 @@ use std::{
 };
 
 use aleph_client::{pallets::system::SystemApi, AccountId, AsConnection, SignedConnectionApi};
-use ethers::{
-    abi::Address,
-    providers::Middleware,
-    types::{spoof::Account, BlockNumber},
-};
+use ethers::{abi::Address, providers::Middleware, types::BlockNumber};
 use log::{debug, error, info, warn};
 use thiserror::Error;
 use tokio::{select, sync::broadcast, time::sleep};
