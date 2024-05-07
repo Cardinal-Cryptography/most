@@ -23,6 +23,12 @@ use crate::{
 pub const ONE_AZERO: u128 = 1_000_000_000_000;
 pub const ONE_ETHER: u128 = 1_000_000_000_000_000_000;
 
+pub const ETH_TO_AZERO_RELAYING_BUFFER: u128 = 100 * ONE_AZERO;
+pub const TRADED_AZERO_FEE_MULTIPLIER: u128 = 10;
+pub const SLIPPAGE_PERCENT: u128 = 1;
+
+pub const HOUR_IN_MILLIS: u64 = 60 * 60 * 1000;
+
 #[derive(Debug, Error)]
 #[error(transparent)]
 #[non_exhaustive]
@@ -147,17 +153,15 @@ impl Trader {
                         Err(why) => {
                             warn!("Query to `get_base_fee` has failed {why:?}.");
                             continue;
-
                         },
                     };
 
-                    // check azero balance
-                    if azero_balance > current_base_fee + ONE_AZERO  {
-                        // swap everything above base fee plus one A0
-                        let surplus = azero_balance.saturating_sub(current_base_fee).saturating_sub(ONE_AZERO);
-                        info!("{surplus} A0 above the safe limit will be swapped.");
+                    let azero_available_for_swap = azero_balance.saturating_sub(current_base_fee + ETH_TO_AZERO_RELAYING_BUFFER);
+                    let swap_path = [wrapped_azero_address.clone(), azero_ether.address.clone()];
 
-                        let path = [wrapped_azero_address.clone(), azero_ether.address.clone()];
+                    // check azero balance
+                    if azero_available_for_swap > current_base_fee * TRADED_AZERO_FEE_MULTIPLIER {
+                        info!("{azero_available_for_swap} A0 above the safe limit will be swapped.");
 
                         let min_weth_amount_out = match router
                             .get_amounts_out(azero_signed_connection.as_connection(), surplus, &path)
@@ -168,7 +172,7 @@ impl Trader {
                                 debug!("Amounts out {amounts:?}.");
 
                                 match amounts.last() {
-                                    Some(amount) => amount.saturating_mul(995).saturating_div(1000), // 0.5 percent slippage
+                                    Some(amount) => amount.saturating_mul(100 - SLIPPAGE_PERCENT).saturating_div(100),
                                     None => {
                                         warn!("Query to `calculate_amounts_out` returned an empty result.");
                                         continue;
@@ -196,7 +200,7 @@ impl Trader {
                                 min_weth_amount_out,
                                 &path,
                                 whoami_azero.clone(),
-                                now.saturating_add(3600000) as u64, // within one hour
+                                now.saturating_add(HOUR_IN_MILLIS) as u64, // within one hour
                             )
                             .await
                         {
