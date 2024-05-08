@@ -9,10 +9,7 @@ use aleph_client::{
         event::{translate_events, BlockDetails, ContractEvent},
         ContractInstance, ExecCallParams, ReadonlyCallParams,
     },
-    contract_transcode::{
-        ContractMessageTranscoder,
-        Value::{self, Seq},
-    },
+    contract_transcode::Value::{self, Seq},
     sp_weights::weight_v2::Weight,
     utility::BlocksApi,
     waiting::BlockStatus,
@@ -52,7 +49,6 @@ pub enum AzeroContractError {
 pub struct RouterInstance {
     pub contract: ContractInstance,
     pub address: AccountId,
-    pub transcoder: ContractMessageTranscoder,
     pub ref_time_limit: u64,
     pub proof_size_limit: u64,
 }
@@ -69,7 +65,6 @@ impl RouterInstance {
         Ok(Self {
             address: address.clone(),
             contract: ContractInstance::new(address, metadata_path)?,
-            transcoder: ContractMessageTranscoder::load(metadata_path)?,
             ref_time_limit,
             proof_size_limit,
         })
@@ -146,7 +141,6 @@ impl RouterInstance {
 pub struct AzeroEtherInstance {
     pub contract: ContractInstance,
     pub address: AccountId,
-    pub transcoder: ContractMessageTranscoder,
     pub ref_time_limit: u64,
     pub proof_size_limit: u64,
 }
@@ -163,7 +157,6 @@ impl AzeroEtherInstance {
         Ok(Self {
             address: address.clone(),
             contract: ContractInstance::new(address, metadata_path)?,
-            transcoder: ContractMessageTranscoder::load(metadata_path)?,
             ref_time_limit,
             proof_size_limit,
         })
@@ -239,7 +232,6 @@ impl AdvisoryInstance {
 pub struct MostInstance {
     pub contract: ContractInstance,
     pub address: AccountId,
-    pub transcoder: ContractMessageTranscoder,
     pub ref_time_limit: u64,
     pub proof_size_limit: u64,
 }
@@ -255,7 +247,6 @@ impl MostInstance {
             .map_err(|why| AzeroContractError::NotAccountId(why.to_string()))?;
         Ok(Self {
             address: address.clone(),
-            transcoder: ContractMessageTranscoder::load(metadata_path)?,
             contract: ContractInstance::new(address, metadata_path)?,
             ref_time_limit,
             proof_size_limit,
