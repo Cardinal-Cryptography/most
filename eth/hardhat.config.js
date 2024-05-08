@@ -115,7 +115,7 @@ if (SEPOLIA_KEY) {
         "0xc4E0B92Df2DE77C077D060e49ec63DC196980716", // sepolia account address corresponding to SEPOLIA_KEY
       ],
       threshold: 1,
-      weth: "0xfff9976782d46cc05630d1f6ebab18b2324d6b14",
+      weth: "0xd91aE8FD2Be53F74876a9cc4aFb416645A0c8420",
     },
   };
 }
