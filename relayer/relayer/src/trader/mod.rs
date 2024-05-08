@@ -126,6 +126,11 @@ impl Trader {
         let whoami_azero = azero_signed_connection.account_id();
         let whoami_eth = eth_signed_connection.address().to_string();
 
+        let swap_path = [wrapped_azero_address.clone(), azero_ether.address.clone()];
+
+        let mut receiver: [u8; 32] = [0; 32];
+        receiver.copy_from_slice(&left_pad(eth_signed_connection.address().0.to_vec(), 32));
+
         info!("Starting");
 
         select! {
@@ -155,10 +160,6 @@ impl Trader {
                     };
 
                     let azero_available_for_swap = azero_balance.saturating_sub(current_base_fee + ETH_TO_AZERO_RELAYING_BUFFER);
-                    let swap_path = [wrapped_azero_address.clone(), azero_ether.address.clone()];
-
-                    let mut receiver: [u8; 32] = [0; 32];
-                    receiver.copy_from_slice(&left_pad(eth_signed_connection.address().0.to_vec(), 32));
 
                     // check azero balance
                     if azero_available_for_swap > current_base_fee * TRADED_AZERO_FEE_MULTIPLIER {
@@ -169,7 +170,6 @@ impl Trader {
                             .await
                         {
                             Ok(amounts) => {
-
                                 debug!("Amounts out {amounts:?}.");
 
                                 match amounts.last() {
@@ -224,7 +224,7 @@ impl Trader {
                             info!("Requesting a cross chain transfer of {azero_eth_balance} units of Azero ETH [{azero_ether_address}] to {whoami_eth}.");
 
                             // set allowance
-                            if let Err (why) = azero_ether.approve (&azero_signed_connection, most_azero.address.clone (), azero_eth_balance).await {
+                            if let Err(why) = azero_ether.approve(&azero_signed_connection, most_azero.address.clone(), azero_eth_balance).await {
                                 warn!("Approve tx failed: {why:?}.");
                                 continue;
                             }
