@@ -171,6 +171,7 @@ jobs:
 
           mkdir -p eth/artifacts/contracts/Most.sol
           cp -rf '${{ env.TMP_ARTIFACT_ETH_MOST_DIR }}'/Most.json eth/artifacts/contracts/Most.sol/Most.json
+          mkdir -p eth/artifacts/contracts/WETH9.sol
           cp -rf '${{ env.TMP_ARTIFACT_ETH_WETH9_DIR }}'/WETH9.json eth/artifacts/contracts/WETH9.sol/WETH9.json
 
           docker_tag=${{ steps.get-ref-properties.outputs.sha }}
