@@ -102,6 +102,30 @@ jobs:
           contract: azero_advisory
           dst-artifact: downloaded-artifact-azero-advisory
 
+      - name: Download azero_token artifact from S3 bucket
+        uses: Cardinal-Cryptography/github-actions/download-contract-artifact@v6
+        with:
+          aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
+          s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
+          project: most
+          version: ${{ github.sha }}
+          contract: azero_token
+          dst-artifact: downloaded-artifact-azero-token
+
+      - name: Download azero_router_contract artifact from S3 bucket
+        uses: Cardinal-Cryptography/github-actions/download-contract-artifact@v6
+        with:
+          aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
+          s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
+          project: most
+          version: ${{ github.sha }}
+          contract: azero_router_contract
+          dst-artifact: downloaded-artifact-azero-router-contract
+
       - name: Download eth_most artifact from S3 bucket
         uses: Cardinal-Cryptography/github-actions/download-contract-artifact@v6
         with:
@@ -113,6 +137,18 @@ jobs:
           version: ${{ github.sha }}
           contract: eth_most
           dst-artifact: downloaded-artifact-eth-most
+      
+      - name: Download eth_weth9 artifact from S3 bucket
+        uses: Cardinal-Cryptography/github-actions/download-contract-artifact@v6
+        with:
+          aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
+          s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
+          project: most
+          version: ${{ github.sha }}
+          contract: eth_weth9
+          dst-artifact: downloaded-artifact-eth-weth9
 
       - name: Install Rust toolchain
         uses: Cardinal-Cryptography/github-actions/install-rust-toolchain@v6
@@ -122,14 +158,20 @@ jobs:
         env:
           TMP_ARTIFACT_AZERO_MOST_DIR: downloaded-artifact-azero-most
           TMP_ARTIFACT_AZERO_ADVISORY_DIR: downloaded-artifact-azero-advisory
+          TMP_ARTIFACT_AZERO_TOKEN_DIR: downloaded-artifact-azero-advisory
+          TMP_ARTIFACT_AZERO_ROUTER_CONTRACT_DIR: downloaded-artifact-azero-router-contract
           TMP_ARTIFACT_ETH_MOST_DIR: downloaded-artifact-eth-most
+          TMP_ARTIFACT_ETH_WETH9_DIR: downloaded-artifact-eth-weth9
         run: |
           mkdir -p azero/artifacts
           cp -rf '${{ env.TMP_ARTIFACT_AZERO_MOST_DIR }}'/* azero/artifacts/
           cp -rf '${{ env.TMP_ARTIFACT_AZERO_ADVISORY_DIR }}'/* azero/artifacts/
+          cp -rf '${{ env.TMP_ARTIFACT_AZERO_TOKEN_DIR }}'/* azero/artifacts/
+          cp -rf '${{ env.TMP_ARTIFACT_AZERO_ROUTER_CONTRACT_DIR }}'/* azero/artifacts/
 
           mkdir -p eth/artifacts/contracts/Most.sol
           cp -rf '${{ env.TMP_ARTIFACT_ETH_MOST_DIR }}'/Most.json eth/artifacts/contracts/Most.sol/Most.json
+          cp -rf '${{ env.TMP_ARTIFACT_ETH_WETH9_DIR }}'/WETH9.json eth/artifacts/contracts/WETH9.sol/WETH9.json
 
           docker_tag=${{ steps.get-ref-properties.outputs.sha }}
           docker_name=most-relayer-${docker_tag}
