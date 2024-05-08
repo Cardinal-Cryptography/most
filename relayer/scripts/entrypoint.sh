@@ -129,5 +129,18 @@ if [[ -n "${ETH_MIN_CONFIRMATIONS}" ]]; then
   ARGS+=(--eth-tx-min-confirmations=${ETH_MIN_CONFIRMATIONS})
 fi
 
+if [[ -n "${RUN_TRADER}" ]]; then
+  ROUTER_ADDRESS=${ROUTER_ADDRESS:?"Router address is required for running trader component"}  
+  AZERO_ETHER_ADDRESS=${AZERO_ETHER_ADDRESS:?"Azero wrapped ETH token address is required for running trader component"}
+  WRAPPED_AZERO_ADDRESS=${WRAPPED_AZERO_ADDRESS:?"Wrapped Azero token address is required for running trader component"}
+
+  ARGS+=(
+    --run-trader
+    --router-address=${ROUTER_ADDRESS}
+    --azero-ether-address=${AZERO_ETHER_ADDRESS}
+    --wrapped-azero-address=${WRAPPED_AZERO_ADDRESS}
+  )
+fi
+
 # --- RUN
 xargs most-relayer "${ARGS[@]}"
