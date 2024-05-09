@@ -133,12 +133,14 @@ if [[ -n "${RUN_TRADER}" ]]; then
   ROUTER_ADDRESS=${ROUTER_ADDRESS:?"Router address is required for running trader component"}  
   AZERO_ETHER_ADDRESS=${AZERO_ETHER_ADDRESS:?"Azero wrapped ETH token address is required for running trader component"}
   WRAPPED_AZERO_ADDRESS=${WRAPPED_AZERO_ADDRESS:?"Wrapped Azero token address is required for running trader component"}
+  ETH_WRAPPED_ETHER_ADDRESS=${ETH_WRAPPED_ETHER_ADDRESS:?"ETH wrapped token address is required for running trader component"}
 
   ARGS+=(
     --run-trader-component
     --router-address=${ROUTER_ADDRESS}
     --azero-ether-address=${AZERO_ETHER_ADDRESS}
-    --wrapped-azero-address=${WRAPPED_AZERO_ADDRESS}
+    --azero-wrapped-azero-address=${WRAPPED_AZERO_ADDRESS}
+    --eth-wrapped-ether-address=${ETH_WRAPPED_ETHER_ADDRESS}
   )
 fi
 
