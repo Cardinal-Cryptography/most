@@ -23,10 +23,11 @@ pub const ONE_AZERO: u128 = 1_000_000_000_000;
 pub const ONE_ETHER: u128 = 1_000_000_000_000_000_000;
 
 pub const ETH_TO_AZERO_RELAYING_BUFFER: u128 = 100 * ONE_AZERO;
-pub const TRADED_AZERO_FEE_MULTIPLIER: u128 = 10;
+pub const TRADED_AZERO_FEE_MULTIPLIER: u128 = 20;
 pub const SLIPPAGE_PERCENT: u128 = 1;
 
 pub const HOUR_IN_MILLIS: u64 = 60 * 60 * 1000;
+pub const TRADER_QUERY_INTERVAL_MINS: u64 = 5;
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -288,7 +289,7 @@ impl Trader {
                         }
                     }
 
-                    sleep(Duration::from_millis(HOUR_IN_MILLIS)).await;
+                    sleep(Duration::from_mins(TRADER_QUERY_INTERVAL_MINS)).await;
                 }
 
             } => {
