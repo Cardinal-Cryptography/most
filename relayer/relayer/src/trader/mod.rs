@@ -27,7 +27,7 @@ pub const TRADED_AZERO_FEE_MULTIPLIER: u128 = 20;
 pub const SLIPPAGE_PERCENT: u128 = 1;
 
 pub const HOUR_IN_MILLIS: u64 = 60 * 60 * 1000;
-pub const TRADER_QUERY_INTERVAL_MINS: u64 = 5;
+pub const TRADER_QUERY_INTERVAL_MILLIS: u64 = 5 * 60 * 1000;
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -289,7 +289,7 @@ impl Trader {
                         }
                     }
 
-                    sleep(Duration::from_mins(TRADER_QUERY_INTERVAL_MINS)).await;
+                    sleep(Duration::from_millis(TRADER_QUERY_INTERVAL_MILLIS)).await;
                 }
 
             } => {
