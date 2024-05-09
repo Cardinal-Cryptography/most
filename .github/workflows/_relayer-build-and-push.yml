@@ -158,7 +158,7 @@ jobs:
         env:
           TMP_ARTIFACT_AZERO_MOST_DIR: downloaded-artifact-azero-most
           TMP_ARTIFACT_AZERO_ADVISORY_DIR: downloaded-artifact-azero-advisory
-          TMP_ARTIFACT_AZERO_TOKEN_DIR: downloaded-artifact-azero-advisory
+          TMP_ARTIFACT_AZERO_TOKEN_DIR: downloaded-artifact-azero-token
           TMP_ARTIFACT_AZERO_ROUTER_CONTRACT_DIR: downloaded-artifact-azero-router-contract
           TMP_ARTIFACT_ETH_MOST_DIR: downloaded-artifact-eth-most
           TMP_ARTIFACT_ETH_WETH9_DIR: downloaded-artifact-eth-weth9
