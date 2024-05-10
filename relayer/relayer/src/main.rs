@@ -228,6 +228,9 @@ async fn main() -> Result<(), RelayerError> {
                     tick = Instant::now();
                 }
             }
+            Err(RelayerError::TraderComponent(why)) => {
+                error!("Trader component exited with an error {why:?}. Restart is required to run Trader again.");
+            }
             Err(why) => {
                 error!("One of the core components exited with an error {why:?}. This is fatal");
                 std::process::exit(1);
