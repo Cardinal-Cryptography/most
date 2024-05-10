@@ -26,6 +26,6 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 COPY ./most.json /usr/local/most.json
 COPY ./advisory.json /usr/local/advisory.json
 COPY ./token.json /usr/local/token.json
-COPY ./router_contract.json /usr/local/router_contract.json
+COPY ./router_contract.json /usr/local/router.json
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
