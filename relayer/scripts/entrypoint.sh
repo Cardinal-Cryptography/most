@@ -54,7 +54,7 @@ ARGS=(
   --dev-account-index=${RELAYER_ID}
   --redis-node=${REDIS}
   --azero-contract-metadata=${AZERO_MOST_METADATA}
-  --token-metadata=${TOKEN_METADATA}
+  --azero-ether-metadata=${TOKEN_METADATA}
   --router-metadata=${ROUTER_METADATA}
 )
 
