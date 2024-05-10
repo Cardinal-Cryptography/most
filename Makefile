@@ -396,8 +396,10 @@ ifeq ($(DOCKER_RELAYER_COPY_ADDRESSES),copy)
 endif
 	cp azero/artifacts/most.json relayer/most.json
 	cp azero/artifacts/advisory.json relayer/advisory.json
+	cp azero/artifacts/token.json relayer/token.json
+	cp azero/artifacts/router.json relayer/router.json
 	cd relayer && docker build -t $(DOCKER_RELAYER_NAME) --build-arg COPY_ADDRESSES=$(DOCKER_RELAYER_COPY_ADDRESSES) .
-	rm -f relayer/azero_addresses.json relayer/eth_addresses.json relayer/most.json relayer/advisory.json
+	rm -f relayer/azero_addresses.json relayer/eth_addresses.json relayer/most.json relayer/advisory.json relayer/token.json relayer/router.json
 
 contract_spec.json: # Generate a a file describing deployed contracts based on addresses.json files
 contract_spec.json: azero/addresses.json eth/addresses.json

@@ -43,6 +43,8 @@ echo "RELAYER_ID=${RELAYER_ID}"
 
 AZERO_MOST_METADATA=${AZERO_MOST_METADATA:-"/usr/local/most.json"}
 ADVISORY_METADATA=${ADVISORY_METADATA:-"/usr/local/advisory.json"}
+TOKEN_METADATA=${ADVISORY_METADATA:-"/usr/local/token.json"}
+ROUTER_METADATA=${AZERO_MOST_METADATA:-"/usr/local/router.json"}
 
 ARGS=(
   --name "guardian_${RELAYER_ID}"
@@ -52,6 +54,8 @@ ARGS=(
   --dev-account-index=${RELAYER_ID}
   --redis-node=${REDIS}
   --azero-contract-metadata=${AZERO_MOST_METADATA}
+  --token-metadata=${TOKEN_METADATA}
+  --router-metadata=${ROUTER_METADATA}
 )
 
 # --- Addresses can be passed as environment variables.
