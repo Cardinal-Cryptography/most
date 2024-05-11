@@ -43,8 +43,8 @@ echo "RELAYER_ID=${RELAYER_ID}"
 
 AZERO_MOST_METADATA=${AZERO_MOST_METADATA:-"/usr/local/most.json"}
 ADVISORY_METADATA=${ADVISORY_METADATA:-"/usr/local/advisory.json"}
-TOKEN_METADATA=${ADVISORY_METADATA:-"/usr/local/token.json"}
-ROUTER_METADATA=${AZERO_MOST_METADATA:-"/usr/local/router.json"}
+TOKEN_METADATA=${TOKEN_METADATA:-"/usr/local/token.json"}
+ROUTER_METADATA=${ROUTER_METADATA:-"/usr/local/router.json"}
 
 ARGS=(
   --name "guardian_${RELAYER_ID}"
