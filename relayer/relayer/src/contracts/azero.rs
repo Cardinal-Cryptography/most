@@ -13,7 +13,7 @@ use aleph_client::{
     sp_weights::weight_v2::Weight,
     utility::BlocksApi,
     waiting::BlockStatus,
-    AccountId, AlephConfig, Connection, TxInfo,
+    AccountId, AlephConfig, Connection, SignedConnectionApi, TxInfo,
 };
 use log::{debug, error, trace};
 use subxt::events::Events;
@@ -258,6 +258,44 @@ impl MostInstance {
             .contract
             .read0::<Result<u128, _>, _>(connection, "get_base_fee", Default::default())
             .await??)
+    }
+
+    pub async fn get_collected_reward(
+        &self,
+        connection: &Connection,
+        committee_id: u128,
+        member_id: AccountId,
+    ) -> Result<u128, AzeroContractError> {
+        Ok(self
+            .contract
+            .read(
+                connection,
+                "get_outstanding_meber_rewards",
+                &[committee_id.to_string(), member_id.to_string()],
+                Default::default(),
+            )
+            .await?)
+    }
+
+    pub async fn payout_rewards(
+        &self,
+        signed_connection: &AzeroConnectionWithSigner,
+        committee_id: u128,
+    ) -> Result<TxInfo, AzeroContractError> {
+        let args = [
+            committee_id.to_string(),
+            signed_connection.account_id().to_string(),
+        ];
+
+        self.contract
+            .exec(
+                signed_connection,
+                "payout_rewards",
+                &args,
+                ExecCallParams::new(),
+            )
+            .await
+            .map_err(AzeroContractError::AlephClient)
     }
 
     pub async fn send_request(

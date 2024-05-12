@@ -144,6 +144,8 @@ impl Trader {
                 loop {
                     debug!("Ping");
 
+                    payout_relayer_rewards(azero_signed_connection.clone(), &most_azero).await;
+
                     let azero_balance = azero_signed_connection
                         .get_free_balance(whoami_azero.to_owned(), None)
                         .await;
@@ -295,6 +297,50 @@ impl Trader {
             } => {
                 Err(TraderError::TraderExited)
             }
+        }
+    }
+}
+
+pub async fn payout_relayer_rewards(
+    azero_signed_connection: Arc<AzeroConnectionWithSigner>,
+    most: &MostInstance,
+) {
+    let current_committee_id = match most
+        .current_committee_id(azero_signed_connection.as_connection())
+        .await
+    {
+        Ok(committee_id) => committee_id,
+        Err(why) => {
+            warn!("Could not fetch current committee id: {why:?}");
+            return;
+        }
+    };
+
+    let rewards = most
+        .get_collected_reward(
+            azero_signed_connection.as_connection(),
+            current_committee_id,
+            azero_signed_connection.account_id().clone(),
+        )
+        .await;
+
+    match rewards {
+        Ok(rewards) => {
+            info!("Outstanding rewards: {rewards:?}");
+            if rewards > 10 * ONE_AZERO {
+                if let Err(why) = most
+                    .payout_rewards(
+                        &azero_signed_connection,
+                        current_committee_id,
+                    )
+                    .await
+                {
+                    warn!("Could not withdraw rewards: {why:?}");
+                }
+            }
+        }
+        Err(why) => {
+            warn!("Could not fetch rewards: {why:?}");
         }
     }
 }
