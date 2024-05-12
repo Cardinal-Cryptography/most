@@ -1,4 +1,5 @@
 use std::{
+    fmt::Debug,
     str::FromStr,
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -165,121 +166,96 @@ impl Trader {
                     let azero_available_for_swap = azero_balance.saturating_sub(current_base_fee + ETH_TO_AZERO_RELAYING_BUFFER);
 
                     // check azero balance
-                    if azero_available_for_swap > current_base_fee * TRADED_AZERO_FEE_MULTIPLIER {
-                        info!("{azero_available_for_swap} A0 above the safe limit will be swapped.");
-
-                        let min_weth_amount_out = match router
-                            .get_amounts_out(azero_signed_connection.as_connection(), azero_available_for_swap, &swap_path)
-                            .await
-                        {
-                            Ok(amounts) => {
-                                debug!("Amounts out {amounts:?}.");
-
-                                match amounts.last() {
-                                    Some(amount) => amount.saturating_mul(100 - SLIPPAGE_PERCENT).saturating_div(100),
-                                    None => {
-                                        warn!("Query to `calculate_amounts_out` returned an empty result.");
-                                        continue;
-                                    }
-                                }
-                            },
-
-                            Err(why) => {
-                                warn!("Could not `get_amounts_out`: {why:?}");
-                                continue;
-                            }
-                        };
-
-                        let now = SystemTime::now()
-                            .duration_since(UNIX_EPOCH)
-                            .expect("unix timestamp")
-                            .as_millis();
-
-                        info!("Requesting a swap of {azero_available_for_swap} Azero to at least {min_weth_amount_out} Azero ETH.");
-
-                        if let Err(why) = router
-                            .swap_exact_native_for_tokens(
-                                &azero_signed_connection,
-                                azero_available_for_swap,
-                                min_weth_amount_out,
-                                &swap_path,
-                                whoami_azero.clone(),
-                                now.saturating_add(HOUR_IN_MILLIS.into()) as u64, // within one hour
-                            )
-                            .await
-                        {
-                            warn!("Could not perform swap: {why:?}.");
-                            continue;
-                        }
-
-                        // check azero Eth balance
-                        let azero_eth_balance = match azero_ether
-                            .balance_of(azero_signed_connection.as_connection(), whoami_azero.clone())
-                            .await {
-                                Ok(balance) => balance,
-                                Err(why) => {
-                                    warn!("Error when querying for Azero ETH balance: {why:?}.");
-                                    continue;
-                                },
-                            };
-
-                        if azero_eth_balance > 0 {
-                            info!("Requesting a cross chain transfer of {azero_eth_balance} units of Azero ETH [{azero_ether_address}] to {whoami_eth}.");
-
-                            // set allowance
-                            if let Err(why) = azero_ether.approve(&azero_signed_connection, most_azero.address.clone(), azero_eth_balance).await {
-                                warn!("Approve tx failed: {why:?}.");
-                                continue;
-                            }
-
-                            if let Err(why) = most_azero
-                                .send_request(
-                                    &azero_signed_connection,
-                                    *azero_ether.address.clone().as_ref(),
-                                    azero_eth_balance,
-                                    receiver,
-                                    current_base_fee
-                                )
-                                .await
-                            {
-                                warn!("Could not send the cross-chain transfer request: {why:?}.");
-                                continue;
-                            }
-
-                        }
-
-                    } else {
+                    if azero_available_for_swap < current_base_fee * TRADED_AZERO_FEE_MULTIPLIER {
                         debug!("{whoami_azero} has A0 balance too low for bridging");
+                        continue;
                     }
 
-                    // check 0xwETH balance
-                    let wrapped_ether_balance = match wrapped_ether
-                        .balance_of(eth_signed_connection.address())
-                        .block(BlockNumber::Finalized)
+                    info!("{azero_available_for_swap} A0 above the safe limit will be swapped.");
+
+                    let min_weth_amount_out = match router
+                        .get_amounts_out(azero_signed_connection.as_connection(), azero_available_for_swap, &swap_path)
                         .await
                     {
-                        Ok(balance) => balance,
+                        Ok(amounts) => {
+                            debug!("Amounts out {amounts:?}.");
+
+                            match amounts.last() {
+                                Some(amount) => amount.saturating_mul(100 - SLIPPAGE_PERCENT).saturating_div(100),
+                                None => {
+                                    warn!("Query to `calculate_amounts_out` returned an empty result.");
+                                    continue;
+                                }
+                            }
+                        },
+
                         Err(why) => {
-                            warn!("Query for WETH balance failed : {why:?}.");
+                            warn!("Could not `get_amounts_out`: {why:?}");
                             continue;
                         }
                     };
 
-                    debug!("{whoami_eth} has a balance of: {wrapped_ether_balance:?} WETH9.");
+                    let now = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .expect("unix timestamp")
+                        .as_millis();
 
-                    // withdraw 0xwETH -> ETH
-                    if !wrapped_ether_balance.is_zero() {
+                    info!("Requesting a swap of {azero_available_for_swap} Azero to at least {min_weth_amount_out} Azero ETH.");
 
-                        info!("{whoami_eth} has a positive balance of {wrapped_ether_balance} WETH9 that will be unwrapped.");
-
-                        if let Err(why) = wrapped_ether
-                            .withdraw(wrapped_ether_balance)
-                            .block(BlockNumber::Finalized)
-                            .await {
-                                warn!("Unwrapping WETH failed : {why:?}.");
-                                continue;
-                            }
+                    if let Err(why) = router
+                        .swap_exact_native_for_tokens(
+                            &azero_signed_connection,
+                            azero_available_for_swap,
+                            min_weth_amount_out,
+                            &swap_path,
+                            whoami_azero.clone(),
+                            now.saturating_add(HOUR_IN_MILLIS.into()) as u64, // within one hour
+                        )
+                        .await
+                    {
+                        warn!("Could not perform swap: {why:?}.");
+                        continue;
                     }
+
+                    // check azero Eth balance
+                    let azero_eth_balance = match azero_ether
+                        .balance_of(azero_signed_connection.as_connection(), whoami_azero.clone())
+                        .await {
+                            Ok(balance) => balance,
+                            Err(why) => {
+                                warn!("Error when querying for Azero ETH balance: {why:?}.");
+                                continue;
+                            },
+                        };
+
+                    if azero_eth_balance > 0 {
+                        info!("Requesting a cross chain transfer of {azero_eth_balance} units of Azero ETH [{azero_ether_address}] to {whoami_eth}.");
+
+                        // set allowance
+                        if let Err(why) = azero_ether.approve(&azero_signed_connection, most_azero.address.clone(), azero_eth_balance).await {
+                            warn!("Approve tx failed: {why:?}.");
+                            continue;
+                        }
+
+                        if let Err(why) = most_azero
+                            .send_request(
+                                &azero_signed_connection,
+                                *azero_ether.address.clone().as_ref(),
+                                azero_eth_balance,
+                                receiver,
+                                current_base_fee
+                            )
+                            .await
+                        {
+                            warn!("Could not send the cross-chain transfer request: {why:?}.");
+                            continue;
+                        }
+                    }
+
+                    unwrap_eth(
+                        eth_signed_connection.clone(),
+                        &wrapped_ether
+                    ).await;
 
                     // check ETH balance
                     if let Ok (eth_balance) = eth_signed_connection.get_balance(eth_signed_connection.address(), None).await {
@@ -301,7 +277,7 @@ impl Trader {
     }
 }
 
-pub async fn payout_relayer_rewards(
+async fn payout_relayer_rewards(
     azero_signed_connection: Arc<AzeroConnectionWithSigner>,
     most: &MostInstance,
 ) {
@@ -329,10 +305,7 @@ pub async fn payout_relayer_rewards(
             info!("Outstanding rewards: {rewards:?}");
             if rewards > 10 * ONE_AZERO {
                 if let Err(why) = most
-                    .payout_rewards(
-                        &azero_signed_connection,
-                        current_committee_id,
-                    )
+                    .payout_rewards(&azero_signed_connection, current_committee_id)
                     .await
                 {
                     warn!("Could not withdraw rewards: {why:?}");
@@ -341,6 +314,38 @@ pub async fn payout_relayer_rewards(
         }
         Err(why) => {
             warn!("Could not fetch rewards: {why:?}");
+        }
+    }
+}
+
+async fn unwrap_eth(
+    eth_signed_connection: Arc<SignedEthConnection>,
+    wrapped_ether: &WETH9<SignedEthConnection>,
+) {
+    let wrapped_ether_balance = match wrapped_ether
+        .balance_of(eth_signed_connection.address())
+        .block(BlockNumber::Finalized)
+        .await
+    {
+        Ok(balance) => balance,
+        Err(why) => {
+            warn!("Query for WETH balance failed : {why:?}.");
+            return;
+        }
+    };
+
+    debug!("ETH balance: {wrapped_ether_balance:?} WETH9.");
+
+    // withdraw 0xwETH -> ETH
+    if !wrapped_ether_balance.is_zero() {
+        info!("Unwrapping {wrapped_ether_balance} WETH9.");
+
+        if let Err(why) = wrapped_ether
+            .withdraw(wrapped_ether_balance)
+            .block(BlockNumber::Finalized)
+            .await
+        {
+            warn!("Unwrapping WETH failed : {why:?}.");
         }
     }
 }
