@@ -28,7 +28,7 @@ pub const TRADED_AZERO_FEE_MULTIPLIER: u128 = 20;
 pub const SLIPPAGE_PERCENT: u128 = 1;
 
 pub const HOUR_IN_MILLIS: u64 = 60 * 60 * 1000;
-pub const TRADER_QUERY_INTERVAL_MILLIS: u64 = 5 * 60 * 1000;
+pub const TRADER_QUERY_INTERVAL_MILLIS: u64 = 30 * 1000;
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -143,6 +143,8 @@ impl Trader {
 
             () = async {
                 loop {
+                    sleep(Duration::from_millis(TRADER_QUERY_INTERVAL_MILLIS)).await;
+
                     debug!("Ping");
 
                     payout_relayer_rewards(azero_signed_connection.clone(), &most_azero).await;
@@ -267,10 +269,7 @@ impl Trader {
                             info!("{whoami_eth} has a balance of {eth_balance} ETH.");
                         }
                     }
-
-                    sleep(Duration::from_millis(TRADER_QUERY_INTERVAL_MILLIS)).await;
                 }
-
             } => {
                 Err(TraderError::TraderExited)
             }
