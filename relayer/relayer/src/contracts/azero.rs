@@ -268,13 +268,13 @@ impl MostInstance {
     ) -> Result<u128, AzeroContractError> {
         Ok(self
             .contract
-            .read(
+            .read::<_, Result<u128, _>, _>(
                 connection,
                 "get_outstanding_member_rewards",
                 &[committee_id.to_string(), member_id.to_string()],
                 Default::default(),
             )
-            .await?)
+            .await??)
     }
 
     pub async fn payout_rewards(
