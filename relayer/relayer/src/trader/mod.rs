@@ -6,7 +6,7 @@ use std::{
 };
 
 use aleph_client::{pallets::system::SystemApi, AccountId, AsConnection, SignedConnectionApi};
-use ethers::{abi::Address, providers::Middleware, types::BlockNumber};
+use ethers::providers::Middleware;
 use log::{debug, error, info, warn};
 use thiserror::Error;
 use tokio::{select, sync::broadcast, time::sleep};
@@ -14,7 +14,7 @@ use tokio::{select, sync::broadcast, time::sleep};
 use crate::{
     config::Config,
     connections::{azero::AzeroConnectionWithSigner, eth::SignedEthConnection},
-    contracts::{AzeroContractError, AzeroEtherInstance, MostInstance, RouterInstance, WETH9},
+    contracts::{AzeroContractError, AzeroEtherInstance, MostInstance, RouterInstance},
     helpers::left_pad,
     CircuitBreakerEvent,
 };
@@ -76,7 +76,6 @@ impl Trader {
             azero_wrapped_azero_address,
             azero_ether_address,
             azero_ether_metadata,
-            eth_wrapped_ether_address,
             ..
         } = &*config;
 
@@ -115,15 +114,6 @@ impl Trader {
                 TraderError::MissingRequired("azero_wrapped_azero_address".to_owned()),
             )?)
             .map_err(|err| TraderError::NotAccountId(err.to_owned()))?;
-
-        let wrapped_ether_address = eth_wrapped_ether_address
-            .clone()
-            .ok_or(TraderError::MissingRequired(
-                "eth_wrapped_ether_address".to_owned(),
-            ))?
-            .parse::<Address>()?;
-
-        let wrapped_ether = WETH9::new(wrapped_ether_address, eth_signed_connection.clone());
 
         let whoami_azero = azero_signed_connection.account_id();
         let whoami_eth = eth_signed_connection.address().to_string();

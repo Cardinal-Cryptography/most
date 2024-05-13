@@ -104,9 +104,6 @@ pub struct Config {
     pub default_sync_from_block_azero: SyncFromBlock,
 
     #[arg(long)]
-    pub eth_wrapped_ether_address: Option<String>,
-
-    #[arg(long)]
     pub eth_contract_address: String,
 
     #[arg(long, default_value = "http://127.0.0.1:8545")]
