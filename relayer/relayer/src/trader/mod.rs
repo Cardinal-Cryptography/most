@@ -255,11 +255,6 @@ impl Trader {
                         }
                     }
 
-                    unwrap_eth(
-                        eth_signed_connection.clone(),
-                        &wrapped_ether
-                    ).await;
-
                     // check ETH balance
                     if let Ok (eth_balance) = eth_signed_connection.get_balance(eth_signed_connection.address(), None).await {
                         // warning if the balance drops too low
@@ -314,38 +309,6 @@ async fn payout_relayer_rewards(
         }
         Err(why) => {
             warn!("Could not fetch rewards: {why:?}");
-        }
-    }
-}
-
-async fn unwrap_eth(
-    eth_signed_connection: Arc<SignedEthConnection>,
-    wrapped_ether: &WETH9<SignedEthConnection>,
-) {
-    let wrapped_ether_balance = match wrapped_ether
-        .balance_of(eth_signed_connection.address())
-        .block(BlockNumber::Finalized)
-        .await
-    {
-        Ok(balance) => balance,
-        Err(why) => {
-            warn!("Query for WETH balance failed : {why:?}.");
-            return;
-        }
-    };
-
-    debug!("ETH balance: {wrapped_ether_balance:?} WETH9.");
-
-    // withdraw 0xwETH -> ETH
-    if !wrapped_ether_balance.is_zero() {
-        info!("Unwrapping {wrapped_ether_balance} WETH9.");
-
-        if let Err(why) = wrapped_ether
-            .withdraw(wrapped_ether_balance)
-            .block(BlockNumber::Finalized)
-            .await
-        {
-            warn!("Unwrapping WETH failed : {why:?}.");
         }
     }
 }
