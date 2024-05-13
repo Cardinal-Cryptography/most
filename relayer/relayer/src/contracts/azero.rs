@@ -411,7 +411,7 @@ impl MostInstance {
     ) -> Result<u128, AzeroContractError> {
         Ok(self
             .contract
-            .read0::<Result<u128, _>, _>(connection, "current_committee_id", Default::default())
+            .read0::<Result<u128, _>, _>(connection, "get_current_committee_id", Default::default())
             .await??)
     }
 
