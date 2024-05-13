@@ -270,7 +270,7 @@ impl MostInstance {
             .contract
             .read(
                 connection,
-                "get_outstanding_meber_rewards",
+                "get_outstanding_member_rewards",
                 &[committee_id.to_string(), member_id.to_string()],
                 Default::default(),
             )
