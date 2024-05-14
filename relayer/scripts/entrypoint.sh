@@ -7,6 +7,7 @@ set -eo pipefail
 
 ETH_ADDRESSES_FILE="/usr/local/contracts/eth_addresses.json"
 AZERO_ADDRESSES_FILE="/usr/local/contracts/azero_addresses.json"
+COMMON_ADDRESSES_FILE="/usr/local/contracts/common_addresses.json"
 
 # --- FUNCTIONS
 
@@ -59,7 +60,7 @@ ARGS=(
 )
 
 # --- Addresses can be passed as environment variables.
-# --- If they are not, they should be present in the docker container. 
+# --- If they are not, they should be present in the docker container.
 if [[ -n "${ADVISORY_ADDRESSES}" ]]; then
   ARGS+=(--advisory-contract-addresses=${ADVISORY_ADDRESSES})
 else
@@ -134,17 +135,12 @@ if [[ -n "${ETH_MIN_CONFIRMATIONS}" ]]; then
 fi
 
 if [[ -n "${RUN_TRADER}" ]]; then
-  ROUTER_ADDRESS=${ROUTER_ADDRESS:?"Router address is required for running trader component"}  
-  AZERO_ETHER_ADDRESS=${AZERO_ETHER_ADDRESS:?"Azero wrapped ETH token address is required for running trader component"}
-  WRAPPED_AZERO_ADDRESS=${WRAPPED_AZERO_ADDRESS:?"Wrapped Azero token address is required for running trader component"}
-  ETH_WRAPPED_ETHER_ADDRESS=${ETH_WRAPPED_ETHER_ADDRESS:?"ETH wrapped token address is required for running trader component"}
-
   ARGS+=(
     --run-trader-component
-    --router-address=${ROUTER_ADDRESS}
-    --azero-ether-address=${AZERO_ETHER_ADDRESS}
-    --azero-wrapped-azero-address=${WRAPPED_AZERO_ADDRESS}
-    --eth-wrapped-ether-address=${ETH_WRAPPED_ETHER_ADDRESS}
+    --router-address=$(get_address $COMMON_ADDRESSES_FILE azero_router))
+    --azero-ether-address=${jq -r '.addresses.azero_tokens.address[] | select(.[0] | endswith("ETH")) | .[2]' $AZERO_ADDRESSES_FILE}
+    --azero-wrapped-azero-address=$(get_address $COMMON_ADDRESSES_FILE azero_wazero))
+    --eth-wrapped-ether-address=${jq -r '.addresses.azero_tokens.address[] | select(.[0] | endswith("ETH")) | .[1]' $AZERO_ADDRESSES_FILE}
   )
 fi
 
