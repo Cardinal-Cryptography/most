@@ -131,7 +131,7 @@ impl Trader {
                 Ok(cb_event?)
             },
 
-            () = async {
+            _ = async {
                 loop {
                     sleep(Duration::from_millis(TRADER_QUERY_INTERVAL_MILLIS)).await;
 
@@ -143,7 +143,7 @@ impl Trader {
                         .get_free_balance(whoami_azero.to_owned(), None)
                         .await;
 
-                    info!("{whoami_azero} has a balance of: {azero_balance} Azero.");
+                    info!("{whoami_azero} has a balance of: {azero_balance} pA0.");
 
                     let current_base_fee = match most_azero.get_base_fee(azero_signed_connection.as_connection()).await {
                         Ok(amount) => {
@@ -192,7 +192,7 @@ impl Trader {
                         .expect("unix timestamp")
                         .as_millis();
 
-                    info!("Requesting a swap of {azero_available_for_swap} Azero to at least {min_weth_amount_out} Azero ETH.");
+                    info!("Requesting a swap of {azero_available_for_swap} pA0 to at least {min_weth_amount_out} Azero ETH.");
 
                     if let Err(why) = router
                         .swap_exact_native_for_tokens(
@@ -248,9 +248,9 @@ impl Trader {
                     if let Ok (eth_balance) = eth_signed_connection.get_balance(eth_signed_connection.address(), None).await {
                         // warning if the balance drops too low
                         if eth_balance < ONE_ETHER.into () {
-                            warn!("{whoami_eth} has a low ETH balance: {eth_balance} ETH.");
+                            warn!("{whoami_eth} has a low ETH balance: {eth_balance} Wei.");
                         } else {
-                            info!("{whoami_eth} has a balance of {eth_balance} ETH.");
+                            info!("{whoami_eth} has a balance of {eth_balance} Wei.");
                         }
                     }
                 }
