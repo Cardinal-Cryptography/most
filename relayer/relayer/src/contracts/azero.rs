@@ -38,8 +38,7 @@ pub enum AzeroContractError {
     MissingOrInvalidField(String),
 
     #[error("send_request tx has failed")]
-    SendRequestTxFailure {
-        src_token_address: String,
+    SendRequestNativeEtherTxFailure {
         amount: u128,
         dest_receiver_address: String,
         base_fee: u128,
@@ -298,10 +297,9 @@ impl MostInstance {
             .map_err(AzeroContractError::AlephClient)
     }
 
-    pub async fn send_request(
+    pub async fn send_request_native_ether(
         &self,
         signed_connection: &AzeroConnectionWithSigner,
-        src_token_address: [u8; 32],
         amount: u128,
         dest_receiver_address: [u8; 32],
         base_fee: u128,
@@ -310,22 +308,22 @@ impl MostInstance {
             ref_time: self.ref_time_limit,
             proof_size: self.proof_size_limit,
         };
-        let args = [
-            bytes32_to_str(&src_token_address),
-            amount.to_string(),
-            bytes32_to_str(&dest_receiver_address),
-        ];
+        let args = [amount.to_string(), bytes32_to_str(&dest_receiver_address)];
 
         let params = ExecCallParams::new().gas_limit(gas_limit).value(base_fee);
 
         // Exec does dry run first, so there's no need to repeat it here
         self.contract
-            .exec(signed_connection, "send_request", &args, params)
+            .exec(
+                signed_connection,
+                "send_request_native_ether",
+                &args,
+                params,
+            )
             .await
             .map_err(|why| {
                 error!("send_request failure: {why:?}");
-                AzeroContractError::SendRequestTxFailure {
-                    src_token_address: hex::encode(src_token_address),
+                AzeroContractError::SendRequestNativeEtherTxFailure {
                     amount,
                     dest_receiver_address: hex::encode(dest_receiver_address),
                     base_fee,

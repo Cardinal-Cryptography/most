@@ -231,9 +231,8 @@ impl Trader {
                         }
 
                         if let Err(why) = most_azero
-                            .send_request(
+                            .send_request_native_ether(
                                 &azero_signed_connection,
-                                *azero_ether.address.clone().as_ref(),
                                 azero_eth_balance,
                                 receiver,
                                 current_base_fee
