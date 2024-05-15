@@ -47,7 +47,6 @@ pub enum AzeroContractError {
 
 pub struct RouterInstance {
     pub contract: ContractInstance,
-    pub address: AccountId,
     pub ref_time_limit: u64,
     pub proof_size_limit: u64,
 }
@@ -62,7 +61,6 @@ impl RouterInstance {
         let address = AccountId::from_str(address)
             .map_err(|why| AzeroContractError::NotAccountId(why.to_string()))?;
         Ok(Self {
-            address: address.clone(),
             contract: ContractInstance::new(address, metadata_path)?,
             ref_time_limit,
             proof_size_limit,
@@ -125,14 +123,13 @@ impl RouterInstance {
     where
         T: ToString,
     {
-  let strings: Vec<_> = data.into_iter().map(|x| x.to_string()).collect();
-  format!("[{:}]", strings.join(", "));
+        let strings: Vec<_> = coll.iter().map(|x| x.to_string()).collect();
+        format!("[{:}]", strings.join(", "))
     }
 }
 
 pub struct AzeroEtherInstance {
     pub contract: ContractInstance,
-    pub address: AccountId,
     pub ref_time_limit: u64,
     pub proof_size_limit: u64,
 }
@@ -147,7 +144,6 @@ impl AzeroEtherInstance {
         let address = AccountId::from_str(address)
             .map_err(|why| AzeroContractError::NotAccountId(why.to_string()))?;
         Ok(Self {
-            address: address.clone(),
             contract: ContractInstance::new(address, metadata_path)?,
             ref_time_limit,
             proof_size_limit,
@@ -223,7 +219,6 @@ impl AdvisoryInstance {
 
 pub struct MostInstance {
     pub contract: ContractInstance,
-    pub address: AccountId,
     pub ref_time_limit: u64,
     pub proof_size_limit: u64,
 }
@@ -238,7 +233,6 @@ impl MostInstance {
         let address = AccountId::from_str(address)
             .map_err(|why| AzeroContractError::NotAccountId(why.to_string()))?;
         Ok(Self {
-            address: address.clone(),
             contract: ContractInstance::new(address, metadata_path)?,
             ref_time_limit,
             proof_size_limit,
