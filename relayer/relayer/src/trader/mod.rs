@@ -156,8 +156,7 @@ impl Trader {
             config,
             azero_signed_connection.clone(),
             eth_signed_connection.clone(),
-        )
-        .unwrap();
+        )?;
 
         let swap_path = [
             wrapped_azero_address.clone(),
