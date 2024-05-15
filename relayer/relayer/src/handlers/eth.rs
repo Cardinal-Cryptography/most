@@ -130,7 +130,7 @@ impl EthereumEventHandler {
                 )
                 .await?
             {
-                debug!("Azero: request with nonce {request_nonce} not yet finalized.");
+                debug!("Azero: request 0x{request_hash_hex} not yet finalized.");
 
                 if !contract
                     .needs_signature(
