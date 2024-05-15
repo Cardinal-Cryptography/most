@@ -245,7 +245,6 @@ impl Trader {
 
                     // check ETH balance
                     if let Ok (eth_balance) = eth_signed_connection.get_balance(eth_signed_connection.address(), None).await {
-                        // warning if the balance drops too low
                         if eth_balance < ONE_ETHER.into () {
                             warn!("{whoami_eth} has a low ETH balance: {eth_balance} Wei.");
                         } else {
