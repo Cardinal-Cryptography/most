@@ -31,6 +31,7 @@ pub const HOUR_IN_MILLIS: u64 = 60 * 60 * 1000;
 pub const TRADER_QUERY_INTERVAL_MILLIS: u64 = 30 * 1000;
 
 pub const BRIDGING_THRESHOLD: u128 = ONE_ETHER / 10;
+pub const REWARD_WITHDRAWAL_THRESHOLD: u128 = 10 * ONE_AZERO;
 
 #[derive(Debug, Error)]
 #[error(transparent)]
