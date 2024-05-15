@@ -286,7 +286,7 @@ async fn payout_relayer_rewards(
     match rewards {
         Ok(rewards) => {
             info!("Outstanding rewards: {rewards:?}");
-            if rewards > 10 * ONE_AZERO {
+            if rewards > REWARD_WITHDRAWAL_THRESHOLD {
                 if let Err(why) = most
                     .payout_rewards(&azero_signed_connection, current_committee_id)
                     .await
