@@ -19,10 +19,10 @@ use crate::{
     CircuitBreakerEvent,
 };
 
-// trader component will sell the surplus
 pub const ONE_AZERO: u128 = 1_000_000_000_000;
 pub const ONE_ETHER: u128 = 1_000_000_000_000_000_000;
 
+// trader component will sell the surplus
 pub const ETH_TO_AZERO_RELAYING_BUFFER: u128 = 100 * ONE_AZERO;
 pub const TRADED_AZERO_FEE_MULTIPLIER: u128 = 20;
 pub const SLIPPAGE_PERCENT: u128 = 1;
@@ -195,7 +195,8 @@ impl Trader {
                     let current_base_fee = match most_azero.get_base_fee(azero_signed_connection.as_connection()).await {
                         Ok(amount) => {
                             info!("Current base fee: {amount} pA0");
-                            amount},
+                            amount
+                        },
                         Err(why) => {
                             warn!("Query to `get_base_fee` has failed {why:?}.");
                             continue;
