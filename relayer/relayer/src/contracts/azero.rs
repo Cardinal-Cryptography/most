@@ -125,15 +125,8 @@ impl RouterInstance {
     where
         T: ToString,
     {
-        let mut encoding: String = "[".to_owned();
-        for i in 0..coll.len() {
-            encoding.push_str(&coll[i].to_string());
-            if i < (coll.len() - 1) {
-                encoding.push(',')
-            }
-        }
-        encoding.push(']');
-        encoding
+  let strings: Vec<_> = data.into_iter().map(|x| x.to_string()).collect();
+  format!("[{:}]", strings.join(", "));
     }
 }
 
