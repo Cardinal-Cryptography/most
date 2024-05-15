@@ -6,7 +6,7 @@ use std::{
 };
 
 use aleph_client::{pallets::system::SystemApi, AccountId, AsConnection, SignedConnectionApi};
-use ethers::providers::Middleware;
+use ethers::{core::types::H160, providers::Middleware};
 use log::{debug, error, info, warn};
 use thiserror::Error;
 use tokio::{select, sync::broadcast, time::sleep};
@@ -59,16 +59,21 @@ pub enum TraderError {
     TraderExited,
 }
 
-#[derive(Copy, Clone)]
-pub struct Trader;
+pub struct Trader {
+    most_azero: MostInstance,
+    router: RouterInstance,
+    azero_ether: AzeroEtherInstance,
+    whoami_azero: AccountId,
+    whoami_eth: H160,
+    wrapped_azero_address: AccountId,
+}
 
 impl Trader {
-    pub async fn run(
+    fn new(
         config: Arc<Config>,
         azero_signed_connection: Arc<AzeroConnectionWithSigner>,
         eth_signed_connection: Arc<SignedEthConnection>,
-        mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
-    ) -> Result<CircuitBreakerEvent, TraderError> {
+    ) -> Result<Self, TraderError> {
         let Config {
             azero_contract_metadata,
             azero_contract_address,
@@ -119,15 +124,50 @@ impl Trader {
             .map_err(|err| TraderError::NotAccountId(err.to_owned()))?;
 
         let whoami_azero = azero_signed_connection.account_id();
-        let whoami_eth = eth_signed_connection.address().to_string();
+        let whoami_eth = eth_signed_connection.address();
+
+        let mut receiver: [u8; 32] = [0; 32];
+        receiver.copy_from_slice(&left_pad(eth_signed_connection.address().0.to_vec(), 32));
+
+        Ok(Self {
+            router,
+            most_azero,
+            whoami_azero: whoami_azero.clone(),
+            whoami_eth,
+            wrapped_azero_address,
+            azero_ether,
+        })
+    }
+
+    pub async fn run(
+        config: Arc<Config>,
+        azero_signed_connection: Arc<AzeroConnectionWithSigner>,
+        eth_signed_connection: Arc<SignedEthConnection>,
+        mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
+    ) -> Result<CircuitBreakerEvent, TraderError> {
+        let Trader {
+            router,
+            most_azero,
+            whoami_azero,
+            whoami_eth,
+            azero_ether,
+            wrapped_azero_address,
+        } = Self::new(
+            config,
+            azero_signed_connection.clone(),
+            eth_signed_connection.clone(),
+        )
+        .unwrap();
 
         let swap_path = [
             wrapped_azero_address.clone(),
             azero_ether.contract.address().clone(),
         ];
 
+        let azero_ether_address = azero_ether.contract.address().clone();
+
         let mut receiver: [u8; 32] = [0; 32];
-        receiver.copy_from_slice(&left_pad(eth_signed_connection.address().0.to_vec(), 32));
+        receiver.copy_from_slice(&left_pad(whoami_eth.0.to_vec(), 32));
 
         info!("Starting");
 
