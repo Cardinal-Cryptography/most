@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - master
-      - trader-component
 
 jobs:
   check-vars-and-secrets:
