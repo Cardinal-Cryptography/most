@@ -168,6 +168,8 @@ impl Trader {
         let mut receiver: [u8; 32] = [0; 32];
         receiver.copy_from_slice(&left_pad(whoami_eth.0.to_vec(), 32));
 
+        let whoami_eth = whoami_eth.to_string();
+
         info!("Starting");
 
         select! {
