@@ -57,7 +57,7 @@ pub struct Config {
     #[arg(long)]
     pub router_address: Option<String>,
 
-    #[arg(long, default_value = "../azero/artifacts/router.json")]
+    #[arg(long, default_value = "../azero/external_artifacts/router.json")]
     pub router_metadata: String,
 
     /// Ethereum PSP22 token on the AlephZero
