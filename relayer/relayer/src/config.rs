@@ -43,6 +43,33 @@ pub struct Config {
     #[arg(long, use_value_delimiter = true, value_delimiter = ',')]
     pub blacklisted_requests: Option<Vec<H256>>,
 
+    /// Whether to include trading component that makes periodic swaps from A0 -> Ethereum
+    #[arg(
+        long,
+        default_value = "false",
+        requires("router_address"),
+        requires("azero_wrapped_azero_address"),
+        requires("azero_ether_address"),
+        requires("eth_wrapped_ether_address")
+    )]
+    pub run_trader_component: bool,
+
+    #[arg(long)]
+    pub router_address: Option<String>,
+
+    #[arg(long, default_value = "../azero/external_artifacts/router.json")]
+    pub router_metadata: String,
+
+    /// Ethereum PSP22 token on the AlephZero
+    #[arg(long)]
+    pub azero_ether_address: Option<String>,
+
+    #[arg(long, default_value = "../azero/artifacts/token.json")]
+    pub azero_ether_metadata: String,
+
+    #[arg(long)]
+    pub azero_wrapped_azero_address: Option<String>,
+
     #[arg(long, use_value_delimiter = true, value_delimiter = ',')]
     pub advisory_contract_addresses: Option<Vec<String>>,
 

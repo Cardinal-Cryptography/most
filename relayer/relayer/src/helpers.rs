@@ -5,3 +5,14 @@ pub fn concat_u8_arrays(arrays: Vec<&[u8]>) -> Vec<u8> {
     }
     result
 }
+
+pub fn left_pad(coll: Vec<u8>, n: usize) -> Vec<u8> {
+    let len = coll.len();
+    if len >= n {
+        return coll;
+    }
+    let padding_len = 32 - len;
+    let mut padded = vec![0; padding_len];
+    padded.extend(coll);
+    padded
+}

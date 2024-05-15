@@ -1,0 +1,2386 @@
+{
+  "source": {
+    "hash": "0xd95a57023da223ec522904d2b4e598ef683220efed58815bbefee10d50134754",
+    "language": "ink! 4.3.0",
+    "compiler": "rustc 1.72.1",
+    "build_info": {
+      "build_mode": "Release",
+      "cargo_contract_version": "3.2.0",
+      "rust_toolchain": "stable-x86_64-unknown-linux-gnu",
+      "wasm_opt_settings": {
+        "keep_debug_symbols": false,
+        "optimization_passes": "Z"
+      }
+    }
+  },
+  "contract": {
+    "name": "router_contract",
+    "version": "0.1.0",
+    "authors": [
+      "Cardinal Cryptography"
+    ]
+  },
+  "spec": {
+    "constructors": [
+      {
+        "args": [
+          {
+            "label": "factory",
+            "type": {
+              "displayName": [
+                "AccountId"
+              ],
+              "type": 0
+            }
+          },
+          {
+            "label": "wnative",
+            "type": {
+              "displayName": [
+                "AccountId"
+              ],
+              "type": 0
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "new",
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink_primitives",
+            "ConstructorResult"
+          ],
+          "type": 3
+        },
+        "selector": "0x9bae9d5e"
+      }
+    ],
+    "docs": [],
+    "environment": {
+      "accountId": {
+        "displayName": [
+          "AccountId"
+        ],
+        "type": 0
+      },
+      "balance": {
+        "displayName": [
+          "Balance"
+        ],
+        "type": 13
+      },
+      "blockNumber": {
+        "displayName": [
+          "BlockNumber"
+        ],
+        "type": 34
+      },
+      "chainExtension": {
+        "displayName": [
+          "ChainExtension"
+        ],
+        "type": 35
+      },
+      "hash": {
+        "displayName": [
+          "Hash"
+        ],
+        "type": 33
+      },
+      "maxEventTopics": 4,
+      "timestamp": {
+        "displayName": [
+          "Timestamp"
+        ],
+        "type": 14
+      }
+    },
+    "events": [],
+    "lang_error": {
+      "displayName": [
+        "ink",
+        "LangError"
+      ],
+      "type": 5
+    },
+    "messages": [
+      {
+        "args": [],
+        "default": false,
+        "docs": [],
+        "label": "owner",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 6
+        },
+        "selector": "0xfeaea4fa"
+      },
+      {
+        "args": [
+          {
+            "label": "new_owner",
+            "type": {
+              "displayName": [
+                "AccountId"
+              ],
+              "type": 0
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "set_owner",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 7
+        },
+        "selector": "0x367facd6"
+      },
+      {
+        "args": [
+          {
+            "label": "token_0",
+            "type": {
+              "displayName": [
+                "AccountId"
+              ],
+              "type": 0
+            }
+          },
+          {
+            "label": "token_1",
+            "type": {
+              "displayName": [
+                "AccountId"
+              ],
+              "type": 0
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "read_cache",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 10
+        },
+        "selector": "0x08b0908e"
+      },
+      {
+        "args": [
+          {
+            "label": "pair",
+            "type": {
+              "displayName": [
+                "AccountId"
+              ],
+              "type": 0
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "add_pair_to_cache",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 7
+        },
+        "selector": "0xb2a9e1fe"
+      },
+      {
+        "args": [
+          {
+            "label": "token_0",
+            "type": {
+              "displayName": [
+                "AccountId"
+              ],
+              "type": 0
+            }
+          },
+          {
+            "label": "token_1",
+            "type": {
+              "displayName": [
+                "AccountId"
+              ],
+              "type": 0
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "remove_pair_from_cache",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 7
+        },
+        "selector": "0xc8c726c8"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [],
+        "label": "Router::factory",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 6
+        },
+        "selector": "0xac3a4c18"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [],
+        "label": "Router::wnative",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 6
+        },
+        "selector": "0x5593eab6"
+      },
+      {
+        "args": [
+          {
+            "label": "token_0",
+            "type": {
+              "displayName": [
+                "AccountId"
+              ],
+              "type": 0
+            }
+          },
+          {
+            "label": "token_1",
+            "type": {
+              "displayName": [
+                "AccountId"
+              ],
+              "type": 0
+            }
+          },
+          {
+            "label": "amount_0_desired",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "amount_1_desired",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "amount_0_min",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "amount_1_min",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "to",
+            "type": {
+              "displayName": [
+                "AccountId"
+              ],
+              "type": 0
+            }
+          },
+          {
+            "label": "deadline",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 14
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "Router::add_liquidity",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 15
+        },
+        "selector": "0xa5b7d597"
+      },
+      {
+        "args": [
+          {
+            "label": "token",
+            "type": {
+              "displayName": [
+                "AccountId"
+              ],
+              "type": 0
+            }
+          },
+          {
+            "label": "amount_token_desired",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "amount_token_min",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "amount_native_min",
+            "type": {
+              "displayName": [
+                "Balance"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "to",
+            "type": {
+              "displayName": [
+                "AccountId"
+              ],
+              "type": 0
+            }
+          },
+          {
+            "label": "deadline",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 14
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "Router::add_liquidity_native",
+        "mutates": true,
+        "payable": true,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 15
+        },
+        "selector": "0x292d7221"
+      },
+      {
+        "args": [
+          {
+            "label": "token_0",
+            "type": {
+              "displayName": [
+                "AccountId"
+              ],
+              "type": 0
+            }
+          },
+          {
+            "label": "token_1",
+            "type": {
+              "displayName": [
+                "AccountId"
+              ],
+              "type": 0
+            }
+          },
+          {
+            "label": "liquidity",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "amount_0_min",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "amount_1_min",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "to",
+            "type": {
+              "displayName": [
+                "AccountId"
+              ],
+              "type": 0
+            }
+          },
+          {
+            "label": "deadline",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 14
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "Router::remove_liquidity",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 24
+        },
+        "selector": "0xd3abe5a3"
+      },
+      {
+        "args": [
+          {
+            "label": "token",
+            "type": {
+              "displayName": [
+                "AccountId"
+              ],
+              "type": 0
+            }
+          },
+          {
+            "label": "liquidity",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "amount_token_min",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "amount_native_min",
+            "type": {
+              "displayName": [
+                "Balance"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "to",
+            "type": {
+              "displayName": [
+                "AccountId"
+              ],
+              "type": 0
+            }
+          },
+          {
+            "label": "deadline",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 14
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "Router::remove_liquidity_native",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 24
+        },
+        "selector": "0x3448bb5c"
+      },
+      {
+        "args": [
+          {
+            "label": "amount_in",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "amount_out_min",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "path",
+            "type": {
+              "displayName": [
+                "Vec"
+              ],
+              "type": 27
+            }
+          },
+          {
+            "label": "to",
+            "type": {
+              "displayName": [
+                "AccountId"
+              ],
+              "type": 0
+            }
+          },
+          {
+            "label": "deadline",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 14
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "Router::swap_exact_tokens_for_tokens",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 28
+        },
+        "selector": "0xaf0a8836"
+      },
+      {
+        "args": [
+          {
+            "label": "amount_out",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "amount_in_max",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "path",
+            "type": {
+              "displayName": [
+                "Vec"
+              ],
+              "type": 27
+            }
+          },
+          {
+            "label": "to",
+            "type": {
+              "displayName": [
+                "AccountId"
+              ],
+              "type": 0
+            }
+          },
+          {
+            "label": "deadline",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 14
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "Router::swap_tokens_for_exact_tokens",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 28
+        },
+        "selector": "0xd8eafd67"
+      },
+      {
+        "args": [
+          {
+            "label": "amount_out_min",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "path",
+            "type": {
+              "displayName": [
+                "Vec"
+              ],
+              "type": 27
+            }
+          },
+          {
+            "label": "to",
+            "type": {
+              "displayName": [
+                "AccountId"
+              ],
+              "type": 0
+            }
+          },
+          {
+            "label": "deadline",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 14
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "Router::swap_exact_native_for_tokens",
+        "mutates": true,
+        "payable": true,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 28
+        },
+        "selector": "0x0a78e251"
+      },
+      {
+        "args": [
+          {
+            "label": "amount_out",
+            "type": {
+              "displayName": [
+                "Balance"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "amount_in_max",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "path",
+            "type": {
+              "displayName": [
+                "Vec"
+              ],
+              "type": 27
+            }
+          },
+          {
+            "label": "to",
+            "type": {
+              "displayName": [
+                "AccountId"
+              ],
+              "type": 0
+            }
+          },
+          {
+            "label": "deadline",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 14
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "Router::swap_tokens_for_exact_native",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 28
+        },
+        "selector": "0xb2b28f92"
+      },
+      {
+        "args": [
+          {
+            "label": "amount_in",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "amount_out_min",
+            "type": {
+              "displayName": [
+                "Balance"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "path",
+            "type": {
+              "displayName": [
+                "Vec"
+              ],
+              "type": 27
+            }
+          },
+          {
+            "label": "to",
+            "type": {
+              "displayName": [
+                "AccountId"
+              ],
+              "type": 0
+            }
+          },
+          {
+            "label": "deadline",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 14
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "Router::swap_exact_tokens_for_native",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 28
+        },
+        "selector": "0xcb577423"
+      },
+      {
+        "args": [
+          {
+            "label": "amount_out",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "path",
+            "type": {
+              "displayName": [
+                "Vec"
+              ],
+              "type": 27
+            }
+          },
+          {
+            "label": "to",
+            "type": {
+              "displayName": [
+                "AccountId"
+              ],
+              "type": 0
+            }
+          },
+          {
+            "label": "deadline",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 14
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "Router::swap_native_for_exact_tokens",
+        "mutates": true,
+        "payable": true,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 28
+        },
+        "selector": "0x1299fdf2"
+      },
+      {
+        "args": [
+          {
+            "label": "amount_0",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "reserve_0",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "reserve_1",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          " Returns how much of `token_B` tokens should be added",
+          " to the pool to maintain the constant ratio `k = reserve_0 / reserve_1`,",
+          " given `amount_0` of `token_A`."
+        ],
+        "label": "Router::quote",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 31
+        },
+        "selector": "0x16347b10"
+      },
+      {
+        "args": [
+          {
+            "label": "amount_in",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "reserve_0",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "reserve_1",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "fee",
+            "type": {
+              "displayName": [
+                "u8"
+              ],
+              "type": 2
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          " Returns amount of `B` tokens received",
+          " for `amount_in` of `A` tokens that maintains",
+          " the constant ratio of `k = reserve_0 / reserve_1`."
+        ],
+        "label": "Router::get_amount_out",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 31
+        },
+        "selector": "0x41e315fd"
+      },
+      {
+        "args": [
+          {
+            "label": "amount_out",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "reserve_0",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "reserve_1",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "fee",
+            "type": {
+              "displayName": [
+                "u8"
+              ],
+              "type": 2
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          " Returns amount of `A` tokens user has to supply",
+          " to get exactly `amount_out` of `B` token while maintaining",
+          " the constant ratio of `k = reserve_0 / reserve_1`."
+        ],
+        "label": "Router::get_amount_in",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 31
+        },
+        "selector": "0xea4ac85d"
+      },
+      {
+        "args": [
+          {
+            "label": "amount_in",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "path",
+            "type": {
+              "displayName": [
+                "Vec"
+              ],
+              "type": 27
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "Router::get_amounts_out",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 28
+        },
+        "selector": "0x7170b8f6"
+      },
+      {
+        "args": [
+          {
+            "label": "amount_out",
+            "type": {
+              "displayName": [
+                "u128"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "label": "path",
+            "type": {
+              "displayName": [
+                "Vec"
+              ],
+              "type": 27
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "Router::get_amounts_in",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 28
+        },
+        "selector": "0x707998fc"
+      }
+    ]
+  },
+  "storage": {
+    "root": {
+      "layout": {
+        "struct": {
+          "fields": [
+            {
+              "layout": {
+                "leaf": {
+                  "key": "0x00000000",
+                  "ty": 0
+                }
+              },
+              "name": "factory"
+            },
+            {
+              "layout": {
+                "leaf": {
+                  "key": "0x00000000",
+                  "ty": 0
+                }
+              },
+              "name": "wnative"
+            },
+            {
+              "layout": {
+                "leaf": {
+                  "key": "0x00000000",
+                  "ty": 0
+                }
+              },
+              "name": "owner"
+            },
+            {
+              "layout": {
+                "root": {
+                  "layout": {
+                    "struct": {
+                      "fields": [
+                        {
+                          "layout": {
+                            "leaf": {
+                              "key": "0x902ed4e3",
+                              "ty": 0
+                            }
+                          },
+                          "name": "0"
+                        },
+                        {
+                          "layout": {
+                            "leaf": {
+                              "key": "0x902ed4e3",
+                              "ty": 2
+                            }
+                          },
+                          "name": "1"
+                        }
+                      ],
+                      "name": "(A, B)"
+                    }
+                  },
+                  "root_key": "0x902ed4e3"
+                }
+              },
+              "name": "pairs"
+            }
+          ],
+          "name": "RouterContract"
+        }
+      },
+      "root_key": "0x00000000"
+    }
+  },
+  "types": [
+    {
+      "id": 0,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "type": 1,
+                "typeName": "[u8; 32]"
+              }
+            ]
+          }
+        },
+        "path": [
+          "ink_primitives",
+          "types",
+          "AccountId"
+        ]
+      }
+    },
+    {
+      "id": 1,
+      "type": {
+        "def": {
+          "array": {
+            "len": 32,
+            "type": 2
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": {
+        "def": {
+          "primitive": "u8"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 4
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 5
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 4
+          },
+          {
+            "name": "E",
+            "type": 5
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 4,
+      "type": {
+        "def": {
+          "tuple": []
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "index": 1,
+                "name": "CouldNotReadInput"
+              }
+            ]
+          }
+        },
+        "path": [
+          "ink_primitives",
+          "LangError"
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 0
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 5
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 0
+          },
+          {
+            "name": "E",
+            "type": 5
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 7,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 8
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 5
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 8
+          },
+          {
+            "name": "E",
+            "type": 5
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 8,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 4
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 4
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 9,
+      "type": {
+        "def": {
+          "composite": {}
+        },
+        "path": [
+          "router_contract",
+          "CallerIsNotOwner"
+        ]
+      }
+    },
+    {
+      "id": 10,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 11
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 5
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 11
+          },
+          {
+            "name": "E",
+            "type": 5
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 11,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "index": 0,
+                "name": "None"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 12
+                  }
+                ],
+                "index": 1,
+                "name": "Some"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 12
+          }
+        ],
+        "path": [
+          "Option"
+        ]
+      }
+    },
+    {
+      "id": 12,
+      "type": {
+        "def": {
+          "tuple": [
+            0,
+            2
+          ]
+        }
+      }
+    },
+    {
+      "id": 13,
+      "type": {
+        "def": {
+          "primitive": "u128"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "type": {
+        "def": {
+          "primitive": "u64"
+        }
+      }
+    },
+    {
+      "id": 15,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 16
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 5
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 16
+          },
+          {
+            "name": "E",
+            "type": 5
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 16,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 17
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 18
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 17
+          },
+          {
+            "name": "E",
+            "type": 18
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 17,
+      "type": {
+        "def": {
+          "tuple": [
+            13,
+            13,
+            13
+          ]
+        }
+      }
+    },
+    {
+      "id": 18,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 19,
+                    "typeName": "PSP22Error"
+                  }
+                ],
+                "index": 0,
+                "name": "PSP22Error"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 21,
+                    "typeName": "FactoryError"
+                  }
+                ],
+                "index": 1,
+                "name": "FactoryError"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 22,
+                    "typeName": "PairError"
+                  }
+                ],
+                "index": 2,
+                "name": "PairError"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 5,
+                    "typeName": "LangError"
+                  }
+                ],
+                "index": 3,
+                "name": "LangError"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 23,
+                    "typeName": "MathError"
+                  }
+                ],
+                "index": 4,
+                "name": "MathError"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 20,
+                    "typeName": "String"
+                  }
+                ],
+                "index": 5,
+                "name": "CrossContractCallFailed"
+              },
+              {
+                "index": 6,
+                "name": "Expired"
+              },
+              {
+                "index": 7,
+                "name": "IdenticalAddresses"
+              },
+              {
+                "index": 8,
+                "name": "InvalidPath"
+              },
+              {
+                "index": 9,
+                "name": "PairNotFound"
+              },
+              {
+                "index": 10,
+                "name": "TransferError"
+              },
+              {
+                "index": 11,
+                "name": "ExcessiveInputAmount"
+              },
+              {
+                "index": 12,
+                "name": "InsufficientAmount"
+              },
+              {
+                "index": 13,
+                "name": "InsufficientOutputAmount"
+              },
+              {
+                "index": 14,
+                "name": "InsufficientAmountA"
+              },
+              {
+                "index": 15,
+                "name": "InsufficientAmountB"
+              },
+              {
+                "index": 16,
+                "name": "InsufficientLiquidity"
+              }
+            ]
+          }
+        },
+        "path": [
+          "traits",
+          "router",
+          "RouterError"
+        ]
+      }
+    },
+    {
+      "id": 19,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 20,
+                    "typeName": "String"
+                  }
+                ],
+                "index": 0,
+                "name": "Custom"
+              },
+              {
+                "index": 1,
+                "name": "InsufficientBalance"
+              },
+              {
+                "index": 2,
+                "name": "InsufficientAllowance"
+              },
+              {
+                "index": 3,
+                "name": "ZeroRecipientAddress"
+              },
+              {
+                "index": 4,
+                "name": "ZeroSenderAddress"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 20,
+                    "typeName": "String"
+                  }
+                ],
+                "index": 5,
+                "name": "SafeTransferCheckFailed"
+              }
+            ]
+          }
+        },
+        "path": [
+          "psp22",
+          "errors",
+          "PSP22Error"
+        ]
+      }
+    },
+    {
+      "id": 20,
+      "type": {
+        "def": {
+          "primitive": "str"
+        }
+      }
+    },
+    {
+      "id": 21,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 22,
+                    "typeName": "PairError"
+                  }
+                ],
+                "index": 0,
+                "name": "PairError"
+              },
+              {
+                "index": 1,
+                "name": "CallerIsNotFeeSetter"
+              },
+              {
+                "index": 2,
+                "name": "IdenticalAddresses"
+              },
+              {
+                "index": 3,
+                "name": "PairExists"
+              },
+              {
+                "index": 4,
+                "name": "PairInstantiationFailed"
+              }
+            ]
+          }
+        },
+        "path": [
+          "traits",
+          "factory",
+          "FactoryError"
+        ]
+      }
+    },
+    {
+      "id": 22,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 19,
+                    "typeName": "PSP22Error"
+                  }
+                ],
+                "index": 0,
+                "name": "PSP22Error"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 5,
+                    "typeName": "LangError"
+                  }
+                ],
+                "index": 1,
+                "name": "LangError"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 23,
+                    "typeName": "MathError"
+                  }
+                ],
+                "index": 2,
+                "name": "MathError"
+              },
+              {
+                "index": 3,
+                "name": "KInvariantChanged"
+              },
+              {
+                "index": 4,
+                "name": "InsufficientLiquidityMinted"
+              },
+              {
+                "index": 5,
+                "name": "InsufficientLiquidityBurned"
+              },
+              {
+                "index": 6,
+                "name": "InsufficientOutputAmount"
+              },
+              {
+                "index": 7,
+                "name": "InsufficientLiquidity"
+              },
+              {
+                "index": 8,
+                "name": "InsufficientInputAmount"
+              },
+              {
+                "index": 9,
+                "name": "InvalidTo"
+              },
+              {
+                "index": 10,
+                "name": "ReservesOverflow"
+              }
+            ]
+          }
+        },
+        "path": [
+          "traits",
+          "pair",
+          "PairError"
+        ]
+      }
+    },
+    {
+      "id": 23,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 2,
+                    "typeName": "u8"
+                  }
+                ],
+                "index": 0,
+                "name": "AddOverflow"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 2,
+                    "typeName": "u8"
+                  }
+                ],
+                "index": 1,
+                "name": "CastOverflow"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 2,
+                    "typeName": "u8"
+                  }
+                ],
+                "index": 2,
+                "name": "DivByZero"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 2,
+                    "typeName": "u8"
+                  }
+                ],
+                "index": 3,
+                "name": "MulOverflow"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 2,
+                    "typeName": "u8"
+                  }
+                ],
+                "index": 4,
+                "name": "SubUnderflow"
+              }
+            ]
+          }
+        },
+        "path": [
+          "traits",
+          "MathError"
+        ]
+      }
+    },
+    {
+      "id": 24,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 25
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 5
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 25
+          },
+          {
+            "name": "E",
+            "type": 5
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 25,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 26
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 18
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 26
+          },
+          {
+            "name": "E",
+            "type": 18
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 26,
+      "type": {
+        "def": {
+          "tuple": [
+            13,
+            13
+          ]
+        }
+      }
+    },
+    {
+      "id": 27,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 0
+          }
+        }
+      }
+    },
+    {
+      "id": 28,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 29
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 5
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 29
+          },
+          {
+            "name": "E",
+            "type": 5
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 29,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 30
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 18
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 30
+          },
+          {
+            "name": "E",
+            "type": 18
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 30,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 13
+          }
+        }
+      }
+    },
+    {
+      "id": 31,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 32
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 5
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 32
+          },
+          {
+            "name": "E",
+            "type": 5
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 32,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 13
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 18
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 13
+          },
+          {
+            "name": "E",
+            "type": 18
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 33,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "type": 1,
+                "typeName": "[u8; 32]"
+              }
+            ]
+          }
+        },
+        "path": [
+          "ink_primitives",
+          "types",
+          "Hash"
+        ]
+      }
+    },
+    {
+      "id": 34,
+      "type": {
+        "def": {
+          "primitive": "u32"
+        }
+      }
+    },
+    {
+      "id": 35,
+      "type": {
+        "def": {
+          "variant": {}
+        },
+        "path": [
+          "ink_env",
+          "types",
+          "NoChainExtension"
+        ]
+      }
+    }
+  ],
+  "version": "4"
+}
