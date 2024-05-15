@@ -9,16 +9,13 @@ use aleph_client::{
         event::{translate_events, BlockDetails, ContractEvent},
         ContractInstance, ExecCallParams, ReadonlyCallParams,
     },
-    contract_transcode::{
-        ContractMessageTranscoder,
-        Value::{self, Seq},
-    },
+    contract_transcode::Value::{self, Seq},
     sp_weights::weight_v2::Weight,
     utility::BlocksApi,
     waiting::BlockStatus,
-    AccountId, AlephConfig, Connection, TxInfo,
+    AccountId, AlephConfig, Connection, SignedConnectionApi, TxInfo,
 };
-use log::{error, info, trace};
+use log::{debug, error, trace};
 use subxt::events::Events;
 use thiserror::Error;
 
@@ -39,6 +36,155 @@ pub enum AzeroContractError {
 
     #[error("Missing or invalid field")]
     MissingOrInvalidField(String),
+
+    #[error("send_request tx has failed")]
+    SendRequestNativeEtherTxFailure {
+        amount: u128,
+        dest_receiver_address: String,
+        base_fee: u128,
+    },
+}
+
+pub struct RouterInstance {
+    pub contract: ContractInstance,
+    pub ref_time_limit: u64,
+    pub proof_size_limit: u64,
+}
+
+impl RouterInstance {
+    pub fn new(
+        address: &str,
+        metadata_path: &str,
+        ref_time_limit: u64,
+        proof_size_limit: u64,
+    ) -> Result<Self, AzeroContractError> {
+        let address = AccountId::from_str(address)
+            .map_err(|why| AzeroContractError::NotAccountId(why.to_string()))?;
+        Ok(Self {
+            contract: ContractInstance::new(address, metadata_path)?,
+            ref_time_limit,
+            proof_size_limit,
+        })
+    }
+
+    pub async fn swap_exact_native_for_tokens(
+        &self,
+        signed_connection: &AzeroConnectionWithSigner,
+        amount_in: u128,
+        amount_out_min: u128,
+        path: &[AccountId],
+        to: AccountId,
+        deadline: u64,
+    ) -> Result<TxInfo, AzeroContractError> {
+        let gas_limit = Weight {
+            ref_time: self.ref_time_limit,
+            proof_size: self.proof_size_limit,
+        };
+
+        let path_encoding = self.encode_vec(path);
+        let args: Vec<String> = vec![
+            amount_out_min.to_string(),
+            path_encoding,
+            to.to_string(),
+            deadline.to_string(),
+        ];
+
+        let params = ExecCallParams::new().gas_limit(gas_limit).value(amount_in);
+        self.contract
+            .exec(
+                signed_connection,
+                "Router::swap_exact_native_for_tokens",
+                &args,
+                params,
+            )
+            .await
+            .map_err(AzeroContractError::AlephClient)
+    }
+
+    pub async fn get_amounts_out(
+        &self,
+        connection: &Connection,
+        amount_in: u128,
+        path: &[AccountId],
+    ) -> Result<Vec<u128>, AzeroContractError> {
+        let path_encoding = self.encode_vec(path);
+        Ok(self
+            .contract
+            .read::<_, Result<Vec<u128>, _>, _>(
+                connection,
+                "Router::get_amounts_out",
+                &[amount_in.to_string(), path_encoding],
+                Default::default(),
+            )
+            .await??)
+    }
+
+    fn encode_vec<T>(&self, coll: &[T]) -> String
+    where
+        T: ToString,
+    {
+        let strings: Vec<_> = coll.iter().map(|x| x.to_string()).collect();
+        format!("[{:}]", strings.join(", "))
+    }
+}
+
+pub struct AzeroEtherInstance {
+    pub contract: ContractInstance,
+    pub ref_time_limit: u64,
+    pub proof_size_limit: u64,
+}
+
+impl AzeroEtherInstance {
+    pub fn new(
+        address: &str,
+        metadata_path: &str,
+        ref_time_limit: u64,
+        proof_size_limit: u64,
+    ) -> Result<Self, AzeroContractError> {
+        let address = AccountId::from_str(address)
+            .map_err(|why| AzeroContractError::NotAccountId(why.to_string()))?;
+        Ok(Self {
+            contract: ContractInstance::new(address, metadata_path)?,
+            ref_time_limit,
+            proof_size_limit,
+        })
+    }
+
+    pub async fn approve(
+        &self,
+        signed_connection: &AzeroConnectionWithSigner,
+        spender: AccountId,
+        value: u128,
+    ) -> Result<TxInfo, AzeroContractError> {
+        let gas_limit = Weight {
+            ref_time: self.ref_time_limit,
+            proof_size: self.proof_size_limit,
+        };
+        let args = [spender.to_string(), value.to_string()];
+        let params = ExecCallParams::new().gas_limit(gas_limit);
+
+        // Exec does dry run first, so there's no need to repeat it here
+        self.contract
+            .exec(signed_connection, "PSP22::approve", &args, params)
+            .await
+            .map_err(AzeroContractError::AlephClient)
+    }
+
+    pub async fn balance_of(
+        &self,
+        connection: &Connection,
+        owner: AccountId,
+    ) -> Result<u128, AzeroContractError> {
+        Ok(self
+            .contract
+            .read(
+                connection,
+                "PSP22::balance_of",
+                &[owner.to_string()],
+                Default::default(),
+            )
+            .await?)
+    }
 }
 
 pub struct AdvisoryInstance {
@@ -73,8 +219,6 @@ impl AdvisoryInstance {
 
 pub struct MostInstance {
     pub contract: ContractInstance,
-    pub address: AccountId,
-    pub transcoder: ContractMessageTranscoder,
     pub ref_time_limit: u64,
     pub proof_size_limit: u64,
 }
@@ -89,12 +233,89 @@ impl MostInstance {
         let address = AccountId::from_str(address)
             .map_err(|why| AzeroContractError::NotAccountId(why.to_string()))?;
         Ok(Self {
-            address: address.clone(),
-            transcoder: ContractMessageTranscoder::load(metadata_path)?,
             contract: ContractInstance::new(address, metadata_path)?,
             ref_time_limit,
             proof_size_limit,
         })
+    }
+
+    pub async fn get_base_fee(&self, connection: &Connection) -> Result<u128, AzeroContractError> {
+        Ok(self
+            .contract
+            .read0::<Result<u128, _>, _>(connection, "get_base_fee", Default::default())
+            .await??)
+    }
+
+    pub async fn get_collected_reward(
+        &self,
+        connection: &Connection,
+        committee_id: u128,
+        member_id: AccountId,
+    ) -> Result<u128, AzeroContractError> {
+        Ok(self
+            .contract
+            .read::<_, Result<u128, _>, _>(
+                connection,
+                "get_outstanding_member_rewards",
+                &[committee_id.to_string(), member_id.to_string()],
+                Default::default(),
+            )
+            .await??)
+    }
+
+    pub async fn payout_rewards(
+        &self,
+        signed_connection: &AzeroConnectionWithSigner,
+        committee_id: u128,
+    ) -> Result<TxInfo, AzeroContractError> {
+        let args = [
+            committee_id.to_string(),
+            signed_connection.account_id().to_string(),
+        ];
+
+        self.contract
+            .exec(
+                signed_connection,
+                "payout_rewards",
+                &args,
+                ExecCallParams::new(),
+            )
+            .await
+            .map_err(AzeroContractError::AlephClient)
+    }
+
+    pub async fn send_request_native_ether(
+        &self,
+        signed_connection: &AzeroConnectionWithSigner,
+        amount: u128,
+        dest_receiver_address: [u8; 32],
+        base_fee: u128,
+    ) -> Result<TxInfo, AzeroContractError> {
+        let gas_limit = Weight {
+            ref_time: self.ref_time_limit,
+            proof_size: self.proof_size_limit,
+        };
+        let args = [amount.to_string(), bytes32_to_str(&dest_receiver_address)];
+
+        let params = ExecCallParams::new().gas_limit(gas_limit).value(base_fee);
+
+        // Exec does dry run first, so there's no need to repeat it here
+        self.contract
+            .exec(
+                signed_connection,
+                "send_request_native_ether",
+                &args,
+                params,
+            )
+            .await
+            .map_err(|why| {
+                error!("send_request failure: {why:?}");
+                AzeroContractError::SendRequestNativeEtherTxFailure {
+                    amount,
+                    dest_receiver_address: hex::encode(dest_receiver_address),
+                    base_fee,
+                }
+            })
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -128,7 +349,7 @@ impl MostInstance {
             .exec(signed_connection, "receive_request", &args, params)
             .await
             .map_err(AzeroContractError::AlephClient);
-        info!("receive_request: {:?}", call_result);
+        debug!("receive_request: {:?}", call_result);
         call_result
     }
 
@@ -175,7 +396,7 @@ impl MostInstance {
     ) -> Result<u128, AzeroContractError> {
         Ok(self
             .contract
-            .read0::<Result<u128, _>, _>(connection, "current_committee_id", Default::default())
+            .read0::<Result<u128, _>, _>(connection, "get_current_committee_id", Default::default())
             .await??)
     }
 

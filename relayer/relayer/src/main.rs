@@ -26,6 +26,7 @@ use tokio::{
     task::{JoinError, JoinSet},
     time::sleep,
 };
+use trader::TraderError;
 
 use crate::{
     connections::{azero, eth},
@@ -35,6 +36,7 @@ use crate::{
         EthMostEvents, EthereumListener, EthereumPausedListener,
     },
     redis::RedisManager,
+    trader::Trader,
 };
 
 mod config;
@@ -44,6 +46,7 @@ mod handlers;
 mod helpers;
 mod listeners;
 mod redis;
+mod trader;
 
 const DEV_MNEMONIC: &str =
     "harsh master island dirt equip search awesome double turn crush wool grant";
@@ -97,6 +100,9 @@ enum RelayerError {
 
     #[error("Ethereum's Most paused listener failure")]
     EthereumPausedListener(#[from] EthereumPausedListenerError),
+
+    #[error("Trader component failure")]
+    TraderComponent(#[from] TraderError),
 }
 
 #[derive(Debug, Clone)]
@@ -160,8 +166,16 @@ async fn create_eth_connections(
                 .index(config.dev_account_index)?
                 .build()?;
 
+        let private_key = wallet
+            .signer()
+            .to_bytes()
+            .iter()
+            .map(|&i| format!("{:X}", i))
+            .collect::<Vec<String>>()
+            .join("");
+
         info!(
-            "Creating signed connection using a development key {}",
+            "Creating signed connection using a development key {} [{private_key}]",
             &wallet.address()
         );
         eth::with_local_wallet(eth::connect(config).await, wallet).await?
@@ -213,6 +227,9 @@ async fn main() -> Result<(), RelayerError> {
                     run_relayer(first_run, &mut tasks, config.clone()).await?;
                     tick = Instant::now();
                 }
+            }
+            Err(RelayerError::TraderComponent(why)) => {
+                error!("Trader component exited with an error {why:?}. Restart is required to run Trader again.");
             }
             Err(why) => {
                 error!("One of the core components exited with an error {why:?}. This is fatal");
@@ -339,5 +356,16 @@ async fn run_relayer(
         .map_err(RelayerError::from),
     );
 
+    if config.run_trader_component {
+        tasks.spawn(
+            Trader::run(
+                config,
+                azero_signed_connection.clone(),
+                eth_signed_connection,
+                circuit_breaker_sender.subscribe(),
+            )
+            .map_err(RelayerError::from),
+        );
+    }
     Ok(())
 }

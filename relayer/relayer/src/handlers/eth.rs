@@ -75,12 +75,6 @@ impl EthereumEventHandler {
         {
             debug!("Handling eth contract event: {crosschain_transfer_event:?}");
 
-            info!(
-                    "Decoded event data: [dest_token_address: 0x{}, amount: {amount}, dest_receiver_address: 0x{}, request_nonce: {request_nonce}, committee_id: {committee_id}]",
-                    AccountId::from(dest_token_address),
-                    AccountId::from(dest_receiver_address)
-                );
-
             // concat bytes
             let bytes = concat_u8_arrays(vec![
                 &committee_id.as_u128().to_le_bytes(),
@@ -96,7 +90,12 @@ impl EthereumEventHandler {
             debug!("Hashed event data: {request_hash:?}");
 
             let request_hash_hex = hex::encode(request_hash);
-            info!("Request hash hex encoding: 0x{}", request_hash_hex);
+
+            info!(
+                "Decoded event data: [request_hash: 0x{request_hash_hex}, dest_token_address: 0x{}, amount: {amount}, dest_receiver_address: 0x{}, request_nonce: {request_nonce}, committee_id: {committee_id}]",
+                AccountId::from(dest_token_address),
+                AccountId::from(dest_receiver_address)
+            );
 
             if let Some(blacklist) = blacklisted_requests {
                 if blacklist.contains(&H256::from_str(&request_hash_hex)?) {
@@ -131,7 +130,7 @@ impl EthereumEventHandler {
                 )
                 .await?
             {
-                debug!("Azero: request with nonce {request_nonce} not yet finalized.");
+                debug!("Azero: request 0x{request_hash_hex} not yet finalized.");
 
                 if !contract
                     .needs_signature(

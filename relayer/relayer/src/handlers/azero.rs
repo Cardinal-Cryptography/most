@@ -86,12 +86,6 @@ impl AlephZeroEventHandler {
 
                 debug!("Handling azero contract event: {crosschain_transfer_event:?}");
 
-                info!(
-                    "Decoded event data: [dest_token_address: {}, amount: {amount}, dest_receiver_address: {}, request_nonce: {request_nonce}, committee_id: {committee_id}]",
-                    hex::encode(dest_token_address),
-                    hex::encode(dest_receiver_address)
-                );
-
                 // NOTE: for some reason, ethers-rs's `encode_packed` does not properly encode the data
                 // (it does not pad uint to 32 bytes, but uses the actual number of bytes required to store the value)
                 // so we use `abi::encode` instead (it only differs for signed and dynamic size types, which we don't use here)
@@ -109,7 +103,12 @@ impl AlephZeroEventHandler {
                 debug!("Hashed event data: {request_hash:?}");
 
                 let request_hash_hex = hex::encode(request_hash);
-                info!("Request hash hex encoding: 0x{}", request_hash_hex);
+
+                info!(
+                    "Decoded event data: [request_hash: 0x{request_hash_hex}, dest_token_address: {}, amount: {amount}, dest_receiver_address: {}, request_nonce: {request_nonce}, committee_id: {committee_id}]",
+                    hex::encode(dest_token_address),
+                    hex::encode(dest_receiver_address)
+                );
 
                 if let Some(blacklist) = blacklisted_requests {
                     if blacklist.contains(&H256::from_str(&request_hash_hex)?) {
