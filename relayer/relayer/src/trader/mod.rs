@@ -220,8 +220,7 @@ impl Trader {
                             },
                         };
 
-                    // Never bridge less than 0.1 ETH
-                    if azero_eth_balance > ONE_ETHER / 10 {
+                    if azero_eth_balance > BRIDGING_THRESHOLD {
                         info!("Requesting a cross chain transfer of {azero_eth_balance} units of Azero ETH [{azero_ether_address}] to {whoami_eth}.");
 
                         // set allowance
