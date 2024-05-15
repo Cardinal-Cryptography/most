@@ -30,6 +30,8 @@ pub const SLIPPAGE_PERCENT: u128 = 1;
 pub const HOUR_IN_MILLIS: u64 = 60 * 60 * 1000;
 pub const TRADER_QUERY_INTERVAL_MILLIS: u64 = 30 * 1000;
 
+pub const BRIDGING_THRESHOLD: u128 = ONE_ETHER / 10;
+
 #[derive(Debug, Error)]
 #[error(transparent)]
 #[non_exhaustive]
