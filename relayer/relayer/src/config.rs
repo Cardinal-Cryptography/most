@@ -70,6 +70,9 @@ pub struct Config {
     #[arg(long)]
     pub azero_wrapped_azero_address: Option<String>,
 
+    #[arg(long)]
+    pub eth_wrapped_ether_address: Option<String>,
+
     #[arg(long, use_value_delimiter = true, value_delimiter = ',')]
     pub advisory_contract_addresses: Option<Vec<String>>,
 

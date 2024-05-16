@@ -137,10 +137,10 @@ fi
 if [[ -n "${RUN_TRADER}" ]]; then
   ARGS+=(
     --run-trader-component
-    --router-address=$(get_address $COMMON_ADDRESSES_FILE azero_router))
-    --azero-ether-address=${jq -r '.addresses.azero_tokens.address[] | select(.[0] | endswith("ETH")) | .[2]' $AZERO_ADDRESSES_FILE}
-    --azero-wrapped-azero-address=$(get_address $COMMON_ADDRESSES_FILE azero_wazero))
-    --eth-wrapped-ether-address=${jq -r '.addresses.azero_tokens.address[] | select(.[0] | endswith("ETH")) | .[1]' $AZERO_ADDRESSES_FILE}
+    --router-address=$(get_address $COMMON_ADDRESSES_FILE azero_router)
+    --azero-ether-address=$(jq -r '.tokens[] | select(.[0] | endswith("ETH")) | .[2]' $AZERO_ADDRESSES_FILE)
+    --azero-wrapped-azero-address=$(get_address $COMMON_ADDRESSES_FILE azero_wazero)
+    --eth-wrapped-ether-address=$(jq -r '.tokens[] | select(.[0] | endswith("ETH")) | .[1]' $AZERO_ADDRESSES_FILE)
   )
 fi
 
