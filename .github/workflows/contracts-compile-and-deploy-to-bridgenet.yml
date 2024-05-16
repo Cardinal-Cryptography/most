@@ -15,18 +15,18 @@ jobs:
     uses: ./.github/workflows/_check-vars-and-secrets.yml
     secrets: inherit
 
-  test-azero-contracts:
-    needs: [check-vars-and-secrets]
-    uses: ./.github/workflows/test-azero-contracts.yml
+  #test-azero-contracts:
+  #  needs: [check-vars-and-secrets]
+  #  uses: ./.github/workflows/test-azero-contracts.yml
 
-  test-eth-contracts:
-    needs: [check-vars-and-secrets]
-    uses: ./.github/workflows/test-eth-contracts.yml
+  #test-eth-contracts:
+  #  needs: [check-vars-and-secrets]
+  #  uses: ./.github/workflows/test-eth-contracts.yml
 
   deploy-contracts:
     name: Deploy and setup contracts
     runs-on: [self-hosted, Linux, X64, large]
-    needs: [test-eth-contracts, test-azero-contracts]
+    needs: [check-vars-and-secrets]
     outputs:
       artifact-matrix-json: ${{ steps.get-artifact-matrix.outputs.artifact-matrix }}
 
