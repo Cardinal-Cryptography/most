@@ -86,7 +86,7 @@ jobs:
           aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
           s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
           project: most
-          version: ${{ github.sha }}
+          version: bc8d0677d3bc68af428386ac98f2fb31d801c2c2
           contract: azero_most
           dst-artifact: downloaded-artifact-azero-most
 
@@ -98,7 +98,7 @@ jobs:
           aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
           s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
           project: most
-          version: ${{ github.sha }}
+          version: bc8d0677d3bc68af428386ac98f2fb31d801c2c2
           contract: azero_advisory
           dst-artifact: downloaded-artifact-azero-advisory
 
@@ -110,7 +110,7 @@ jobs:
           aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
           s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
           project: most
-          version: ${{ github.sha }}
+          version: bc8d0677d3bc68af428386ac98f2fb31d801c2c2
           contract: azero_token
           dst-artifact: downloaded-artifact-azero-token
 
@@ -122,7 +122,7 @@ jobs:
           aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
           s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
           project: most
-          version: ${{ github.sha }}
+          version: bc8d0677d3bc68af428386ac98f2fb31d801c2c2
           contract: eth_most
           dst-artifact: downloaded-artifact-eth-most
       
@@ -134,7 +134,7 @@ jobs:
           aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
           s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
           project: most
-          version: ${{ github.sha }}
+          version: bc8d0677d3bc68af428386ac98f2fb31d801c2c2
           contract: eth_weth9
           dst-artifact: downloaded-artifact-eth-weth9
 
