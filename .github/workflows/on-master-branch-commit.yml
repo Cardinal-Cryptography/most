@@ -20,7 +20,7 @@ jobs:
     secrets: inherit
 
   build-and-deploy-relayer-to-devnet:
-    needs: [compile-common-contracts]
+    needs: [compile-contracts-and-deploy-to-bridgenets]
     name: Build and deploy relayer to devnet
     uses: ./.github/workflows/relayer-build-and-deploy-to-devnet.yml
     secrets: inherit
