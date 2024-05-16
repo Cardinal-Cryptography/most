@@ -1,0 +1,60 @@
+---
+name: Common contracts - compile and store
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+concurrency:
+  group: "${{ github.ref }}-${{ github.workflow }}"
+  cancel-in-progress: false
+
+jobs:
+  check-vars-and-secrets:
+    name: Check vars and secrets
+    uses: ./.github/workflows/_check-vars-and-secrets.yml
+    secrets: inherit
+
+  build-common-contracts:
+    name: Build common contracts
+    runs-on: [self-hosted, Linux, X64, large]
+    needs: [check-vars-and-secrets]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          repository: 'Cardinal-Cryptography/common-amm'
+
+      - name: Install Rust toolchain
+        uses: Cardinal-Cryptography/github-actions/install-rust-toolchain@v6
+
+      - name: Cache Crates
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo 
+          key: ${{ runner.os }}-rust-${{ hashFiles('rust-toolchain.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-rust
+
+      - name: Build contracts
+        run: |
+          make build-dockerized
+
+      - name: Prepare files to be uploaded
+        run: |
+          find artifacts
+          mkdir tmp-artifacts-to-upload
+          cp artifacts/router_contract.json tmp-artifacts-to-upload/azero_router.json
+
+      - name: Store artifact in S3 bucket
+        uses: Cardinal-Cryptography/github-actions/store-contract-artifact@v6
+        with:
+          aws-access-key-id: ${{ secrets.CONTRACTS_CMN_ARTIFACTS_RW_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CONTRACTS_CMN_ARTIFACTS_RW_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
+          s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
+          project: common
+          version: ${{ github.sha }}
+          contract: azero_router_in_most
+          src-artifact: tmp-artifacts-to-upload/azero_router.json
+          if-exist: overwrite
