@@ -122,7 +122,7 @@ jobs:
           aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
           s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
           project: common
-          version: ${{ github.sha }}
+          version: 79cfb0cdb79d3657ed682a50c5288846fdeed6ab
           contract: azero_router_in_most
           dst-artifact: downloaded-artifact-azero-router
 

@@ -4,9 +4,6 @@ name: Common contracts - compile and store
 on:
   workflow_call:
   workflow_dispatch:
-  push:
-    branches:
-      - add-building-common-contract
 
 concurrency:
   group: "${{ github.ref }}-${{ github.workflow }}"
