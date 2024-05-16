@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - master
+      - add-building-common-contract
 
 jobs:
   check-vars-and-secrets:
