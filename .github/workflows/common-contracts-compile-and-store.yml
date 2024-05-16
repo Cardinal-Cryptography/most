@@ -44,7 +44,7 @@ jobs:
         run: |
           find artifacts
           mkdir tmp-artifacts-to-upload
-          cp artifacts/router_contract.json tmp-artifacts-to-upload/azero_router.json
+          cp artifacts/router_contract.json tmp-artifacts-to-upload/router.json
 
       - name: Store artifact in S3 bucket
         uses: Cardinal-Cryptography/github-actions/store-contract-artifact@v6
@@ -56,5 +56,5 @@ jobs:
           project: common
           version: ${{ github.sha }}
           contract: azero_router_in_most
-          src-artifact: tmp-artifacts-to-upload/azero_router.json
+          src-artifact: tmp-artifacts-to-upload/router.json
           if-exist: overwrite

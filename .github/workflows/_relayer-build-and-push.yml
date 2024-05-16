@@ -117,13 +117,13 @@ jobs:
       - name: Download azero_router artifact from S3 bucket
         uses: Cardinal-Cryptography/github-actions/download-contract-artifact@v6
         with:
-          aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.CONTRACTS_CMN_ARTIFACTS_RO_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CONTRACTS_CMN_ARTIFACTS_RO_AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
           s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
-          project: most
+          project: common
           version: ${{ github.sha }}
-          contract: azero_router
+          contract: azero_router_in_most
           dst-artifact: downloaded-artifact-azero-router
 
       - name: Download eth_most artifact from S3 bucket

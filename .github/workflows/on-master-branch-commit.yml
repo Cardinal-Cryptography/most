@@ -25,7 +25,7 @@ jobs:
     uses: ./.github/workflows/common-contracts-compile-and-store.yml
 
   build-and-deploy-relayer-to-devnet:
-    needs: [compile-contracts-and-deploy-to-bridgenet]
+    needs: [compile-common-contracts]
     name: Build and deploy relayer to devnet
     uses: ./.github/workflows/relayer-build-and-deploy-to-devnet.yml
     secrets: inherit
