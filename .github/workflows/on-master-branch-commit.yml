@@ -23,6 +23,7 @@ jobs:
     needs: [compile-contracts-and-deploy-to-bridgenet]
     name: Compile and store common contracts
     uses: ./.github/workflows/common-contracts-compile-and-store.yml
+    secrets: inherit
 
   build-and-deploy-relayer-to-devnet:
     needs: [compile-common-contracts]
