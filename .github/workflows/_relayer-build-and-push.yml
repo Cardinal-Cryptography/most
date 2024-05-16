@@ -114,18 +114,6 @@ jobs:
           contract: azero_token
           dst-artifact: downloaded-artifact-azero-token
 
-      - name: Download azero_router artifact from S3 bucket
-        uses: Cardinal-Cryptography/github-actions/download-contract-artifact@v6
-        with:
-          aws-access-key-id: ${{ secrets.CONTRACTS_CMN_ARTIFACTS_RO_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.CONTRACTS_CMN_ARTIFACTS_RO_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
-          s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
-          project: common
-          version: 79cfb0cdb79d3657ed682a50c5288846fdeed6ab
-          contract: azero_router_in_most
-          dst-artifact: downloaded-artifact-azero-router
-
       - name: Download eth_most artifact from S3 bucket
         uses: Cardinal-Cryptography/github-actions/download-contract-artifact@v6
         with:
@@ -159,7 +147,7 @@ jobs:
           TMP_ARTIFACT_AZERO_MOST_DIR: downloaded-artifact-azero-most
           TMP_ARTIFACT_AZERO_ADVISORY_DIR: downloaded-artifact-azero-advisory
           TMP_ARTIFACT_AZERO_TOKEN_DIR: downloaded-artifact-azero-token
-          TMP_ARTIFACT_AZERO_ROUTER_DIR: downloaded-artifact-azero-router
+          TMP_ARTIFACT_AZERO_ROUTER_DIR: azero/external_artifacts
           TMP_ARTIFACT_ETH_MOST_DIR: downloaded-artifact-eth-most
           TMP_ARTIFACT_ETH_WETH9_DIR: downloaded-artifact-eth-weth9
         run: |
