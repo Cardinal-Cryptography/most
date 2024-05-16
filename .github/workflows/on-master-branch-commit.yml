@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - master
-      - add-building-common-contract
 
 jobs:
   check-vars-and-secrets:
@@ -17,12 +16,6 @@ jobs:
     needs: [check-vars-and-secrets]
     name: Compile contracts and deploy to bridgenet
     uses: ./.github/workflows/contracts-compile-and-deploy-to-bridgenet.yml
-    secrets: inherit
-
-  compile-common-contracts:
-    needs: [compile-contracts-and-deploy-to-bridgenet]
-    name: Compile and store common contracts
-    uses: ./.github/workflows/common-contracts-compile-and-store.yml
     secrets: inherit
 
   build-and-deploy-relayer-to-devnet:

@@ -4,6 +4,9 @@ name: Common contracts - compile and store
 on:
   workflow_call:
   workflow_dispatch:
+  push:
+    branches:
+      - add-building-common-contract
 
 concurrency:
   group: "${{ github.ref }}-${{ github.workflow }}"
@@ -25,16 +28,13 @@ jobs:
         with:
           repository: 'Cardinal-Cryptography/common-amm'
 
+      - name: Call action get-ref-properties
+        id: get-ref-properties
+        # yamllint disable-line rule:line-length
+        uses: Cardinal-Cryptography/github-actions/get-ref-properties@v6
+
       - name: Install Rust toolchain
         uses: Cardinal-Cryptography/github-actions/install-rust-toolchain@v6
-
-      - name: Cache Crates
-        uses: actions/cache@v3
-        with:
-          path: ~/.cargo 
-          key: ${{ runner.os }}-rust-${{ hashFiles('rust-toolchain.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-rust
 
       - name: Build contracts
         run: |
@@ -54,7 +54,7 @@ jobs:
           aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
           s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
           project: common
-          version: ${{ github.sha }}
+          version: ${{ steps.get-ref-properties.outputs.full-sha }}
           contract: azero_router_in_most
           src-artifact: tmp-artifacts-to-upload/router.json
           if-exist: overwrite
