@@ -12,8 +12,8 @@ import { ethers } from "ethers";
 const envFile = process.env.AZERO_ENV;
 
 function getTokenAddresses(addresses, tokenName): [string, string] {
-  for (let [_, ethAddress, azeroAddress] of addresses.tokens) {
-    if (tokenName == tokenName) {
+  for (let [_tokenName, ethAddress, azeroAddress] of addresses.tokens) {
+    if (tokenName == _tokenName) {
       return [ethAddress, azeroAddress];
     }
   }
@@ -25,7 +25,7 @@ async function main(): Promise<void> {
   const { ws_node, deployer_seed } = config;
 
   const addresses = await import_azero_addresses();
-  const weth_azero = getTokenAddresses(addresses, "weth")[1];
+  const weth_azero = getTokenAddresses(addresses, "wETH")[1];
 
   const { most: most_azero } = await import_azero_addresses();
 
@@ -67,6 +67,13 @@ async function main(): Promise<void> {
   const most = new Most(most_azero, signer, api);
 
   let srcTokenAddress = hexToBytes(accountIdToHex(weth_azero));
+
+  const supported = await most.query.getSupportedPair(srcTokenAddress);
+  console.log(weth_azero, "supported pair is", supported.value.ok);
+  if (supported.value.ok == undefined) {
+    console.error("Unsupported pair");
+    process.exit(-1);
+  }
 
   let destReceiverAddress = hexToBytes(
     ethers.zeroPadValue(ethers.getBytes(receiver), 32),
