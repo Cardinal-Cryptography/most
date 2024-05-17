@@ -148,7 +148,7 @@ pub mod most {
         default_gas_price: u128,
         /// maximum time in milliseconds since last oracle update
         gas_oracle_max_age: u64,
-        /// maximum limit on gas for call to oracle
+        /// maximum limit on gas for a call to the oracle
         oracle_call_gas_limit: u64,
         /// percentage buffer over the estimated cost
         base_fee_buffer_percentage: u128,
@@ -182,7 +182,7 @@ pub mod most {
         /// rewards collected by the individual commitee members for relaying cross-chain transfer requests
         paid_out_member_rewards: Mapping<(AccountId, CommitteeId), u128, ManualKey<0x50414944>>,
         /// committe members can specify a special account for collecting the rewards, different from the one used for signing
-        payout_accounts: Mapping<AccountId, AccountId>,
+        payout_accounts: Mapping<AccountId, AccountId, ManualKey<0x18f97340>>,
         /// Wrapped ethereum (azero) address. Necessary to perform bridging weth(azero) -> ether(eth).
         weth: Lazy<AccountId, ManualKey<0x7CD95FED>>,
     }
@@ -572,7 +572,63 @@ pub mod most {
             Ok(())
         }
 
-        // ---  getter txs
+        // --- getters
+
+        /// Query average gas it takes for a confirmation of a single cross-chain transfer request on the destination chain
+        ///
+        /// Sum of the total gas usage of *all* the relay transactions divided it by the current committee size and multiplied by 1.2
+        #[ink(message)]
+        pub fn get_relay_gas_usage(&self) -> Result<u128, MostError> {
+            Ok(self.data()?.relay_gas_usage)
+        }
+
+        /// Query minimum gas price used to calculate the fee that can be charged for a cross-chain transfer request
+        #[ink(message)]
+        pub fn get_min_gas_price(&self) -> Result<u128, MostError> {
+            Ok(self.data()?.min_gas_price)
+        }
+
+        /// Query maximum gas price used to calculate the fee that can be charged for a cross-chain transfer request
+        #[ink(message)]
+        pub fn get_max_gas_price(&self) -> Result<u128, MostError> {
+            Ok(self.data()?.max_gas_price)
+        }
+
+        /// Query default gas price used to calculate the fee that is charged for a cross-chain transfer request if the gas price oracle is not available
+        #[ink(message)]
+        pub fn get_default_gas_price(&self) -> Result<u128, MostError> {
+            Ok(self.data()?.default_gas_price)
+        }
+
+        /// Query maximum time in milliseconds since last oracle update
+        #[ink(message)]
+        pub fn get_gas_oracle_max_age(&self) -> Result<u64, MostError> {
+            Ok(self.data()?.gas_oracle_max_age)
+        }
+
+        /// Query maximum limit on gas for a call to the oracle
+        #[ink(message)]
+        pub fn get_oracle_call_gas_limit(&self) -> Result<u64, MostError> {
+            Ok(self.data()?.oracle_call_gas_limit)
+        }
+
+        /// Query percentage buffer over the estimated cost
+        #[ink(message)]
+        pub fn get_base_fee_buffer_percentage(&self) -> Result<u128, MostError> {
+            Ok(self.data()?.base_fee_buffer_percentage)
+        }
+
+        /// Query gas price oracle address
+        #[ink(message)]
+        pub fn get_gas_price_oracle(&self) -> Result<Option<AccountId>, MostError> {
+            Ok(self.data()?.gas_price_oracle)
+        }
+
+        /// Query token pair
+        #[ink(message)]
+        pub fn get_supported_pair(&self, src_token: [u8; 32]) -> Option<[u8; 32]> {
+            self.supported_pairs.get(src_token)
+        }
 
         /// Query payout_account for a committee member (if any)
         #[ink(message)]
