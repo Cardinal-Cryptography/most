@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - master
+      - relayer/inject-common-addresses # TODO: temporary
 
 jobs:
   check-vars-and-secrets:

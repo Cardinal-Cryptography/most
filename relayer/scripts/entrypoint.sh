@@ -7,7 +7,7 @@ set -eo pipefail
 
 ETH_ADDRESSES_FILE="/usr/local/contracts/eth_addresses.json"
 AZERO_ADDRESSES_FILE="/usr/local/contracts/azero_addresses.json"
-COMMON_ADDRESSES_FILE="/usr/local/contracts/common_addresses.json"
+COMMON_ADDRESSES_FILE="/usr/local/common_addresses.json"
 
 # --- FUNCTIONS
 
@@ -137,9 +137,9 @@ fi
 if [[ -n "${RUN_TRADER}" ]]; then
   ARGS+=(
     --run-trader-component
-    --router-address=$(get_address $COMMON_ADDRESSES_FILE azero_router)
-    --azero-ether-address=$(jq -r '.tokens[] | select(.[0] | endswith("ETH")) | .[2]' $AZERO_ADDRESSES_FILE)
-    --azero-wrapped-azero-address=$(get_address $COMMON_ADDRESSES_FILE azero_wazero)
+    --router-address=$(cat $COMMON_ADDRESSES_FILE | jq --raw-output '.["addresses"].azero_router.address')
+    --azero-ether-address=$(jq --raw-output '.tokens[] | select(.[0] | endswith("ETH")) | .[2]' $AZERO_ADDRESSES_FILE)
+    --azero-wrapped-azero-address=$(cat $COMMON_ADDRESSES_FILE | jq --raw-output '.["addresses"].azero_wazero.address')
   )
 fi
 
