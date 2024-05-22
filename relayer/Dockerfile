@@ -3,7 +3,7 @@ ARG COPY_ADDRESSES=copy
 FROM ubuntu:jammy-20231211.1 as build_copy
 ONBUILD COPY ./azero_addresses.json /usr/local/contracts/azero_addresses.json
 ONBUILD COPY ./eth_addresses.json /usr/local/contracts/eth_addresses.json
-ONBUILD COPY ./common_addresses.json /usr/local/common_addresses.json
+ONBUILD COPY ./common_addresses.json /usr/local/contracts/common_addresses.json
 
 FROM ubuntu:jammy-20231211.1 as build_no_copy
 ONBUILD RUN echo "Contract addresses are not copied"
