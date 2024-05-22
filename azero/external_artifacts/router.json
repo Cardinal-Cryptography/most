@@ -1,6 +1,6 @@
 {
   "source": {
-    "hash": "0xd95a57023da223ec522904d2b4e598ef683220efed58815bbefee10d50134754",
+    "hash": "0x2f6f3b3c4d6ac3bd1fd91e6f189f61414e4f80a03e9bc4177216bbf1f510e4bd",
     "language": "ink! 4.3.0",
     "compiler": "rustc 1.72.1",
     "build_info": {
@@ -2052,7 +2052,8 @@
           }
         },
         "path": [
-          "traits",
+          "amm_helpers",
+          "math",
           "MathError"
         ]
       }

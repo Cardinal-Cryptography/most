@@ -39,7 +39,7 @@ jobs:
     uses: Cardinal-Cryptography/github-actions/.github/workflows/_featurenet-delete.yml@v6
     secrets: inherit
     with:
-      featurenet-name: updnet-bridgenet
+      featurenet-name: bridgenet
 
   wait-for-deletion:
     needs: [delete-bridgenet]

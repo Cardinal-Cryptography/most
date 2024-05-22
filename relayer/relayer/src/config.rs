@@ -49,8 +49,7 @@ pub struct Config {
         default_value = "false",
         requires("router_address"),
         requires("azero_wrapped_azero_address"),
-        requires("azero_ether_address"),
-        requires("eth_wrapped_ether_address")
+        requires("azero_ether_address")
     )]
     pub run_trader_component: bool,
 

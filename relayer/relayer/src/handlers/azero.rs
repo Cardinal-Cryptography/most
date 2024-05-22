@@ -105,7 +105,7 @@ impl AlephZeroEventHandler {
                 let request_hash_hex = hex::encode(request_hash);
 
                 info!(
-                    "Decoded event data: [request_hash: 0x{request_hash_hex}, dest_token_address: {}, amount: {amount}, dest_receiver_address: {}, request_nonce: {request_nonce}, committee_id: {committee_id}]",
+                    "Decoded event data: [request_hash: 0x{request_hash_hex}, dest_token_address: 0x{}, amount: {amount}, dest_receiver_address: 0x{}, request_nonce: {request_nonce}, committee_id: {committee_id}]",
                     hex::encode(dest_token_address),
                     hex::encode(dest_receiver_address)
                 );
