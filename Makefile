@@ -393,8 +393,14 @@ endif
 ifeq ($(DOCKER_RELAYER_COPY_ADDRESSES),copy)
 	cp azero/addresses.json relayer/azero_addresses.json
 	cp eth/addresses.json relayer/eth_addresses.json
+ifeq ($(NETWORK),bridgenet)
+	echo "Bridgenet addresses for Common are not yet known"; exit 1
+else ifeq ($(NETWORK),testnet)
+	curl https://public-chain-contracts.s3.eu-central-1.amazonaws.com/common/addresses/testnet/stage.json | jq --arg NET "azero" '.addresses | to_entries | map(select(.key | contains($NET + "_"))) | map({(.key): .value.address}) | add'
+else ifeq ($(NETWORK),mainnet)
+	curl https://public-chain-contracts.s3.eu-central-1.amazonaws.com/common/addresses/mainnet/prod.json | jq --arg NET "azero" '.addresses | to_entries | map(select(.key | contains($NET + "_"))) | map({(.key): .value.address}) | add'
 endif
-	wget -O relayer/common_addresses.json https://public-chain-contracts.s3.eu-central-1.amazonaws.com/common/addresses/testnet/stage.json
+endif
 	cp azero/artifacts/most.json relayer/most.json
 	cp azero/artifacts/advisory.json relayer/advisory.json
 	cp azero/artifacts/token.json relayer/token.json
