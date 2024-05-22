@@ -139,7 +139,7 @@ if [[ -n "${RUN_TRADER}" ]]; then
     --run-trader-component
     --router-address=$(get_address $COMMON_ADDRESSES_FILE azero_router)
     --azero-ether-address=$(jq --raw-output '.tokens[] | select(.[0] | endswith("ETH")) | .[2]' $AZERO_ADDRESSES_FILE)
-    --azero-wrapped-azero-address=$(get_address $COMMON_ADDRESSES_FILE azero_wazero')
+    --azero-wrapped-azero-address=$(get_address $COMMON_ADDRESSES_FILE azero_wazero)
   )
 fi
 
