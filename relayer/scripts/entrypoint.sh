@@ -7,7 +7,7 @@ set -eo pipefail
 
 ETH_ADDRESSES_FILE="/usr/local/contracts/eth_addresses.json"
 AZERO_ADDRESSES_FILE="/usr/local/contracts/azero_addresses.json"
-COMMON_ADDRESSES_FILE="/usr/local/common_addresses.json"
+COMMON_ADDRESSES_FILE="/usr/local/contracts/common_addresses.json"
 
 # --- FUNCTIONS
 
