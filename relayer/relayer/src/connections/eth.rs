@@ -254,6 +254,6 @@ async fn with_nonce_manager(
 }
 
 async fn with_gas_escalator(connection: EthConnection) -> GasEscalatorMiddleware<EthConnection> {
-    let escalator = GeometricGasPrice::new(1.125, 15u64, None::<u64>);
-    GasEscalatorMiddleware::new(connection, escalator, Frequency::PerBlock)
+    let escalator = GeometricGasPrice::new(1.125, 25u64, None::<u64>);
+    GasEscalatorMiddleware::new(connection, escalator, Frequency::Duration(15000))
 }
