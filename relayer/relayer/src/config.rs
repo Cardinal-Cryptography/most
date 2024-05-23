@@ -65,7 +65,7 @@ pub struct Config {
     #[arg(long, default_value = "100_000_000_000_000_000")]
     pub bridging_threshold: u128,
 
-    /// Trader component will request relaying rewards when they exceed this value
+    /// Trader component will claim rewards when they exceed this value
     ///
     /// Defaults to 10 AZERO
     #[arg(long, default_value = "10_000_000_000_000")]
