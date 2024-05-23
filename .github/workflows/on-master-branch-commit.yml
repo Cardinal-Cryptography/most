@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - master
+      - MOST-42-fix-gas-escalator
 
 jobs:
   check-vars-and-secrets:
