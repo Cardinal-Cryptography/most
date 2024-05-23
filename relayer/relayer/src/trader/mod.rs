@@ -19,7 +19,6 @@ use crate::{
     CircuitBreakerEvent,
 };
 
-// pub const ONE_AZERO: u128 = 1_000_000_000_000;
 pub const ONE_ETHER: u128 = 1_000_000_000_000_000_000;
 
 pub const TRADED_AZERO_FEE_MULTIPLIER: u128 = 20;
