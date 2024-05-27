@@ -399,6 +399,11 @@ else ifeq ($(NETWORK),mainnet)
 	echo "Mainnet addresses for Common are not yet known"; exit 1
 else ifeq ($(NETWORK),bridgenet)
 	echo "Bridgenet addresses for Common are not yet known"; exit 1
+else ifeq ($(NETWORK),development)
+	echo "Local development network does not have common contracts deployed and cannot be used for Trader testing."
+	touch relayer/common_addresses.json
+else
+	echo "Unknown network"; exit 1
 endif
 endif
 	cp azero/artifacts/most.json relayer/most.json
