@@ -20,7 +20,7 @@ jobs:
       RUSTC_WRAPPER: sccache
     steps:
       - name: Checkout Source code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Call action get-ref-properties
         id: get-ref-properties

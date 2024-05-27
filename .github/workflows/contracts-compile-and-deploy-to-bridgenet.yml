@@ -32,10 +32,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup node
-        uses: asdf-vm/actions/install@v2
+        uses: asdf-vm/actions/install@v3
 
       - name: Deploy eth contracts
         shell: bash
@@ -109,7 +109,7 @@ jobs:
       matrix: ${{ fromJson(needs.deploy-contracts.outputs.artifact-matrix-json) }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - uses: actions/download-artifact@v4
         with:
@@ -140,7 +140,7 @@ jobs:
     needs: [deploy-contracts]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - uses: actions/download-artifact@v4
         with:
