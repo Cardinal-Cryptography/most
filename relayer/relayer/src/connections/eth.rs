@@ -1,4 +1,4 @@
-use std::{fmt::Debug, time::Duration};
+use std::fmt::Debug;
 
 use ethers::{
     abi::Address,
@@ -33,10 +33,7 @@ pub enum EthConnectionError {
     #[error("Signer error")]
     SignerMiddleware(
         #[from]
-        SignerMiddlewareError<
-            NonceManagerMiddleware<PersistentEthConnection>,
-            EthereumSigner,
-        >,
+        SignerMiddlewareError<NonceManagerMiddleware<PersistentEthConnection>, EthereumSigner>,
     ),
 
     #[error("Nonce manager error")]
@@ -208,9 +205,7 @@ impl Signer for EthVsockSigner {
 }
 
 pub async fn connect(config: &Config) -> EthConnection {
-    Provider::<Http>::connect(&config.eth_node_http_url)
-        .await
-        .interval(Duration::from_secs(config.eth_poll_interval))
+    Provider::<Http>::connect(&config.eth_node_http_url).await
 }
 
 pub async fn with_local_wallet(
@@ -248,14 +243,12 @@ pub async fn with_nonce_manager(
     address: Address,
 ) -> Result<NonceManagerMiddleware<PersistentEthConnection>, EthConnectionError> {
     let nonce_manager = connection.nonce_manager(address);
-    nonce_manager.initialize_nonce(None).await?;    
+    nonce_manager.initialize_nonce(None).await?;
 
     Ok(nonce_manager)
 }
 
-pub async fn with_gas_escalator(
-    connection: EthConnection,
-) -> PersistentEthConnection {
+pub async fn with_gas_escalator(connection: EthConnection) -> PersistentEthConnection {
     let escalator = GeometricGasPrice::new(1.125, 25u64, None::<u64>);
     GasEscalatorMiddleware::new(connection, escalator, Frequency::Duration(15000))
 }

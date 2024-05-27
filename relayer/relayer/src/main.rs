@@ -11,9 +11,7 @@ use connections::{
     azero::{AzeroConnectionWithSigner, AzeroWsConnection},
     eth::{EthConnection, EthConnectionError, PersistentEthConnection, SignedEthConnection},
 };
-use ethers::{
-    signers::{coins_bip39::English, MnemonicBuilder, Signer},
-};
+use ethers::signers::{coins_bip39::English, MnemonicBuilder, Signer};
 use futures::TryFutureExt;
 use handlers::{AlephZeroEventsHandlerError, EthereumEventsHandlerError};
 use listeners::{
