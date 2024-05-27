@@ -56,7 +56,7 @@ pub struct Config {
     /// Trader component will always keep this + current base_fee in the guardians balance and will only sell the surplus
     ///
     /// Defaults to 1000 AZERO
-    #[arg(long, default_value = "1000_000_000_000_000")]
+    #[arg(long, default_value = "1_000_000_000_000_000")]
     pub eth_to_azero_relaying_buffer: u128,
 
     /// Trader component will bridge azero wETH after the balance exceeds this amount
