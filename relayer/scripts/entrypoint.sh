@@ -141,6 +141,19 @@ if [[ -n "${RUN_TRADER}" ]]; then
     --azero-ether-address=$(jq -r '.tokens[] | select(.[0] | endswith("ETH")) | .[2]' $AZERO_ADDRESSES_FILE)
     --azero-wrapped-azero-address=$(get_address $COMMON_ADDRESSES_FILE azero_wazero)
   )
+
+  if [[ -n "${ETH_TO_AZERO_RELAYING_BUFFER}" ]]; then
+    ARGS+=(--eth-to-azero-relaying-buffer=${ETH_TO_AZERO_RELAYING_BUFFER})
+  fi
+
+  if [[ -n "${BRIDGING_THRESHOLD}" ]]; then
+    ARGS+=(--bridging-threshold=${BRIDGING_THRESHOLD})
+  fi
+
+  if [[ -n "${REWARD_WITHDRAWAL_THRESHOLD}" ]]; then
+    ARGS+=(--reward-withdrawal-threshold=${REWARD_WITHDRAWAL_THRESHOLD})
+  fi
+
 fi
 
 # --- RUN
