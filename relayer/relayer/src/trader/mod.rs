@@ -19,19 +19,13 @@ use crate::{
     CircuitBreakerEvent,
 };
 
-pub const ONE_AZERO: u128 = 1_000_000_000_000;
 pub const ONE_ETHER: u128 = 1_000_000_000_000_000_000;
 
-// trader component will sell the surplus
-pub const ETH_TO_AZERO_RELAYING_BUFFER: u128 = 100 * ONE_AZERO;
 pub const TRADED_AZERO_FEE_MULTIPLIER: u128 = 20;
 pub const SLIPPAGE_PERCENT: u128 = 1;
 
 pub const HOUR_IN_MILLIS: u64 = 60 * 60 * 1000;
 pub const TRADER_QUERY_INTERVAL_MILLIS: u64 = 30 * 1000;
-
-pub const BRIDGING_THRESHOLD: u128 = ONE_ETHER / 10;
-pub const REWARD_WITHDRAWAL_THRESHOLD: u128 = 10 * ONE_AZERO;
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -66,6 +60,9 @@ pub struct Trader {
     whoami_azero: AccountId,
     whoami_eth: H160,
     wrapped_azero_address: AccountId,
+    eth_to_azero_relaying_buffer: u128,
+    bridging_threshold: u128,
+    reward_withdrawal_threshold: u128,
 }
 
 impl Trader {
@@ -84,6 +81,9 @@ impl Trader {
             azero_wrapped_azero_address,
             azero_ether_address,
             azero_ether_metadata,
+            eth_to_azero_relaying_buffer,
+            bridging_threshold,
+            reward_withdrawal_threshold,
             ..
         } = &*config;
 
@@ -136,6 +136,9 @@ impl Trader {
             whoami_eth,
             wrapped_azero_address,
             azero_ether,
+            eth_to_azero_relaying_buffer: *eth_to_azero_relaying_buffer,
+            bridging_threshold: *bridging_threshold,
+            reward_withdrawal_threshold: *reward_withdrawal_threshold,
         })
     }
 
@@ -152,8 +155,11 @@ impl Trader {
             whoami_eth,
             azero_ether,
             wrapped_azero_address,
+            bridging_threshold,
+            eth_to_azero_relaying_buffer,
+            reward_withdrawal_threshold,
         } = Self::new(
-            config,
+            config.clone(),
             azero_signed_connection.clone(),
             eth_signed_connection.clone(),
         )?;
@@ -184,7 +190,7 @@ impl Trader {
 
                     debug!("Ping");
 
-                    payout_relayer_rewards(azero_signed_connection.clone(), &most_azero).await;
+                    payout_relayer_rewards(azero_signed_connection.clone(), &most_azero, reward_withdrawal_threshold).await;
 
                     let azero_balance = azero_signed_connection
                         .get_free_balance(whoami_azero.to_owned(), None)
@@ -203,7 +209,7 @@ impl Trader {
                         },
                     };
 
-                    let azero_available_for_swap = azero_balance.saturating_sub(current_base_fee + ETH_TO_AZERO_RELAYING_BUFFER);
+                    let azero_available_for_swap = azero_balance.saturating_sub(current_base_fee + eth_to_azero_relaying_buffer);
 
                     // check azero balance
                     if azero_available_for_swap < current_base_fee * TRADED_AZERO_FEE_MULTIPLIER {
@@ -268,7 +274,7 @@ impl Trader {
                             },
                         };
 
-                    if azero_eth_balance > BRIDGING_THRESHOLD {
+                    if azero_eth_balance > bridging_threshold {
                         info!("Requesting a cross chain transfer of {azero_eth_balance} units of Azero ETH [{azero_ether_address}] to {whoami_eth}.");
 
                         // set allowance
@@ -310,6 +316,7 @@ impl Trader {
 async fn payout_relayer_rewards(
     azero_signed_connection: Arc<AzeroConnectionWithSigner>,
     most: &MostInstance,
+    threshold: u128,
 ) {
     let current_committee_id = match most
         .current_committee_id(azero_signed_connection.as_connection())
@@ -333,7 +340,7 @@ async fn payout_relayer_rewards(
     match rewards {
         Ok(rewards) => {
             info!("Outstanding rewards: {rewards:?}");
-            if rewards > REWARD_WITHDRAWAL_THRESHOLD {
+            if rewards > threshold {
                 if let Err(why) = most
                     .payout_rewards(&azero_signed_connection, current_committee_id)
                     .await

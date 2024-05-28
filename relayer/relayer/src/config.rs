@@ -53,6 +53,24 @@ pub struct Config {
     )]
     pub run_trader_component: bool,
 
+    /// Trader component will always keep this + current base_fee in the guardians balance and will only sell the surplus
+    ///
+    /// Defaults to 1000 AZERO
+    #[arg(long, default_value = "1_000_000_000_000_000")]
+    pub eth_to_azero_relaying_buffer: u128,
+
+    /// Trader component will bridge azero wETH after the balance exceeds this amount
+    ///
+    /// Defaults to 0.1 ETH
+    #[arg(long, default_value = "100_000_000_000_000_000")]
+    pub bridging_threshold: u128,
+
+    /// Trader component will claim rewards when they exceed this value
+    ///
+    /// Defaults to 10 AZERO
+    #[arg(long, default_value = "10_000_000_000_000")]
+    pub reward_withdrawal_threshold: u128,
+
     #[arg(long)]
     pub router_address: Option<String>,
 
