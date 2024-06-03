@@ -7,9 +7,11 @@ describe("MostBenchmark", function () {
   it(" deploy + estimate gas cost and successfully call sendRequest and receiveRequest.", async () => {
     const accounts = await hre.ethers.getSigners();
 
-    let guardianKeys = accounts.slice(1, 9);
+    const threshold = 5;
+    const committeeSize = 8;
+
+    let guardianKeys = accounts.slice(1, committeeSize + 1);
     let guardianAddresses = guardianKeys.map((x) => x.address);
-    let threshold = 5;
 
     const Token = await hre.ethers.getContractFactory("Token");
     const token = await Token.deploy("10000", "18", "TestToken", "TEST");
@@ -22,7 +24,7 @@ describe("MostBenchmark", function () {
     const Most = await hre.ethers.getContractFactory("Most");
     const most = await upgrades.deployProxy(
       Most,
-      [guardianAddresses, 5, accounts[0].address, wethAddress],
+      [guardianAddresses, threshold, accounts[0].address, wethAddress],
       {
         initializer: "initialize",
         kind: "uups",
@@ -31,13 +33,13 @@ describe("MostBenchmark", function () {
     const mostAddress = await most.getAddress();
 
     // Easy way to get a "random" bytes32 value
-    let azContract = getRandomAlephAccount(42);
-    let azContract2 = getRandomAlephAccount(43);
-    let tokenAddressBytes32 = addressToBytes32(tokenAddress);
+    const azeroContract = getRandomAlephAccount(42);
+    const azeroContract2 = getRandomAlephAccount(43);
+    const tokenAddressBytes32 = addressToBytes32(tokenAddress);
 
     // Add pair of linked contracts
-    await most.addPair(tokenAddressBytes32, azContract, { from: accounts[0] });
-    await most.addPair(addressToBytes32(wethAddress), azContract2, {
+    await most.addPair(tokenAddressBytes32, azeroContract, { from: accounts[0] });
+    await most.addPair(addressToBytes32(wethAddress), azeroContract2, {
       from: accounts[0],
     });
     await most.unpause();
@@ -45,11 +47,12 @@ describe("MostBenchmark", function () {
     // Gas estimate for sendRequest
 
     // bytes32 "address" of account on Aleph
-    let azAccount = getRandomAlephAccount(0);
+    const azeroAccount = getRandomAlephAccount(0);
+    const amount = 1000;
 
     const gasEstimateApprove = await token.approve.estimateGas(
       mostAddress,
-      1000,
+      amount,
       {
         from: accounts[0],
       },
@@ -58,27 +61,27 @@ describe("MostBenchmark", function () {
     console.log("Gas estimate for approve: ", Number(gasEstimateApprove));
 
     // Allow Most to spend tokens
-    await token.approve(mostAddress, 1000, {
+    await token.approve(mostAddress, amount, {
       from: accounts[0],
     });
 
     const gasEstimateSend = await most.sendRequest.estimateGas(
       tokenAddressBytes32,
-      1000,
-      azAccount,
+      amount,
+      azeroAccount,
       { from: accounts[0] },
     );
 
     console.log("Gas estimate for sendRequest: ", Number(gasEstimateSend));
 
-    await most.sendRequest(tokenAddressBytes32, 1000, azAccount, {
+    await most.sendRequest(tokenAddressBytes32, amount, azeroAccount, {
       gas: gasEstimateSend,
       from: accounts[0],
     });
 
     const gasEstimateSendNative = await most.sendRequestNative.estimateGas(
-      azAccount,
-      { from: accounts[0], value: 1000 },
+      azeroAccount,
+      { from: accounts[0], value: 2*amount },
     );
 
     console.log(
@@ -86,56 +89,108 @@ describe("MostBenchmark", function () {
       Number(gasEstimateSendNative),
     );
 
-    await most.sendRequestNative(azAccount, {
+    await most.sendRequestNative(azeroAccount, {
       gas: gasEstimateSendNative,
       from: accounts[0],
-      value: 1000,
+      value: 2*amount,
     });
 
     // Gas estimate for bridgeReceive
-    let ethAccount = addressToBytes32(accounts[9].address);
-    let committeeId = 0;
-    let requestHash = hre.ethers.solidityPackedKeccak256(
-      ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
-      [committeeId, tokenAddressBytes32, 1000, ethAccount, 1],
+    const ethAccount = addressToBytes32(accounts[committeeSize + 1].address);
+    const committeeId = 0;
+    let nonce = 0;
+
+    await benchmarkReceiveRequest(
+      most,
+      guardianKeys,
+      committeeSize,
+      committeeId,
+      tokenAddressBytes32,
+      amount,
+      ethAccount,
+      nonce,
+      "token",
     );
 
-    // Estimate gas for each signature
-    let gasEstimates = [...Array(threshold).keys()];
-    for (let i = 0; i < threshold; i++) {
-      gasEstimates[i] = Number(
-        await most
-          .connect(guardianKeys[i])
-          .receiveRequest.estimateGas(
-            requestHash,
-            committeeId,
-            tokenAddressBytes32,
-            1000,
-            ethAccount,
-            1,
-          ),
-      );
+    await benchmarkReceiveRequest(
+      most,
+      guardianKeys,
+      committeeSize,
+      committeeId,
+      addressToBytes32(wethAddress),
+      amount,
+      ethAccount,
+      ++nonce,
+      "weth - no unwrap",
+    );
 
-      // Check if gas estimate is high enough
+    const zeroAddress = "0x0000000000000000000000000000000000000000000000000000000000000000";
+
+    await benchmarkReceiveRequest(
+      most,
+      guardianKeys,
+      committeeSize,
+      committeeId,
+      zeroAddress,
+      amount,
+      ethAccount,
+      nonce,
+      "weth - unwrap",
+    );
+  });
+});
+
+// function to benchmark the gas cost of receiveRequest with given parameters
+async function benchmarkReceiveRequest(
+  most,
+  guardianKeys,
+  committeeSize,
+  committeeId,
+  tokenAddressBytes32,
+  amount,
+  ethAccount,
+  nonce,
+  desc,
+) {
+  let requestHash = hre.ethers.solidityPackedKeccak256(
+    ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
+    [committeeId, tokenAddressBytes32, amount, ethAccount, nonce],
+  );
+
+  let gasEstimates = [...Array(committeeSize).keys()];
+  for (let i = 0; i < committeeSize; i++) {
+    gasEstimates[i] = Number(
       await most
         .connect(guardianKeys[i])
-        .receiveRequest(
+        .receiveRequest.estimateGas(
           requestHash,
           committeeId,
           tokenAddressBytes32,
-          1000,
+          amount,
           ethAccount,
-          1,
-          {
-            gas: gasEstimates[i],
-          },
-        );
-    }
+          nonce,
+        ),
+    );
 
-    console.log("Gas estimates for receiveRequest: ", gasEstimates);
+    // Check if gas estimate is high enough
+    await most
+      .connect(guardianKeys[i])
+      .receiveRequest(
+        requestHash,
+        committeeId,
+        tokenAddressBytes32,
+        amount,
+        ethAccount,
+        nonce,
+        {
+          gas: gasEstimates[i],
+        },
+      );
+  }
 
-    // Sum gas estimates
-    let sum = gasEstimates.reduce((a, b) => a + b, 0);
-    console.log("Sum of gas estimates for receiveRequest: ", sum);
-  });
-});
+  console.log("Gas estimates for receiveRequest (%s): ", desc, gasEstimates);
+
+  // Sum gas estimates
+  let sum = gasEstimates.reduce((a, b) => a + b, 0);
+  console.log("Sum of gas estimates for receiveRequest (%s): ", desc, sum);
+}
