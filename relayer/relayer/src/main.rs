@@ -9,7 +9,7 @@ use clap::Parser;
 use config::Config;
 use connections::{
     azero::{AzeroConnectionWithSigner, AzeroWsConnection},
-    eth::{EthConnection, EthConnectionError, SignedEthConnection},
+    eth::{EthConnection, EthConnectionError, GasEscalatingEthConnection, SignedEthConnection},
 };
 use ethers::signers::{coins_bip39::English, MnemonicBuilder, Signer};
 use futures::TryFutureExt;
@@ -29,7 +29,10 @@ use tokio::{
 use trader::TraderError;
 
 use crate::{
-    connections::{azero, eth},
+    connections::{
+        azero,
+        eth::{self, with_gas_escalator},
+    },
     handlers::{AlephZeroEventsHandler, EthereumEventsHandler},
     listeners::{
         AdvisoryListener, AlephZeroHaltedListener, AlephZeroListener, AzeroMostEvents,
@@ -154,10 +157,11 @@ async fn create_azero_connections(
 
 async fn create_eth_connections(
     config: &Config,
+    persistent_eth_connection: GasEscalatingEthConnection,
 ) -> Result<(Arc<EthConnection>, Arc<SignedEthConnection>), EthConnectionError> {
     let eth_signed_connection = if let Some(cid) = config.signer_cid {
         info!("Creating signed connection using a Signer client");
-        eth::with_signer(eth::connect(config).await, cid, config.signer_port).await?
+        eth::with_signer(persistent_eth_connection, cid, config.signer_port).await?
     } else if config.dev {
         let wallet =
             // use the default development mnemonic
@@ -178,7 +182,7 @@ async fn create_eth_connections(
             "Creating signed connection using a development key {} [{private_key}]",
             &wallet.address()
         );
-        eth::with_local_wallet(eth::connect(config).await, wallet).await?
+        eth::with_local_wallet(persistent_eth_connection, wallet).await?
     } else {
         panic!("Use dev mode or connect to a signer");
     };
@@ -198,8 +202,16 @@ async fn main() -> Result<(), RelayerError> {
 
     let mut tasks = JoinSet::new();
     let mut first_run = true;
+    // Gas escalator should be shared between all relayer runs - otherwise the gas escalating task will leak on every restart
+    let persistent_eth_connection = with_gas_escalator(eth::connect(&config).await).await;
 
-    run_relayer(first_run, &mut tasks, config.clone()).await?;
+    run_relayer(
+        first_run,
+        &mut tasks,
+        config.clone(),
+        persistent_eth_connection.clone(),
+    )
+    .await?;
 
     first_run = false;
 
@@ -224,7 +236,13 @@ async fn main() -> Result<(), RelayerError> {
                     info!("Waiting {delay:?} before rebooting.");
 
                     sleep(delay).await;
-                    run_relayer(first_run, &mut tasks, config.clone()).await?;
+                    run_relayer(
+                        first_run,
+                        &mut tasks,
+                        config.clone(),
+                        persistent_eth_connection.clone(),
+                    )
+                    .await?;
                     tick = Instant::now();
                 }
             }
@@ -246,12 +264,14 @@ async fn run_relayer(
     first_run: bool,
     tasks: &mut JoinSet<Result<CircuitBreakerEvent, RelayerError>>,
     config: Arc<Config>,
+    persistent_eth_connection: GasEscalatingEthConnection,
 ) -> Result<(), RelayerError> {
     // create connections
     let (azero_connection, azero_signed_connection) = create_azero_connections(&config).await?;
     info!("Established connection to Aleph Zero node");
 
-    let (eth_connection, eth_signed_connection) = create_eth_connections(&config).await?;
+    let (eth_connection, eth_signed_connection) =
+        create_eth_connections(&config, persistent_eth_connection).await?;
     info!("Established connection to the Ethereum node");
 
     // Create channels
