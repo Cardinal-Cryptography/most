@@ -9,7 +9,7 @@ use clap::Parser;
 use config::Config;
 use connections::{
     azero::{AzeroConnectionWithSigner, AzeroWsConnection},
-    eth::{EthConnection, EthConnectionError, PersistentEthConnection, SignedEthConnection},
+    eth::{EthConnection, EthConnectionError, GasEscalatingEthConnection, SignedEthConnection},
 };
 use ethers::signers::{coins_bip39::English, MnemonicBuilder, Signer};
 use futures::TryFutureExt;
@@ -157,7 +157,7 @@ async fn create_azero_connections(
 
 async fn create_eth_connections(
     config: &Config,
-    persistent_eth_connection: PersistentEthConnection,
+    persistent_eth_connection: GasEscalatingEthConnection,
 ) -> Result<(Arc<EthConnection>, Arc<SignedEthConnection>), EthConnectionError> {
     let eth_signed_connection = if let Some(cid) = config.signer_cid {
         info!("Creating signed connection using a Signer client");
@@ -202,7 +202,7 @@ async fn main() -> Result<(), RelayerError> {
 
     let mut tasks = JoinSet::new();
     let mut first_run = true;
-    // Gas escalator should be shared between all relayer runs
+    // Gas escalator should be shared between all relayer runs - otherwise the gas escalating task will leak on every restart
     let persistent_eth_connection = with_gas_escalator(eth::connect(&config).await).await;
 
     run_relayer(
@@ -264,7 +264,7 @@ async fn run_relayer(
     first_run: bool,
     tasks: &mut JoinSet<Result<CircuitBreakerEvent, RelayerError>>,
     config: Arc<Config>,
-    persistent_eth_connection: PersistentEthConnection,
+    persistent_eth_connection: GasEscalatingEthConnection,
 ) -> Result<(), RelayerError> {
     // create connections
     let (azero_connection, azero_signed_connection) = create_azero_connections(&config).await?;

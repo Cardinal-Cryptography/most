@@ -22,9 +22,9 @@ use tokio::sync::Mutex;
 use crate::config::Config;
 
 pub type EthConnection = Provider<Http>;
-pub type PersistentEthConnection = GasEscalatorMiddleware<EthConnection>;
+pub type GasEscalatingEthConnection = GasEscalatorMiddleware<EthConnection>;
 pub type SignedEthConnection =
-    SignerMiddleware<NonceManagerMiddleware<PersistentEthConnection>, EthereumSigner>;
+    SignerMiddleware<NonceManagerMiddleware<GasEscalatingEthConnection>, EthereumSigner>;
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -33,11 +33,11 @@ pub enum EthConnectionError {
     #[error("Signer error")]
     SignerMiddleware(
         #[from]
-        SignerMiddlewareError<NonceManagerMiddleware<PersistentEthConnection>, EthereumSigner>,
+        SignerMiddlewareError<NonceManagerMiddleware<GasEscalatingEthConnection>, EthereumSigner>,
     ),
 
     #[error("Nonce manager error")]
-    NonceManager(#[from] NonceManagerError<PersistentEthConnection>),
+    NonceManager(#[from] NonceManagerError<GasEscalatingEthConnection>),
 
     #[error("Join error {0}")]
     Join(#[from] tokio::task::JoinError),
@@ -209,7 +209,7 @@ pub async fn connect(config: &Config) -> EthConnection {
 }
 
 pub async fn with_local_wallet(
-    connection: PersistentEthConnection,
+    connection: GasEscalatingEthConnection,
     wallet: LocalWallet,
 ) -> Result<SignedEthConnection, EthConnectionError> {
     let nonce_manager = with_nonce_manager(connection, wallet.address()).await?;
@@ -219,7 +219,7 @@ pub async fn with_local_wallet(
 }
 
 pub async fn with_signer(
-    connection: PersistentEthConnection,
+    connection: GasEscalatingEthConnection,
     cid: u32,
     port: u32,
 ) -> Result<SignedEthConnection, EthConnectionError> {
@@ -239,16 +239,16 @@ pub async fn with_signer(
 }
 
 pub async fn with_nonce_manager(
-    connection: PersistentEthConnection,
+    connection: GasEscalatingEthConnection,
     address: Address,
-) -> Result<NonceManagerMiddleware<PersistentEthConnection>, EthConnectionError> {
+) -> Result<NonceManagerMiddleware<GasEscalatingEthConnection>, EthConnectionError> {
     let nonce_manager = connection.nonce_manager(address);
     nonce_manager.initialize_nonce(None).await?;
 
     Ok(nonce_manager)
 }
 
-pub async fn with_gas_escalator(connection: EthConnection) -> PersistentEthConnection {
+pub async fn with_gas_escalator(connection: EthConnection) -> GasEscalatingEthConnection {
     let escalator = GeometricGasPrice::new(1.125, 25u64, None::<u64>);
     GasEscalatorMiddleware::new(connection, escalator, Frequency::Duration(15000))
 }
