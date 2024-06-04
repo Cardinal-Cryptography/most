@@ -46,7 +46,9 @@ describe("MostBenchmark", function () {
     const usdtAddressBytes32 = addressToBytes32(usdtAddress);
 
     // Add pair of linked contracts
-    await most.addPair(tokenAddressBytes32, azeroWrappedToken, { from: accounts[0] });
+    await most.addPair(tokenAddressBytes32, azeroWrappedToken, {
+      from: accounts[0],
+    });
     await most.addPair(wethAddressBytes32, azeroWrappedWeth, {
       from: accounts[0],
     });
@@ -102,7 +104,10 @@ describe("MostBenchmark", function () {
       { from: accounts[0] },
     );
 
-    console.log("Gas estimate for sendRequest USDT: ", Number(gasEstimateSendUsdt));
+    console.log(
+      "Gas estimate for sendRequest USDT: ",
+      Number(gasEstimateSendUsdt),
+    );
 
     await most.sendRequest(usdtAddressBytes32, amount, azeroAccount, {
       gas: gasEstimateSendUsdt,
@@ -167,7 +172,8 @@ describe("MostBenchmark", function () {
       "weth - no unwrap",
     );
 
-    const zeroAddress = "0x0000000000000000000000000000000000000000000000000000000000000000";
+    const zeroAddress =
+      "0x0000000000000000000000000000000000000000000000000000000000000000";
 
     await benchmarkReceiveRequest(
       most,
