@@ -63,56 +63,25 @@ describe("MostBenchmark", function () {
     const azeroAccount = getRandomAlephAccount(0);
     const amount = 1000;
 
-    const gasEstimateApprove = await token.approve.estimateGas(
-      mostAddress,
-      amount,
-      {
-        from: accounts[0],
-      },
-    );
-
-    console.log("Gas estimate for approve: ", Number(gasEstimateApprove));
-
-    // Allow Most to spend tokens
-    await token.approve(mostAddress, amount, {
-      from: accounts[0],
-    });
-
-    const gasEstimateSend = await most.sendRequest.estimateGas(
+    await benchmarkSendRequest(
+      most,
+      token,
       tokenAddressBytes32,
       amount,
       azeroAccount,
-      { from: accounts[0] },
+      accounts[0],
+      "token",
     );
 
-    console.log("Gas estimate for sendRequest: ", Number(gasEstimateSend));
-
-    await most.sendRequest(tokenAddressBytes32, amount, azeroAccount, {
-      gas: gasEstimateSend,
-      from: accounts[0],
-    });
-
-    // Send usdt
-    await usdt.approve(mostAddress, amount, {
-      from: accounts[0],
-    });
-
-    const gasEstimateSendUsdt = await most.sendRequest.estimateGas(
+    await benchmarkSendRequest(
+      most,
+      usdt,
       usdtAddressBytes32,
       amount,
       azeroAccount,
-      { from: accounts[0] },
+      accounts[0],
+      "USDT",
     );
-
-    console.log(
-      "Gas estimate for sendRequest USDT: ",
-      Number(gasEstimateSendUsdt),
-    );
-
-    await most.sendRequest(usdtAddressBytes32, amount, azeroAccount, {
-      gas: gasEstimateSendUsdt,
-      from: accounts[0],
-    });
 
     // Send native ETH
     const gasEstimateSendNative = await most.sendRequestNative.estimateGas(
@@ -189,6 +158,53 @@ describe("MostBenchmark", function () {
   });
 });
 
+// Function to benchmark the gas cost of approve + sendRequest with given parameters
+async function benchmarkSendRequest(
+  most,
+  token,
+  tokenAddressBytes32,
+  amount,
+  azeroAccount,
+  signer,
+  desc,
+) {
+  const gasEstimateApprove = await token.approve.estimateGas(
+    most.target,
+    amount,
+    {
+      from: signer,
+    },
+  );
+
+  console.log(
+    "Gas estimate for approve (%s): ",
+    desc,
+    Number(gasEstimateApprove),
+  );
+
+  await token.approve(most.target, amount, {
+    from: signer,
+  });
+
+  const gasEstimateSend = await most.sendRequest.estimateGas(
+    tokenAddressBytes32,
+    amount,
+    azeroAccount,
+    { from: signer },
+  );
+
+  console.log(
+    "Gas estimate for sendRequest (%s): ",
+    desc,
+    Number(gasEstimateSend),
+  );
+
+  await most.sendRequest(tokenAddressBytes32, amount, azeroAccount, {
+    gas: gasEstimateSend,
+    from: signer,
+  });
+}
+
 // function to benchmark the gas cost of receiveRequest with given parameters
 async function benchmarkReceiveRequest(
   most,
@@ -237,7 +253,7 @@ async function benchmarkReceiveRequest(
       );
   }
 
-  console.log("Gas estimates for receiveRequest (%s): ", desc, gasEstimates);
+  console.log("\nGas estimates for receiveRequest (%s): ", desc, gasEstimates);
 
   // Sum gas estimates
   let sum = gasEstimates.reduce((a, b) => a + b, 0);
