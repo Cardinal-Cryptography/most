@@ -114,8 +114,8 @@ enum CircuitBreakerEvent {
     AlephZeroEventHandlerFailure,
     BridgeHaltAlephZero,
     BridgeHaltEthereum,
-    AdvisoryEmergency(#[allow(dead_code)] AccountId), // field is needed for logs
-    AlephClientError,                                 // signifies a connection error
+    AdvisoryEmergency(#[allow(dead_code)] Vec<AccountId>), // field is needed for logs
+    AlephClientError,                                      // signifies a connection error
     EthConnectionError,
 }
 
@@ -279,18 +279,50 @@ async fn run_relayer(
     let (eth_block_number_sender, _) = broadcast::channel::<u32>(1);
 
     let (azero_events_sender, azero_events_receiver) = mpsc::channel::<AzeroMostEvents>(32);
-    let (azero_block_number_sender, _) = broadcast::channel::<u32>(1);
+    let (azero_block_number_sender, azero_block_number_receiver) = broadcast::channel::<u32>(1);
     let (azero_block_seal_sender, azero_block_seal_receiver) = mpsc::channel::<u32>(1);
 
     let (circuit_breaker_sender, _circuit_breaker_receiver) =
         broadcast::channel::<CircuitBreakerEvent>(1);
 
+    let advisory_addresses = Arc::new(AdvisoryListener::parse_advisory_addresses(config.clone()));
+
+    // Check advisory status before starting the relayer
+    let active_advisories = AdvisoryListener::query_active_advisories(
+        advisory_addresses.clone(),
+        azero_connection.clone(),
+    )
+    .await?;
+
+    // If there are active advisories, we should avoid starting the relayer.
+    // Starting all the components might lead to a race condition in which event handlers
+    // might start processing before advisory listener activates the circuit breaker.
+    if !active_advisories.is_empty() {
+        info!("Active advisories detected: {active_advisories:?} - Relayer will not start.");
+        tasks.spawn(async { Ok(CircuitBreakerEvent::AdvisoryEmergency(active_advisories)) });
+        return Ok(());
+    }
+
+    // Receivers need to be prepared beforehand in order to receive all the data from other components
+    let advisory_circuit_breaker_receiver = circuit_breaker_sender.subscribe();
+    let aleph_halted_circuit_breaker_receiver = circuit_breaker_sender.subscribe();
+    let eth_paused_circuit_breaker_receiver = circuit_breaker_sender.subscribe();
+    let redis_manager_circuit_breaker_receiver = circuit_breaker_sender.subscribe();
+    let eth_listener_circuit_breaker_receiver = circuit_breaker_sender.subscribe();
+    let eth_events_handler_circuit_breaker_receiver = circuit_breaker_sender.subscribe();
+    let aleph_listener_circuit_breaker_receiver = circuit_breaker_sender.subscribe();
+    let aleph_events_handler_circuit_breaker_receiver = circuit_breaker_sender.subscribe();
+    let trader_circuit_breaker_receiver = circuit_breaker_sender.subscribe();
+
+    let redis_manager_eth_block_number_receiver = eth_block_number_sender.subscribe();
+    let eth_listener_eth_block_number_receiver = eth_block_number_sender.subscribe();
+
     tasks.spawn(
         AdvisoryListener::run(
-            Arc::clone(&config),
+            advisory_addresses,
             Arc::clone(&azero_connection),
             circuit_breaker_sender.clone(),
-            circuit_breaker_sender.subscribe(),
+            advisory_circuit_breaker_receiver,
         )
         .map_err(RelayerError::from),
     );
@@ -300,7 +332,7 @@ async fn run_relayer(
             Arc::clone(&config),
             Arc::clone(&azero_connection),
             circuit_breaker_sender.clone(),
-            circuit_breaker_sender.subscribe(),
+            aleph_halted_circuit_breaker_receiver,
         )
         .map_err(RelayerError::from),
     );
@@ -310,7 +342,7 @@ async fn run_relayer(
             Arc::clone(&config),
             Arc::clone(&eth_connection),
             circuit_breaker_sender.clone(),
-            circuit_breaker_sender.subscribe(),
+            eth_paused_circuit_breaker_receiver,
         )
         .map_err(RelayerError::from),
     );
@@ -320,10 +352,10 @@ async fn run_relayer(
             first_run,
             Arc::clone(&config),
             eth_block_number_sender.clone(),
-            eth_block_number_sender.subscribe(),
+            redis_manager_eth_block_number_receiver,
             azero_block_number_sender.clone(),
             azero_block_seal_receiver,
-            circuit_breaker_sender.subscribe(),
+            redis_manager_circuit_breaker_receiver,
         )
         .map_err(RelayerError::from),
     );
@@ -334,8 +366,8 @@ async fn run_relayer(
             Arc::clone(&eth_connection),
             eth_events_sender.clone(),
             eth_block_number_sender.clone(),
-            eth_block_number_sender.subscribe(),
-            circuit_breaker_sender.subscribe(),
+            eth_listener_eth_block_number_receiver,
+            eth_listener_circuit_breaker_receiver,
         )
         .map_err(RelayerError::from),
     );
@@ -346,7 +378,7 @@ async fn run_relayer(
             eth_events_receiver,
             Arc::clone(&azero_signed_connection),
             circuit_breaker_sender.clone(),
-            circuit_breaker_sender.subscribe(),
+            eth_events_handler_circuit_breaker_receiver,
         )
         .map_err(RelayerError::from),
     );
@@ -357,10 +389,10 @@ async fn run_relayer(
             Arc::clone(&azero_connection),
             azero_events_sender,
             azero_block_number_sender.clone(),
-            azero_block_number_sender.subscribe(),
+            azero_block_number_receiver,
             azero_block_seal_sender.clone(),
             circuit_breaker_sender.clone(),
-            circuit_breaker_sender.subscribe(),
+            aleph_listener_circuit_breaker_receiver,
         )
         .map_err(RelayerError::from),
     );
@@ -371,7 +403,7 @@ async fn run_relayer(
             Arc::clone(&eth_signed_connection),
             azero_events_receiver,
             circuit_breaker_sender.clone(),
-            circuit_breaker_sender.subscribe(),
+            aleph_events_handler_circuit_breaker_receiver,
         )
         .map_err(RelayerError::from),
     );
@@ -382,7 +414,7 @@ async fn run_relayer(
                 config,
                 azero_signed_connection.clone(),
                 eth_signed_connection,
-                circuit_breaker_sender.subscribe(),
+                trader_circuit_breaker_receiver,
             )
             .map_err(RelayerError::from),
         );

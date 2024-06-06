@@ -1,5 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
+use aleph_client::AccountId;
 use futures::future::join_all;
 use log::{debug, info, warn};
 use thiserror::Error;
@@ -31,11 +32,72 @@ pub struct AdvisoryListener;
 
 impl AdvisoryListener {
     pub async fn run(
-        config: Arc<Config>,
+        advisories: Arc<Vec<AdvisoryInstance>>,
         azero_connection: Arc<AzeroWsConnection>,
         circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
         mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
     ) -> Result<CircuitBreakerEvent, AdvisoryListenerError> {
+        loop {
+            debug!("Ping");
+
+            select! {
+                cb_event = circuit_breaker_receiver.recv() => {
+                    warn!("Exiting due to a circuit breaker event {cb_event:?}");
+                    return Ok(cb_event?);
+                },
+
+                active_advisories_res = Self::query_active_advisories(
+                    advisories.clone(),
+                    azero_connection.clone(),
+                ) => {
+                    debug!("Querying");
+
+                    match active_advisories_res {
+                        Err(why) => {
+                            warn!("Exiting due to an error querying active advisories {why:?}");
+                            let status = CircuitBreakerEvent::AlephClientError;
+                            circuit_breaker_sender.send(status.clone())?;
+                            return Ok(status.clone());
+                        },
+                        Ok(advisories) => {
+                            if advisories.is_empty() {
+                                debug!("No active advisories");
+                            } else {
+                                warn!("Exiting due to activation of advisories {advisories:?}");
+                                let status = CircuitBreakerEvent::AdvisoryEmergency(advisories);
+                                circuit_breaker_sender.send(status.clone())?;
+                                return Ok(status.clone());
+                            }
+                        },
+                    }
+                }
+            }
+
+            sleep(Duration::from_secs(ALEPH_BLOCK_PROD_TIME_SEC)).await;
+        }
+    }
+
+    pub async fn query_active_advisories(
+        advisories: Arc<Vec<AdvisoryInstance>>,
+        azero_connection: Arc<AzeroWsConnection>,
+    ) -> Result<Vec<AccountId>, AdvisoryListenerError> {
+        join_all(
+            advisories
+                .iter()
+                .map(|advisory| advisory.is_emergency(&azero_connection))
+                .collect::<Vec<_>>(),
+        )
+        .await
+        .into_iter()
+        .filter_map(|maybe_emergency| match maybe_emergency {
+            Ok((true, address)) => Some(Ok(address)),
+            Ok((false, _)) => None,
+            Err(why) => Some(Err(AdvisoryListenerError::AzeroContract(why))),
+        })
+        .collect()
+    }
+
+    pub fn parse_advisory_addresses(config: Arc<Config>) -> Vec<AdvisoryInstance> {
         let Config {
             advisory_contract_metadata,
             advisory_contract_addresses,
@@ -44,7 +106,7 @@ impl AdvisoryListener {
 
         info!("Starting");
 
-        let contracts: Vec<AdvisoryInstance> = advisory_contract_addresses
+        advisory_contract_addresses
             .clone()
             .expect("Advisory addresses")
             .into_iter()
@@ -54,49 +116,7 @@ impl AdvisoryListener {
                     acc.push(AdvisoryInstance::new(&address, advisory_contract_metadata)?);
                     Ok(acc)
                 },
-            )?;
-
-        loop {
-            debug!("Ping");
-
-            select! {
-                cb_event = circuit_breaker_receiver.recv () => {
-                    warn!("Exiting due to a circuit breaker event {cb_event:?}");
-                    return Ok(cb_event?);
-                },
-
-                results = join_all(
-                    contracts
-                        .iter()
-                        .map(|advisory| advisory.is_emergency(&azero_connection))
-                        .collect::<Vec<_>>()) => {
-
-                    debug!("Querying");
-
-                    for maybe_emergency in results {
-                        match maybe_emergency {
-                            Ok((is_emergency, address)) => {
-                                if is_emergency {
-                                    warn!("Exiting due to an emergency state in one of the advisory contracts {address}");
-                                    let status = CircuitBreakerEvent::AdvisoryEmergency(address);
-                                    circuit_breaker_sender.send(status.clone())?;
-                                    return Ok(status.clone());
-                                }
-                            },
-
-                            Err(why) => {
-                                warn!("Exiting due to a connection error {why:?}");
-                                let status = CircuitBreakerEvent::AlephClientError;
-                                circuit_breaker_sender.send(status.clone())?;
-                                return Ok(status.clone());
-                            }
-                        }
-                    }
-                }
-
-            }
-
-            sleep(Duration::from_secs(ALEPH_BLOCK_PROD_TIME_SEC)).await;
-        }
+            )
+            .expect("Advisory addresses list")
     }
 }

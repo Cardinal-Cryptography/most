@@ -150,18 +150,18 @@ impl AlephZeroListener {
                         })
                         .collect::<Vec<ContractEvent>>();
 
-                    let (ack_sender, ack_receiver) = oneshot::channel::<u32> ();
+                    let (ack_sender, ack_receiver) = oneshot::channel::<u32>();
                     event_batch_ack_receiver.push_back(ack_receiver);
 
                     select! {
-                        cb_event = circuit_breaker_receiver.recv () => {
+                        cb_event = circuit_breaker_receiver.recv() => {
                             warn!(target: "AlephZeroListener", "Exiting before sending events due to a circuit breaker event {cb_event:?}");
                             return Ok(cb_event?);
                         },
 
-                        Ok (_) = azero_events_sender
+                        Ok(_) = azero_events_sender
                             .send(AzeroMostEvents {
-                                events: filtered_events.clone (),
+                                events: filtered_events.clone(),
                                 from_block: unprocessed_block_number,
                                 to_block,
                                 ack: ack_sender
