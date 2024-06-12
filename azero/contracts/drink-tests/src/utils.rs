@@ -366,6 +366,8 @@ pub mod token {
 }
 
 pub mod wrapped_azero {
+    use crate::wrappers::wrapped_azero::WrappedAZERO;
+
     use super::*;
     use wrapped_azero::Instance as WrappedAzero;
     use wrappers::wrapped_azero::{self, PSP22};
@@ -382,6 +384,38 @@ pub mod wrapped_azero {
             .result
             .to_account_id()
             .into()
+    }
+
+    pub fn deposit(
+        session: &mut Session,
+        wazero: &WrappedAzero,
+        amount: u128,
+        caller: drink::AccountId32,
+    ) -> Result<(), wrapped_azero::PSP22Error> {
+        let _ = session.set_actor(caller);
+
+        handle_ink_error(
+            session
+                .execute(WrappedAZERO::deposit(wazero).with_value(amount))
+                .unwrap(),
+        )
+    }
+
+    /// Increases allowance of given token to given spender by given amount.
+    pub fn increase_allowance(
+        session: &mut Session,
+        wazero: &WrappedAzero,
+        spender: AccountId,
+        amount: u128,
+        caller: drink::AccountId32,
+    ) -> Result<(), wrapped_azero::PSP22Error> {
+        let _ = session.set_actor(caller);
+
+        handle_ink_error(
+            session
+                .execute(PSP22::increase_allowance(wazero, spender, amount))
+                .unwrap(),
+        )
     }
 
     pub fn balance_of(session: &mut Session, wazero: &WrappedAzero, account: AccountId) -> u128 {
