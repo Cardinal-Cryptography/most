@@ -11,8 +11,8 @@ declare -a CONTRACTS=(
     "most"
     "token"
     "migrations"
+    "wrapped_azero"
 )
-
 
 # Process gas price oracle contract. Requires special handling due to a different directory structure and name.
 function gas_price_oracle() {
@@ -30,6 +30,13 @@ function copy_contract() {
     done
 }
 
+function compile_contracts() {
+    for c in ${CONTRACTS[@]}; do
+        echo "Compiling $c" ;
+        cargo contract build --release --manifest-path $SCRIPT_DIR/../contracts/$c/Cargo.toml
+    done
+}
+
 function wrap_contracts() {
     for c in ${CONTRACTS[@]}; do
         echo "Wrapping $c" ;
@@ -40,6 +47,7 @@ function wrap_contracts() {
 }
 
 function run() {
+    compile_contracts
     wrap_contracts
     copy_contract
 }

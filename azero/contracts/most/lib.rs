@@ -931,16 +931,17 @@ pub mod most {
             self.ensure_halted()?;
 
             // Check if MOST has mint permission to the PSP22 token
-            let psp22_address: AccountId = from.into();
-            let psp22: ink::contract_ref!(Mintable) = psp22_address.into();
-            if psp22.minter() != self.env().account_id() {
-                return Err(MostError::NoMintPermission);
+            if local_token {
+                self.local_token.insert::<AccountId, ()>(from.into(), &());
+            } else {
+                let psp22_address: AccountId = from.into();
+                let psp22: ink::contract_ref!(Mintable) = psp22_address.into();
+                if psp22.minter() != self.env().account_id() {
+                    return Err(MostError::NoMintPermission);
+                }
             }
 
             self.supported_pairs.insert(from, &to);
-            if local_token {
-                self.local_token.insert::<AccountId, ()>(from.into(), &());
-            }
             Ok(())
         }
 

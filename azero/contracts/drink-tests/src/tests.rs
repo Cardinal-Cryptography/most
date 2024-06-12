@@ -116,6 +116,145 @@ fn most_needs_to_be_token_minter_to_add_pair(mut session: Session) {
 }
 
 #[drink::test]
+fn most_is_not_a_minter_for_native_psp22(mut session: Session) {
+    mint_to_default_accounts(&mut session);
+
+    let most = most::setup(
+        &mut session,
+        guardian_accounts(),
+        DEFAULT_THRESHOLD,
+        POCKET_MONEY,
+        RELAY_GAS_USAGE,
+        MIN_GAS_PRICE,
+        MAX_GAS_PRICE,
+        DEFAULT_GAS_PRICE,
+        GAS_ORACLE_MAX_AGE,
+        ORACLE_CALL_GAS_LIMIT,
+        BASE_FEE_BUFFER_PERCENTAGE,
+        None,
+        owner(),
+        BOB,
+    );
+    let token = token::setup(&mut session, "TestToken".to_string(), bob(), BOB);
+
+    let token_address: ink_primitives::AccountId = token.into();
+    let result = most::add_pair(
+        &mut session,
+        &most,
+        *token_address.as_ref(),
+        REMOTE_TOKEN,
+        true,
+        OWNER,
+    );
+
+    assert_eq!(result, Ok(()));
+}
+
+#[drink::test]
+fn most_native_azero_transfer(mut session: Session) {
+    mint_to_default_accounts(&mut session);
+
+    let most = most::setup(
+        &mut session,
+        guardian_accounts(),
+        DEFAULT_THRESHOLD,
+        POCKET_MONEY,
+        RELAY_GAS_USAGE,
+        MIN_GAS_PRICE,
+        MAX_GAS_PRICE,
+        DEFAULT_GAS_PRICE,
+        GAS_ORACLE_MAX_AGE,
+        ORACLE_CALL_GAS_LIMIT,
+        BASE_FEE_BUFFER_PERCENTAGE,
+        None,
+        owner(),
+        BOB,
+    );
+    let token = token::setup(&mut session, "TestToken".to_string(), bob(), BOB);
+
+    let token_address: ink_primitives::AccountId = token.into();
+    
+}
+
+#[drink::test]
+fn _most_native_psp22_gets_locked_and_not_burned(mut session: Session) {
+    mint_to_default_accounts(&mut session);
+
+    let most = most::setup(
+        &mut session,
+        guardian_accounts(),
+        DEFAULT_THRESHOLD,
+        POCKET_MONEY,
+        RELAY_GAS_USAGE,
+        MIN_GAS_PRICE,
+        MAX_GAS_PRICE,
+        DEFAULT_GAS_PRICE,
+        GAS_ORACLE_MAX_AGE,
+        ORACLE_CALL_GAS_LIMIT,
+        BASE_FEE_BUFFER_PERCENTAGE,
+        None,
+        owner(),
+        BOB,
+    );
+    let token = token::setup(&mut session, "TestToken".to_string(), bob(), BOB);
+
+    let token_address: ink_primitives::AccountId = token.into();
+    
+}
+
+#[drink::test]
+fn _most_native_psp22_unlock(mut session: Session) {
+    mint_to_default_accounts(&mut session);
+
+    let most = most::setup(
+        &mut session,
+        guardian_accounts(),
+        DEFAULT_THRESHOLD,
+        POCKET_MONEY,
+        RELAY_GAS_USAGE,
+        MIN_GAS_PRICE,
+        MAX_GAS_PRICE,
+        DEFAULT_GAS_PRICE,
+        GAS_ORACLE_MAX_AGE,
+        ORACLE_CALL_GAS_LIMIT,
+        BASE_FEE_BUFFER_PERCENTAGE,
+        None,
+        owner(),
+        BOB,
+    );
+    let token = token::setup(&mut session, "TestToken".to_string(), bob(), BOB);
+
+    let token_address: ink_primitives::AccountId = token.into();
+    
+}
+
+#[drink::test]
+fn _most_native_azero_unlock(mut session: Session) {
+    mint_to_default_accounts(&mut session);
+
+    let most = most::setup(
+        &mut session,
+        guardian_accounts(),
+        DEFAULT_THRESHOLD,
+        POCKET_MONEY,
+        RELAY_GAS_USAGE,
+        MIN_GAS_PRICE,
+        MAX_GAS_PRICE,
+        DEFAULT_GAS_PRICE,
+        GAS_ORACLE_MAX_AGE,
+        ORACLE_CALL_GAS_LIMIT,
+        BASE_FEE_BUFFER_PERCENTAGE,
+        None,
+        owner(),
+        BOB,
+    );
+    let token = token::setup(&mut session, "TestToken".to_string(), bob(), BOB);
+
+    let token_address: ink_primitives::AccountId = token.into();
+    
+}
+
+#[drink::test]
 fn correct_receive_request(mut session: Session) {
     mint_to_default_accounts(&mut session);
 
