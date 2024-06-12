@@ -16,6 +16,9 @@ declare -a CONTRACTS=(
 
 # Process gas price oracle contract. Requires special handling due to a different directory structure and name.
 function gas_price_oracle() {
+    echo "Compiling gas price oracle";
+    cargo contract build --release --manifest-path $SCRIPT_DIR/../contracts/gas-price-oracle/contract/Cargo.toml ;
+
     echo "Wrapping gas price oracle" ;
     ink-wrapper --metadata $SCRIPT_DIR/../contracts/gas-price-oracle/contract/target/ink/oracle.json  \
         --wasm-path ../../resources/gas_price_oracle.wasm | rustfmt --edition 2021 > $SCRIPT_DIR/../contracts/drink-tests/src/wrappers/gas_price_oracle.rs ;

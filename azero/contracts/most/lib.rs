@@ -316,6 +316,7 @@ pub mod most {
             amount: u128,
             dest_receiver_address: [u8; 32],
             native_azero_request: bool,
+            transferred_fee: u128,
         ) -> Result<(), MostError> {
             if dest_receiver_address == ETH_ZERO_ADDRESS {
                 return Err(MostError::ZeroAddress);
@@ -326,7 +327,6 @@ pub mod most {
             }
 
             let current_base_fee = self.get_base_fee()?;
-            let transferred_fee = self.env().transferred_value();
 
             if transferred_fee.lt(&current_base_fee) {
                 return Err(MostError::BaseFeeTooLow);
@@ -404,6 +404,7 @@ pub mod most {
                 amount,
                 dest_receiver_address,
                 false,
+                self.env().transferred_value(),
             )
         }
 
@@ -428,16 +429,17 @@ pub mod most {
                 amount,
                 dest_receiver_address,
                 false,
+                self.env().transferred_value(),
             )
         }
 
         #[ink(message, payable)]
         pub fn send_request_native_azero(
             &mut self,
+            amount: u128,
             dest_receiver_address: [u8; 32],
         ) -> Result<(), MostError> {
             self.ensure_not_halted()?;
-            let amount = self.env().transferred_value();
 
             let wrapped_azero_address = self.wazero.get().ok_or(MostError::WrappedAzeroNotSet)?;
             let wrapped_azero_address_bytes: [u8; 32] = *wrapped_azero_address.as_ref();
@@ -460,6 +462,7 @@ pub mod most {
                 amount,
                 dest_receiver_address,
                 true,
+                self.env().transferred_value() - amount,
             )
         }
 
