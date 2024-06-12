@@ -59,6 +59,7 @@ fn no_zero_amount_allowed(mut session: Session) {
         &most,
         *token_address.as_ref(),
         REMOTE_TOKEN,
+        false,
         OWNER,
     )
     .expect("Add pair should succeed");
@@ -107,6 +108,7 @@ fn most_needs_to_be_token_minter_to_add_pair(mut session: Session) {
         &most,
         *token_address.as_ref(),
         REMOTE_TOKEN,
+        false,
         OWNER,
     );
 
@@ -141,6 +143,7 @@ fn correct_receive_request(mut session: Session) {
         &most,
         *token_address.as_ref(),
         REMOTE_TOKEN,
+        false,
         OWNER,
     )
     .expect("Add pair should succeed");
@@ -255,6 +258,7 @@ fn receive_request_after_switching_to_higher_threshold(mut session: Session) {
         &most,
         *token_address.as_ref(),
         REMOTE_TOKEN,
+        false,
         OWNER,
     )
     .expect("Add pair should succeed");

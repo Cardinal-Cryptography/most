@@ -129,13 +129,19 @@ pub mod most {
         most: &Most,
         token: [u8; 32],
         remote_token: [u8; 32],
+        is_local: bool,
         caller: drink::AccountId32,
     ) -> Result<(), most::MostError> {
         let _ = session.set_actor(caller);
 
         handle_ink_error(
             session
-                .execute(most::Instance::add_pair(most, token, remote_token))
+                .execute(most::Instance::add_pair(
+                    most,
+                    token,
+                    remote_token,
+                    is_local,
+                ))
                 .unwrap(),
         )
     }

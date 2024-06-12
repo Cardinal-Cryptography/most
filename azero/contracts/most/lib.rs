@@ -954,6 +954,16 @@ pub mod most {
             Ok(())
         }
 
+        /// Set wazero(azero) psp22 token contract
+        ///
+        /// Can only be called by the contracts owner
+        #[ink(message)]
+        pub fn set_wazero(&mut self, wazero_address: AccountId) -> Result<(), MostError> {
+            self.ensure_owner()?;
+            self.wazero.set(&wazero_address);
+            Ok(())
+        }
+
         /// Sets address of the account that receives rewards on behalf of the committee member.
         ///
         /// Can only be called by an account that was a committee member in `committee_id`.
