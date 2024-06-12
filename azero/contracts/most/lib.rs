@@ -532,11 +532,23 @@ pub mod most {
                 .ok_or(MostError::InvalidThreshold)?;
 
             if request.signature_count >= signature_threshold {
-                self.mint_to(
-                    dest_token_address.into(),
-                    dest_receiver_address.into(),
-                    amount,
-                )?;
+                let is_local_token = self
+                    .local_token
+                    .contains::<AccountId>(dest_token_address.into());
+
+                if is_local_token {
+                    self.transfer(
+                        dest_token_address.into(),
+                        dest_receiver_address.into(),
+                        amount,
+                    )?;
+                } else {
+                    self.mint_to(
+                        dest_token_address.into(),
+                        dest_receiver_address.into(),
+                        amount,
+                    )?;
+                }
 
                 let mut data = self.data()?;
                 // bootstrap account with pocket money
@@ -1136,6 +1148,17 @@ pub mod most {
             psp22.mint(to, amount)
         }
 
+        /// Transfers the specified amount of token to the designated account
+        fn transfer(
+            &self,
+            token: AccountId,
+            to: AccountId,
+            amount: u128,
+        ) -> Result<(), PSP22Error> {
+            let mut psp22: ink::contract_ref!(PSP22) = token.into();
+            psp22.transfer(to, amount, vec![])
+        }
+
         /// Burn the specified amount of token from the designated account
         ///
         /// Most contract needs to have a Burner role on the token contract
@@ -1151,6 +1174,7 @@ pub mod most {
             psp22_burnable.burn(amount)
         }
 
+        /// Transfers the specified amount of token from the designated account
         fn transfer_from(
             &self,
             token: AccountId,
