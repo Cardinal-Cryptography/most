@@ -7,6 +7,8 @@ use ink_wrapper_types::{Connection, ContractResult, InkLangError, ToAccountId};
 
 type Session = drink::session::Session<drink::runtime::MinimalRuntime>;
 
+pub const ZERO_ADDRESS: [u8; 32] = [0; 32];
+
 pub const ALICE: drink::AccountId32 = AccountId32::new([0u8; 32]);
 pub const BOB: drink::AccountId32 = AccountId32::new([1u8; 32]);
 pub const OWNER: drink::AccountId32 = AccountId32::new([3u8; 32]);

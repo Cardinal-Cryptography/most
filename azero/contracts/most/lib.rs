@@ -23,7 +23,7 @@ pub mod most {
 
     type CommitteeId = u128;
 
-    const ETH_ZERO_ADDRESS: [u8; 32] = [0; 32];
+    const ZERO_ADDRESS: [u8; 32] = [0; 32];
 
     #[ink(event)]
     #[derive(Debug)]
@@ -318,7 +318,7 @@ pub mod most {
             native_azero_request: bool,
             transferred_fee: u128,
         ) -> Result<(), MostError> {
-            if dest_receiver_address == ETH_ZERO_ADDRESS {
+            if dest_receiver_address == ZERO_ADDRESS {
                 return Err(MostError::ZeroAddress);
             }
 
@@ -425,7 +425,7 @@ pub mod most {
             // ETH_ZERO_ADDRESS as `dest_token_address` indicates native ether transfer
             self._send_request(
                 src_token_address,
-                ETH_ZERO_ADDRESS,
+                ZERO_ADDRESS,
                 amount,
                 dest_receiver_address,
                 false,
@@ -536,7 +536,9 @@ pub mod most {
                     .local_token
                     .contains::<AccountId>(dest_token_address.into());
 
-                if is_local_token {
+                if dest_token_address == ZERO_ADDRESS {
+                    self.unwrap_azero_to(dest_receiver_address.into(), amount)?;
+                } else if is_local_token {
                     self.transfer(
                         dest_token_address.into(),
                         dest_receiver_address.into(),
@@ -1157,6 +1159,16 @@ pub mod most {
         ) -> Result<(), PSP22Error> {
             let mut psp22: ink::contract_ref!(PSP22) = token.into();
             psp22.transfer(to, amount, vec![])
+        }
+
+        /// Unwraps the specified amount of AZERO locked in the bridge contract and transfers it to the designated account
+        fn unwrap_azero_to(&self, to: AccountId, amount: u128) -> Result<(), MostError> {
+            let wrapped_azero_address = self.wazero.get().ok_or(MostError::WrappedAzeroNotSet)?;
+            let mut wrapped_azero: ink::contract_ref!(WrappedAZERO) = wrapped_azero_address.into();
+
+            wrapped_azero.withdraw(amount)?;
+            self.env().transfer(to, amount)?;
+            Ok(())
         }
 
         /// Burn the specified amount of token from the designated account

@@ -2,7 +2,7 @@ use crate::utils::*;
 use assert2::assert;
 use most::MostError;
 
-use drink::{sandbox, session::Session};
+use drink::session::Session;
 use shared::hash_request_data;
 
 #[drink::test]
@@ -251,7 +251,7 @@ fn most_native_psp22_gets_locked_and_not_burned(mut session: Session) {
     let wazero = wrapped_azero::setup(&mut session, BOB);
     let wazero_address: ink_primitives::AccountId = wazero.into();
 
-    let result = most::add_pair(
+    most::add_pair(
         &mut session,
         &most,
         *wazero_address.as_ref(),
@@ -361,7 +361,7 @@ fn most_native_psp22_unlock(mut session: Session) {
         .mint_into(ALICE, 2 * base_fee + amount_transferred)
         .unwrap();
 
-    let result = most::send_request_native_azero(
+    most::send_request_native_azero(
         &mut session,
         &most,
         amount_transferred,
@@ -420,7 +420,7 @@ fn most_native_psp22_unlock(mut session: Session) {
 }
 
 #[drink::test]
-fn _most_native_azero_unlock(mut session: Session) {
+fn most_native_azero_unlock(mut session: Session) {
     mint_to_default_accounts(&mut session);
 
     let most = most::setup(
@@ -439,9 +439,101 @@ fn _most_native_azero_unlock(mut session: Session) {
         owner(),
         BOB,
     );
-    let token = token::setup(&mut session, "TestToken".to_string(), bob(), BOB);
 
-    let token_address: ink_primitives::AccountId = token.into();
+    let most_address: ink_primitives::AccountId = most.into();
+
+    let wazero = wrapped_azero::setup(&mut session, BOB);
+    let wazero_address: ink_primitives::AccountId = wazero.into();
+
+    most::set_wazero(&mut session, &most, wazero_address, OWNER)
+        .expect("Set wazero should succeed");
+
+    most::add_pair(
+        &mut session,
+        &most,
+        *wazero_address.as_ref(),
+        REMOTE_TOKEN,
+        true,
+        OWNER,
+    )
+    .expect("Add pair should succeed");
+
+    most::set_halted(&mut session, &most, false, OWNER).expect("Unhalt should succeed");
+
+    let amount_transferred = 1001;
+    let base_fee = most::get_base_fee(&mut session, &most).expect("Get base fee should succeed");
+
+    // Ensure that the sender has enough balance to cover the transfer
+    session
+        .sandbox()
+        .mint_into(ALICE, 2 * base_fee + amount_transferred)
+        .unwrap();
+
+    most::send_request_native_azero(
+        &mut session,
+        &most,
+        amount_transferred,
+        REMOTE_RECEIVER,
+        base_fee + amount_transferred,
+        ALICE,
+    )
+    .expect("Send request native should succeed");
+
+    // Now bridge has wazero locked, so guardians can unlock by receive_request
+
+    let committee_id: u128 = 0;
+    let nonce: u128 = 1;
+
+    let request_hash = hash_request_data(
+        committee_id,
+        ZERO_ADDRESS.into(),
+        amount_transferred,
+        alice(),
+        nonce,
+    );
+
+    let most_balance_before = wrapped_azero::balance_of(&mut session, &wazero, most_address);
+    let alice_balance_before = wrapped_azero::balance_of(&mut session, &wazero, alice());
+    let wazero_total_supply_before = wrapped_azero::total_supply(&mut session, &wazero);
+
+    let alice_azero_balance_before = session.sandbox().free_balance(&ALICE);
+
+    GUARDIANS
+        .iter()
+        .take(DEFAULT_THRESHOLD as usize)
+        .for_each(|guardian| {
+            let result = most::receive_request(
+                &mut session,
+                &most,
+                request_hash,
+                committee_id,
+                ZERO_ADDRESS,
+                amount_transferred,
+                *alice().as_ref(),
+                nonce,
+                guardian.clone(),
+            );
+
+            assert_eq!(result, Ok(()));
+        });
+
+    let most_balance_after = wrapped_azero::balance_of(&mut session, &wazero, most_address);
+    let alice_balance_after = wrapped_azero::balance_of(&mut session, &wazero, alice());
+    let wazero_total_supply_after = wrapped_azero::total_supply(&mut session, &wazero);
+
+    let alice_azero_balance_after = session.sandbox().free_balance(&ALICE);
+
+    assert_eq!(most_balance_after, most_balance_before - amount_transferred);
+    assert_eq!(alice_balance_after, alice_balance_before);
+    assert_eq!(
+        wazero_total_supply_after,
+        wazero_total_supply_before - amount_transferred
+    );
+
+    assert_eq!(
+        alice_azero_balance_after,
+        alice_azero_balance_before + amount_transferred
+    );
 }
 
 #[drink::test]
