@@ -20,6 +20,7 @@ const envFile = process.env.AZERO_ENV;
 async function addTokenPair(
   tokenEth: string,
   tokenAzero: string,
+  is_native_psp22: boolean,
   mostContract: Most,
 ) {
   const tokenEthAddress = ethers.zeroPadValue(ethers.getBytes(tokenEth), 32);
@@ -30,6 +31,7 @@ async function addTokenPair(
   await mostContract.tx.addPair(
     hexToBytes(tokenAzeroAddress),
     hexToBytes(tokenEthAddress),
+    is_native_psp22,
   );
 }
 
@@ -95,7 +97,7 @@ async function main(): Promise<void> {
   const most = new Most(most_azero, deployer, api);
 
   for (let [symbol, eth_address, azero_address] of tokens) {
-    await addTokenPair(eth_address, azero_address, most);
+    await addTokenPair(eth_address, azero_address, false, most);
     if (symbol == "wETH") {
       await most.tx.setWeth(azero_address);
     }
