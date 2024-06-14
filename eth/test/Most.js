@@ -16,6 +16,7 @@ const TOKEN_AMOUNT = 1000;
 const ALEPH_ACCOUNT = getRandomAlephAccount(3);
 const WRAPPED_TOKEN_ADDRESS = getRandomAlephAccount(5);
 const WRAPPED_WETH_ADDRESS = getRandomAlephAccount(6);
+const PSP22_ADDRESS = getRandomAlephAccount(7);
 
 describe("Most", function () {
   describe("Constructor", function () {
@@ -90,6 +91,7 @@ describe("Most", function () {
     const WETH = await ethers.getContractFactory("WETH9");
     const weth = await WETH.deploy();
     const wethAddress = await weth.getAddress();
+    const wethAddressBytes32 = addressToBytes32(wethAddress);
 
     const Most = await ethers.getContractFactory("Most");
     const most = await upgrades.deployProxy(
@@ -111,19 +113,32 @@ describe("Most", function () {
     );
     const tokenAddressBytes32 = addressToBytes32(await token.getAddress());
 
-    await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS, true);
+    const PSP22Token = await ethers.getContractFactory("WrappedToken");
+    const psp22Token = await WrappedToken.deploy(
+      "Wrapped PSP22 Token",
+      "WTEST",
+      8,
+      mostAddress,
+    );
+    const psp22TokenAddressBytes32 = addressToBytes32(await psp22Token.getAddress());
+
+    await most.addPair(tokenAddressBytes32, REMOTE_TOKEN_ADDRESS, true);
     await most.addPair(
-      addressToBytes32(wethAddress),
+      wethAddressBytes32,
       WRAPPED_WETH_ADDRESS,
       true,
     );
+    await most.addPair(psp22TokenAddressBytes32, PSP22_ADDRESS, false);
     await most.unpause();
 
     return {
       most,
       token,
       weth,
+      psp22Token,
       tokenAddressBytes32,
+      wethAddressBytes32,
+      psp22TokenAddressBytes32,
       mostAddress,
       wethAddress,
     };
@@ -191,11 +206,10 @@ describe("Most", function () {
 
   describe("sendRequestNative", function () {
     it("Reverts if token is not whitelisted", async () => {
-      const { most, wethAddress } = await loadFixture(
+      const { most, wethAddressBytes32 } = await loadFixture(
         deployEightGuardianMostFixture,
       );
 
-      const wethAddressBytes32 = addressToBytes32(wethAddress);
       await most.pause();
       await most.removePair(wethAddressBytes32);
       await most.unpause();
@@ -206,7 +220,7 @@ describe("Most", function () {
     });
 
     it("Transfers tokens to Most", async () => {
-      const { most, mostAddress, wethAddress, weth } = await loadFixture(
+      const { most, mostAddress, weth } = await loadFixture(
         deployEightGuardianMostFixture,
       );
       await most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT });
@@ -471,7 +485,7 @@ describe("Most", function () {
 
   describe("receiveRequestNative", function () {
     it("Unlocks tokens for the user", async () => {
-      const { most, weth, wethAddress, mostAddress } = await loadFixture(
+      const { most, weth, mostAddress } = await loadFixture(
         deployEightGuardianMostFixture,
       );
       const zeroAddress = "0x0000000000000000000000000000000000000000";
@@ -515,7 +529,7 @@ describe("Most", function () {
     });
 
     it("Unsuccessful transfer to a contract fails with event", async () => {
-      const { most, weth, wethAddress, mostAddress, token } = await loadFixture(
+      const { most, weth, mostAddress, token } = await loadFixture(
         deployEightGuardianMostFixture,
       );
       const zeroAddress = "0x0000000000000000000000000000000000000000";
@@ -570,7 +584,6 @@ describe("Most", function () {
           ),
       );
       await res.to.emit(most, "EthTransferFailed").withArgs(requestHash);
-
       await res.to.emit(most, "RequestProcessed").withArgs(requestHash);
 
       const balanceAfter = await provider.getBalance(ethAddress);
@@ -593,7 +606,7 @@ describe("Most", function () {
         }
         exec(
           'sed -i "17 a     uint256 public test;" ./contracts/MostV2.sol',
-          async (error, stdout, stderr) => {
+          async (error) => {
             if (error !== null) {
               console.log("exec error: " + error);
             }
@@ -660,7 +673,7 @@ describe("Most", function () {
       });
 
       // clean up
-      exec("rm ./contracts/MostV2.sol", (error, stdout, stderr) => {
+      exec("rm ./contracts/MostV2.sol", (error) => {
         if (error !== null) {
           console.log("exec error: " + error);
         }
