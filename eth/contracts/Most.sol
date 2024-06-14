@@ -318,12 +318,19 @@ contract Most is
         emit CommitteeUpdated(committeeId);
     }
 
-    function addPair(bytes32 from, bytes32 to, bool isLocal) external onlyOwner whenPaused {
+    function addPair(
+        bytes32 from,
+        bytes32 to,
+        bool isLocal
+    ) external onlyOwner whenPaused {
         supportedPairs[from] = to;
         isLocalToken[bytes32ToAddress(from)] = isLocal;
     }
 
-    function setLocalToken(bytes32 token, bool isLocal) external onlyOwner whenPaused {
+    function setLocalToken(
+        bytes32 token,
+        bool isLocal
+    ) external onlyOwner whenPaused {
         isLocalToken[bytes32ToAddress(token)] = isLocal;
     }
 

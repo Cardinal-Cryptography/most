@@ -189,7 +189,11 @@ describe("Most", function () {
         deployEightGuardianMostFixture,
       );
       await most.pause();
-      await most.addPair(addressToBytes32(wethAddress), WRAPPED_TOKEN_ADDRESS, false);
+      await most.addPair(
+        addressToBytes32(wethAddress),
+        WRAPPED_TOKEN_ADDRESS,
+        false,
+      );
       await most.unpause();
       await most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT });
 
@@ -201,7 +205,11 @@ describe("Most", function () {
         deployEightGuardianMostFixture,
       );
       await most.pause();
-      await most.addPair(addressToBytes32(wethAddress), WRAPPED_TOKEN_ADDRESS, false);
+      await most.addPair(
+        addressToBytes32(wethAddress),
+        WRAPPED_TOKEN_ADDRESS,
+        false,
+      );
       await most.unpause();
       await expect(
         most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
@@ -590,7 +598,11 @@ describe("Most", function () {
 
             await token.approve(mostAddress, TOKEN_AMOUNT);
             await most.pause();
-            await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS, false);
+            await most.addPair(
+              tokenAddressBytes32,
+              WRAPPED_TOKEN_ADDRESS,
+              false,
+            );
             await most.unpause();
 
             // sending request works before the upgrade
