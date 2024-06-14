@@ -36,14 +36,20 @@ describe("MostBenchmark", function () {
     );
     const mostAddress = await most.getAddress();
 
+    const PSP22 = await hre.ethers.getContractFactory("WrappedToken");
+    const psp22 = await PSP22.deploy("Wrapped Token", "WTK", 8, mostAddress);
+    const psp22Address = await psp22.getAddress();
+
     // Easy way to get a "random" bytes32 value
     const azeroWrappedToken = getRandomAlephAccount(42);
     const azeroWrappedWeth = getRandomAlephAccount(43);
     const azeroWrappedUsdt = getRandomAlephAccount(44);
+    const azeroPsp22 = getRandomAlephAccount(45);
 
     const tokenAddressBytes32 = addressToBytes32(tokenAddress);
     const wethAddressBytes32 = addressToBytes32(wethAddress);
     const usdtAddressBytes32 = addressToBytes32(usdtAddress);
+    const psp22AddressBytes32 = addressToBytes32(psp22Address);
 
     // Add pair of linked contracts
     await most.addPair(tokenAddressBytes32, azeroWrappedToken, true, {
@@ -53,6 +59,9 @@ describe("MostBenchmark", function () {
       from: accounts[0],
     });
     await most.addPair(usdtAddressBytes32, azeroWrappedUsdt, true, {
+      from: accounts[0],
+    });
+    await most.addPair(psp22AddressBytes32, azeroPsp22, false, {
       from: accounts[0],
     });
     await most.unpause();
@@ -154,6 +163,30 @@ describe("MostBenchmark", function () {
       ethAccount,
       ++nonce,
       "weth - unwrap",
+    );
+
+    const psp22Receiver = accounts[0];
+
+    await benchmarkReceiveRequest(
+      most,
+      guardianKeys,
+      committeeSize,
+      committeeId,
+      psp22AddressBytes32,
+      amount,
+      addressToBytes32(psp22Receiver.address),
+      ++nonce,
+      "psp22",
+    );
+
+    await benchmarkSendRequest(
+      most,
+      psp22,
+      psp22AddressBytes32,
+      amount,
+      azeroAccount,
+      psp22Receiver,
+      "psp22",
     );
   });
 });
