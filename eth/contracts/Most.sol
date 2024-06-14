@@ -38,6 +38,8 @@ contract Most is
     mapping(uint256 committeeId => uint256) public signatureThreshold;
     mapping(address => bool) public isLocalToken;
 
+    address public wrappedAzeroAddress;
+
     struct Request {
         uint256 signatureCount;
         mapping(address => bool) signatures;
@@ -82,6 +84,7 @@ contract Most is
     error UnwrappingEth();
     error EthTransfer();
     error ZeroAddress();
+    error AzeroAddressNotSet();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -181,7 +184,7 @@ contract Most is
     ///
     /// @dev Tx emits a CrosschainTransferRequest event that the relayers listen to
     /// & forward to the destination chain.
-    function sendRequestNative(
+    function sendRequestNativeEth(
         bytes32 destReceiverAddress
     ) external payable whenNotPaused {
         uint256 amount = msg.value;
@@ -203,6 +206,37 @@ contract Most is
         emit CrosschainTransferRequest(
             committeeId,
             destTokenAddress,
+            amount,
+            destReceiverAddress,
+            requestNonce
+        );
+
+        ++requestNonce;
+    }
+
+    function sendRequestAzeroToNative(
+        uint256 amount,
+        bytes32 destReceiverAddress
+    ) external {
+        if (amount == 0) revert ZeroAmount();
+        if (destReceiverAddress == bytes32(0)) revert ZeroAddress();
+        if (wrappedAzeroAddress == address(0)) revert AzeroAddressNotSet();
+
+        bytes32 wrappedAzeroAddressBytes32 = addressToBytes32(
+            wrappedAzeroAddress
+        );
+        bytes32 destTokenAddress = supportedPairs[wrappedAzeroAddressBytes32];
+
+        if (destTokenAddress == 0x0) revert UnsupportedPair();
+
+        IERC20 azeroToken = IERC20(wrappedAzeroAddress);
+        azeroToken.safeTransferFrom(msg.sender, address(this), amount);
+        IWrappedToken burnableToken = IWrappedToken(wrappedAzeroAddress);
+        burnableToken.burn(amount);
+
+        emit CrosschainTransferRequest(
+            committeeId,
+            0x0,
             amount,
             destReceiverAddress,
             requestNonce
@@ -329,6 +363,12 @@ contract Most is
         ++committeeId;
         _setCommittee(_committee, _signatureThreshold);
         emit CommitteeUpdated(committeeId);
+    }
+
+    function setWrappedAzeroAddress(
+        address _wrappedAzeroAddress
+    ) external onlyOwner whenPaused {
+        wrappedAzeroAddress = _wrappedAzeroAddress;
     }
 
     function addPair(

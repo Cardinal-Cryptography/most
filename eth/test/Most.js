@@ -16,7 +16,7 @@ const TOKEN_AMOUNT = 1000;
 const ALEPH_ACCOUNT = getRandomAlephAccount(3);
 const WRAPPED_TOKEN_ADDRESS = getRandomAlephAccount(5);
 const WRAPPED_WETH_ADDRESS = getRandomAlephAccount(6);
-const PSP22_ADDRESS = getRandomAlephAccount(7);
+const WAZERO_ADDRESS = getRandomAlephAccount(7);
 
 describe("Most", function () {
   describe("Constructor", function () {
@@ -113,44 +113,43 @@ describe("Most", function () {
     );
     const tokenAddressBytes32 = addressToBytes32(await token.getAddress());
 
-    const PSP22Token = await ethers.getContractFactory("WrappedToken");
-    const psp22Token = await PSP22Token.deploy(
-      "Wrapped PSP22 Token",
-      "WTEST",
-      8,
+    const WrappedAzero = await ethers.getContractFactory("WrappedToken");
+    const wrappedAzero = await WrappedAzero.deploy(
+      "Wrapped AZERO",
+      "wAZERO",
+      12,
       mostAddress,
     );
-    const psp22TokenAddressBytes32 = addressToBytes32(await psp22Token.getAddress());
+    const wrappedAzeroAddress = await wrappedAzero.getAddress();
+    const wrappedAzeroAddressBytes32 = addressToBytes32(wrappedAzeroAddress);
+
+    await most.setWrappedAzeroAddress(wrappedAzeroAddress);
 
     await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS, true);
-    await most.addPair(
-      wethAddressBytes32,
-      WRAPPED_WETH_ADDRESS,
-      true,
-    );
-    await most.addPair(psp22TokenAddressBytes32, PSP22_ADDRESS, false);
+    await most.addPair(wethAddressBytes32, WRAPPED_WETH_ADDRESS, true);
+    await most.addPair(wrappedAzeroAddressBytes32, WAZERO_ADDRESS, false);
     await most.unpause();
 
     return {
       most,
       token,
       weth,
-      psp22Token,
+      wrappedAzero,
       tokenAddressBytes32,
       wethAddressBytes32,
-      psp22TokenAddressBytes32,
+      wrappedAzeroAddressBytes32,
       mostAddress,
       wethAddress,
     };
   }
 
-  async function mintPSP22ToAccount(psp22Token, account, amount) {
-    let currentMinterBurner = await psp22Token.minterBurner();
+  async function mintPSP22ToAccount(wrappedAzero, account, amount) {
+    let currentMinterBurner = await wrappedAzero.minterBurner();
     const accounts = await ethers.getSigners();
     let tempMinerBurner = accounts[12];
-    await psp22Token.setMinterBurner(tempMinerBurner.address);
-    await psp22Token.connect(tempMinerBurner).mint(account, amount);
-    await psp22Token.setMinterBurner(currentMinterBurner);
+    await wrappedAzero.setMinterBurner(tempMinerBurner.address);
+    await wrappedAzero.connect(tempMinerBurner).mint(account, amount);
+    await wrappedAzero.setMinterBurner(currentMinterBurner);
   }
 
   describe("sendRequest", function () {
@@ -213,25 +212,29 @@ describe("Most", function () {
     });
 
     it("Burns psp22 token representations", async () => {
-      const { most, psp22Token, psp22TokenAddressBytes32, mostAddress } =
+      const { most, wrappedAzero, wrappedAzeroAddressBytes32, mostAddress } =
         await loadFixture(deployEightGuardianMostFixture);
 
       const accounts = await ethers.getSigners();
       const txSigner = accounts[0];
       const txSignerAddress = txSigner.address;
 
-      await mintPSP22ToAccount(psp22Token, txSignerAddress, TOKEN_AMOUNT);
+      await mintPSP22ToAccount(wrappedAzero, txSignerAddress, TOKEN_AMOUNT);
 
-      expect(await psp22Token.balanceOf(txSignerAddress)).to.equal(TOKEN_AMOUNT);
+      expect(await wrappedAzero.balanceOf(txSignerAddress)).to.equal(
+        TOKEN_AMOUNT,
+      );
 
-      await psp22Token.connect(txSigner).approve(mostAddress, TOKEN_AMOUNT);
-      await most.connect(txSigner).sendRequest(psp22TokenAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT);
+      await wrappedAzero.connect(txSigner).approve(mostAddress, TOKEN_AMOUNT);
+      await most
+        .connect(txSigner)
+        .sendRequest(wrappedAzeroAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT);
 
-      expect(await psp22Token.totalSupply()).to.equal(0);
+      expect(await wrappedAzero.totalSupply()).to.equal(0);
     });
   });
 
-  describe("sendRequestNative", function () {
+  describe("sendRequestNativeEth", function () {
     it("Reverts if token is not whitelisted", async () => {
       const { most, wethAddressBytes32 } = await loadFixture(
         deployEightGuardianMostFixture,
@@ -242,7 +245,7 @@ describe("Most", function () {
       await most.unpause();
 
       await expect(
-        most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
+        most.sendRequestNativeEth(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
       ).to.be.revertedWithCustomError(most, "UnsupportedPair");
     });
 
@@ -250,7 +253,7 @@ describe("Most", function () {
       const { most, mostAddress, weth } = await loadFixture(
         deployEightGuardianMostFixture,
       );
-      await most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT });
+      await most.sendRequestNativeEth(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT });
 
       expect(await weth.balanceOf(mostAddress)).to.equal(TOKEN_AMOUNT);
     });
@@ -258,10 +261,74 @@ describe("Most", function () {
     it("Emits correct event", async () => {
       const { most } = await loadFixture(deployEightGuardianMostFixture);
       await expect(
-        most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
+        most.sendRequestNativeEth(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
       )
         .to.emit(most, "CrosschainTransferRequest")
         .withArgs(0, WRAPPED_WETH_ADDRESS, TOKEN_AMOUNT, ALEPH_ACCOUNT, 0);
+    });
+  });
+
+  describe("sendRequestAzeroToNative", function () {
+    it("Reverts if token is not whitelisted", async () => {
+      const { most, wrappedAzeroAddressBytes32 } = await loadFixture(
+        deployEightGuardianMostFixture,
+      );
+
+      await most.pause();
+      await most.removePair(wrappedAzeroAddressBytes32);
+      await most.unpause();
+
+      await expect(
+        most.sendRequestAzeroToNative(TOKEN_AMOUNT, ALEPH_ACCOUNT),
+      ).to.be.revertedWithCustomError(most, "UnsupportedPair");
+    });
+
+    it("Burns psp22 token representations", async () => {
+      const { most, wrappedAzero, mostAddress } = await loadFixture(
+        deployEightGuardianMostFixture,
+      );
+
+      const accounts = await ethers.getSigners();
+      const txSigner = accounts[0];
+      const txSignerAddress = txSigner.address;
+
+      await mintPSP22ToAccount(wrappedAzero, txSignerAddress, TOKEN_AMOUNT);
+
+      expect(await wrappedAzero.balanceOf(txSignerAddress)).to.equal(
+        TOKEN_AMOUNT,
+      );
+
+      await wrappedAzero.connect(txSigner).approve(mostAddress, TOKEN_AMOUNT);
+      await most
+        .connect(txSigner)
+        .sendRequestAzeroToNative(TOKEN_AMOUNT, ALEPH_ACCOUNT);
+
+      expect(await wrappedAzero.totalSupply()).to.equal(0);
+    });
+
+    it("Emits correct event", async () => {
+      const { most, wrappedAzero, mostAddress } = await loadFixture(
+        deployEightGuardianMostFixture,
+      );
+
+      const accounts = await ethers.getSigners();
+      const txSigner = accounts[0];
+      const txSignerAddress = txSigner.address;
+
+      await mintPSP22ToAccount(wrappedAzero, txSignerAddress, TOKEN_AMOUNT);
+
+      expect(await wrappedAzero.balanceOf(txSignerAddress)).to.equal(
+        TOKEN_AMOUNT,
+      );
+
+      await wrappedAzero.connect(txSigner).approve(mostAddress, TOKEN_AMOUNT);
+      await expect(
+        most
+          .connect(txSigner)
+          .sendRequestAzeroToNative(TOKEN_AMOUNT, ALEPH_ACCOUNT),
+      )
+        .to.emit(most, "CrosschainTransferRequest")
+        .withArgs(0, "0x0000000000000000000000000000000000000000000000000000000000000000", TOKEN_AMOUNT, ALEPH_ACCOUNT, 0);
     });
   });
 
@@ -404,17 +471,16 @@ describe("Most", function () {
     });
 
     it("Mints psp22 token representations for the user", async () => {
-      const { most, psp22Token, psp22TokenAddressBytes32 } = await loadFixture(
-        deployEightGuardianMostFixture,
-      );
+      const { most, wrappedAzero, wrappedAzeroAddressBytes32 } =
+        await loadFixture(deployEightGuardianMostFixture);
 
-      expect(await psp22Token.balanceOf(await most.getAddress())).to.equal(0);
+      expect(await wrappedAzero.balanceOf(await most.getAddress())).to.equal(0);
 
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
       const requestHash = ethers.solidityPackedKeccak256(
         ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
-        [0, psp22TokenAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
+        [0, wrappedAzeroAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
       );
 
       for (let i = 1; i < 6; i++) {
@@ -423,14 +489,14 @@ describe("Most", function () {
           .receiveRequest(
             requestHash,
             0,
-            psp22TokenAddressBytes32,
+            wrappedAzeroAddressBytes32,
             TOKEN_AMOUNT,
             ethAddress,
             0,
           );
       }
 
-      expect(await psp22Token.balanceOf(accounts[10].address)).to.equal(
+      expect(await wrappedAzero.balanceOf(accounts[10].address)).to.equal(
         TOKEN_AMOUNT,
       );
     });
