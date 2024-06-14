@@ -35,6 +35,7 @@ contract Most is
     mapping(bytes32 committeeMemberId => bool) private committee;
     mapping(uint256 committeeId => uint256) public committeeSize;
     mapping(uint256 committeeId => uint256) public signatureThreshold;
+    mapping(address => bool) public isLocalToken;
 
     struct Request {
         uint256 signatureCount;
@@ -317,8 +318,13 @@ contract Most is
         emit CommitteeUpdated(committeeId);
     }
 
-    function addPair(bytes32 from, bytes32 to) external onlyOwner whenPaused {
+    function addPair(bytes32 from, bytes32 to, bool isLocal) external onlyOwner whenPaused {
         supportedPairs[from] = to;
+        isLocalToken[bytes32ToAddress(from)] = isLocal;
+    }
+
+    function setLocalToken(bytes32 token, bool isLocal) external onlyOwner whenPaused {
+        isLocalToken[bytes32ToAddress(token)] = isLocal;
     }
 
     function removePair(bytes32 from) external onlyOwner whenPaused {
