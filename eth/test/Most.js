@@ -2,7 +2,6 @@ const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
 const {
   loadFixture,
-  setBalance,
 } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 const { execSync: exec } = require("child_process");
 
@@ -16,6 +15,7 @@ const {
 const TOKEN_AMOUNT = 1000;
 const ALEPH_ACCOUNT = getRandomAlephAccount(3);
 const WRAPPED_TOKEN_ADDRESS = getRandomAlephAccount(5);
+const WRAPPED_WETH_ADDRESS = getRandomAlephAccount(6);
 
 describe("Most", function () {
   describe("Constructor", function () {
@@ -101,7 +101,6 @@ describe("Most", function () {
       },
     );
     const mostAddress = await most.getAddress();
-    await most.unpause();
 
     const Token = await ethers.getContractFactory("Token");
     const token = await Token.deploy(
@@ -111,6 +110,14 @@ describe("Most", function () {
       "TEST",
     );
     const tokenAddressBytes32 = addressToBytes32(await token.getAddress());
+
+    await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS, true);
+    await most.addPair(
+      addressToBytes32(wethAddress),
+      WRAPPED_WETH_ADDRESS,
+      true,
+    );
+    await most.unpause();
 
     return {
       most,
@@ -124,12 +131,28 @@ describe("Most", function () {
 
   describe("sendRequest", function () {
     it("Reverts if token is not whitelisted", async () => {
-      const { most, token, tokenAddressBytes32, mostAddress } =
-        await loadFixture(deployEightGuardianMostFixture);
+      const { most, mostAddress } = await loadFixture(
+        deployEightGuardianMostFixture,
+      );
 
-      await token.approve(mostAddress, TOKEN_AMOUNT);
+      const Token = await ethers.getContractFactory("Token");
+      const anotherToken = await Token.deploy(
+        "10000000000000000000000000",
+        "18",
+        "NonWhitelistedToken",
+        "NWT",
+      );
+      const anotherTokenAddressBytes32 = addressToBytes32(
+        await anotherToken.getAddress(),
+      );
+
+      await anotherToken.approve(mostAddress, TOKEN_AMOUNT);
       await expect(
-        most.sendRequest(tokenAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT),
+        most.sendRequest(
+          anotherTokenAddressBytes32,
+          TOKEN_AMOUNT,
+          ALEPH_ACCOUNT,
+        ),
       ).to.be.revertedWithCustomError(most, "UnsupportedPair");
     });
 
@@ -138,9 +161,6 @@ describe("Most", function () {
         deployEightGuardianMostFixture,
       );
 
-      await most.pause();
-      await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS, false);
-      await most.unpause();
       await expect(
         most.sendRequest(tokenAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT),
       ).to.be.reverted;
@@ -151,9 +171,6 @@ describe("Most", function () {
         await loadFixture(deployEightGuardianMostFixture);
 
       await token.approve(mostAddress, TOKEN_AMOUNT);
-      await most.pause();
-      await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS, false);
-      await most.unpause();
       await most.sendRequest(tokenAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT);
 
       expect(await token.balanceOf(mostAddress)).to.equal(TOKEN_AMOUNT);
@@ -164,9 +181,6 @@ describe("Most", function () {
         await loadFixture(deployEightGuardianMostFixture);
 
       await token.approve(mostAddress, TOKEN_AMOUNT);
-      await most.pause();
-      await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS, false);
-      await most.unpause();
       await expect(
         most.sendRequest(tokenAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT),
       )
@@ -177,7 +191,14 @@ describe("Most", function () {
 
   describe("sendRequestNative", function () {
     it("Reverts if token is not whitelisted", async () => {
-      const { most } = await loadFixture(deployEightGuardianMostFixture);
+      const { most, wethAddress } = await loadFixture(
+        deployEightGuardianMostFixture,
+      );
+
+      const wethAddressBytes32 = addressToBytes32(wethAddress);
+      await most.pause();
+      await most.removePair(wethAddressBytes32);
+      await most.unpause();
 
       await expect(
         most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
@@ -188,34 +209,18 @@ describe("Most", function () {
       const { most, mostAddress, wethAddress, weth } = await loadFixture(
         deployEightGuardianMostFixture,
       );
-      await most.pause();
-      await most.addPair(
-        addressToBytes32(wethAddress),
-        WRAPPED_TOKEN_ADDRESS,
-        false,
-      );
-      await most.unpause();
       await most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT });
 
       expect(await weth.balanceOf(mostAddress)).to.equal(TOKEN_AMOUNT);
     });
 
     it("Emits correct event", async () => {
-      const { most, wethAddress } = await loadFixture(
-        deployEightGuardianMostFixture,
-      );
-      await most.pause();
-      await most.addPair(
-        addressToBytes32(wethAddress),
-        WRAPPED_TOKEN_ADDRESS,
-        false,
-      );
-      await most.unpause();
+      const { most } = await loadFixture(deployEightGuardianMostFixture);
       await expect(
         most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
       )
         .to.emit(most, "CrosschainTransferRequest")
-        .withArgs(0, WRAPPED_TOKEN_ADDRESS, TOKEN_AMOUNT, ALEPH_ACCOUNT, 0);
+        .withArgs(0, WRAPPED_WETH_ADDRESS, TOKEN_AMOUNT, ALEPH_ACCOUNT, 0);
     });
   });
 
@@ -597,13 +602,6 @@ describe("Most", function () {
               await loadFixture(deployEightGuardianMostFixture);
 
             await token.approve(mostAddress, TOKEN_AMOUNT);
-            await most.pause();
-            await most.addPair(
-              tokenAddressBytes32,
-              WRAPPED_TOKEN_ADDRESS,
-              false,
-            );
-            await most.unpause();
 
             // sending request works before the upgrade
             await expect(

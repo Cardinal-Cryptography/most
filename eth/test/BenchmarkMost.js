@@ -46,13 +46,13 @@ describe("MostBenchmark", function () {
     const usdtAddressBytes32 = addressToBytes32(usdtAddress);
 
     // Add pair of linked contracts
-    await most.addPair(tokenAddressBytes32, azeroWrappedToken, {
+    await most.addPair(tokenAddressBytes32, azeroWrappedToken, true, {
       from: accounts[0],
     });
-    await most.addPair(wethAddressBytes32, azeroWrappedWeth, {
+    await most.addPair(wethAddressBytes32, azeroWrappedWeth, true, {
       from: accounts[0],
     });
-    await most.addPair(usdtAddressBytes32, azeroWrappedUsdt, {
+    await most.addPair(usdtAddressBytes32, azeroWrappedUsdt, true, {
       from: accounts[0],
     });
     await most.unpause();

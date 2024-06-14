@@ -9,6 +9,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {IWETH9} from "./IWETH9.sol";
+import {IWrappedToken} from "./IWrappedToken.sol";
 
 /// @title Most
 /// @author Cardinal Cryptography
@@ -148,14 +149,20 @@ contract Most is
         if (amount == 0) revert ZeroAmount();
         if (destReceiverAddress == bytes32(0)) revert ZeroAddress();
 
-        IERC20 token = IERC20(bytes32ToAddress(srcTokenAddress));
+        address token = bytes32ToAddress(srcTokenAddress);
 
         bytes32 destTokenAddress = supportedPairs[srcTokenAddress];
         if (destTokenAddress == 0x0) revert UnsupportedPair();
 
-        // lock tokens in this contract
+        // burn or lock tokens in this contract
         // message sender needs to give approval else this tx will revert
-        token.safeTransferFrom(msg.sender, address(this), amount);
+        IERC20 tokenERC20 = IERC20(token);
+        tokenERC20.safeTransferFrom(msg.sender, address(this), amount);
+
+        if (!isLocalToken[token]) {
+            IWrappedToken burnableToken = IWrappedToken(token);
+            burnableToken.burn(amount);
+        }
 
         emit CrosschainTransferRequest(
             committeeId,
@@ -255,6 +262,7 @@ contract Most is
             address _destReceiverAddress = bytes32ToAddress(
                 destReceiverAddress
             );
+
             // return the locked tokens
             // address(0) indicates bridging native ether
             if (_destTokenAddress == address(0)) {
@@ -269,6 +277,10 @@ contract Most is
                 if (!sendNativeEthSuccess) {
                     emit EthTransferFailed(requestHash);
                 }
+            } else if (!isLocalToken[_destTokenAddress]) {
+                // Mint representation of the remote token
+                IWrappedToken mintableToken = IWrappedToken(_destTokenAddress);
+                mintableToken.mint(_destReceiverAddress, amount);
             } else {
                 IERC20 token = IERC20(_destTokenAddress);
                 if (
@@ -281,6 +293,7 @@ contract Most is
                     emit TokenTransferFailed(requestHash);
                 }
             }
+
             emit RequestProcessed(requestHash);
         }
     }
