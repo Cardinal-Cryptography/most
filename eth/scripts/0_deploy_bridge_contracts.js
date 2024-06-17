@@ -8,22 +8,7 @@ async function main() {
 
   console.log("Using ", accounts[0], "as the transaction signer");
 
-  // read addresses
-  let addresses = JSON.parse(
-    fs.readFileSync("addresses.json", { encoding: "utf8", flag: "r" }),
-  );
-
-  const Migrations = artifacts.require("Migrations");
-  const migrations = await Migrations.at(addresses.migrations);
-
-  // check migratons
-  let lastCompletedMigration = await migrations.last_completed_migration();
-  lastCompletedMigration = lastCompletedMigration.toNumber();
-  console.log("Last completed migration: ", lastCompletedMigration);
-  if (lastCompletedMigration != 1) {
-    console.error("Previous migration has not been completed");
-    process.exit(-1);
-  }
+  addresses = {};
 
   if (network.name == "development" || network.name == "bridgenet") {
     const WETH = await ethers.getContractFactory("WETH9");
@@ -32,13 +17,13 @@ async function main() {
     console.log("WETH deployed to:", weth.target);
     addresses.weth = weth.target;
 
-    const Token = await ethers.getContractFactory("Token");
+    const USDT = await ethers.getContractFactory("TetherToken");
     console.log("Deploying USDT...");
-    const usdt = await Token.deploy(
-      "12000000000000000000000000",
-      "6",
-      "Tether",
+    const usdt = await USDT.deploy(
+      "1000000000000000000",
+      "Tether USD",
       "USDT",
+      "6"
     );
     console.log("USDT deployed to:", usdt.target);
     addresses.usdt = usdt.target;
@@ -51,7 +36,7 @@ async function main() {
     [
       config.guardianIds,
       config.threshold,
-      addresses.gnosis.safe,
+      accounts[0],
       addresses.weth,
     ],
     {
@@ -62,11 +47,8 @@ async function main() {
   await most.waitForDeployment();
   console.log("Most deployed to:", most.target);
 
-  console.log("Updating migrations...");
-  await migrations.setCompleted(2);
 
   // --- append addresses
-
   addresses = {
     ...addresses,
     most: most.target,

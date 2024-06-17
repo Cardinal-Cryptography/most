@@ -5,8 +5,6 @@ DOCKER_RELAYER_COPY_ADDRESSES ?= copy
 DOCKER_RELAYER_COMPILE_CONTRACTS ?= compile
 DOCKER_SIGNER_NAME ?= most-signer
 
-export BRIDGENET_AZERO_START_BLOCK=`ENDPOINT=https://rpc-fe-bridgenet.dev.azero.dev ./relayer/scripts/azero_best_finalized.sh`
-export BRIDGENET_ETH_START_BLOCK=`ENDPOINT=https://rpc-eth-bridgenet.dev.azero.dev ./relayer/scripts/eth_best_finalized.sh`
 export CONTRACT_VERSION ?=`git rev-parse HEAD`
 
 .PHONY: help
@@ -33,7 +31,7 @@ clean-eth:
 .PHONY: clean
 clean: # Remove all node data
 clean: stop-local-bridgenet
-	git clean -fdx
+	git clean -fdx -e "target/"
 
 .PHONY: bootstrap-azero
 bootstrap-azero: # Bootstrap the node data
@@ -96,9 +94,7 @@ compile-eth: eth-deps
 deploy-eth: # Deploy eth contracts
 deploy-eth: compile-eth
 	cd eth && \
-	npx hardhat run --network $(NETWORK) scripts/0_deploy_migrations.js && \
-	npx hardhat run --network $(NETWORK) scripts/1_deploy_gnosis_safe.js && \
-	npx hardhat run --network $(NETWORK) scripts/2_deploy_bridge_contracts.js
+	npx hardhat run --network $(NETWORK) scripts/0_deploy_bridge_contracts.js
 
 .PHONY: deploy-eth-live
 deploy-eth-live: # Deploy only the MOST contract on a live ethereum network (testnet or mainnet)
@@ -126,7 +122,7 @@ verify-eth:
 setup-eth: # Setup eth contracts
 setup-eth: compile-eth
 	cd eth && \
-	npx hardhat run --network $(NETWORK) scripts/3_setup_bridge_contracts.js
+	npx hardhat run --network $(NETWORK) scripts/1_setup_bridge_contracts.js
 
 .PHONY: decode-eth
 decode-eth: # Decode eth contract call
@@ -238,22 +234,10 @@ ethereum-azero-transfer: # Request a transfer of 1 unit of wETH from Ethereum to
 ethereum-azero-transfer:
 	cd eth && npx hardhat run --network $(NETWORK) scripts/bridge_weth.js
 
-.PHONY: bridgenet-bridge
-bridgenet-bridge: # Run the bridge on bridgenet
-bridgenet-bridge: build-docker-relayer redis-instance
-	NETWORK=bridgenet AZERO_ENV=bridgenet make deploy
-	AZERO_START_BLOCK=${BRIDGENET_AZERO_START_BLOCK} ETH_START_BLOCK=${BRIDGENET_ETH_START_BLOCK} docker-compose -f ./relayer/scripts/bridgenet-relayers-compose.yml up -d
-	make bridgenet-relayers-logs
-
 .PHONY: devnet-relayers-logs
 devnet-relayers-logs: # Show the logs of the devnet relayers
 devnet-relayers-logs:
 	docker compose -f ./relayer/scripts/devnet-relayers-compose.yml logs -f
-
-.PHONY: bridgenet-relayers-logs
-bridgenet-relayers-logs: # Show the logs of the bridgenet relayers
-bridgenet-relayers-logs:
-	docker compose -f ./relayer/scripts/bridgenet-relayers-compose.yml logs -f
 
 .PHONY: test-solidity
 test-solidity: # Run solidity tests
