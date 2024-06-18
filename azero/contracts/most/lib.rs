@@ -335,7 +335,6 @@ pub mod most {
             let sender = self.env().caller();
 
             if self.local_token.get(src_token_address).is_none() {
-                // burn the psp22 tokens
                 self.burn_from(src_token_address, sender, amount)?;
             } else if !native_azero_request {
                 // lock the tokens in the contract
