@@ -465,7 +465,7 @@ pub mod most {
             self._send_request(
                 wrapped_azero_address,
                 dest_token_address,
-                amount,
+                amount_to_bridge,
                 dest_receiver_address,
                 true,
                 transferred_fee,
