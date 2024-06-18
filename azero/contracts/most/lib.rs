@@ -24,6 +24,7 @@ pub mod most {
     type CommitteeId = u128;
 
     const ZERO_ADDRESS: [u8; 32] = [0; 32];
+    const NATIVE_MARKER_ADDRESS: [u8; 32] = [0; 32];
 
     #[ink(event)]
     #[derive(Debug)]
@@ -424,7 +425,7 @@ pub mod most {
             // ETH_ZERO_ADDRESS as `dest_token_address` indicates native ether transfer
             self._send_request(
                 src_token_address,
-                ZERO_ADDRESS,
+                NATIVE_MARKER_ADDRESS,
                 amount,
                 dest_receiver_address,
                 false,
@@ -977,6 +978,7 @@ pub mod most {
         #[ink(message)]
         pub fn set_wazero(&mut self, wazero_address: AccountId) -> Result<(), MostError> {
             self.ensure_owner()?;
+            self.ensure_halted()?;
             self.wazero.set(&wazero_address);
             Ok(())
         }
