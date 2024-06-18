@@ -340,7 +340,7 @@ pub mod most {
             } else if !native_azero_request {
                 // lock the tokens in the contract
                 self.transfer_from(src_token_address, sender, amount)?;
-            }
+            } // if the transfer is done in native AZERO, then the tokens are already in the contract, so no action is needed
 
             let mut data = self.data()?;
             // NOTE: this allows the committee members to take a payout for requests that are not neccessarily finished
