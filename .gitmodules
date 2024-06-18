@@ -1,3 +1,0 @@
-[submodule "azero/contracts/wAZERO"]
-	path = azero/contracts/wrapped_azero
-	url = https://github.com/Cardinal-Cryptography/wAZERO

@@ -6,9 +6,6 @@ readonly SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null 
 mkdir -p $SCRIPT_DIR/../contracts/drink-tests/src/wrappers
 mkdir -p $SCRIPT_DIR/../contracts/drink-tests/resources
 
-# Make sure that wAZERO contract is present
-git submodule update --init
-
 ## Builds all contracts and generates code for contract interaction. Run in a container.
 docker run --rm \
     --name ink-dev \
