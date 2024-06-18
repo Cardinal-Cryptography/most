@@ -25,11 +25,9 @@ async function addTokenPair(
     new Keyring({ type: "sr25519" }).decodeAddress(azeroTokenAddress),
   );
 
-  await mostContract.addPair(
-    ethTokenAddressBytes,
-    azeroTokenAddressBytes,
-    { from: ownerSigner },
-  );
+  await mostContract.addPair(ethTokenAddressBytes, azeroTokenAddressBytes, {
+    from: ownerSigner,
+  });
 
   console.log(
     "Most now supports the token pair:",
@@ -79,7 +77,6 @@ async function main() {
     const USDT = await ethers.getContractFactory("TetherToken");
     const usdt = await USDT.attach(addresses.usdt);
     await usdt.transfer(addresses.most, 1000000000000000);
-
 
     for (let [_, ethAddress, azeroAddress] of azeroContracts.tokens) {
       await addTokenPair(ethAddress, azeroAddress, most, signers[0]);

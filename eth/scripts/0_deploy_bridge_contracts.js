@@ -23,7 +23,7 @@ async function main() {
       "1000000000000000000",
       "Tether USD",
       "USDT",
-      "6"
+      "6",
     );
     console.log("USDT deployed to:", usdt.target);
     addresses.usdt = usdt.target;
@@ -33,12 +33,7 @@ async function main() {
   console.log("Deploying Most...");
   const most = await upgrades.deployProxy(
     Most,
-    [
-      config.guardianIds,
-      config.threshold,
-      accounts[0],
-      addresses.weth,
-    ],
+    [config.guardianIds, config.threshold, accounts[0], addresses.weth],
     {
       initializer: "initialize",
       kind: "uups",
@@ -46,7 +41,6 @@ async function main() {
   );
   await most.waitForDeployment();
   console.log("Most deployed to:", most.target);
-
 
   // --- append addresses
   addresses = {
