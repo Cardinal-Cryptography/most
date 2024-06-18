@@ -216,6 +216,7 @@ pub mod most {
         ZeroAddress,
         WrappedEthNotSet,
         WrappedAzeroNotSet,
+        ValueTransferredLowerThanAmount,
     }
 
     impl From<InkEnvError> for MostError {
@@ -436,10 +437,15 @@ pub mod most {
         #[ink(message, payable)]
         pub fn send_request_native_azero(
             &mut self,
-            amount: u128,
+            amount_to_bridge: u128,
             dest_receiver_address: [u8; 32],
         ) -> Result<(), MostError> {
             self.ensure_not_halted()?;
+            let transferred_fee = self
+                .env()
+                .transferred_value()
+                .checked_sub(amount_to_bridge)
+                .ok_or(MostError::ValueTransferredLowerThanAmount)?;
 
             let wrapped_azero_address = self.wazero.get().ok_or(MostError::WrappedAzeroNotSet)?;
             let wrapped_azero_address_bytes: [u8; 32] = *wrapped_azero_address.as_ref();
@@ -448,7 +454,7 @@ pub mod most {
             wrapped_azero
                 .call_mut()
                 .deposit()
-                .transferred_value(amount)
+                .transferred_value(amount_to_bridge)
                 .invoke()?;
 
             let dest_token_address = self
@@ -462,7 +468,7 @@ pub mod most {
                 amount,
                 dest_receiver_address,
                 true,
-                self.env().transferred_value() - amount,
+                transferred_fee,
             )
         }
 
