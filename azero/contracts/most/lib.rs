@@ -536,7 +536,7 @@ pub mod most {
                     .local_token
                     .contains::<AccountId>(dest_token_address.into());
 
-                if dest_token_address == ZERO_ADDRESS {
+                if dest_token_address == NATIVE_MARKER_ADDRESS {
                     self.unwrap_azero_to(dest_receiver_address.into(), amount)?;
                 } else if is_local_token {
                     self.transfer(
