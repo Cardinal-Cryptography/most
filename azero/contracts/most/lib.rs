@@ -17,13 +17,14 @@ pub mod most {
     };
     use ownable2step::*;
     use psp22::{PSP22Error, PSP22};
-    use psp22_traits::{Burnable, Mintable};
+    use psp22_traits::{Burnable, Mintable, WrappedAZERO};
     use scale::{Decode, Encode};
     use shared::{hash_request_data, Keccak256HashOutput as HashedRequest};
 
     type CommitteeId = u128;
 
-    const ETH_ZERO_ADDRESS: [u8; 32] = [0; 32];
+    const ZERO_ADDRESS: [u8; 32] = [0; 32];
+    const NATIVE_MARKER_ADDRESS: [u8; 32] = [0; 32];
 
     #[ink(event)]
     #[derive(Debug)]
@@ -185,6 +186,10 @@ pub mod most {
         payout_accounts: Mapping<AccountId, AccountId, ManualKey<0x18f97340>>,
         /// Wrapped ethereum (azero) address. Necessary to perform bridging weth(azero) -> ether(eth).
         weth: Lazy<AccountId, ManualKey<0x7CD95FED>>,
+        /// Mapping holding the information wheter a specific token originates on Aleph Zero chain
+        local_token: Mapping<AccountId, (), ManualKey<0x6c6f6361>>,
+        /// Wrapped AZERO address
+        wazero: Lazy<AccountId, ManualKey<0x77617a65>>,
     }
 
     #[derive(Debug, PartialEq, Eq, Encode, Decode)]
@@ -210,6 +215,8 @@ pub mod most {
         NoMintPermission,
         ZeroAddress,
         WrappedEthNotSet,
+        WrappedAzeroNotSet,
+        ValueTransferredLowerThanAmount,
     }
 
     impl From<InkEnvError> for MostError {
@@ -282,6 +289,7 @@ pub mod most {
             let mut ownable_data = Lazy::new();
             ownable_data.set(&Ownable2StepData::new(owner));
             let weth = Lazy::new();
+            let wazero = Lazy::new();
 
             Ok(Self {
                 data,
@@ -297,6 +305,8 @@ pub mod most {
                 paid_out_member_rewards: Mapping::new(),
                 payout_accounts: Mapping::new(),
                 weth,
+                local_token: Mapping::new(),
+                wazero,
             })
         }
 
@@ -307,8 +317,10 @@ pub mod most {
             dest_token_address: [u8; 32],
             amount: u128,
             dest_receiver_address: [u8; 32],
+            native_azero_request: bool,
+            transferred_fee: u128,
         ) -> Result<(), MostError> {
-            if dest_receiver_address == ETH_ZERO_ADDRESS {
+            if dest_receiver_address == ZERO_ADDRESS {
                 return Err(MostError::ZeroAddress);
             }
 
@@ -317,7 +329,6 @@ pub mod most {
             }
 
             let current_base_fee = self.get_base_fee()?;
-            let transferred_fee = self.env().transferred_value();
 
             if transferred_fee.lt(&current_base_fee) {
                 return Err(MostError::BaseFeeTooLow);
@@ -325,8 +336,12 @@ pub mod most {
 
             let sender = self.env().caller();
 
-            // burn the psp22 tokens
-            self.burn_from(src_token_address, sender, amount)?;
+            if self.local_token.get(src_token_address).is_none() {
+                self.burn_from(src_token_address, sender, amount)?;
+            } else if !native_azero_request {
+                // lock the tokens in the contract
+                self.transfer_from(src_token_address, sender, amount)?;
+            } // if the transfer is done in native AZERO, then the tokens are already in the contract, so no action is needed
 
             let mut data = self.data()?;
             // NOTE: this allows the committee members to take a payout for requests that are not neccessarily finished
@@ -389,6 +404,8 @@ pub mod most {
                 dest_token_address,
                 amount,
                 dest_receiver_address,
+                false,
+                self.env().transferred_value(),
             )
         }
 
@@ -397,7 +414,7 @@ pub mod most {
         /// Upon checking basic conditions the contract will burn the `amount` number of weth tokens from the caller
         /// and emit an event which is to be picked up & acted on up by the bridge guardians.
         #[ink(message, payable)]
-        pub fn send_request_native_ether(
+        pub fn send_request_ether_to_native(
             &mut self,
             amount: u128,
             dest_receiver_address: [u8; 32],
@@ -406,12 +423,51 @@ pub mod most {
 
             let src_token_address = self.weth.get().ok_or(MostError::WrappedEthNotSet)?;
 
-            // ETH_ZERO_ADDRESS as `dest_token_address` indicates native ether transfer
             self._send_request(
                 src_token_address,
-                ETH_ZERO_ADDRESS,
+                NATIVE_MARKER_ADDRESS,
                 amount,
                 dest_receiver_address,
+                false,
+                self.env().transferred_value(),
+            )
+        }
+
+        #[ink(message, payable)]
+        pub fn send_request_native_azero(
+            &mut self,
+            amount_to_bridge: u128,
+            dest_receiver_address: [u8; 32],
+        ) -> Result<(), MostError> {
+            self.ensure_not_halted()?;
+            let transferred_fee = self
+                .env()
+                .transferred_value()
+                .checked_sub(amount_to_bridge)
+                .ok_or(MostError::ValueTransferredLowerThanAmount)?;
+
+            let wrapped_azero_address = self.wazero.get().ok_or(MostError::WrappedAzeroNotSet)?;
+            let wrapped_azero_address_bytes: [u8; 32] = *wrapped_azero_address.as_ref();
+            let mut wrapped_azero: contract_ref!(WrappedAZERO) = wrapped_azero_address.into();
+
+            wrapped_azero
+                .call_mut()
+                .deposit()
+                .transferred_value(amount_to_bridge)
+                .invoke()?;
+
+            let dest_token_address = self
+                .supported_pairs
+                .get(wrapped_azero_address_bytes)
+                .ok_or(MostError::UnsupportedPair)?;
+
+            self._send_request(
+                wrapped_azero_address,
+                dest_token_address,
+                amount_to_bridge,
+                dest_receiver_address,
+                true,
+                transferred_fee,
             )
         }
 
@@ -481,11 +537,25 @@ pub mod most {
                 .ok_or(MostError::InvalidThreshold)?;
 
             if request.signature_count >= signature_threshold {
-                self.mint_to(
-                    dest_token_address.into(),
-                    dest_receiver_address.into(),
-                    amount,
-                )?;
+                let is_local_token = self
+                    .local_token
+                    .contains::<AccountId>(dest_token_address.into());
+
+                if dest_token_address == NATIVE_MARKER_ADDRESS {
+                    self.unwrap_azero_to(dest_receiver_address.into(), amount)?;
+                } else if is_local_token {
+                    self.transfer(
+                        dest_token_address.into(),
+                        dest_receiver_address.into(),
+                        amount,
+                    )?;
+                } else {
+                    self.mint_to(
+                        dest_token_address.into(),
+                        dest_receiver_address.into(),
+                        amount,
+                    )?;
+                }
 
                 let mut data = self.data()?;
                 // bootstrap account with pocket money
@@ -873,15 +943,24 @@ pub mod most {
         ///
         /// Can only be called by the contracts owner
         #[ink(message)]
-        pub fn add_pair(&mut self, from: [u8; 32], to: [u8; 32]) -> Result<(), MostError> {
+        pub fn add_pair(
+            &mut self,
+            from: [u8; 32],
+            to: [u8; 32],
+            local_token: bool,
+        ) -> Result<(), MostError> {
             self.ensure_owner()?;
             self.ensure_halted()?;
 
             // Check if MOST has mint permission to the PSP22 token
-            let psp22_address: AccountId = from.into();
-            let psp22: ink::contract_ref!(Mintable) = psp22_address.into();
-            if psp22.minter() != self.env().account_id() {
-                return Err(MostError::NoMintPermission);
+            if local_token {
+                self.local_token.insert::<AccountId, ()>(from.into(), &());
+            } else {
+                let psp22_address: AccountId = from.into();
+                let psp22: ink::contract_ref!(Mintable) = psp22_address.into();
+                if psp22.minter() != self.env().account_id() {
+                    return Err(MostError::NoMintPermission);
+                }
             }
 
             self.supported_pairs.insert(from, &to);
@@ -895,6 +974,17 @@ pub mod most {
         pub fn set_weth(&mut self, weth_address: AccountId) -> Result<(), MostError> {
             self.ensure_owner()?;
             self.weth.set(&weth_address);
+            Ok(())
+        }
+
+        /// Set wazero(azero) psp22 token contract
+        ///
+        /// Can only be called by the contracts owner
+        #[ink(message)]
+        pub fn set_wazero(&mut self, wazero_address: AccountId) -> Result<(), MostError> {
+            self.ensure_owner()?;
+            self.ensure_halted()?;
+            self.wazero.set(&wazero_address);
             Ok(())
         }
 
@@ -1066,6 +1156,27 @@ pub mod most {
             psp22.mint(to, amount)
         }
 
+        /// Transfers the specified amount of token to the designated account
+        fn transfer(
+            &self,
+            token: AccountId,
+            to: AccountId,
+            amount: u128,
+        ) -> Result<(), PSP22Error> {
+            let mut psp22: ink::contract_ref!(PSP22) = token.into();
+            psp22.transfer(to, amount, vec![])
+        }
+
+        /// Unwraps the specified amount of AZERO locked in the bridge contract and transfers it to the designated account
+        fn unwrap_azero_to(&self, to: AccountId, amount: u128) -> Result<(), MostError> {
+            let wrapped_azero_address = self.wazero.get().ok_or(MostError::WrappedAzeroNotSet)?;
+            let mut wrapped_azero: ink::contract_ref!(WrappedAZERO) = wrapped_azero_address.into();
+
+            wrapped_azero.withdraw(amount)?;
+            self.env().transfer(to, amount)?;
+            Ok(())
+        }
+
         /// Burn the specified amount of token from the designated account
         ///
         /// Most contract needs to have a Burner role on the token contract
@@ -1075,11 +1186,21 @@ pub mod most {
             from: AccountId,
             amount: u128,
         ) -> Result<(), PSP22Error> {
-            let mut psp22: ink::contract_ref!(PSP22) = token.into();
-            psp22.transfer_from(from, self.env().account_id(), amount, vec![])?;
+            self.transfer_from(token, from, amount)?;
 
             let mut psp22_burnable: ink::contract_ref!(Burnable) = token.into();
             psp22_burnable.burn(amount)
+        }
+
+        /// Transfers the specified amount of token from the designated account
+        fn transfer_from(
+            &self,
+            token: AccountId,
+            from: AccountId,
+            amount: u128,
+        ) -> Result<(), PSP22Error> {
+            let mut psp22: ink::contract_ref!(PSP22) = token.into();
+            psp22.transfer_from(from, self.env().account_id(), amount, vec![])
         }
 
         fn data(&self) -> Result<Data, MostError> {

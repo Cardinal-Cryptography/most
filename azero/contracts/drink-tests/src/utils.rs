@@ -7,6 +7,8 @@ use ink_wrapper_types::{Connection, ContractResult, InkLangError, ToAccountId};
 
 type Session = drink::session::Session<drink::runtime::MinimalRuntime>;
 
+pub const ZERO_ADDRESS: [u8; 32] = [0; 32];
+
 pub const ALICE: drink::AccountId32 = AccountId32::new([0u8; 32]);
 pub const BOB: drink::AccountId32 = AccountId32::new([1u8; 32]);
 pub const OWNER: drink::AccountId32 = AccountId32::new([3u8; 32]);
@@ -129,13 +131,34 @@ pub mod most {
         most: &Most,
         token: [u8; 32],
         remote_token: [u8; 32],
+        is_local: bool,
         caller: drink::AccountId32,
     ) -> Result<(), most::MostError> {
         let _ = session.set_actor(caller);
 
         handle_ink_error(
             session
-                .execute(most::Instance::add_pair(most, token, remote_token))
+                .execute(most::Instance::add_pair(
+                    most,
+                    token,
+                    remote_token,
+                    is_local,
+                ))
+                .unwrap(),
+        )
+    }
+
+    pub fn set_wazero(
+        session: &mut Session,
+        most: &Most,
+        wazero: AccountId,
+        caller: drink::AccountId32,
+    ) -> Result<(), most::MostError> {
+        let _ = session.set_actor(caller);
+
+        handle_ink_error(
+            session
+                .execute(most::Instance::set_wazero(most, wazero))
                 .unwrap(),
         )
     }
@@ -170,6 +193,26 @@ pub mod most {
             session
                 .execute(
                     most::Instance::send_request(most, token, amount, remote_receiver)
+                        .with_value(value_transferred),
+                )
+                .unwrap(),
+        )
+    }
+
+    pub fn send_request_native_azero(
+        session: &mut Session,
+        most: &Most,
+        amount: u128,
+        remote_receiver: [u8; 32],
+        value_transferred: u128,
+        caller: drink::AccountId32,
+    ) -> Result<(), most::MostError> {
+        let _ = session.set_actor(caller);
+
+        handle_ink_error(
+            session
+                .execute(
+                    most::Instance::send_request_native_azero(most, amount, remote_receiver)
                         .with_value(value_transferred),
                 )
                 .unwrap(),
@@ -321,6 +364,68 @@ pub mod token {
 
     pub fn total_supply(session: &mut Session, token: &Token) -> u128 {
         handle_ink_error(session.query(PSP22::total_supply(token)).unwrap())
+    }
+}
+
+pub mod wrapped_azero {
+    use crate::wrappers::wrapped_azero::WrappedAZERO;
+
+    use super::*;
+    use wrapped_azero::Instance as WrappedAzero;
+    use wrappers::wrapped_azero::{self, PSP22};
+
+    pub fn setup(session: &mut Session, caller: drink::AccountId32) -> WrappedAzero {
+        let _code_hash = session.upload_code(wrapped_azero::upload()).unwrap();
+        let _ = session.set_actor(caller);
+
+        let instance = WrappedAzero::new();
+
+        session
+            .instantiate(instance)
+            .unwrap()
+            .result
+            .to_account_id()
+            .into()
+    }
+
+    pub fn deposit(
+        session: &mut Session,
+        wazero: &WrappedAzero,
+        amount: u128,
+        caller: drink::AccountId32,
+    ) -> Result<(), wrapped_azero::PSP22Error> {
+        let _ = session.set_actor(caller);
+
+        handle_ink_error(
+            session
+                .execute(WrappedAZERO::deposit(wazero).with_value(amount))
+                .unwrap(),
+        )
+    }
+
+    /// Increases allowance of given token to given spender by given amount.
+    pub fn increase_allowance(
+        session: &mut Session,
+        wazero: &WrappedAzero,
+        spender: AccountId,
+        amount: u128,
+        caller: drink::AccountId32,
+    ) -> Result<(), wrapped_azero::PSP22Error> {
+        let _ = session.set_actor(caller);
+
+        handle_ink_error(
+            session
+                .execute(PSP22::increase_allowance(wazero, spender, amount))
+                .unwrap(),
+        )
+    }
+
+    pub fn balance_of(session: &mut Session, wazero: &WrappedAzero, account: AccountId) -> u128 {
+        handle_ink_error(session.query(PSP22::balance_of(wazero, account)).unwrap())
+    }
+
+    pub fn total_supply(session: &mut Session, wazero: &WrappedAzero) -> u128 {
+        handle_ink_error(session.query(PSP22::total_supply(wazero)).unwrap())
     }
 }
 
