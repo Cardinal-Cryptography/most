@@ -8,6 +8,7 @@ const azeroContracts = require("../../azero/addresses.json");
 async function addTokenPair(
   ethTokenAddress,
   azeroTokenAddress,
+  isLocal,
   mostContract,
   ownerSigner,
 ) {
@@ -25,7 +26,7 @@ async function addTokenPair(
     new Keyring({ type: "sr25519" }).decodeAddress(azeroTokenAddress),
   );
 
-  await mostContract.addPair(ethTokenAddressBytes, azeroTokenAddressBytes, {
+  await mostContract.addPair(ethTokenAddressBytes, azeroTokenAddressBytes, isLocal, {
     from: ownerSigner,
   });
 
@@ -79,7 +80,7 @@ async function main() {
     await usdt.transfer(addresses.most, 1000000000000000);
 
     for (let [_, ethAddress, azeroAddress] of azeroContracts.tokens) {
-      await addTokenPair(ethAddress, azeroAddress, most, signers[0]);
+      await addTokenPair(ethAddress, azeroAddress, true, most, signers[0]);
     }
 
     // --- unpause most

@@ -36,23 +36,39 @@ describe("MostBenchmark", function () {
     );
     const mostAddress = await most.getAddress();
 
+    const WrappedAzero = await hre.ethers.getContractFactory("WrappedToken");
+    const wrappedAzero = await WrappedAzero.deploy(
+      "Wrapped AZERO",
+      "wAZERO",
+      12,
+      mostAddress,
+    );
+    const wrappedAzeroAddress = await wrappedAzero.getAddress();
+
+    await most.setWrappedAzeroAddress(wrappedAzeroAddress);
+
     // Easy way to get a "random" bytes32 value
     const azeroWrappedToken = getRandomAlephAccount(42);
     const azeroWrappedWeth = getRandomAlephAccount(43);
     const azeroWrappedUsdt = getRandomAlephAccount(44);
+    const azeroPsp22 = getRandomAlephAccount(45);
 
     const tokenAddressBytes32 = addressToBytes32(tokenAddress);
     const wethAddressBytes32 = addressToBytes32(wethAddress);
     const usdtAddressBytes32 = addressToBytes32(usdtAddress);
+    const wrappedAzeroAddressBytes32 = addressToBytes32(wrappedAzeroAddress);
 
     // Add pair of linked contracts
-    await most.addPair(tokenAddressBytes32, azeroWrappedToken, {
+    await most.addPair(tokenAddressBytes32, azeroWrappedToken, true, {
       from: accounts[0],
     });
-    await most.addPair(wethAddressBytes32, azeroWrappedWeth, {
+    await most.addPair(wethAddressBytes32, azeroWrappedWeth, true, {
       from: accounts[0],
     });
-    await most.addPair(usdtAddressBytes32, azeroWrappedUsdt, {
+    await most.addPair(usdtAddressBytes32, azeroWrappedUsdt, true, {
+      from: accounts[0],
+    });
+    await most.addPair(wrappedAzeroAddressBytes32, azeroPsp22, false, {
       from: accounts[0],
     });
     await most.unpause();
@@ -84,17 +100,17 @@ describe("MostBenchmark", function () {
     );
 
     // Send native ETH
-    const gasEstimateSendNative = await most.sendRequestNative.estimateGas(
+    const gasEstimateSendNative = await most.sendRequestNativeEth.estimateGas(
       azeroAccount,
       { from: accounts[0], value: 2 * amount },
     );
 
     console.log(
-      "Gas estimate for sendRequestNative: ",
+      "Gas estimate for sendRequestNativeEth: ",
       Number(gasEstimateSendNative),
     );
 
-    await most.sendRequestNative(azeroAccount, {
+    await most.sendRequestNativeEth(azeroAccount, {
       gas: gasEstimateSendNative,
       from: accounts[0],
       value: 2 * amount,
@@ -155,6 +171,61 @@ describe("MostBenchmark", function () {
       ++nonce,
       "weth - unwrap",
     );
+
+    const azeroReceiver = accounts[0];
+
+    await benchmarkReceiveRequest(
+      most,
+      guardianKeys,
+      committeeSize,
+      committeeId,
+      wrappedAzeroAddressBytes32,
+      2 * amount,
+      addressToBytes32(azeroReceiver.address),
+      ++nonce,
+      "azero",
+    );
+
+    await benchmarkSendRequest(
+      most,
+      wrappedAzero,
+      wrappedAzeroAddressBytes32,
+      amount,
+      azeroAccount,
+      azeroReceiver,
+      "azero",
+    );
+
+    // Gas estimate for sendRequestAzeroToNative
+    const gasEstimateApprove = await wrappedAzero.approve.estimateGas(
+      most.target,
+      amount,
+      {
+        from: accounts[0],
+      },
+    );
+
+    console.log("Gas estimate for approve: ", Number(gasEstimateApprove));
+
+    await wrappedAzero.approve(most.target, amount, {
+      gas: gasEstimateApprove,
+      from: accounts[0],
+    });
+
+    const gasEstimateSendAzeroToNative =
+      await most.sendRequestAzeroToNative.estimateGas(amount, azeroAccount, {
+        from: accounts[0],
+      });
+
+    console.log(
+      "Gas estimate for sendRequestAzeroToNative: ",
+      Number(gasEstimateSendAzeroToNative),
+    );
+
+    await most.sendRequestAzeroToNative(amount, azeroAccount, {
+      gas: gasEstimateSendAzeroToNative,
+      from: accounts[0],
+    });
   });
 });
 

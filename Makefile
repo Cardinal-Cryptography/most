@@ -242,7 +242,7 @@ devnet-relayers-logs:
 .PHONY: test-solidity
 test-solidity: # Run solidity tests
 test-solidity: eth-deps
-	cd eth && npx hardhat test ./test/Most.js ./test/WrappedEther.js
+	cd eth && npx hardhat test ./test/Most.js ./test/WrappedEther.js ./test/WrappedToken.js
 
 .PHONY: test-ink
 test-ink: # Run ink tests
@@ -275,12 +275,7 @@ e2e-tests:
 
 .PHONY: drink-tests
 drink-tests: # Run drink tests
-drink-tests: compile-azero
-	cd azero && npm run drink-tests
-
-.PHONY: drink-tests-docker
-drink-tests-docker: # Run drink tests with docker contract build
-drink-tests-docker: compile-azero-docker
+drink-tests:
 	cd azero && npm run drink-tests
 
 .PHONY: check-js-format

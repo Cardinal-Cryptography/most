@@ -9,6 +9,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {IWETH9} from "./IWETH9.sol";
+import {IWrappedToken} from "./IWrappedToken.sol";
 
 /// @title Most
 /// @author Cardinal Cryptography
@@ -35,6 +36,9 @@ contract Most is
     mapping(bytes32 committeeMemberId => bool) private committee;
     mapping(uint256 committeeId => uint256) public committeeSize;
     mapping(uint256 committeeId => uint256) public signatureThreshold;
+    mapping(address => bool) public isLocalToken;
+
+    address public wrappedAzeroAddress;
 
     struct Request {
         uint256 signatureCount;
@@ -80,6 +84,7 @@ contract Most is
     error UnwrappingEth();
     error EthTransfer();
     error ZeroAddress();
+    error AzeroAddressNotSet();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -147,14 +152,20 @@ contract Most is
         if (amount == 0) revert ZeroAmount();
         if (destReceiverAddress == bytes32(0)) revert ZeroAddress();
 
-        IERC20 token = IERC20(bytes32ToAddress(srcTokenAddress));
+        address token = bytes32ToAddress(srcTokenAddress);
 
         bytes32 destTokenAddress = supportedPairs[srcTokenAddress];
         if (destTokenAddress == 0x0) revert UnsupportedPair();
 
-        // lock tokens in this contract
+        // burn or lock tokens in this contract
         // message sender needs to give approval else this tx will revert
-        token.safeTransferFrom(msg.sender, address(this), amount);
+        IERC20 tokenERC20 = IERC20(token);
+        tokenERC20.safeTransferFrom(msg.sender, address(this), amount);
+
+        if (!isLocalToken[token]) {
+            IWrappedToken burnableToken = IWrappedToken(token);
+            burnableToken.burn(amount);
+        }
 
         emit CrosschainTransferRequest(
             committeeId,
@@ -173,7 +184,7 @@ contract Most is
     ///
     /// @dev Tx emits a CrosschainTransferRequest event that the relayers listen to
     /// & forward to the destination chain.
-    function sendRequestNative(
+    function sendRequestNativeEth(
         bytes32 destReceiverAddress
     ) external payable whenNotPaused {
         uint256 amount = msg.value;
@@ -195,6 +206,37 @@ contract Most is
         emit CrosschainTransferRequest(
             committeeId,
             destTokenAddress,
+            amount,
+            destReceiverAddress,
+            requestNonce
+        );
+
+        ++requestNonce;
+    }
+
+    function sendRequestAzeroToNative(
+        uint256 amount,
+        bytes32 destReceiverAddress
+    ) external {
+        if (amount == 0) revert ZeroAmount();
+        if (destReceiverAddress == bytes32(0)) revert ZeroAddress();
+        if (wrappedAzeroAddress == address(0)) revert AzeroAddressNotSet();
+
+        bytes32 wrappedAzeroAddressBytes32 = addressToBytes32(
+            wrappedAzeroAddress
+        );
+        bytes32 destTokenAddress = supportedPairs[wrappedAzeroAddressBytes32];
+
+        if (destTokenAddress == 0x0) revert UnsupportedPair();
+
+        IERC20 azeroToken = IERC20(wrappedAzeroAddress);
+        azeroToken.safeTransferFrom(msg.sender, address(this), amount);
+        IWrappedToken burnableToken = IWrappedToken(wrappedAzeroAddress);
+        burnableToken.burn(amount);
+
+        emit CrosschainTransferRequest(
+            committeeId,
+            0x0,
             amount,
             destReceiverAddress,
             requestNonce
@@ -254,6 +296,7 @@ contract Most is
             address _destReceiverAddress = bytes32ToAddress(
                 destReceiverAddress
             );
+
             // return the locked tokens
             // address(0) indicates bridging native ether
             if (_destTokenAddress == address(0)) {
@@ -268,6 +311,10 @@ contract Most is
                 if (!sendNativeEthSuccess) {
                     emit EthTransferFailed(requestHash);
                 }
+            } else if (!isLocalToken[_destTokenAddress]) {
+                // Mint representation of the remote token
+                IWrappedToken mintableToken = IWrappedToken(_destTokenAddress);
+                mintableToken.mint(_destReceiverAddress, amount);
             } else {
                 IERC20 token = IERC20(_destTokenAddress);
                 if (
@@ -280,6 +327,7 @@ contract Most is
                     emit TokenTransferFailed(requestHash);
                 }
             }
+
             emit RequestProcessed(requestHash);
         }
     }
@@ -317,8 +365,26 @@ contract Most is
         emit CommitteeUpdated(committeeId);
     }
 
-    function addPair(bytes32 from, bytes32 to) external onlyOwner whenPaused {
+    function setWrappedAzeroAddress(
+        address _wrappedAzeroAddress
+    ) external onlyOwner whenPaused {
+        wrappedAzeroAddress = _wrappedAzeroAddress;
+    }
+
+    function addPair(
+        bytes32 from,
+        bytes32 to,
+        bool isLocal
+    ) external onlyOwner whenPaused {
         supportedPairs[from] = to;
+        isLocalToken[bytes32ToAddress(from)] = isLocal;
+    }
+
+    function setLocalToken(
+        bytes32 token,
+        bool isLocal
+    ) external onlyOwner whenPaused {
+        isLocalToken[bytes32ToAddress(token)] = isLocal;
     }
 
     function removePair(bytes32 from) external onlyOwner whenPaused {

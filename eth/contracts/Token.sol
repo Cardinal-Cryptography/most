@@ -11,11 +11,11 @@ contract Token is ERC20 {
 
     constructor(
         uint256 _totalSupply,
-        uint8 _decimals_,
+        uint8 __decimals,
         string memory _name,
         string memory _symbol
     ) ERC20(_name, _symbol) {
-        _decimals = _decimals_;
+        _decimals = __decimals;
         _mint(msg.sender, _totalSupply);
     }
 

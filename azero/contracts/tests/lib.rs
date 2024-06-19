@@ -300,7 +300,7 @@ mod e2e {
             .await
             .expect("Setting weth should succeed");
 
-        let send_request_res = most_send_request_native_ether(
+        let send_request_res = most_send_request_ether_to_native(
             &mut client,
             &alice(),
             most_address,
@@ -1253,7 +1253,7 @@ mod e2e {
             client,
             caller,
             most,
-            |most| most.add_pair(*token.as_ref(), remote_token),
+            |most| most.add_pair(*token.as_ref(), remote_token, false),
             None,
         )
         .await
@@ -1343,7 +1343,7 @@ mod e2e {
         .await
     }
 
-    async fn most_send_request_native_ether(
+    async fn most_send_request_ether_to_native(
         client: &mut E2EClient,
         caller: &Keypair,
         most: AccountId,
@@ -1355,7 +1355,7 @@ mod e2e {
             client,
             caller,
             most,
-            |most| most.send_request_native_ether(amount, receiver_address),
+            |most| most.send_request_ether_to_native(amount, receiver_address),
             Some(base_fee),
         )
         .await

@@ -13,9 +13,11 @@ declare -a CONTRACTS=(
     "migrations"
 )
 
-
 # Process gas price oracle contract. Requires special handling due to a different directory structure and name.
 function gas_price_oracle() {
+    echo "Compiling gas price oracle";
+    cargo contract build --release --manifest-path $SCRIPT_DIR/../contracts/gas-price-oracle/contract/Cargo.toml ;
+
     echo "Wrapping gas price oracle" ;
     ink-wrapper --metadata $SCRIPT_DIR/../contracts/gas-price-oracle/contract/target/ink/oracle.json  \
         --wasm-path ../../resources/gas_price_oracle.wasm | rustfmt --edition 2021 > $SCRIPT_DIR/../contracts/drink-tests/src/wrappers/gas_price_oracle.rs ;
@@ -30,6 +32,13 @@ function copy_contract() {
     done
 }
 
+function compile_contracts() {
+    for c in ${CONTRACTS[@]}; do
+        echo "Compiling $c" ;
+        cargo contract build --release --manifest-path $SCRIPT_DIR/../contracts/$c/Cargo.toml
+    done
+}
+
 function wrap_contracts() {
     for c in ${CONTRACTS[@]}; do
         echo "Wrapping $c" ;
@@ -39,8 +48,18 @@ function wrap_contracts() {
     gas_price_oracle
 }
 
+function wrap_wazero() {
+    echo "Copying contract wAZERO";
+    cp $SCRIPT_DIR/../external_artifacts/wrapped_azero.wasm  $SCRIPT_DIR/../contracts/drink-tests/resources/wrapped_azero.wasm;
+    echo "Wrapping wAZERO";
+    ink-wrapper --metadata $SCRIPT_DIR/../external_artifacts/wrapped_azero.json  \
+        --wasm-path ../../resources/wrapped_azero.wasm | rustfmt --edition 2021 > $SCRIPT_DIR/../contracts/drink-tests/src/wrappers/wrapped_azero.rs ;
+}
+
 function run() {
+    compile_contracts
     wrap_contracts
+    wrap_wazero
     copy_contract
 }
 
