@@ -2,7 +2,6 @@ const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
 const {
   loadFixture,
-  setBalance,
 } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 const { execSync: exec } = require("child_process");
 
@@ -16,6 +15,8 @@ const {
 const TOKEN_AMOUNT = 1000;
 const ALEPH_ACCOUNT = getRandomAlephAccount(3);
 const WRAPPED_TOKEN_ADDRESS = getRandomAlephAccount(5);
+const WRAPPED_WETH_ADDRESS = getRandomAlephAccount(6);
+const WAZERO_ADDRESS = getRandomAlephAccount(7);
 
 describe("Most", function () {
   describe("Constructor", function () {
@@ -90,6 +91,7 @@ describe("Most", function () {
     const WETH = await ethers.getContractFactory("WETH9");
     const weth = await WETH.deploy();
     const wethAddress = await weth.getAddress();
+    const wethAddressBytes32 = addressToBytes32(wethAddress);
 
     const Most = await ethers.getContractFactory("Most");
     const most = await upgrades.deployProxy(
@@ -101,7 +103,6 @@ describe("Most", function () {
       },
     );
     const mostAddress = await most.getAddress();
-    await most.unpause();
 
     const Token = await ethers.getContractFactory("Token");
     const token = await Token.deploy(
@@ -112,24 +113,69 @@ describe("Most", function () {
     );
     const tokenAddressBytes32 = addressToBytes32(await token.getAddress());
 
+    const WrappedAzero = await ethers.getContractFactory("WrappedToken");
+    const wrappedAzero = await WrappedAzero.deploy(
+      "Wrapped AZERO",
+      "wAZERO",
+      12,
+      mostAddress,
+    );
+    const wrappedAzeroAddress = await wrappedAzero.getAddress();
+    const wrappedAzeroAddressBytes32 = addressToBytes32(wrappedAzeroAddress);
+
+    await most.setWrappedAzeroAddress(wrappedAzeroAddress);
+
+    await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS, true);
+    await most.addPair(wethAddressBytes32, WRAPPED_WETH_ADDRESS, true);
+    await most.addPair(wrappedAzeroAddressBytes32, WAZERO_ADDRESS, false);
+    await most.unpause();
+
     return {
       most,
       token,
       weth,
+      wrappedAzero,
       tokenAddressBytes32,
+      wethAddressBytes32,
+      wrappedAzeroAddressBytes32,
       mostAddress,
       wethAddress,
     };
   }
 
+  async function mintPSP22ToAccount(wrappedAzero, account, amount) {
+    let currentMinterBurner = await wrappedAzero.minterBurner();
+    const accounts = await ethers.getSigners();
+    let tempMinerBurner = accounts[12];
+    await wrappedAzero.setMinterBurner(tempMinerBurner.address);
+    await wrappedAzero.connect(tempMinerBurner).mint(account, amount);
+    await wrappedAzero.setMinterBurner(currentMinterBurner);
+  }
+
   describe("sendRequest", function () {
     it("Reverts if token is not whitelisted", async () => {
-      const { most, token, tokenAddressBytes32, mostAddress } =
-        await loadFixture(deployEightGuardianMostFixture);
+      const { most, mostAddress } = await loadFixture(
+        deployEightGuardianMostFixture,
+      );
 
-      await token.approve(mostAddress, TOKEN_AMOUNT);
+      const Token = await ethers.getContractFactory("Token");
+      const anotherToken = await Token.deploy(
+        "10000000000000000000000000",
+        "18",
+        "NonWhitelistedToken",
+        "NWT",
+      );
+      const anotherTokenAddressBytes32 = addressToBytes32(
+        await anotherToken.getAddress(),
+      );
+
+      await anotherToken.approve(mostAddress, TOKEN_AMOUNT);
       await expect(
-        most.sendRequest(tokenAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT),
+        most.sendRequest(
+          anotherTokenAddressBytes32,
+          TOKEN_AMOUNT,
+          ALEPH_ACCOUNT,
+        ),
       ).to.be.revertedWithCustomError(most, "UnsupportedPair");
     });
 
@@ -138,9 +184,6 @@ describe("Most", function () {
         deployEightGuardianMostFixture,
       );
 
-      await most.pause();
-      await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
-      await most.unpause();
       await expect(
         most.sendRequest(tokenAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT),
       ).to.be.reverted;
@@ -151,9 +194,6 @@ describe("Most", function () {
         await loadFixture(deployEightGuardianMostFixture);
 
       await token.approve(mostAddress, TOKEN_AMOUNT);
-      await most.pause();
-      await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
-      await most.unpause();
       await most.sendRequest(tokenAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT);
 
       expect(await token.balanceOf(mostAddress)).to.equal(TOKEN_AMOUNT);
@@ -164,50 +204,137 @@ describe("Most", function () {
         await loadFixture(deployEightGuardianMostFixture);
 
       await token.approve(mostAddress, TOKEN_AMOUNT);
-      await most.pause();
-      await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
-      await most.unpause();
       await expect(
         most.sendRequest(tokenAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT),
       )
         .to.emit(most, "CrosschainTransferRequest")
         .withArgs(0, WRAPPED_TOKEN_ADDRESS, TOKEN_AMOUNT, ALEPH_ACCOUNT, 0);
     });
+
+    it("Burns psp22 token representations", async () => {
+      const { most, wrappedAzero, wrappedAzeroAddressBytes32, mostAddress } =
+        await loadFixture(deployEightGuardianMostFixture);
+
+      const accounts = await ethers.getSigners();
+      const txSigner = accounts[0];
+      const txSignerAddress = txSigner.address;
+
+      await mintPSP22ToAccount(wrappedAzero, txSignerAddress, TOKEN_AMOUNT);
+
+      expect(await wrappedAzero.balanceOf(txSignerAddress)).to.equal(
+        TOKEN_AMOUNT,
+      );
+
+      await wrappedAzero.connect(txSigner).approve(mostAddress, TOKEN_AMOUNT);
+      await most
+        .connect(txSigner)
+        .sendRequest(wrappedAzeroAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT);
+
+      expect(await wrappedAzero.totalSupply()).to.equal(0);
+    });
   });
 
-  describe("sendRequestNative", function () {
+  describe("sendRequestNativeEth", function () {
     it("Reverts if token is not whitelisted", async () => {
-      const { most } = await loadFixture(deployEightGuardianMostFixture);
+      const { most, wethAddressBytes32 } = await loadFixture(
+        deployEightGuardianMostFixture,
+      );
+
+      await most.pause();
+      await most.removePair(wethAddressBytes32);
+      await most.unpause();
 
       await expect(
-        most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
+        most.sendRequestNativeEth(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
       ).to.be.revertedWithCustomError(most, "UnsupportedPair");
     });
 
     it("Transfers tokens to Most", async () => {
-      const { most, mostAddress, wethAddress, weth } = await loadFixture(
+      const { most, mostAddress, weth } = await loadFixture(
         deployEightGuardianMostFixture,
       );
-      await most.pause();
-      await most.addPair(addressToBytes32(wethAddress), WRAPPED_TOKEN_ADDRESS);
-      await most.unpause();
-      await most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT });
+      await most.sendRequestNativeEth(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT });
 
       expect(await weth.balanceOf(mostAddress)).to.equal(TOKEN_AMOUNT);
     });
 
     it("Emits correct event", async () => {
-      const { most, wethAddress } = await loadFixture(
-        deployEightGuardianMostFixture,
-      );
-      await most.pause();
-      await most.addPair(addressToBytes32(wethAddress), WRAPPED_TOKEN_ADDRESS);
-      await most.unpause();
+      const { most } = await loadFixture(deployEightGuardianMostFixture);
       await expect(
-        most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
+        most.sendRequestNativeEth(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
       )
         .to.emit(most, "CrosschainTransferRequest")
-        .withArgs(0, WRAPPED_TOKEN_ADDRESS, TOKEN_AMOUNT, ALEPH_ACCOUNT, 0);
+        .withArgs(0, WRAPPED_WETH_ADDRESS, TOKEN_AMOUNT, ALEPH_ACCOUNT, 0);
+    });
+  });
+
+  describe("sendRequestAzeroToNative", function () {
+    it("Reverts if token is not whitelisted", async () => {
+      const { most, wrappedAzeroAddressBytes32 } = await loadFixture(
+        deployEightGuardianMostFixture,
+      );
+
+      await most.pause();
+      await most.removePair(wrappedAzeroAddressBytes32);
+      await most.unpause();
+
+      await expect(
+        most.sendRequestAzeroToNative(TOKEN_AMOUNT, ALEPH_ACCOUNT),
+      ).to.be.revertedWithCustomError(most, "UnsupportedPair");
+    });
+
+    it("Burns psp22 token representations", async () => {
+      const { most, wrappedAzero, mostAddress } = await loadFixture(
+        deployEightGuardianMostFixture,
+      );
+
+      const accounts = await ethers.getSigners();
+      const txSigner = accounts[0];
+      const txSignerAddress = txSigner.address;
+
+      await mintPSP22ToAccount(wrappedAzero, txSignerAddress, TOKEN_AMOUNT);
+
+      expect(await wrappedAzero.balanceOf(txSignerAddress)).to.equal(
+        TOKEN_AMOUNT,
+      );
+
+      await wrappedAzero.connect(txSigner).approve(mostAddress, TOKEN_AMOUNT);
+      await most
+        .connect(txSigner)
+        .sendRequestAzeroToNative(TOKEN_AMOUNT, ALEPH_ACCOUNT);
+
+      expect(await wrappedAzero.totalSupply()).to.equal(0);
+    });
+
+    it("Emits correct event", async () => {
+      const { most, wrappedAzero, mostAddress } = await loadFixture(
+        deployEightGuardianMostFixture,
+      );
+
+      const accounts = await ethers.getSigners();
+      const txSigner = accounts[0];
+      const txSignerAddress = txSigner.address;
+
+      await mintPSP22ToAccount(wrappedAzero, txSignerAddress, TOKEN_AMOUNT);
+
+      expect(await wrappedAzero.balanceOf(txSignerAddress)).to.equal(
+        TOKEN_AMOUNT,
+      );
+
+      await wrappedAzero.connect(txSigner).approve(mostAddress, TOKEN_AMOUNT);
+      await expect(
+        most
+          .connect(txSigner)
+          .sendRequestAzeroToNative(TOKEN_AMOUNT, ALEPH_ACCOUNT),
+      )
+        .to.emit(most, "CrosschainTransferRequest")
+        .withArgs(
+          0,
+          "0x0000000000000000000000000000000000000000000000000000000000000000",
+          TOKEN_AMOUNT,
+          ALEPH_ACCOUNT,
+          0,
+        );
     });
   });
 
@@ -349,6 +476,37 @@ describe("Most", function () {
       );
     });
 
+    it("Mints psp22 token representations for the user", async () => {
+      const { most, wrappedAzero, wrappedAzeroAddressBytes32 } =
+        await loadFixture(deployEightGuardianMostFixture);
+
+      expect(await wrappedAzero.balanceOf(await most.getAddress())).to.equal(0);
+
+      const accounts = await ethers.getSigners();
+      const ethAddress = addressToBytes32(accounts[10].address);
+      const requestHash = ethers.solidityPackedKeccak256(
+        ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
+        [0, wrappedAzeroAddressBytes32, TOKEN_AMOUNT, ethAddress, 0],
+      );
+
+      for (let i = 1; i < 6; i++) {
+        await most
+          .connect(accounts[i])
+          .receiveRequest(
+            requestHash,
+            0,
+            wrappedAzeroAddressBytes32,
+            TOKEN_AMOUNT,
+            ethAddress,
+            0,
+          );
+      }
+
+      expect(await wrappedAzero.balanceOf(accounts[10].address)).to.equal(
+        TOKEN_AMOUNT,
+      );
+    });
+
     it("Reverts on non-matching hash", async () => {
       const { most, token, tokenAddressBytes32 } = await loadFixture(
         deployEightGuardianMostFixture,
@@ -458,7 +616,7 @@ describe("Most", function () {
 
   describe("receiveRequestNative", function () {
     it("Unlocks tokens for the user", async () => {
-      const { most, weth, wethAddress, mostAddress } = await loadFixture(
+      const { most, weth, mostAddress } = await loadFixture(
         deployEightGuardianMostFixture,
       );
       const zeroAddress = "0x0000000000000000000000000000000000000000";
@@ -502,7 +660,7 @@ describe("Most", function () {
     });
 
     it("Unsuccessful transfer to a contract fails with event", async () => {
-      const { most, weth, wethAddress, mostAddress, token } = await loadFixture(
+      const { most, weth, mostAddress, token } = await loadFixture(
         deployEightGuardianMostFixture,
       );
       const zeroAddress = "0x0000000000000000000000000000000000000000";
@@ -557,7 +715,6 @@ describe("Most", function () {
           ),
       );
       await res.to.emit(most, "EthTransferFailed").withArgs(requestHash);
-
       await res.to.emit(most, "RequestProcessed").withArgs(requestHash);
 
       const balanceAfter = await provider.getBalance(ethAddress);
@@ -580,7 +737,7 @@ describe("Most", function () {
         }
         exec(
           'sed -i "17 a     uint256 public test;" ./contracts/MostV2.sol',
-          async (error, stdout, stderr) => {
+          async (error) => {
             if (error !== null) {
               console.log("exec error: " + error);
             }
@@ -589,9 +746,6 @@ describe("Most", function () {
               await loadFixture(deployEightGuardianMostFixture);
 
             await token.approve(mostAddress, TOKEN_AMOUNT);
-            await most.pause();
-            await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS);
-            await most.unpause();
 
             // sending request works before the upgrade
             await expect(
@@ -650,7 +804,7 @@ describe("Most", function () {
       });
 
       // clean up
-      exec("rm ./contracts/MostV2.sol", (error, stdout, stderr) => {
+      exec("rm ./contracts/MostV2.sol", (error) => {
         if (error !== null) {
           console.log("exec error: " + error);
         }

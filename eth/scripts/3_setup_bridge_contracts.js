@@ -36,6 +36,7 @@ async function createSafeInstance(signer, contracts) {
 async function addTokenPair(
   ethTokenAddress,
   azeroTokenAddress,
+  isLocal,
   mostContract,
   safeInstances,
 ) {
@@ -54,12 +55,13 @@ async function addTokenPair(
   );
 
   const iface = await new ethers.Interface([
-    "function addPair(bytes32 from, bytes32 to)",
+    "function addPair(bytes32 from, bytes32 to, bool isLocal)",
   ]);
 
   const addPaircalldata = await iface.encodeFunctionData("addPair", [
     ethTokenAddressBytes,
     azeroTokenAddressBytes,
+    isLocal,
   ]);
 
   const transactions = [
@@ -197,7 +199,10 @@ async function main() {
     console.log("signer1", signer1.address);
 
     for (let [_, ethAddress, azeroAddress] of azeroContracts.tokens) {
-      await addTokenPair(ethAddress, azeroAddress, most, [safeSdk0, safeSdk1]);
+      await addTokenPair(ethAddress, azeroAddress, true, most, [
+        safeSdk0,
+        safeSdk1,
+      ]);
     }
 
     // --- unpause most
