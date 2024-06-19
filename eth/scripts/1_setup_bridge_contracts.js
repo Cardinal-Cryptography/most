@@ -26,9 +26,14 @@ async function addTokenPair(
     new Keyring({ type: "sr25519" }).decodeAddress(azeroTokenAddress),
   );
 
-  await mostContract.addPair(ethTokenAddressBytes, azeroTokenAddressBytes, isLocal, {
-    from: ownerSigner,
-  });
+  await mostContract.addPair(
+    ethTokenAddressBytes,
+    azeroTokenAddressBytes,
+    isLocal,
+    {
+      from: ownerSigner,
+    },
+  );
 
   console.log(
     "Most now supports the token pair:",
