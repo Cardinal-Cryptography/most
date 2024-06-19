@@ -423,7 +423,6 @@ pub mod most {
 
             let src_token_address = self.weth.get().ok_or(MostError::WrappedEthNotSet)?;
 
-            // ETH_ZERO_ADDRESS as `dest_token_address` indicates native ether transfer
             self._send_request(
                 src_token_address,
                 NATIVE_MARKER_ADDRESS,
