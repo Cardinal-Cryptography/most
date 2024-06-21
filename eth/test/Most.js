@@ -234,7 +234,7 @@ describe("Most", function () {
     });
   });
 
-  describe("sendRequestNativeEth", function () {
+  describe("sendRequestNative", function () {
     it("Reverts if token is not whitelisted", async () => {
       const { most, wethAddressBytes32 } = await loadFixture(
         deployEightGuardianMostFixture,
@@ -245,7 +245,7 @@ describe("Most", function () {
       await most.unpause();
 
       await expect(
-        most.sendRequestNativeEth(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
+        most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
       ).to.be.revertedWithCustomError(most, "UnsupportedPair");
     });
 
@@ -253,7 +253,7 @@ describe("Most", function () {
       const { most, mostAddress, weth } = await loadFixture(
         deployEightGuardianMostFixture,
       );
-      await most.sendRequestNativeEth(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT });
+      await most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT });
 
       expect(await weth.balanceOf(mostAddress)).to.equal(TOKEN_AMOUNT);
     });
@@ -261,7 +261,7 @@ describe("Most", function () {
     it("Emits correct event", async () => {
       const { most } = await loadFixture(deployEightGuardianMostFixture);
       await expect(
-        most.sendRequestNativeEth(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
+        most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
       )
         .to.emit(most, "CrosschainTransferRequest")
         .withArgs(0, WRAPPED_WETH_ADDRESS, TOKEN_AMOUNT, ALEPH_ACCOUNT, 0);

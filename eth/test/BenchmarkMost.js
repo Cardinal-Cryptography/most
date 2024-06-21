@@ -100,17 +100,17 @@ describe("MostBenchmark", function () {
     );
 
     // Send native ETH
-    const gasEstimateSendNative = await most.sendRequestNativeEth.estimateGas(
+    const gasEstimateSendNative = await most.sendRequestNative.estimateGas(
       azeroAccount,
       { from: accounts[0], value: 2 * amount },
     );
 
     console.log(
-      "Gas estimate for sendRequestNativeEth: ",
+      "Gas estimate for sendRequestNative: ",
       Number(gasEstimateSendNative),
     );
 
-    await most.sendRequestNativeEth(azeroAccount, {
+    await most.sendRequestNative(azeroAccount, {
       gas: gasEstimateSendNative,
       from: accounts[0],
       value: 2 * amount,
