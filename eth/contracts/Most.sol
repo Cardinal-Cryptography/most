@@ -184,7 +184,7 @@ contract Most is
     ///
     /// @dev Tx emits a CrosschainTransferRequest event that the relayers listen to
     /// & forward to the destination chain.
-    function sendRequestNativeEth(
+    function sendRequestNative(
         bytes32 destReceiverAddress
     ) external payable whenNotPaused {
         uint256 amount = msg.value;

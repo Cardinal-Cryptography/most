@@ -414,7 +414,7 @@ pub mod most {
         /// Upon checking basic conditions the contract will burn the `amount` number of weth tokens from the caller
         /// and emit an event which is to be picked up & acted on up by the bridge guardians.
         #[ink(message, payable)]
-        pub fn send_request_ether_to_native(
+        pub fn send_request_native_ether(
             &mut self,
             amount: u128,
             dest_receiver_address: [u8; 32],
