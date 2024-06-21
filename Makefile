@@ -26,12 +26,16 @@ clean-azero:
 clean-eth: # Remove eth node data
 clean-eth:
 	cd devnet-eth && ./clean.sh && echo "Done devnet-eth clean"
-	cd eth && npx hardhat clean && echo "Done eth clean"
+	cd eth && npx hardhat clean && rm -r cache && rm -rf .openzeppelin && echo "Done eth clean"
 
 .PHONY: clean
 clean: # Remove all node data
-clean: stop-local-bridgenet
-	git clean -fdx -e "target/"
+clean: stop-local-bridgenet clean-eth clean-azero
+	
+.PHONY: full-clean
+full-clean: # Remove all build and node data
+full-clean: stop-local-bridgenet
+	git clean -fdX
 
 .PHONY: bootstrap-azero
 bootstrap-azero: # Bootstrap the node data
