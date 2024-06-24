@@ -84,9 +84,9 @@ async function main(): Promise<void> {
     [],
   );
 
-  const { address: wrappedAzeroAddress } = await wrappedAzeroConstructors.new(
-    { gasLimit: estimatedGasWrappedAzero },
-  );
+  const { address: wrappedAzeroAddress } = await wrappedAzeroConstructors.new({
+    gasLimit: estimatedGasWrappedAzero,
+  });
 
   let estimatedGasAdvisory = await estimateContractInit(
     api,

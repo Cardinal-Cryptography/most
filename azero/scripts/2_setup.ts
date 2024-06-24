@@ -53,10 +53,7 @@ async function main(): Promise<void> {
 
   const { ws_node, deployer_seed, dev } = config;
 
-  const {
-    tokens,
-    most: most_azero,
-  } = await import_azero_addresses();
+  const { tokens, most: most_azero } = await import_azero_addresses();
 
   const wsProvider = new WsProvider(ws_node);
   const keyring = new Keyring({ type: "sr25519" });
