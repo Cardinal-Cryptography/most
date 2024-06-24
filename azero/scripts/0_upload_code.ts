@@ -22,6 +22,9 @@ async function main(): Promise<void> {
   const tokenCodeHash = await uploadCode(api, deployer, "token.contract");
   console.log("token code hash:", tokenCodeHash);
 
+  const wrappedAzeroCodeHash = await uploadCode(api, deployer, "wrapped_azero.contract");
+  console.log("wrapped azero code hash:", wrappedAzeroCodeHash);
+
   const mostCodeHash = await uploadCode(api, deployer, "most.contract");
   console.log("most code hash:", mostCodeHash);
 

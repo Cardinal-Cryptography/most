@@ -1,11 +1,10 @@
 import { ApiPromise, WsProvider, Keyring } from "@polkadot/api";
 import { KeyringPair } from "@polkadot/keyring/types";
-import Migrations from "../types/contracts/migrations";
-import MigrationsConstructors from "../types/constructors/migrations";
 import MostConstructors from "../types/constructors/most";
 import TokenConstructors from "../types/constructors/token";
 import OracleConstructors from "../types/constructors/oracle";
 import AdvisoryConstructors from "../types/constructors/advisory";
+import WrappedAzeroConstructors from "../types/constructors/wrapped_azero";
 import {
   estimateContractInit,
   import_env,
@@ -73,9 +72,21 @@ async function main(): Promise<void> {
   const deployer = keyring.addFromUri(deployer_seed);
   console.log("Using", deployer.address, "as the deployer");
 
+  const wrappedAzeroConstructors = new WrappedAzeroConstructors(api, deployer);
   const mostConstructors = new MostConstructors(api, deployer);
   const oracleConstructors = new OracleConstructors(api, deployer);
   const advisoryConstructors = new AdvisoryConstructors(api, deployer);
+
+  let estimatedGasWrappedAzero = await estimateContractInit(
+    api,
+    deployer,
+    "wrapped_azero.contract",
+    [],
+  );
+
+  const { address: wrappedAzeroAddress } = await wrappedAzeroConstructors.new(
+    { gasLimit: estimatedGasWrappedAzero },
+  );
 
   let estimatedGasAdvisory = await estimateContractInit(
     api,

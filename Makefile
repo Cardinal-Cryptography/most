@@ -182,24 +182,42 @@ watch-azero: # watch azero contracts and generate artifacts
 watch-azero: azero-deps
 	cd azero && npm run watch
 
+.PHONY: compile-azero-single-contract
+compile-azero-single-contract: # compile azero contract and generate artifacts
+compile-azero-single-contract: azero-deps
+	cd azero/contracts/$(CONTRACT_DIR) && cargo contract build --release
+	cp azero/contracts/$(CONTRACT_DIR)/target/ink/$(CONTRACT_NAME).* azero/artifacts/
+
 .PHONY: compile-azero
 compile-azero: # compile azero contracts and generate artifacts
 compile-azero: azero-deps
-	cd azero && npm run compile
+	mkdir -p azero/artifacts
+	make compile-azero-single-contract CONTRACT_DIR=advisory CONTRACT_NAME=advisory
+	make compile-azero-single-contract CONTRACT_DIR=most CONTRACT_NAME=most
+	make compile-azero-single-contract CONTRACT_DIR=token CONTRACT_NAME=token
+	make compile-azero-single-contract CONTRACT_DIR=gas-price-oracle/contract CONTRACT_NAME=oracle
+	cd azero && cp external_artifacts/wrapped_azero.contract artifacts/
+	cd azero && cp external_artifacts/wrapped_azero.json artifacts/
+	cd azero && cp external_artifacts/wrapped_azero.wasm artifacts/
+
+.PHONY: typechain-azero
+typechain-azero: # Generate typechain typings for azero contracts
+typechain-azero:
+	cd azero && npm run typechain
 
 .PHONY: deploy-azero
 deploy-azero: # Deploy azero contracts
-deploy-azero: compile-azero
+deploy-azero: compile-azero typechain-azero
 	cd azero && AZERO_ENV=$(AZERO_ENV) npm run deploy
 
 .PHONY: upload-azero
 upload-azero: # Upload azero contract code without instantiating (useful for upgrades)
-upload-azero: compile-azero-docker
+upload-azero: compile-azero-docker typechain-azero
 	cd azero && AZERO_ENV=$(AZERO_ENV) npm run upload
 
 .PHONY: setup-azero
 setup-azero: # Setup azero contracts
-setup-azero: compile-azero
+setup-azero: compile-azero typechain-azero
 	cd azero && AZERO_ENV=$(AZERO_ENV) npm run setup
 
 .PHONY: deploy

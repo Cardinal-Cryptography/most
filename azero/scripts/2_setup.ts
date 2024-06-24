@@ -1,5 +1,4 @@
 import { ApiPromise, WsProvider, Keyring } from "@polkadot/api";
-import Migrations from "../types/contracts/migrations";
 import Most from "../types/contracts/most";
 import Token from "../types/contracts/token";
 import {
