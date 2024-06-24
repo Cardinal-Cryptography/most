@@ -73,22 +73,9 @@ async function main(): Promise<void> {
   const deployer = keyring.addFromUri(deployer_seed);
   console.log("Using", deployer.address, "as the deployer");
 
-  const migrationsConstructors = new MigrationsConstructors(api, deployer);
   const mostConstructors = new MostConstructors(api, deployer);
   const oracleConstructors = new OracleConstructors(api, deployer);
   const advisoryConstructors = new AdvisoryConstructors(api, deployer);
-
-  let estimatedGasMigrations = await estimateContractInit(
-    api,
-    deployer,
-    "migrations.contract",
-    [deployer.address],
-  );
-
-  const { address: migrationsAddress } = await migrationsConstructors.new(
-    deployer.address, // owner
-    { gasLimit: estimatedGasMigrations },
-  );
 
   let estimatedGasAdvisory = await estimateContractInit(
     api,
@@ -175,11 +162,7 @@ async function main(): Promise<void> {
     tokenAddresses.push([token.symbol, ethAddress, address]);
   }
 
-  const migrations = new Migrations(migrationsAddress, deployer, api);
-  await migrations.tx.setCompleted(1);
-
   const addresses: Addresses = {
-    migrations: migrationsAddress,
     most: mostAddress,
     oracle: oracleAddress,
     advisory: advisoryAddress,

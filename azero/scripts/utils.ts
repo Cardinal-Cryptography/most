@@ -14,7 +14,6 @@ export type Addresses = {
   most: string;
   oracle: string;
   advisory: string;
-  migrations: string;
   tokens: [string, string, string][];
 };
 

@@ -19,13 +19,6 @@ async function main(): Promise<void> {
   const deployer = keyring.addFromUri(deployer_seed);
   console.log("Using", deployer.address, "as the deployer");
 
-  const migrationsCodeHash = await uploadCode(
-    api,
-    deployer,
-    "migrations.contract",
-  );
-  console.log("migrations code hash:", migrationsCodeHash);
-
   const tokenCodeHash = await uploadCode(api, deployer, "token.contract");
   console.log("token code hash:", tokenCodeHash);
 
@@ -42,7 +35,6 @@ async function main(): Promise<void> {
     most: mostCodeHash,
     oracle: oracleCodeHash,
     advisory: advisoryCodeHash,
-    migrations: migrationsCodeHash,
     token: tokenCodeHash,
   };
 
