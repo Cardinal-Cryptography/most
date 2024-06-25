@@ -11,13 +11,15 @@ import {
   storeAddresses,
   Addresses,
   import_eth_addresses,
+  import_token_config,
+  findTokenBySymbol,
 } from "./utils";
 import "dotenv/config";
 import "@polkadot/api-augment";
 import { AccountId } from "../types/types-arguments/token";
 import type BN from "bn.js";
 
-const envFile = process.env.AZERO_ENV || "dev";
+const envFile = process.env.AZERO_ENV;
 
 type TokenArgs = [
   initialSupply: string | number | BN,
@@ -46,7 +48,14 @@ async function deployToken(
 
 async function main(): Promise<void> {
   const config = await import_env(envFile);
+  const tokenConfigPath = config.token_config_path;
+  const tokenConfig = await import_token_config(tokenConfigPath);
   const ethAddresses = await import_eth_addresses();
+
+  const isWrappedAzeroDeployed = findTokenBySymbol(
+    "wAZERO",
+    tokenConfig.aleph,
+  ).deployed;
 
   const {
     ws_node,
@@ -61,9 +70,11 @@ async function main(): Promise<void> {
     gas_oracle_max_age,
     oracle_call_gas_limit,
     base_fee_buffer_percentage,
-    tokens,
     dev,
   } = config;
+
+  const tokensEth = tokenConfig.eth;
+  const tokensAleph = tokenConfig.aleph;
 
   const wsProvider = new WsProvider(ws_node);
   const keyring = new Keyring({ type: "sr25519" });
@@ -77,16 +88,23 @@ async function main(): Promise<void> {
   const oracleConstructors = new OracleConstructors(api, deployer);
   const advisoryConstructors = new AdvisoryConstructors(api, deployer);
 
-  let estimatedGasWrappedAzero = await estimateContractInit(
-    api,
-    deployer,
-    "wrapped_azero.contract",
-    [],
-  );
+  var wrappedAzeroAddress = "";
+  if (!isWrappedAzeroDeployed) {
+    let estimatedGasWrappedAzero = await estimateContractInit(
+      api,
+      deployer,
+      "wrapped_azero.contract",
+      [],
+    );
 
-  const { address: wrappedAzeroAddress } = await wrappedAzeroConstructors.new({
-    gasLimit: estimatedGasWrappedAzero,
-  });
+    wrappedAzeroAddress = await wrappedAzeroConstructors
+      .new({
+        gasLimit: estimatedGasWrappedAzero,
+      })
+      .then((res) => res.address);
+  } else {
+    wrappedAzeroAddress = findTokenBySymbol("wAZERO", tokensAleph).address;
+  }
 
   let estimatedGasAdvisory = await estimateContractInit(
     api,
@@ -152,8 +170,8 @@ async function main(): Promise<void> {
   console.log("most address:", mostAddress);
 
   const minterBurner = dev ? deployer.address : mostAddress;
-  var tokenAddresses = [];
-  for (let token of tokens) {
+  var ethTokenAddresses = [];
+  for (let token of tokensEth) {
     const initialSupply = 0;
     const tokenArgs: TokenArgs = [
       initialSupply,
@@ -166,18 +184,32 @@ async function main(): Promise<void> {
     const { address } = await deployToken(tokenArgs, api, deployer);
     console.log(token.symbol, "address:", address);
 
-    let ethAddress = token.checkAddress
-      ? ethAddresses[token.checkAddress]
-      : token.ethAddress!;
+    ethTokenAddresses.push({ symbol: token.symbol, address: address });
+  }
 
-    tokenAddresses.push([token.symbol, ethAddress, address]);
+  var alephTokenAddresses = [];
+  for (let token of tokensAleph) {
+    if (token.deployed) {
+      alephTokenAddresses.push({
+        symbol: token.symbol,
+        address: token.address,
+      });
+    }
+  }
+
+  if (!isWrappedAzeroDeployed) {
+    alephTokenAddresses.push({
+      symbol: "wAZERO",
+      address: wrappedAzeroAddress,
+    });
   }
 
   const addresses: Addresses = {
     most: mostAddress,
     oracle: oracleAddress,
     advisory: advisoryAddress,
-    tokens: tokenAddresses,
+    ethTokens: ethTokenAddresses,
+    alephTokens: alephTokenAddresses,
   };
   console.log("addresses:", addresses);
 

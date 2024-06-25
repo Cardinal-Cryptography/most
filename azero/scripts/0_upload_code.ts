@@ -5,7 +5,7 @@ import { uploadCode, import_env } from "./utils";
 import "dotenv/config";
 import "@polkadot/api-augment";
 
-const envFile = process.env.AZERO_ENV || "dev";
+const envFile = process.env.AZERO_ENV;
 
 async function main(): Promise<void> {
   const config = await import_env(envFile);

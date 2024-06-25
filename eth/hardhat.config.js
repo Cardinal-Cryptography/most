@@ -45,6 +45,7 @@ var config = {
           "0xd7a898720ab24ae154d67f51F2F75341D2A3719f",
         ],
         governanceThreshold: 2,
+        tokenConfigPath: "../tokens_dev.json",
       },
     },
 
@@ -70,6 +71,7 @@ var config = {
           "0xd7a898720ab24ae154d67f51F2F75341D2A3719f",
         ],
         governanceThreshold: 2,
+        tokenConfigPath: "../tokens_dev.json",
       },
     },
   },

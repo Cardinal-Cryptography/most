@@ -6,6 +6,8 @@ import {
   import_azero_addresses,
   accountIdToHex,
   hexToBytes,
+  import_eth_addresses,
+  findTokenBySymbol,
 } from "./utils";
 import "dotenv/config";
 import "@polkadot/api-augment";
@@ -53,7 +55,9 @@ async function main(): Promise<void> {
 
   const { ws_node, deployer_seed, dev } = config;
 
-  const { tokens, most: most_azero } = await import_azero_addresses();
+  const alephAddresses = await import_azero_addresses();
+  const ethAddresses = await import_eth_addresses();
+  const most_azero = alephAddresses.most;
 
   const wsProvider = new WsProvider(ws_node);
   const keyring = new Keyring({ type: "sr25519" });
@@ -65,7 +69,7 @@ async function main(): Promise<void> {
 
   // premint some token for DEV
   if (dev) {
-    for (let [_, __, azero_address] of tokens) {
+    for (let { address: azero_address } of alephAddresses.ethTokens) {
       await mintTokens(
         azero_address,
         1000000000000000,
@@ -79,12 +83,39 @@ async function main(): Promise<void> {
 
   const most = new Most(most_azero, deployer, api);
 
-  for (let [symbol, eth_address, azero_address] of tokens) {
-    await addTokenPair(eth_address, azero_address, false, most);
-    if (symbol == "wETH") {
-      await most.tx.setWeth(azero_address);
-    }
+  // Add token pairs for Ethereum -> Aleph direction
+  for (let {
+    symbol: symbol,
+    address: aleph_address,
+  } of alephAddresses.ethTokens) {
+    const { address: eth_address } = findTokenBySymbol(
+      symbol,
+      ethAddresses.ethTokens,
+    );
+    await addTokenPair(eth_address, aleph_address, false, most);
   }
+
+  // Add token pairs for Aleph -> Ethereum direction
+  for (let {
+    symbol: symbol,
+    address: aleph_address,
+  } of alephAddresses.alephTokens) {
+    const { address: eth_address } = findTokenBySymbol(
+      symbol,
+      ethAddresses.alephTokens,
+    );
+    await addTokenPair(eth_address, aleph_address, true, most);
+  }
+
+  // Set WETH address
+  await most.tx.setWeth(
+    findTokenBySymbol("WETH", alephAddresses.ethTokens).address,
+  );
+
+  // Set WAZERO address
+  await most.tx.setWazero(
+    findTokenBySymbol("wAZERO", alephAddresses.alephTokens).address,
+  );
 
   if (dev) {
     await most.tx.setHalted(false);
