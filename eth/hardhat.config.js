@@ -118,6 +118,7 @@ if (SEPOLIA_KEY) {
       ],
       threshold: 1,
       weth: "0xd91aE8FD2Be53F74876a9cc4aFb416645A0c8420",
+      tokenConfigPath: "../tokens_testnet_example.json",
     },
   };
 }
