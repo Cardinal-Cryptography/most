@@ -63,7 +63,7 @@ This contract delivers information about Ethereum gas prices to the main Most co
 
 ## Frontend
 
-The frontend for this project consists in just one tab of the overall Common frontend. As such it is contained in the [Common frontend](https://github.com/Cardinal-Cryptography/common-frontend/) repo.
+The frontend for this project consists in just one tab of the overall Common frontend.
 
 ## Vocabulary
 
