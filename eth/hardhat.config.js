@@ -124,14 +124,14 @@ if (SEPOLIA_KEY) {
 
 if (ETHEREUM_PRIVATE_KEY) {
   config.networks.mainnet = {
-    url: 'https://ethereum-rpc.publicnode.com',
+    url: "https://ethereum-rpc.publicnode.com",
     accounts: [ETHEREUM_PRIVATE_KEY],
     deploymentConfig: {
       guardianIds: [
         ETHEREUM_GUARDIAN_ADDRESS, // Mainnet account address corresponding to ETHEREUM_PRIVATE_KEY
       ],
       threshold: 1,
-      weth: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+      weth: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
     },
   };
 }
