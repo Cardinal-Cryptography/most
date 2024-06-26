@@ -19,7 +19,7 @@ The bridge is custodial in that the owner of the bridge (or rather a comittee of
 
 The owner of the bridge is not a single entity, but rather a number of owners who vote on any actions with a simple majority. At the time of this writing there are 8 guardians and 5 votes are needed for any actions. Each guardian is in fact represented by 2 public addresses - a governance address and a signing address. Theoretically, the governance committee and the signing committee could have different membership (in term of business entities/persons, they _are_ different in terms of the actual keys), but that's not the case right now.
 
-In practice, a signijwng key is generated during the setup of a Guardian's infrastructure. These keys are then submitted to the governance committee. Finally, the governance committee votes to set the signing committee to the set of keys received in this manner.
+In practice, a signing key is generated during the setup of a Guardian's infrastructure. These keys are then submitted to the governance committee. Finally, the governance committee votes to set the signing committee to the set of keys received in this manner.
 
 ### Governance committee
 
