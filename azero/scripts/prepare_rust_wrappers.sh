@@ -10,7 +10,6 @@ declare -a CONTRACTS=(
     "advisory"
     "most"
     "token"
-    "migrations"
 )
 
 # Process gas price oracle contract. Requires special handling due to a different directory structure and name.

@@ -1,0 +1,24 @@
+{
+    "eth": [
+        {
+            "name": "Tether USD",
+            "symbol": "USDT",
+            "decimals": 6,
+            "deployed": false
+        },
+        {
+            "name": "Wrapped Ether",
+            "symbol": "WETH",
+            "decimals": 18,
+            "deployed": false
+        }
+    ],
+    "aleph": [
+        {
+            "name": "Wrapped AZERO",
+            "symbol": "wAZERO",
+            "decimals": 12,
+            "deployed": false
+        }
+    ]
+}

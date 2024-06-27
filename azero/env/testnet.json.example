@@ -13,18 +13,5 @@
   "default_gas_price": 180000000,
   "relay_gas_usage": 450000,
   "dev": false,
-  "tokens": [
-    {
-      "symbol": "wETH",
-      "name": "Wrapped Ether",
-      "decimals": 18,
-      "ethAddress": "0xfff9976782d46cc05630d1f6ebab18b2324d6b14"
-    },
-    {
-      "symbol": "wAT",
-      "name": "Wrapped Aleph Tether",
-      "decimals": 6,
-      "ethAddress": "0xa781D55E5603Bb60b49cd219863D8102523E7aff"
-    }
-  ]
+  "token_config_path": "/../../cfg/tokens_testnet_example.json"
 }

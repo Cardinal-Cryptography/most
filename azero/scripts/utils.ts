@@ -14,8 +14,8 @@ export type Addresses = {
   most: string;
   oracle: string;
   advisory: string;
-  migrations: string;
-  tokens: [string, string, string][];
+  ethTokens: { symbol: string; address: string }[];
+  alephTokens: { symbol: string; address: string }[];
 };
 
 /**
@@ -62,6 +62,10 @@ export function storeAddresses(addresses: Addresses): void {
   );
 }
 
+export function findTokenBySymbol(symbol: string, tokens: any[]) {
+  return tokens.find((token) => token.symbol === symbol);
+}
+
 export async function import_env(envFile: string) {
   return await import(`../env/${envFile}.json`);
 }
@@ -72,6 +76,10 @@ export async function import_eth_addresses() {
 
 export async function import_azero_addresses() {
   return await import(__dirname + "/../addresses.json");
+}
+
+export async function import_token_config(tokenConfigPath: string) {
+  return await import(__dirname + `${tokenConfigPath}`);
 }
 
 export function hexToBytes(hex: string): number[] {
