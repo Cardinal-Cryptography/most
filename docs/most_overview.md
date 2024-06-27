@@ -26,14 +26,19 @@ In practice, a signing key is generated during the setup of a Guardian's infrast
 The governance committee votes on any major actions that change the bridge operations. Some of the most important ones are:
 
 - Stopping and starting the bridge
-- Changing bridge configuration paramters, including changing committee memberships
+- Changing bridge configuration paramters, such as:
+  - Signing committee membership
+  - Whitelisting tokens that can be transferred through the bridge (note that tokens other than the whitelisted ones cannot be transferred at all)
+  - Gas pricing parameters
 - Updating the code of the bridge contracts
 
-The governance committee is implemented as a multisig address on the Aleph Zero side and as a Gnosis Safe account on the Aleph Zero side.
+The governance committee is implemented as a multisig address on the Aleph Zero side and as a Gnosis Safe account on the Aleph Zero side. Note that this means that the governance committee can also vote to change its own membership - on the Aleph Zero side it happens as a vote to transfer ownership to another multisig, while Gnosis Safe has a dedicated procedure that can add and remove members.
 
 ### Signing committee
 
 The signing committee basically performs only two types of operations. Both essentially comprise in signing bridging requests, that is certifying on one chain that something happened on the other. The first case is certifying that a certain amount of some native token has been transferred into the bridge contract on one chain, which triggers a minting of the same amount of the relevant token on the other side. The second case, is certifying that a certain amount of a bridge token has been transferred into the bridge contract on one chain and burned, which triggers the release of the same amount of tokens from the bridge contract on the other side.
+
+In both cases, what technically happens, is the relayer observing the chain and waiting for a `CrosschainTransferRequest` event. That event is emitted by a contract only when a valid request is processed. When such an event is observed, the relayer submits a `receiver_request` method call with the same set of data on the other chain, thereby performing its certification duty. Only members of the signing committee are allowed to call this method and the method itself enforces a majority vote before performing any transfers, so in that way only once a request is certified by a majority of the committee is it processed on the other chain.
 
 ## Main components
 
@@ -61,9 +66,17 @@ The signer is a separate component that keeps a pair of signing keys (one Ethere
 
 This contract delivers information about Ethereum gas prices to the main Most contracts on the Aleph Zero side. This is used in order to charge the appropriate amount in fees when accepting requests for Aleph Zero -> Ethereum transfers. The contract is intended to be fed with data by an external feeder, source not included in this repo. The main contract has fallback pricing setup so that it works even in the absence of the Gas Price Oracle or when it starts to provide malicious data.
 
+The Aleph Zero Most contract stores the total cost to sign the transaction on the Ethereum side by all relayers in units of gas. This parameter is configurable via a [Governance action](#governance-committee). When processing a `send_request` call it consults the gas price oracle (or uses the configurable defaults if the oracle doesn't work/returns a suspicious pricing) for the price of gas, expressed in `AZERO`. It then makes sure that additional `AZERO` in the amount `total_ethereum_price * gas_price_in_azero` have been transferred to the contract with the call to cover the fee. The frontend is responsible for obtaining this information via getters and making sure that the transaction sent indeed contains this additional fee.
+
 ## Frontend
 
 The frontend for this project consists in just one tab of the overall Common frontend.
+
+## Miscellaneous
+
+### SendRequestNative
+
+As a convenience the contract on the Ethereum side provides a `SendRequestNative` method. Depending on when you're reading this, the Aleph Zero contract might have a similar functionality too. This method combines two steps - wrapping of a specified amount of Ether into Wrapped Ether and then calling a regular `SendRequest` for the same amount.
 
 ## Vocabulary
 
