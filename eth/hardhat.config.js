@@ -47,6 +47,7 @@ var config = {
           "0xd7a898720ab24ae154d67f51F2F75341D2A3719f",
         ],
         governanceThreshold: 2,
+        tokenConfigPath: "../cfg/tokens_dev.json",
       },
     },
 
@@ -72,6 +73,7 @@ var config = {
           "0xd7a898720ab24ae154d67f51F2F75341D2A3719f",
         ],
         governanceThreshold: 2,
+        tokenConfigPath: "../cfg/tokens_dev.json",
       },
     },
   },
@@ -118,6 +120,7 @@ if (SEPOLIA_KEY) {
       ],
       threshold: 1,
       weth: "0xd91aE8FD2Be53F74876a9cc4aFb416645A0c8420",
+      tokenConfigPath: "../cfg/tokens_testnet_example.json",
     },
   };
 }

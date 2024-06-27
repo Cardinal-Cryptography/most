@@ -5,9 +5,13 @@ import { uploadCode, import_env } from "./utils";
 import "dotenv/config";
 import "@polkadot/api-augment";
 
-const envFile = process.env.AZERO_ENV || "dev";
+const envFile = process.env.AZERO_ENV;
 
 async function main(): Promise<void> {
+  if (!envFile) {
+    throw new Error("Please provide an env file");
+  }
+
   const config = await import_env(envFile);
 
   const { ws_node, deployer_seed } = config;
@@ -19,15 +23,15 @@ async function main(): Promise<void> {
   const deployer = keyring.addFromUri(deployer_seed);
   console.log("Using", deployer.address, "as the deployer");
 
-  const migrationsCodeHash = await uploadCode(
-    api,
-    deployer,
-    "migrations.contract",
-  );
-  console.log("migrations code hash:", migrationsCodeHash);
-
   const tokenCodeHash = await uploadCode(api, deployer, "token.contract");
   console.log("token code hash:", tokenCodeHash);
+
+  const wrappedAzeroCodeHash = await uploadCode(
+    api,
+    deployer,
+    "wrapped_azero.contract",
+  );
+  console.log("wrapped azero code hash:", wrappedAzeroCodeHash);
 
   const mostCodeHash = await uploadCode(api, deployer, "most.contract");
   console.log("most code hash:", mostCodeHash);
@@ -42,7 +46,6 @@ async function main(): Promise<void> {
     most: mostCodeHash,
     oracle: oracleCodeHash,
     advisory: advisoryCodeHash,
-    migrations: migrationsCodeHash,
     token: tokenCodeHash,
   };
 

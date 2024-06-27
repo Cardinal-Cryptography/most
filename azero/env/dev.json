@@ -16,18 +16,5 @@
   "oracle_call_gas_limit": 2000000000,
   "base_fee_buffer_percentage": 20,
   "dev": true,
-  "tokens": [
-    {
-      "symbol": "wETH",
-      "name": "Wrapped Ether",
-      "decimals": 18,
-      "checkAddress": "weth"
-    },
-    {
-      "symbol": "USDT",
-      "name": "Tether",
-      "decimals": 6,
-      "checkAddress": "usdt"
-    }
-  ]
+  "token_config_path": "/../../cfg/tokens_dev.json"
 }

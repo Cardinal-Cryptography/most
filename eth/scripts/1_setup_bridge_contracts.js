@@ -3,7 +3,14 @@ const { ethers, network } = require("hardhat");
 const { Keyring } = require("@polkadot/keyring");
 const { u8aToHex } = require("@polkadot/util");
 
-const azeroContracts = require("../../azero/addresses.json");
+function getTokenAddressBySymbol(symbol, tokens) {
+  for (let i = 0; i < tokens.length; i++) {
+    if (tokens[i].symbol == symbol) {
+      return tokens[i].address;
+    }
+  }
+  return null;
+}
 
 async function addTokenPair(
   ethTokenAddress,
@@ -12,12 +19,6 @@ async function addTokenPair(
   mostContract,
   ownerSigner,
 ) {
-  console.log(
-    "Adding token pair to Most:",
-    ethTokenAddress,
-    "=>",
-    azeroTokenAddress,
-  );
   const ethTokenAddressBytes = ethers.zeroPadValue(
     ethers.getBytes(ethTokenAddress),
     32,
@@ -26,7 +27,17 @@ async function addTokenPair(
     new Keyring({ type: "sr25519" }).decodeAddress(azeroTokenAddress),
   );
 
-  await mostContract.addPair(
+  console.log(
+    "Adding token pair to Most:",
+    ethTokenAddress,
+    "=>",
+    azeroTokenAddress,
+    "( direction:",
+    isLocal ? "ETH -> Aleph" : "Aleph -> ETH",
+    ")",
+  );
+
+  const addPairTx = await mostContract.addPair(
     ethTokenAddressBytes,
     azeroTokenAddressBytes,
     isLocal,
@@ -34,6 +45,7 @@ async function addTokenPair(
       from: ownerSigner,
     },
   );
+  await addPairTx.wait(1);
 
   console.log(
     "Most now supports the token pair:",
@@ -60,9 +72,44 @@ async function main() {
     fs.readFileSync("addresses.json", { encoding: "utf8", flag: "r" }),
   );
 
+  // read aleph addresses
+  let alephAddresses = JSON.parse(
+    fs.readFileSync("../azero/addresses.json", { encoding: "utf8", flag: "r" }),
+  );
+
   // --- setup
   const Most = await ethers.getContractFactory("Most");
-  const most = await Most.attach(addresses.most);
+  const most = Most.attach(addresses.most);
+
+  // --- add Ethereum -> Aleph token pairs
+  for (let token of addresses.ethTokens) {
+    await addTokenPair(
+      token.address,
+      getTokenAddressBySymbol(token.symbol, alephAddresses.ethTokens),
+      true,
+      most,
+      signers[0],
+    );
+  }
+
+  // --- add Aleph -> Ethereum token pairs
+  for (let token of addresses.alephTokens) {
+    await addTokenPair(
+      token.address,
+      getTokenAddressBySymbol(token.symbol, alephAddresses.alephTokens),
+      false,
+      most,
+      signers[0],
+    );
+  }
+
+  // Set wrapped azero address
+  const setWrappedAzeroTx = await most.setWrappedAzeroAddress(
+    getTokenAddressBySymbol("wAZERO", addresses.alephTokens),
+    { from: signers[0] },
+  );
+  await setWrappedAzeroTx.wait(1);
+  console.log("Wrapped azero address set to", await most.wrappedAzeroAddress());
 
   if (network.name == "development" || network.name == "bridgenet") {
     // NOTE : TEMPorary before devnet is fixed and uses proper genesis that seeds these accounts with funds
@@ -74,19 +121,17 @@ async function main() {
     }
 
     // --- provide some wETH and USDT to most contract
+    const wethAddress = getTokenAddressBySymbol("WETH", addresses.ethTokens);
     const WETH = await ethers.getContractFactory("WETH9");
-    const weth = await WETH.attach(addresses.weth);
+    const weth = WETH.attach(wethAddress);
 
     await weth.deposit({ value: 1000000000000000 });
     await weth.transfer(addresses.most, 1000000000000000);
 
+    const usdtAddress = getTokenAddressBySymbol("USDT", addresses.ethTokens);
     const USDT = await ethers.getContractFactory("TetherToken");
-    const usdt = await USDT.attach(addresses.usdt);
+    const usdt = USDT.attach(usdtAddress);
     await usdt.transfer(addresses.most, 1000000000000000);
-
-    for (let [_, ethAddress, azeroAddress] of azeroContracts.tokens) {
-      await addTokenPair(ethAddress, azeroAddress, true, most, signers[0]);
-    }
 
     // --- unpause most
     await unpauseMost(most, signers[0]);
