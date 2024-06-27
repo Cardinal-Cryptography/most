@@ -12,7 +12,7 @@ where
     F: Fn() -> R,
     R: Future<Output = Result<u128, anyhow::Error>> + Sized,
 {
-    let tick = tokio::time::Duration::from_secs(30_u64);
+    let tick = tokio::time::Duration::from_secs(12_u64);
     let wait_max = tokio::time::Duration::from_secs(60_u64 * wait_max_minutes);
 
     info!(

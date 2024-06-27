@@ -3,25 +3,33 @@ use std::fs;
 use aleph_client::{Connection, KeyPair, SignedConnection};
 use serde::{Deserialize, Serialize};
 
+use crate::token::{get_token_address_by_symbol, TokenJson};
+
 #[derive(Deserialize, Serialize)]
 pub struct AzeroContractAddressesJson {
     pub most: String,
-    pub tokens: [[String; 3]; 2],
     pub oracle: String,
+    pub advisory: String,
+    #[serde(rename = "ethTokens")]
+    pub eth_tokens: [TokenJson; 2],
+    #[serde(rename = "alephTokens")]
+    pub aleph_tokens: [TokenJson; 1],
 }
 
 pub struct AzeroContractAddresses {
     pub most: String,
     pub weth: String,
-    pub oracle: String,
+    pub wazero: String,
+    pub usdt: String,
 }
 
 impl From<AzeroContractAddressesJson> for AzeroContractAddresses {
     fn from(azero_contract_addresses: AzeroContractAddressesJson) -> Self {
         Self {
             most: azero_contract_addresses.most,
-            weth: azero_contract_addresses.tokens[0][2].clone(),
-            oracle: azero_contract_addresses.oracle,
+            weth: get_token_address_by_symbol(&azero_contract_addresses.eth_tokens, "WETH"),
+            usdt: get_token_address_by_symbol(&azero_contract_addresses.eth_tokens, "USDT"),
+            wazero: get_token_address_by_symbol(&azero_contract_addresses.aleph_tokens, "wAZERO"),
         }
     }
 }
