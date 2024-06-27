@@ -16,5 +16,5 @@
   "oracle_call_gas_limit": 2000000000,
   "base_fee_buffer_percentage": 20,
   "dev": true,
-  "token_config_path": "/../../tokens_dev.json"
+  "token_config_path": "/../../cfg/tokens_dev.json"
 }

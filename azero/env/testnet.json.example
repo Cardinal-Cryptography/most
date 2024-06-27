@@ -13,5 +13,5 @@
   "default_gas_price": 180000000,
   "relay_gas_usage": 450000,
   "dev": false,
-  "token_config_path": "/../../tokens_testnet_example.json"
+  "token_config_path": "/../../cfg/tokens_testnet_example.json"
 }
