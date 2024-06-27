@@ -11,6 +11,8 @@ const DEV_MNEMONIC =
 
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY;
 const SEPOLIA_KEY = process.env.SEPOLIA_KEY;
+const ETHEREUM_PRIVATE_KEY = process.env.ETHEREUM_PRIVATE_KEY;
+const ETHEREUM_GUARDIAN_ADDRESS = process.env.ETHEREUM_GUARDIAN_ADDRESS;
 
 var config = {
   defaultNetwork: "hardhat",
@@ -116,6 +118,20 @@ if (SEPOLIA_KEY) {
       ],
       threshold: 1,
       weth: "0xd91aE8FD2Be53F74876a9cc4aFb416645A0c8420",
+    },
+  };
+}
+
+if (ETHEREUM_PRIVATE_KEY) {
+  config.networks.mainnet = {
+    url: "https://ethereum-rpc.publicnode.com",
+    accounts: [ETHEREUM_PRIVATE_KEY],
+    deploymentConfig: {
+      guardianIds: [
+        ETHEREUM_GUARDIAN_ADDRESS, // Mainnet account address corresponding to ETHEREUM_PRIVATE_KEY
+      ],
+      threshold: 1,
+      weth: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
     },
   };
 }
