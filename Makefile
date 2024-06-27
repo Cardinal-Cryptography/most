@@ -100,12 +100,6 @@ deploy-eth: compile-eth
 	cd eth && \
 	npx hardhat run --network $(NETWORK) scripts/0_deploy_bridge_contracts.js
 
-.PHONY: deploy-eth-live
-deploy-eth-live: # Deploy only the MOST contract on a live ethereum network (testnet or mainnet)
-deploy-eth-live: compile-eth
-	cd eth && \
-	npx hardhat run --network $(NETWORK) scripts/deploy_bridge_live.js
-
 .PHONY: upload-eth
 upload-eth: # Upload the MOST contract to a live ethereum network (testnet or mainnet) for an upgrade
 upload-eth: compile-eth
@@ -114,7 +108,7 @@ upload-eth: compile-eth
 
 .PHONY: deploy-live
 deploy-live: # Deploy azero and eth contracts on a live network (testnet or mainnet)
-deploy-live: deploy-azero-docker setup-azero-docker deploy-eth-live
+deploy-live: deploy-azero-docker setup-azero-docker deploy-eth setup-eth
 
 .PHONY: verify-eth
 verify-eth: # Post verified eth sources of a contract to etherscan
