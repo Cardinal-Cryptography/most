@@ -8,6 +8,10 @@ import "@polkadot/api-augment";
 const envFile = process.env.AZERO_ENV;
 
 async function main(): Promise<void> {
+  if (!envFile) {
+    throw new Error("Please provide an env file");
+  }
+
   const config = await import_env(envFile);
 
   const { ws_node, deployer_seed } = config;

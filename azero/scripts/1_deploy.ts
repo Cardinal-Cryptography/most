@@ -47,10 +47,13 @@ async function deployToken(
 }
 
 async function main(): Promise<void> {
+  if (!envFile) {
+    throw new Error("Please provide an env file");
+  }
+
   const config = await import_env(envFile);
   const tokenConfigPath = config.token_config_path;
   const tokenConfig = await import_token_config(tokenConfigPath);
-  const ethAddresses = await import_eth_addresses();
 
   const isWrappedAzeroDeployed = findTokenBySymbol(
     "wAZERO",

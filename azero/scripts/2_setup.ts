@@ -51,6 +51,10 @@ async function mintTokens(
 }
 
 async function main(): Promise<void> {
+  if (!envFile) {
+    throw new Error("Please provide an env file");
+  }
+
   const config = await import_env(envFile);
 
   const { ws_node, deployer_seed, dev } = config;
