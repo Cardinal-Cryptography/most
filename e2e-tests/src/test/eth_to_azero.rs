@@ -1,24 +1,11 @@
 use std::str::FromStr;
 
 use aleph_client::{contract::ContractInstance, keypair_from_string, sp_runtime::AccountId32};
-use ethers::{
-    core::types::Address,
-    signers::{coins_bip39::English, MnemonicBuilder, Signer},
-    utils,
-};
+use anyhow::{anyhow, Result};
+use ethers::{core::types::Address, utils};
 use log::info;
-use crate::config::Config;
 
 use crate::{azero, config::setup_test, eth, wait::wait_for_balance_change};
-
-async fn create_eth_signed_connection(config: &Config) -> anyhow::Result<eth::SignedConnection> {
-    let wallet = MnemonicBuilder::<English>::default()
-        .phrase(&*config.eth_mnemonic)
-        .index(config.eth_dev_account_index)?
-        .build()?;
-
-    eth::signed_connection(&config.eth_node_http, wallet).await
-}
 
 /// One-way `Ethereum` -> `Aleph Zero` transfer through `most`.
 /// Wraps the required funds into wETH for an Ethereum account.
@@ -28,9 +15,9 @@ async fn create_eth_signed_connection(config: &Config) -> anyhow::Result<eth::Si
 /// Verifies that the correct amount of wETH is present on the Aleph Zero chain.
 /// It relies on all the relevant contracts being deployed on both ends and the (wETH_ETH:wETH_AZERO) pair having been added to `most`.
 #[tokio::test]
-pub async fn eth_to_azero() -> anyhow::Result<()> {
+pub async fn eth_to_azero() -> Result<()> {
     let config = setup_test();
-    let eth_signed_connection = create_eth_signed_connection(&config).await?;
+    let eth_signed_connection = eth::create_signed_connection(&config).await?;
     let eth_account_address = eth_signed_connection.address();
 
     let eth_contract_addresses = eth::contract_addresses(&config.eth_contract_addresses_path)?;
@@ -53,14 +40,13 @@ pub async fn eth_to_azero() -> anyhow::Result<()> {
 
     let approve_args = (most_address, transfer_amount);
 
-    let approve_receipt =
-        eth::call_contract_method(weth_eth, "approve", approve_args).await?;
+    let approve_receipt = eth::call_contract_method(weth_eth, "approve", approve_args).await?;
     info!("`Approve` tx receipt: {:?}", approve_receipt);
 
     let azero_contract_addresses =
         azero::contract_addresses(&config.azero_contract_addresses_path)?;
     let weth_azero_address = AccountId32::from_str(&azero_contract_addresses.weth)
-        .map_err(|e| anyhow::anyhow!("Cannot parse account id from string: {:?}", e))?;
+        .map_err(|e| anyhow!("Cannot parse account id from string: {:?}", e))?;
 
     let weth_azero = ContractInstance::new(
         weth_azero_address,
@@ -99,8 +85,7 @@ pub async fn eth_to_azero() -> anyhow::Result<()> {
         azero_account_address_bytes,
     );
     let send_request_receipt =
-        eth::call_contract_method(most, "sendRequest", send_request_args)
-            .await?;
+        eth::call_contract_method(most, "sendRequest", send_request_args).await?;
     info!("`sendRequest` tx receipt: {:?}", send_request_receipt);
 
     let get_current_balance = || async {

@@ -1,5 +1,6 @@
 use std::{fs, sync::Arc};
 
+use anyhow::{anyhow, Result};
 use ethers::{
     contract::{Contract, ContractInstance},
     core::{
@@ -9,12 +10,15 @@ use ethers::{
     },
     middleware::{Middleware, SignerMiddleware},
     providers::{Http, Provider, ProviderExt},
-    signers::Wallet,
+    signers::{coins_bip39::English, MnemonicBuilder, Wallet},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::token::{get_token_address_by_symbol, TokenJson};
+use crate::{
+    config::Config,
+    token::{get_token_address_by_symbol, TokenJson},
+};
 
 pub type SignedConnection = SignerMiddleware<Provider<Http>, Wallet<SigningKey>>;
 
@@ -48,35 +52,33 @@ impl From<EthContractAddressesJson> for EthContractAddresses {
 
 pub fn contract_addresses_json(
     eth_contract_addresses_path: &str,
-) -> anyhow::Result<EthContractAddressesJson> {
+) -> Result<EthContractAddressesJson> {
     Ok(serde_json::from_str(&fs::read_to_string(
         eth_contract_addresses_path,
     )?)?)
 }
 
-pub fn contract_addresses(
-    eth_contract_addresses_path: &str,
-) -> anyhow::Result<EthContractAddresses> {
+pub fn contract_addresses(eth_contract_addresses_path: &str) -> Result<EthContractAddresses> {
     Ok(EthContractAddresses::from(contract_addresses_json(
         eth_contract_addresses_path,
     )?))
 }
 
-pub fn contract_abi(contract_metadata_path: &str) -> anyhow::Result<Abi> {
+pub fn contract_abi(contract_metadata_path: &str) -> Result<Abi> {
     let metadata: Value = serde_json::from_str(&fs::read_to_string(contract_metadata_path)?)?;
     Ok(serde_json::from_value(metadata["abi"].clone())?)
 }
 
-pub async fn connection(node_http: &str) -> anyhow::Result<Provider<Http>> {
+pub async fn connection(node_http: &str) -> Result<Provider<Http>> {
     Provider::<Http>::try_connect(node_http)
         .await
-        .map_err(|e| anyhow::anyhow!("Cannot establish ETH connection: {:?}", e))
+        .map_err(|e| anyhow!("Cannot establish ETH connection: {:?}", e))
 }
 
 pub async fn signed_connection(
     node_http: &str,
     wallet: Wallet<SigningKey>,
-) -> anyhow::Result<SignedConnection> {
+) -> Result<SignedConnection> {
     let connection = Provider::<Http>::try_connect(node_http).await?;
     Ok(SignerMiddleware::new_with_provider_chain(connection, wallet).await?)
 }
@@ -85,12 +87,7 @@ pub fn contract_from_deployed(
     address: Address,
     abi: Abi,
     signed_connection: &SignedConnection,
-) -> anyhow::Result<
-    ContractInstance<
-        Arc<SignedConnection>,
-        SignedConnection,
-    >,
-> {
+) -> Result<ContractInstance<Arc<SignedConnection>, SignedConnection>> {
     Ok(Contract::new(
         address,
         abi,
@@ -99,26 +96,24 @@ pub fn contract_from_deployed(
 }
 
 pub async fn call_contract_method<T: Tokenize>(
-    contract: ContractInstance<
-        Arc<SignedConnection>,
-        SignedConnection,
-    >,
+    contract: ContractInstance<Arc<SignedConnection>, SignedConnection>,
     method: &str,
     args: T,
-) -> anyhow::Result<TransactionReceipt> {
+) -> Result<TransactionReceipt> {
     let call = contract.method::<_, H256>(method, args)?;
     let pending_tx = call.send().await?;
     pending_tx
         .confirmations(1)
         .await?
-        .ok_or(anyhow::anyhow!("'approve' tx receipt not available."))
+        .ok_or(anyhow!("'approve' tx receipt not available."))
 }
+
 pub async fn send_tx(
     from: Address,
     to: Address,
     amount: U256,
     signed_connection: &SignedConnection,
-) -> anyhow::Result<TransactionReceipt> {
+) -> Result<TransactionReceipt> {
     let send_tx = TransactionRequest::new()
         .to(to)
         .value(U256::from(amount))
@@ -127,5 +122,27 @@ pub async fn send_tx(
         .send_transaction(send_tx, None)
         .await?
         .await?
-        .ok_or(anyhow::anyhow!("Send tx receipt not available."))
+        .ok_or(anyhow!("Send tx receipt not available."))
+}
+
+/*pub async fn get_erc20_balance_of(
+    contract_address: String,
+    owner: Address,
+    connection: &SignedConnection,
+) -> Result<U256> {
+}
+
+pub async fn get_eth_balance_of(
+    owner: Address,
+    connection: &SignedConnection,
+) -> Result<U256> {
+}*/
+
+pub async fn create_signed_connection(config: &Config) -> Result<SignedConnection> {
+    let wallet = MnemonicBuilder::<English>::default()
+        .phrase(&*config.eth_mnemonic)
+        .index(config.eth_dev_account_index)?
+        .build()?;
+
+    signed_connection(&config.eth_node_http, wallet).await
 }

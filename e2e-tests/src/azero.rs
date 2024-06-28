@@ -1,6 +1,7 @@
 use std::fs;
 
 use aleph_client::{Connection, KeyPair, SignedConnection};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 use crate::token::{get_token_address_by_symbol, TokenJson};
@@ -36,15 +37,13 @@ impl From<AzeroContractAddressesJson> for AzeroContractAddresses {
 
 pub fn contract_addresses_json(
     azero_contract_addresses_path: &str,
-) -> anyhow::Result<AzeroContractAddressesJson> {
+) -> Result<AzeroContractAddressesJson> {
     Ok(serde_json::from_str(&fs::read_to_string(
         azero_contract_addresses_path,
     )?)?)
 }
 
-pub fn contract_addresses(
-    azero_contract_addresses_path: &str,
-) -> anyhow::Result<AzeroContractAddresses> {
+pub fn contract_addresses(azero_contract_addresses_path: &str) -> Result<AzeroContractAddresses> {
     Ok(AzeroContractAddresses::from(contract_addresses_json(
         azero_contract_addresses_path,
     )?))
@@ -64,3 +63,17 @@ pub async fn signed_connection(url: &str, keypair: &KeyPair) -> SignedConnection
 pub fn bytes32_to_string(data: &[u8; 32]) -> String {
     "0x".to_string() + &hex::encode(data)
 }
+
+/*pub async fn get_psp22_balance_of(
+    connection: &Connection,
+    token_address: &str,
+    account_address: &str,
+) -> Result<u128> {
+}
+
+pub async fn get_azero_balance_of(
+    connection: &Connection,
+    token_address: &str,
+    account_address: &str,
+) -> Result<u128> {
+}*/
