@@ -76,7 +76,7 @@ The frontend for this project consists in just one tab of the overall Common fro
 
 ### SendRequestNative
 
-As a convenience the contract on the Ethereum side provides a `SendRequestNative` method. Depending on when you're reading this, the Aleph Zero contract might have a similar functionality too. This method combines two steps - wrapping of a specified amount of Ether into Wrapped Ether and then calling a regular `SendRequest` for the same amount.
+As a convenience the contract on the Ethereum side provides a `sendRequestNative` method. Depending on when you're reading this, the Aleph Zero contract might have a similar functionality too. This method combines two steps - wrapping of a specified amount of Ether into Wrapped Ether and then calling a regular `sendRequest` for the same amount.
 
 ## Vocabulary
 
