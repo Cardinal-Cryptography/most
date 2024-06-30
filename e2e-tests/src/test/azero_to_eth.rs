@@ -1,23 +1,11 @@
-use std::str::FromStr;
-
-use aleph_client::{
-    contract::{ContractInstance, ExecCallParams},
-    keypair_from_string,
-    sp_runtime::AccountId32,
-};
+use aleph_client::contract::ExecCallParams;
 use anyhow::{Error, Result};
-use ethers::{
-    middleware::Middleware,
-    prelude::k256::U256,
-    signers::{coins_bip39::English, MnemonicBuilder, Signer},
-    utils,
-};
+use ethers::utils;
 use log::info;
 
 use crate::{
     azero,
     config::{setup_test, TestContext},
-    eth,
     wait::wait_for_balance_change,
 };
 

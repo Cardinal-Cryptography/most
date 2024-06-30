@@ -1,6 +1,6 @@
 use std::fs;
 
-use aleph_client::{sp_runtime::AccountId32, AsConnection, Connection, KeyPair, SignedConnection};
+use aleph_client::{sp_runtime::AccountId32, AsConnection};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
@@ -49,13 +49,6 @@ pub fn contract_addresses(azero_contract_addresses_path: &str) -> Result<AzeroCo
     Ok(AzeroContractAddresses::from(contract_addresses_json(
         azero_contract_addresses_path,
     )?))
-}
-
-pub async fn signed_connection(url: &str, keypair: &KeyPair) -> SignedConnection {
-    SignedConnection::from_connection(
-        Connection::new(url).await,
-        KeyPair::new(keypair.signer().clone()),
-    )
 }
 
 pub fn bytes32_to_string(data: &[u8; 32]) -> String {

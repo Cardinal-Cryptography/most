@@ -71,12 +71,6 @@ pub fn contract_abi(contract_metadata_path: &str) -> Result<Abi> {
     Ok(serde_json::from_value(metadata["abi"].clone())?)
 }
 
-pub async fn connection(node_http: &str) -> Result<Provider<Http>> {
-    Provider::<Http>::try_connect(node_http)
-        .await
-        .map_err(|e| anyhow!("Cannot establish ETH connection: {:?}", e))
-}
-
 pub async fn signed_connection(
     node_http: &str,
     wallet: Wallet<SigningKey>,
@@ -116,10 +110,7 @@ pub async fn send_ether(
     amount: U256,
     signed_connection: &SignedConnection,
 ) -> Result<TransactionReceipt> {
-    let send_tx = TransactionRequest::new()
-        .to(to)
-        .value(amount)
-        .from(from);
+    let send_tx = TransactionRequest::new().to(to).value(amount).from(from);
     signed_connection
         .send_transaction(send_tx, None)
         .await?

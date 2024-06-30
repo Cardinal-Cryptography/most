@@ -1,6 +1,3 @@
-
-
-
 use anyhow::{anyhow, Result};
 use ethers::{types::U64, utils};
 use log::info;
@@ -103,8 +100,7 @@ pub async fn eth_to_azero() -> Result<()> {
     }
 
     let get_current_balance = || async {
-        get_psp22_balance_of(&weth_azero, azero_account, azero_signed_connection.clone())
-                .await
+        get_psp22_balance_of(&weth_azero, azero_account, azero_signed_connection.clone()).await
     };
 
     wait_for_balance_change(
