@@ -13,4 +13,5 @@ mod test;
 #[cfg(test)]
 mod wait;
 
+#[cfg(test)]
 mod token;

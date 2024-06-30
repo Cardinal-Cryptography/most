@@ -287,7 +287,7 @@ test-relayer: compile-azero-docker compile-eth
 e2e-tests: # Run specific e2e test. Requires: `TEST_CASE=test_module::test_name`.
 e2e-tests:
 	cd e2e-tests && \
-		RUST_LOG=info cargo test test::$(TEST_CASE) -- --color always --exact --nocapture --test-threads=1
+		cargo test test::$(TEST_CASE) -- --color always --exact --nocapture --test-threads=1
 
 .PHONY: drink-tests
 drink-tests: # Run drink tests

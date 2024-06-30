@@ -2,7 +2,7 @@ use std::{fs, sync::Arc};
 
 use anyhow::{anyhow, Result};
 use ethers::{
-    contract::{Contract, ContractInstance},
+    contract::Contract,
     core::{
         abi::{Abi, Tokenize},
         k256::ecdsa::SigningKey,
@@ -21,6 +21,8 @@ use crate::{
 };
 
 pub type SignedConnection = SignerMiddleware<Provider<Http>, Wallet<SigningKey>>;
+pub type ContractInstance =
+    ethers::contract::ContractInstance<Arc<SignedConnection>, SignedConnection>;
 
 #[derive(Deserialize, Serialize)]
 pub struct EthContractAddressesJson {
@@ -87,7 +89,7 @@ pub fn contract_from_deployed(
     address: Address,
     abi: Abi,
     signed_connection: &SignedConnection,
-) -> Result<ContractInstance<Arc<SignedConnection>, SignedConnection>> {
+) -> Result<ContractInstance> {
     Ok(Contract::new(
         address,
         abi,
@@ -96,7 +98,7 @@ pub fn contract_from_deployed(
 }
 
 pub async fn call_contract_method<T: Tokenize>(
-    contract: ContractInstance<Arc<SignedConnection>, SignedConnection>,
+    contract: ContractInstance,
     method: &str,
     args: T,
 ) -> Result<TransactionReceipt> {
@@ -108,7 +110,7 @@ pub async fn call_contract_method<T: Tokenize>(
         .ok_or(anyhow!("'approve' tx receipt not available."))
 }
 
-pub async fn send_tx(
+pub async fn send_ether(
     from: Address,
     to: Address,
     amount: U256,
@@ -130,12 +132,13 @@ pub async fn send_tx(
     owner: Address,
     connection: &SignedConnection,
 ) -> Result<U256> {
-}
+}*/
 
-pub async fn get_eth_balance_of(
+/*pub async fn get_eth_balance_of(
     owner: Address,
     connection: &SignedConnection,
 ) -> Result<U256> {
+
 }*/
 
 pub async fn create_signed_connection(config: &Config) -> Result<SignedConnection> {

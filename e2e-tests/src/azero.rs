@@ -1,10 +1,12 @@
 use std::fs;
 
-use aleph_client::{Connection, KeyPair, SignedConnection};
+use aleph_client::{sp_runtime::AccountId32, AsConnection, Connection, KeyPair, SignedConnection};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 use crate::token::{get_token_address_by_symbol, TokenJson};
+
+pub type ContractInstance = aleph_client::contract::ContractInstance;
 
 #[derive(Deserialize, Serialize)]
 pub struct AzeroContractAddressesJson {
@@ -64,14 +66,22 @@ pub fn bytes32_to_string(data: &[u8; 32]) -> String {
     "0x".to_string() + &hex::encode(data)
 }
 
-/*pub async fn get_psp22_balance_of(
-    connection: &Connection,
-    token_address: &str,
-    account_address: &str,
+pub async fn get_psp22_balance_of<C: AsConnection>(
+    token: &ContractInstance,
+    account_address: &AccountId32,
+    connection: C,
 ) -> Result<u128> {
+    token
+        .read(
+            connection.as_connection(),
+            "PSP22::balance_of",
+            &[account_address.to_string()],
+            Default::default(),
+        )
+        .await
 }
 
-pub async fn get_azero_balance_of(
+/*pub async fn get_azero_balance_of(
     connection: &Connection,
     token_address: &str,
     account_address: &str,

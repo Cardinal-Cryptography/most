@@ -18,7 +18,7 @@ where
     let wait_max = Duration::from_secs(60_u64 * wait_max_minutes);
 
     info!(
-        "Waiting a max. of {:?} minutes for finalization",
+        "Waiting a max. of {:?} minutes for token transfer to be detected...",
         wait_max_minutes
     );
 
@@ -30,6 +30,7 @@ where
 
         let balance_current = get_current_balance().await?;
         let balance_change = balance_current - balance_pre_transfer;
+        info!("Current balance change: {:?}", balance_change);
         if balance_change == transfer_amount {
             info!("Required balance change detected: {:?}", balance_change);
             return Ok(());
