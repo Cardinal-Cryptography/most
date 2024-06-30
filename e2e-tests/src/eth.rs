@@ -118,7 +118,7 @@ pub async fn send_ether(
 ) -> Result<TransactionReceipt> {
     let send_tx = TransactionRequest::new()
         .to(to)
-        .value(U256::from(amount))
+        .value(amount)
         .from(from);
     signed_connection
         .send_transaction(send_tx, None)

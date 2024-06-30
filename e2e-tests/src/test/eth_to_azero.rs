@@ -1,15 +1,14 @@
-use std::str::FromStr;
 
-use aleph_client::{contract::ContractInstance, keypair_from_string, sp_runtime::AccountId32};
+
+
 use anyhow::{anyhow, Result};
-use ethers::{core::types::Address, types::U64, utils};
+use ethers::{types::U64, utils};
 use log::info;
 
 use crate::{
-    azero,
     azero::get_psp22_balance_of,
     config::{setup_test, TestContext},
-    eth, test,
+    eth,
     wait::wait_for_balance_change,
 };
 
@@ -104,10 +103,8 @@ pub async fn eth_to_azero() -> Result<()> {
     }
 
     let get_current_balance = || async {
-        Ok(
-            get_psp22_balance_of(&weth_azero, azero_account, azero_signed_connection.clone())
-                .await?,
-        )
+        get_psp22_balance_of(&weth_azero, azero_account, azero_signed_connection.clone())
+                .await
     };
 
     wait_for_balance_change(

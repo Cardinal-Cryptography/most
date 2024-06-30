@@ -51,10 +51,6 @@ pub fn contract_addresses(azero_contract_addresses_path: &str) -> Result<AzeroCo
     )?))
 }
 
-pub async fn connection(url: &str) -> Connection {
-    Connection::new(url).await
-}
-
 pub async fn signed_connection(url: &str, keypair: &KeyPair) -> SignedConnection {
     SignedConnection::from_connection(
         Connection::new(url).await,

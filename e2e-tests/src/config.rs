@@ -89,7 +89,7 @@ impl Config {
         let azero_keypair = aleph_client::KeyPair::from_str(&self.azero_account_seed)?;
         let azero_signed_connection =
             aleph_client::SignedConnection::new(&self.azero_node_ws, azero_keypair).await;
-        let eth_signed_connection = eth::create_signed_connection(&self).await?;
+        let eth_signed_connection = eth::create_signed_connection(self).await?;
 
         let azero_contract_addresses =
             azero::contract_addresses(&self.azero_contract_addresses_path)?;
