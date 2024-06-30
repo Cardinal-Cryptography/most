@@ -97,7 +97,7 @@ pub fn contract_from_deployed(
     ))
 }
 
-pub async fn call_contract_method<T: Tokenize>(
+pub async fn contract_exec<T: Tokenize>(
     contract: ContractInstance,
     method: &str,
     args: T,
@@ -107,7 +107,7 @@ pub async fn call_contract_method<T: Tokenize>(
     pending_tx
         .confirmations(1)
         .await?
-        .ok_or(anyhow!("'approve' tx receipt not available."))
+        .ok_or(anyhow!("tx receipt not available."))
 }
 
 pub async fn send_ether(

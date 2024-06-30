@@ -63,7 +63,7 @@ pub async fn eth_to_azero() -> Result<()> {
 
     // Approve the `most` contract to use the wETH funds
     let approve_args = (most_eth.address(), transfer_amount);
-    let approve_receipt = eth::call_contract_method(weth_eth, "approve", approve_args).await?;
+    let approve_receipt = eth::contract_exec(weth_eth, "approve", approve_args).await?;
 
     if approve_receipt.status.unwrap_or_default() == U64::from(1) {
         info!("Successfully approved the `most` contract to use wETH");
@@ -89,7 +89,7 @@ pub async fn eth_to_azero() -> Result<()> {
         azero_account_address_bytes,
     );
     let send_request_receipt =
-        eth::call_contract_method(most_eth, "sendRequest", send_request_args).await?;
+        eth::contract_exec(most_eth, "sendRequest", send_request_args).await?;
     if send_request_receipt.status.unwrap_or_default() == U64::from(1) {
         info!(
             "Successfully requested the transfer of {} wETH to the Aleph Zero chain",

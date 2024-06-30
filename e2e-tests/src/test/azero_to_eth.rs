@@ -5,14 +5,21 @@ use aleph_client::{
     keypair_from_string,
     sp_runtime::AccountId32,
 };
+use anyhow::{Error, Result};
 use ethers::{
     middleware::Middleware,
+    prelude::k256::U256,
     signers::{coins_bip39::English, MnemonicBuilder, Signer},
     utils,
 };
 use log::info;
 
-use crate::{azero, config::setup_test, eth, wait::wait_for_balance_change};
+use crate::{
+    azero,
+    config::{setup_test, TestContext},
+    eth,
+    wait::wait_for_balance_change,
+};
 
 /// One-way `Aleph Zero` -> `Ethereum` transfer through `most`.
 /// Requires a prior transaction in the other direction to have completed.
@@ -24,28 +31,25 @@ use crate::{azero, config::setup_test, eth, wait::wait_for_balance_change};
 /// Verifies that the correct amount of ETH is present on the Ethereum chain.
 /// It relies on all the relevant contracts being deployed on both ends and the (wETH_ETH:wETH_AZERO) pair having been added to `most`.
 #[tokio::test]
-pub async fn azero_to_eth() -> anyhow::Result<()> {
+pub async fn azero_to_eth() -> Result<()> {
     let config = setup_test();
+    let test_context = config.create_test_context().await?;
 
-    let azero_contract_addresses =
-        azero::contract_addresses(&config.azero_contract_addresses_path)?;
-    let most_address = AccountId32::from_str(&azero_contract_addresses.most)
-        .map_err(|e| anyhow::anyhow!("Cannot parse account id from string: {:?}", e))?;
-    let weth_azero_address = AccountId32::from_str(&azero_contract_addresses.weth)
-        .map_err(|e| anyhow::anyhow!("Cannot parse account id from string: {:?}", e))?;
-
-    let weth_azero = ContractInstance::new(
-        weth_azero_address.clone(),
-        &config.contract_metadata_paths.azero_token,
-    )?;
-
-    let azero_account_keypair = keypair_from_string(&config.azero_account_seed);
-    let azero_signed_connection =
-        azero::signed_connection(&config.azero_node_ws, &azero_account_keypair).await;
+    let TestContext {
+        azero_signed_connection,
+        eth_signed_connection,
+        weth_azero,
+        weth_eth,
+        most_azero,
+        ..
+    } = test_context;
 
     let transfer_amount = utils::parse_ether(config.test_args.transfer_amount)?.as_u128();
 
-    let approve_args = [most_address.to_string(), transfer_amount.to_string()];
+    let approve_args = [
+        most_azero.address().to_string(),
+        transfer_amount.to_string(),
+    ];
 
     let approve_info = weth_azero
         .exec(
@@ -57,31 +61,24 @@ pub async fn azero_to_eth() -> anyhow::Result<()> {
         .await?;
     info!("`approve` tx info: {:?}", approve_info);
 
-    let most = ContractInstance::new(most_address, &config.contract_metadata_paths.azero_most)?;
-
-    let wallet = MnemonicBuilder::<English>::default()
-        .phrase(&*config.eth_mnemonic)
-        .index(config.eth_dev_account_index)?
-        .build()?;
-    let eth_account_address = wallet.address();
+    let eth_account_address = eth_signed_connection.address();
     let mut eth_account_address_bytes = [0_u8; 32];
     eth_account_address_bytes[12..].copy_from_slice(eth_account_address.as_fixed_bytes());
 
-    let eth_connection = eth::connection(&config.eth_node_http).await?;
-
-    let balance_pre_transfer = eth_connection
-        .get_balance(eth_account_address, None)
+    let balance_pre_transfer = weth_eth
+        .method::<_, u128>("balanceOf", eth_account_address)?
+        .call()
         .await?;
     info!("ETH balance pre transfer: {:?}", balance_pre_transfer);
 
-    let weth_azero_address_bytes: [u8; 32] = weth_azero_address.into();
+    let weth_azero_address_bytes: [u8; 32] = (*weth_azero.address()).clone().into();
     let send_request_args = [
         azero::bytes32_to_string(&weth_azero_address_bytes),
         transfer_amount.to_string(),
         azero::bytes32_to_string(&eth_account_address_bytes),
     ];
 
-    let send_request_info = most
+    let send_request_info = most_azero
         .exec(
             &azero_signed_connection,
             "send_request",
@@ -92,17 +89,16 @@ pub async fn azero_to_eth() -> anyhow::Result<()> {
     info!("`send_request` tx info: {:?}", send_request_info);
 
     let get_current_balance = || async {
-        let balance_current = eth_connection
-            .get_balance(eth_account_address, None)
-            .await
-            .map_err(|e| anyhow::anyhow!("Cannot read ETH balance: {:?}", e))?
-            .as_u128();
-        Ok::<_, anyhow::Error>(balance_current)
+        let balance_current = weth_eth
+            .method::<_, u128>("balanceOf", eth_account_address)?
+            .call()
+            .await?;
+        Ok::<u128, Error>(balance_current)
     };
 
     wait_for_balance_change(
         transfer_amount,
-        balance_pre_transfer.as_u128(),
+        balance_pre_transfer,
         get_current_balance,
         config.test_args.wait_max_minutes,
     )
