@@ -17,7 +17,7 @@ use crate::{
 /// Verifies that the correct amount of wETH is present on the Aleph Zero chain.
 /// It relies on all the relevant contracts being deployed on both ends and the (wETH_ETH:wETH_AZERO) pair having been added to `most`.
 #[tokio::test]
-pub async fn eth_to_azero() -> Result<()> {
+pub async fn weth_to_weth() -> Result<()> {
     let config = setup_test();
     let test_context = config.create_test_context().await?;
 

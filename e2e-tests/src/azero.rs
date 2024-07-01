@@ -69,10 +69,3 @@ pub async fn get_psp22_balance_of<C: AsConnection>(
         )
         .await
 }
-
-/*pub async fn get_azero_balance_of(
-    connection: &Connection,
-    token_address: &str,
-    account_address: &str,
-) -> Result<u128> {
-}*/

@@ -118,20 +118,6 @@ pub async fn send_ether(
         .ok_or(anyhow!("Send tx receipt not available."))
 }
 
-/*pub async fn get_erc20_balance_of(
-    contract_address: String,
-    owner: Address,
-    connection: &SignedConnection,
-) -> Result<U256> {
-}*/
-
-/*pub async fn get_eth_balance_of(
-    owner: Address,
-    connection: &SignedConnection,
-) -> Result<U256> {
-
-}*/
-
 pub async fn create_signed_connection(config: &Config) -> Result<SignedConnection> {
     let wallet = MnemonicBuilder::<English>::default()
         .phrase(&*config.eth_mnemonic)
