@@ -13,11 +13,25 @@ const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY;
 const SEPOLIA_KEY = process.env.SEPOLIA_KEY;
 const ETHEREUM_PRIVATE_KEY = process.env.ETHEREUM_PRIVATE_KEY;
 const ETHEREUM_GUARDIAN_ADDRESS = process.env.ETHEREUM_GUARDIAN_ADDRESS;
+const ALEPH_EVM_PRIVATE_KEY = process.env.ALEPH_EVM_PRIVATE_KEY;
+const ALEPH_EVM_GUARDIAN_ADDRESS = process.env.ALEPH_EVM_GUARDIAN_ADDRESS;
 
 var config = {
   defaultNetwork: "hardhat",
   etherscan: {
-    apiKey: ETHERSCAN_API_KEY,
+    apiKey: {
+      alephEVM: "0",
+    },
+    customChains: [
+      {
+        network: "alephEVM",
+        chainId: 2039,
+        urls: {
+          apiURL: "https://aleph-zero.blockscout.com/api",
+          browserURL: "https://aleph-zero.blockscout.com/"
+        }
+      }
+    ]
   },
 
   sourcify: {
@@ -135,6 +149,22 @@ if (ETHEREUM_PRIVATE_KEY) {
       ],
       threshold: 1,
       weth: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    },
+  };
+}
+
+if (ALEPH_EVM_PRIVATE_KEY) {
+  config.networks.alephEVM = {
+    url: "https://alephzero-sepolia.drpc.org",
+    accounts: [ALEPH_EVM_PRIVATE_KEY],
+    deploymentConfig: {
+      guardianIds: [
+        ALEPH_EVM_GUARDIAN_ADDRESS, // Mainnet account address corresponding to ETHEREUM_PRIVATE_KEY
+      ],
+      threshold: 1,
+      // This is obviously wrong (don't even know what is under this), but we don't have a WETH address on Aleph
+      weth: "0x6f40d4a6237c257fff2db00fa0510bba0f85b9d2",
+      tokenConfigPath: "../cfg/tokens_aleph_evm.json",
     },
   };
 }

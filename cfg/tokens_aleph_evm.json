@@ -1,0 +1,20 @@
+{
+    "eth": [
+        {
+            "name": "Wrapped Ether",
+            "symbol": "WETH",
+            "decimals": 18,
+            "deployed": true,
+            "address": "0x6f40d4a6237c257fff2db00fa0510bba0f85b9d2"
+        }
+    ],
+    "aleph": [
+        {
+            "name": "Wrapped AZERO",
+            "symbol": "wAZERO",
+            "decimals": 12,
+            "deployed": true,
+            "address": "5CtuFVgEUz13SFPVY6s2cZrnLDEkxQXc19aXrNARwEBeCXgg"
+        }
+    ]
+}
