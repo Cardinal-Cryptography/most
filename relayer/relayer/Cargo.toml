@@ -28,5 +28,3 @@ tracing = { workspace = true, features = ["log", "log-always"] }
 [features]
 evm = []
 
-[profile.release]
-overflow-checks = true
