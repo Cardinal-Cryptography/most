@@ -288,6 +288,11 @@ test-relayer: # Run relayer tests
 test-relayer: compile-azero-docker compile-eth
 	cd relayer && cargo test
 
+.PHONY: test-relayer-evm
+test-relayer-evm: # Run relayer tests
+test-relayer-evm: compile-azero-docker compile-eth
+	cd relayer && cargo test --features evm
+
 .PHONY: e2e-tests
 e2e-tests: # Run specific e2e test. Requires: `TEST_CASE=test_module::test_name`.
 e2e-tests:
