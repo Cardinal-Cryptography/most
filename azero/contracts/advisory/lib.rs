@@ -1,4 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
+#![allow(
+    non_local_definitions,
+)]
 
 #[ink::contract]
 pub mod advisory {

@@ -12,4 +12,4 @@ RUN . "$NVM_DIR/nvm.sh" && nvm alias default v${NODE_VERSION}
 ENV PATH="/root/.nvm/versions/node/v${NODE_VERSION}/bin/:${PATH}"
 
 COPY rust-toolchain.toml .
-RUN cargo install cargo-contract --version 3.2.0 --locked
+RUN cargo install cargo-contract --version 3.2.0
