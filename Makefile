@@ -322,13 +322,13 @@ relayer-lint: compile-azero-docker compile-eth
 .PHONY: ink-lint
 ink-lint: # Lint ink contracts
 ink-lint:
-	cd azero/contracts/most && cargo clippy -- --no-deps -A unexpected-cfgs -A non-local-definitions
-	cd azero/contracts/token && cargo clippy -- --no-deps -A unexpected-cfgs -A non-local-definitions
-	cd azero/contracts/psp22-traits && cargo clippy -- --no-deps -A unexpected-cfgs -A non-local-definitions
-	cd azero/contracts/tests && cargo clippy -- --no-deps -A unexpected-cfgs -A non-local-definitions
-	cd azero/contracts/gas-price-oracle/contract && cargo clippy -- --no-deps -A unexpected-cfgs -A non-local-definitions
-	cd azero/contracts/gas-price-oracle/trait && cargo clippy -- --no-deps -A unexpected-cfgs -A non-local-definitions
-	cd azero/contracts/ownable2step && cargo clippy -- --no-deps -A unexpected-cfgs -A non-local-definitions
+	cd azero/contracts/most && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
+	cd azero/contracts/token && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
+	cd azero/contracts/psp22-traits && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
+	cd azero/contracts/tests && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
+	cd azero/contracts/gas-price-oracle/contract && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
+	cd azero/contracts/gas-price-oracle/trait && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
+	cd azero/contracts/ownable2step && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
 
 .PHONY: contracts-lint
 contracts-lint: # Lint contracts
