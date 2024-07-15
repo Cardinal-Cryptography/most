@@ -4,6 +4,7 @@ DOCKER_RELAYER_NAME ?= most-relayer
 DOCKER_RELAYER_COPY_ADDRESSES ?= copy
 DOCKER_RELAYER_COMPILE_CONTRACTS ?= compile
 DOCKER_SIGNER_NAME ?= most-signer
+EVM ?= false
 
 export CONTRACT_VERSION ?=`git rev-parse HEAD`
 
@@ -222,6 +223,10 @@ deploy: deploy-eth deploy-azero setup-eth setup-azero
 watch-relayer:
 	cd relayer && cargo watch -s 'cargo clippy' -c
 
+.PHONY: watch-relayer-evm
+watch-relayer-evm:
+	cd relayer && cargo watch -s 'cargo clippy --all-targets --all-features' -c
+
 .PHONY: run-relayer
 run-relayer: # Run a single relayer
 run-relayer:
@@ -283,6 +288,11 @@ test-relayer: # Run relayer tests
 test-relayer: compile-azero-docker compile-eth
 	cd relayer && cargo test
 
+.PHONY: test-relayer-evm
+test-relayer-evm: # Run relayer tests
+test-relayer-evm: compile-azero-docker compile-eth
+	cd relayer && cargo test --features evm
+
 .PHONY: e2e-tests
 e2e-tests: # Run specific e2e test. Requires: `TEST_CASE=test_module::test_name`.
 e2e-tests:
@@ -307,18 +317,18 @@ solidity-lint: eth-deps
 .PHONY: relayer-lint
 relayer-lint: # Lint relayer
 relayer-lint: compile-azero-docker compile-eth
-	cd relayer && cargo clippy -- --no-deps -D warnings
+	cd relayer && cargo clippy --all-targets --all-features -- --no-deps -D warnings
 
 .PHONY: ink-lint
 ink-lint: # Lint ink contracts
 ink-lint:
-	cd azero/contracts/most && cargo clippy -- --no-deps -D warnings
-	cd azero/contracts/token && cargo clippy -- --no-deps -D warnings
-	cd azero/contracts/psp22-traits && cargo clippy -- --no-deps -D warnings
-	cd azero/contracts/tests && cargo clippy -- --no-deps -D warnings
-	cd azero/contracts/gas-price-oracle/contract && cargo clippy -- --no-deps -D warnings
-	cd azero/contracts/gas-price-oracle/trait && cargo clippy -- --no-deps -D warnings
-	cd azero/contracts/ownable2step && cargo clippy -- --no-deps -D warnings
+	cd azero/contracts/most && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
+	cd azero/contracts/token && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
+	cd azero/contracts/psp22-traits && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
+	cd azero/contracts/tests && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
+	cd azero/contracts/gas-price-oracle/contract && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
+	cd azero/contracts/gas-price-oracle/trait && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
+	cd azero/contracts/ownable2step && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
 
 .PHONY: contracts-lint
 contracts-lint: # Lint contracts
@@ -379,12 +389,26 @@ format-check: rust-format-check js-format-check
 format: # Format code
 format: rust-format js-format solidity-format
 
+.PHONY: build-relayer
+build-relayer: # Build relayer
+	cd relayer && cargo build --release
+
+.PHONY: build-relayer-evm
+build-relayer-evm: # Build relayer with evm feature
+	cd relayer && cargo build --release --features evm
+
+
 .PHONY: build-docker-relayer
 build-docker-relayer: # Build relayer docker image
 ifeq ($(DOCKER_RELAYER_COMPILE_CONTRACTS),compile)
 build-docker-relayer: compile-azero compile-eth
 endif
-	cd relayer && cargo build --release
+ifeq ($(EVM),true)
+build-docker-relayer: build-relayer-evm
+else
+build-docker-relayer: build-relayer
+endif
+
 ifeq ($(DOCKER_RELAYER_COPY_ADDRESSES),copy)
 	cp azero/addresses.json relayer/azero_addresses.json
 	cp eth/addresses.json relayer/eth_addresses.json
