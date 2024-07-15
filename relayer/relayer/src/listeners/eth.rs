@@ -72,7 +72,7 @@ impl EthereumListener {
                     return Ok(cb_event?);
                 },
 
-                Ok (unprocessed_block_number) = next_unprocessed_block_number.recv() => {
+                Ok(unprocessed_block_number) = next_unprocessed_block_number.recv() => {
                     // Query for the next unknown finalized block number, if not present we wait for it.
                     info!(target: "EthereumListener","Waiting for the next finalized block number");
 
@@ -82,7 +82,7 @@ impl EthereumListener {
                             return Ok(cb_event?);
                         },
 
-                        next_finalized_block_number = get_next_finalized_block_number_eth(
+                        next_finalized_block_number = get_next_finalized_block_number(
                             eth_connection.clone(),
                             unprocessed_block_number,
                         ) => {
@@ -110,7 +110,7 @@ impl EthereumListener {
                                     return Ok(cb_event?);
                                 },
 
-                                Ok (events) = query.query() => {
+                                Ok(events) = query.query() => {
                                     if events.is_empty () {
                                         info!(target: "EthereumListener", "Marking {} as the next unprocessed block number", to_block +1);
                                         // we send + 1 to self as this is the next block we'd like to see
@@ -154,26 +154,44 @@ impl EthereumListener {
     }
 }
 
-pub async fn get_next_finalized_block_number_eth(
+#[cfg(feature = "evm")]
+pub async fn get_next_finalized_block_number(
     eth_connection: Arc<EthConnection>,
     not_older_than: u32,
 ) -> u32 {
+    // In evm context we treat latest block as finalized.
+    get_next_finalized_block_number_eth(eth_connection, not_older_than, BlockNumber::Latest).await
+}
+
+#[cfg(not(feature = "evm"))]
+pub async fn get_next_finalized_block_number(
+    eth_connection: Arc<EthConnection>,
+    not_older_than: u32,
+) -> u32 {
+    // In ethereum context we treat finalized block as, well, finalized :).
+    get_next_finalized_block_number_eth(eth_connection, not_older_than, BlockNumber::Finalized)
+        .await
+}
+
+pub async fn get_next_finalized_block_number_eth(
+    eth_connection: Arc<EthConnection>,
+    not_older_than: u32,
+    block: BlockNumber,
+) -> u32 {
     loop {
-        match eth_connection.get_block(BlockNumber::Finalized).await {
-            Ok(block) => match block {
-                Some(block) => {
-                    let best_finalized_block_number = block
-                        .number
-                        .expect("Finalized block has a number.")
-                        .as_u32();
-                    if best_finalized_block_number >= not_older_than {
-                        return best_finalized_block_number;
-                    }
+        match eth_connection.get_block(block).await {
+            Ok(Some(block)) => {
+                let best_finalized_block_number = block
+                    .number
+                    .expect("Finalized block has a number.")
+                    .as_u32();
+                if best_finalized_block_number >= not_older_than {
+                    return best_finalized_block_number;
                 }
-                None => {
-                    warn!("No finalized block found.");
-                }
-            },
+            }
+            Ok(None) => {
+                warn!("No finalized block found.");
+            }
             Err(e) => {
                 warn!("Client error when getting last finalized block: {e}");
             }
