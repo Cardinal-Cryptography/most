@@ -42,18 +42,20 @@ pub async fn contract_signature_state<C: Middleware + 'static>(
     committee_id: u128,
 ) -> Result<SignatureState, ContractError<C>> {
     use SignatureState::*;
-    let is_finalized = !contract
+    if !contract
         .needs_signature(request_hash, address, committee_id.into())
         .block(BlockNumber::Finalized)
-        .await?;
+        .await?
+    {
+        return Ok(Finalized);
+    }
     let is_signed = !contract
         .needs_signature(request_hash, address, committee_id.into())
         .block(BlockNumber::Latest)
         .await?;
 
-    Ok(match (is_signed, is_finalized) {
-        (_, true) => Finalized,          // Does not need signature on finalized block
-        (true, _) => SignedNotFinalized, // Signed but not yet finalized
-        (false, _) => NeedSignature,     // Not signed and not finalized
+    Ok(match is_signed {
+        true => SignedNotFinalized, // Signed but not yet finalized
+        false => NeedSignature,     // Not signed and not finalized
     })
 }
