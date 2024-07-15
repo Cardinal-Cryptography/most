@@ -163,7 +163,7 @@ pub async fn get_next_finalized_block_number(
     not_older_than: u32,
 ) -> u32 {
     // In evm context we treat latest block as finalized.
-    get_next_finalized_block_number_eth(eth_connection, not_older_than, BlockNumber::Latest).await
+    get_block_not_older_than(eth_connection, not_older_than, BlockNumber::Latest).await
 }
 
 #[cfg(not(feature = "evm"))]
@@ -172,11 +172,10 @@ pub async fn get_next_finalized_block_number(
     not_older_than: u32,
 ) -> u32 {
     // In ethereum context we treat finalized block as, well, finalized :).
-    get_next_finalized_block_number_eth(eth_connection, not_older_than, BlockNumber::Finalized)
-        .await
+    get_block_not_older_than(eth_connection, not_older_than, BlockNumber::Finalized).await
 }
 
-pub async fn get_next_finalized_block_number_eth(
+pub async fn get_block_not_older_than(
     eth_connection: Arc<EthConnection>,
     not_older_than: u32,
     block: BlockNumber,
@@ -184,23 +183,20 @@ pub async fn get_next_finalized_block_number_eth(
     loop {
         match eth_connection.get_block(block).await {
             Ok(Some(block)) => {
-                let best_finalized_block_number = block
-                    .number
-                    .expect("Finalized block has a number.")
-                    .as_u32();
-                if best_finalized_block_number >= not_older_than {
-                    return best_finalized_block_number;
+                let block_number = block.number.expect("Block has a number.").as_u32();
+                if block_number >= not_older_than {
+                    return block_number;
                 }
             }
             Ok(None) => {
-                warn!("No finalized block found.");
+                warn!("No block found.");
             }
             Err(e) => {
-                warn!("Client error when getting last finalized block: {e}");
+                warn!("Client error when getting block: {e}");
             }
         };
 
-        debug!("Waiting for a next finalized block");
+        debug!("Waiting for a next block");
         sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
     }
 }
