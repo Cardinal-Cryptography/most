@@ -6,7 +6,7 @@ use ethers::{
     core::types::{Address, H256},
     prelude::{ContractCall, ContractError},
     providers::{Middleware, ProviderError},
-    types::{BlockNumber, U256, U64},
+    types::{U256, U64},
     utils::keccak256,
 };
 use log::{debug, error, info, trace, warn};
@@ -21,7 +21,10 @@ use tokio::{
 use crate::{
     config::Config,
     connections::eth::SignedEthConnection,
-    contracts::{get_request_event_data, AzeroContractError, CrosschainTransferRequestData, Most},
+    contracts::{
+        contract_signature_state, get_request_event_data, AzeroContractError,
+        CrosschainTransferRequestData, Most, SignatureState,
+    },
     listeners::AzeroMostEvents,
     CircuitBreakerEvent,
 };
@@ -71,90 +74,90 @@ impl AlephZeroEventHandler {
             ..
         } = &*config;
 
-        if let Some(name) = &event.name {
-            if name.eq("CrosschainTransferRequest") {
-                let data = event.data;
+        match &event.name {
+            Some(name) if name.eq("CrosschainTransferRequest") => {}
+            _ => {
+                debug!("Skipping non azero contract event");
+                return Ok(());
+            }
+        }
 
-                // decode event data
-                let crosschain_transfer_event @ CrosschainTransferRequestData {
-                    committee_id,
-                    dest_token_address,
-                    amount,
-                    dest_receiver_address,
-                    request_nonce,
-                } = get_request_event_data(&data)?;
+        let data = event.data;
 
-                debug!("Handling azero contract event: {crosschain_transfer_event:?}");
+        // decode event data
+        let crosschain_transfer_event @ CrosschainTransferRequestData {
+            committee_id,
+            dest_token_address,
+            amount,
+            dest_receiver_address,
+            request_nonce,
+        } = get_request_event_data(&data)?;
 
-                // NOTE: for some reason, ethers-rs's `encode_packed` does not properly encode the data
-                // (it does not pad uint to 32 bytes, but uses the actual number of bytes required to store the value)
-                // so we use `abi::encode` instead (it only differs for signed and dynamic size types, which we don't use here)
-                let bytes = abi::encode(&[
-                    Token::Uint(committee_id.into()),
-                    Token::FixedBytes(dest_token_address.to_vec()),
-                    Token::Uint(amount.into()),
-                    Token::FixedBytes(dest_receiver_address.to_vec()),
-                    Token::Uint(request_nonce.into()),
-                ]);
+        debug!("Handling azero contract event: {crosschain_transfer_event:?}");
 
-                trace!("ABI compliant concatenated event bytes {bytes:?}");
+        // NOTE: for some reason, ethers-rs's `encode_packed` does not properly encode the data
+        // (it does not pad uint to 32 bytes, but uses the actual number of bytes required to store the value)
+        // so we use `abi::encode` instead (it only differs for signed and dynamic size types, which we don't use here)
+        let bytes = abi::encode(&[
+            Token::Uint(committee_id.into()),
+            Token::FixedBytes(dest_token_address.to_vec()),
+            Token::Uint(amount.into()),
+            Token::FixedBytes(dest_receiver_address.to_vec()),
+            Token::Uint(request_nonce.into()),
+        ]);
 
-                let request_hash = keccak256(bytes);
-                debug!("Hashed event data: {request_hash:?}");
+        trace!("ABI compliant concatenated event bytes {bytes:?}");
 
-                let request_hash_hex = hex::encode(request_hash);
+        let request_hash = keccak256(bytes);
+        debug!("Hashed event data: {request_hash:?}");
 
-                info!(
-                    "Decoded event data: [request_hash: 0x{request_hash_hex}, dest_token_address: 0x{}, amount: {amount}, dest_receiver_address: 0x{}, request_nonce: {request_nonce}, committee_id: {committee_id}]",
-                    hex::encode(dest_token_address),
-                    hex::encode(dest_receiver_address)
-                );
+        let request_hash_hex = hex::encode(request_hash);
 
-                if let Some(blacklist) = blacklisted_requests {
-                    if blacklist.contains(&H256::from_str(&request_hash_hex)?) {
-                        warn!("Skipping blacklisted request: 0x{request_hash_hex}");
-                        return Ok(());
-                    }
-                }
+        info!(
+            "Decoded event data: [request_hash: 0x{request_hash_hex}, dest_token_address: 0x{}, amount: {amount}, dest_receiver_address: 0x{}, request_nonce: {request_nonce}, committee_id: {committee_id}]",
+            hex::encode(dest_token_address),
+            hex::encode(dest_receiver_address)
+        );
 
-                let address = eth_contract_address.parse::<Address>()?;
-                let contract = Most::new(address, eth_signed_connection.clone());
+        if let Some(blacklist) = blacklisted_requests {
+            if blacklist.contains(&H256::from_str(&request_hash_hex)?) {
+                warn!("Skipping blacklisted request: 0x{request_hash_hex}");
+                return Ok(());
+            }
+        }
 
-                if not_in_committee(
-                    &contract,
-                    committee_id.into(),
-                    eth_signed_connection.address(),
-                )
-                .await?
-                {
-                    info!("Guardian signature for 0x{request_hash_hex} not needed - request from a past committee");
+        let address = eth_contract_address.parse::<Address>()?;
+        let contract = Most::new(address, eth_signed_connection.clone());
+
+        if not_in_committee(
+            &contract,
+            committee_id.into(),
+            eth_signed_connection.address(),
+        )
+        .await?
+        {
+            info!("Guardian signature for 0x{request_hash_hex} not needed - request from a past committee");
+            return Ok(());
+        }
+
+        loop {
+            match contract_signature_state(
+                &contract,
+                request_hash,
+                eth_signed_connection.address(),
+                committee_id,
+            )
+            .await?
+            {
+                SignatureState::Finalized => {
+                    info!("Guardian signature for 0x{request_hash_hex} no longer needed");
                     return Ok(());
                 }
-
-                while contract
-                    .needs_signature(
-                        request_hash,
-                        eth_signed_connection.address(),
-                        committee_id.into(),
-                    )
-                    .block(BlockNumber::Finalized)
-                    .await?
-                {
+                SignatureState::SignedNotFinalized => {
                     info!("Request 0x{request_hash_hex} not yet finalized.");
-
-                    if !contract
-                        .needs_signature(
-                            request_hash,
-                            eth_signed_connection.address(),
-                            committee_id.into(),
-                        )
-                        .block(BlockNumber::Latest)
-                        .await?
-                    {
-                        sleep(Duration::from_secs(ETH_WAIT_FOR_FINALITY_CHECK_SEC)).await;
-                        continue;
-                    }
-
+                    sleep(Duration::from_secs(ETH_WAIT_FOR_FINALITY_CHECK_SEC)).await;
+                }
+                SignatureState::NeedSignature => {
                     // forward transfer & vote
                     let call: ContractCall<SignedEthConnection, ()> = contract.receive_request(
                         request_hash,
@@ -170,9 +173,7 @@ impl AlephZeroEventHandler {
                     // Dry-run the tx to check for potential reverts.
                     call.clone().gas(config.eth_gas_limit).call().await?;
 
-                    info!(
-                        "Sending tx for request 0x{request_hash_hex} to the Ethereum network and waiting for {eth_tx_min_confirmations} confirmations."
-                    );
+                    info!("Sending tx for request 0x{request_hash_hex} to the Ethereum network and waiting for {eth_tx_min_confirmations} confirmations.");
 
                     let receipt = call
                         .gas(config.eth_gas_limit)
@@ -189,19 +190,14 @@ impl AlephZeroEventHandler {
 
                     // Check if the tx reverted.
                     if tx_status == Some(U64::from(0)) {
-                        warn!(
-                        "Tx for request 0x{request_hash_hex} has been sent to the Ethereum network: {tx_hash:?} but it reverted."
-                    );
+                        warn!("Tx for request 0x{request_hash_hex} has been sent to the Ethereum network: {tx_hash:?} but it reverted.");
                         return Err(AlephZeroEventHandlerError::EthContractReverted);
                     }
 
                     info!("Tx for request 0x{request_hash_hex} has been sent to the Ethereum network: {tx_hash:?} and received {eth_tx_min_confirmations} confirmations.");
                 }
-
-                info!("Guardian signature for 0x{request_hash_hex} no longer needed");
             }
         }
-        Ok(())
     }
 }
 
