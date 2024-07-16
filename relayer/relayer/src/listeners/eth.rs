@@ -20,6 +20,7 @@ use crate::{
 };
 
 pub const ETH_BLOCK_PROD_TIME_SEC: u64 = 12;
+const LOG_TARGET: &str = "EthereumListener";
 
 pub struct EthereumListener;
 
@@ -61,14 +62,14 @@ impl EthereumListener {
         let address = eth_contract_address.parse::<Address>()?;
         let most_eth = Most::new(address, Arc::clone(&eth_connection));
 
-        info!(target: "EthereumListener", "Starting");
+        info!(target: LOG_TARGET, "Starting");
 
         loop {
-            debug!(target: "EthereumListener", "Ping");
+            debug!(target: LOG_TARGET, "Ping");
 
             let unprocessed_block_number = select! {
                 cb_event = circuit_breaker_receiver.recv() => {
-                    warn!(target: "EthereumListener","Exiting before handling next block due to a circuit breaker event {cb_event:?}");
+                    warn!(target: LOG_TARGET,"Exiting before handling next block due to a circuit breaker event {cb_event:?}");
                     return Ok(cb_event?);
                 },
                 Ok(unprocessed_block_number) = next_unprocessed_block_number.recv() => {
@@ -77,11 +78,11 @@ impl EthereumListener {
             };
 
             // Query for the next unknown finalized block number, if not present we wait for it.
-            info!(target: "EthereumListener", "Waiting for the next finalized block number");
+            info!(target: LOG_TARGET, "Waiting for the next finalized block number");
 
             let next_finalized_block_number = select! {
                 cb_event = circuit_breaker_receiver.recv () => {
-                    warn!(target: "EthereumListener", "Exiting before sending events due to a circuit breaker event {cb_event:?}");
+                    warn!(target: LOG_TARGET, "Exiting before sending events due to a circuit breaker event {cb_event:?}");
                     return Ok(cb_event?);
                 },
                 next_finalized_block_number = get_next_finalized_block_number(
@@ -98,7 +99,7 @@ impl EthereumListener {
                 unprocessed_block_number + sync_step - 1,
             );
 
-            info!(target: "EthereumListener",
+            info!(target: LOG_TARGET,
                   "Processing events from blocks {} - {}",
                   unprocessed_block_number, to_block
             );
@@ -111,7 +112,7 @@ impl EthereumListener {
 
             let events = select! {
                 cb_event = circuit_breaker_receiver.recv () => {
-                    warn!(target: "EthereumListener", "Exiting before sending events due to a circuit breaker event {cb_event:?}");
+                    warn!(target: LOG_TARGET, "Exiting before sending events due to a circuit breaker event {cb_event:?}");
                     return Ok(cb_event?);
                 },
                 Ok(events) = query.query() => {
@@ -120,13 +121,13 @@ impl EthereumListener {
             };
 
             if events.is_empty() {
-                info!(target: "EthereumListener", "Marking {} as the next unprocessed block number", to_block +1);
+                info!(target: LOG_TARGET, "Marking {} as the next unprocessed block number", to_block +1);
                 // we send + 1 to self as this is the next block we'd like to see
                 last_processed_block_number.send(to_block + 1)?;
                 continue;
             }
             let (events_ack_sender, events_ack_receiver) = oneshot::channel::<()>();
-            info!(target: "EthereumListener", "Sending a batch of {} events", &events.len());
+            info!(target: LOG_TARGET, "Sending a batch of {} events", &events.len());
 
             eth_events_sender
                 .send(EthMostEvents {
@@ -137,17 +138,17 @@ impl EthereumListener {
                 })
                 .await?;
 
-            info!(target: "EthereumListener", "Awaiting events ack");
+            info!(target: LOG_TARGET, "Awaiting events ack");
 
             // select between ack and the channel, because the handler could have exited
             select! {
                 cb_event = circuit_breaker_receiver.recv () => {
-                    warn!(target: "EthereumListener", "Exiting before events ack due to a circuit breaker event {cb_event:?}");
+                    warn!(target: LOG_TARGET, "Exiting before events ack due to a circuit breaker event {cb_event:?}");
                     return Ok(cb_event?);
                 },
                 ack_result = events_ack_receiver => {
                     if ack_result.is_ok () {
-                        info!(target: "EthereumListener", "Events ack received, marking {} as the next unprocessed block number", to_block + 1);
+                        info!(target: LOG_TARGET, "Events ack received, marking {} as the next unprocessed block number", to_block + 1);
                         // we send + 1 to self as this is the next block we'd like to see
                         last_processed_block_number.send(to_block + 1)?;
                     }

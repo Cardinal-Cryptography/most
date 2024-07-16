@@ -74,12 +74,12 @@ impl AlephZeroEventHandler {
             ..
         } = &*config;
 
-        match &event.name {
-            Some(name) if name.eq("CrosschainTransferRequest") => {}
-            _ => {
-                debug!("Skipping non azero contract event");
-                return Ok(());
-            }
+        if !event
+            .name
+            .is_some_and(|name| name.eq("CrosschainTransferRequest"))
+        {
+            debug!("Skipping non azero contract event");
+            return Ok(());
         }
 
         let data = event.data;
@@ -149,11 +149,11 @@ impl AlephZeroEventHandler {
             )
             .await?
             {
-                SignatureState::Finalized => {
+                SignatureState::Signed { finalized: true } => {
                     info!("Guardian signature for 0x{request_hash_hex} no longer needed");
                     return Ok(());
                 }
-                SignatureState::SignedNotFinalized => {
+                SignatureState::Signed { finalized: false } => {
                     info!("Request 0x{request_hash_hex} not yet finalized.");
                     sleep(Duration::from_secs(ETH_WAIT_FOR_FINALITY_CHECK_SEC)).await;
                 }

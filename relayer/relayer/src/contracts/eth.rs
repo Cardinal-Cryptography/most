@@ -9,10 +9,8 @@ abigen!(Most, "../eth/artifacts/contracts/Most.sol/Most.json");
 abigen!(WETH9, "../eth/artifacts/contracts/WETH9.sol/WETH9.json");
 
 pub enum SignatureState {
-    #[cfg_attr(feature = "evm", allow(dead_code))]
-    SignedNotFinalized,
+    Signed { finalized: bool },
     NeedSignature,
-    Finalized,
 }
 
 #[cfg(feature = "evm")]
@@ -28,7 +26,7 @@ pub async fn contract_signature_state<C: Middleware + 'static>(
         .block(BlockNumber::Latest)
         .await?
     {
-        Ok(Finalized)
+        Ok(Signed { finalized: true })
     } else {
         Ok(NeedSignature)
     }
@@ -47,7 +45,7 @@ pub async fn contract_signature_state<C: Middleware + 'static>(
         .block(BlockNumber::Finalized)
         .await?
     {
-        return Ok(Finalized);
+        return Ok(Signed { finalized: true });
     }
     let is_signed = !contract
         .needs_signature(request_hash, address, committee_id.into())
@@ -55,7 +53,7 @@ pub async fn contract_signature_state<C: Middleware + 'static>(
         .await?;
 
     Ok(match is_signed {
-        true => SignedNotFinalized, // Signed but not yet finalized
-        false => NeedSignature,     // Not signed and not finalized
+        true => Signed { finalized: false }, // Signed but not yet finalized
+        false => NeedSignature,              // Not signed and not finalized
     })
 }
