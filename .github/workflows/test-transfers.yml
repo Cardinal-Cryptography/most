@@ -28,7 +28,7 @@ jobs:
         run: |
           make local-bridgenet
           sleep 60 # wait 1 minute for everything to be runing
-          make deploy-docker  run-relayers
+          DOCKER_RELAYER_COMPILE_CONTRACTS=no-compile make deploy-docker run-relayers
           
           make ethereum-azero-transfer
           sleep 300 # wait 5 minutes for transfer to register on both chains
