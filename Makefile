@@ -159,7 +159,7 @@ print-azero-codehashes: compile-azero-docker
 
 .PHONY: deploy-azero-docker
 deploy-azero-docker: # Deploy azero contracts compiling in docker
-deploy-azero-docker: azero-deps compile-azero-docker
+deploy-azero-docker: azero-deps compile-azero-docker typechain-azero
 	cd azero && AZERO_ENV=$(AZERO_ENV) npm run deploy
 
 .PHONY: setup-azero-docker
