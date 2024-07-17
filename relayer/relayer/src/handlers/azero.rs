@@ -85,15 +85,17 @@ impl AlephZeroEventHandler {
         let data = event.data;
 
         // decode event data
-        let crosschain_transfer_event @ CrosschainTransferRequestData {
+        let crosschain_transfer_event = get_request_event_data(&data)?;
+
+        debug!("Handling azero contract event: {crosschain_transfer_event:?}");
+
+        let CrosschainTransferRequestData {
             committee_id,
             dest_token_address,
             amount,
             dest_receiver_address,
             request_nonce,
-        } = get_request_event_data(&data)?;
-
-        debug!("Handling azero contract event: {crosschain_transfer_event:?}");
+        } = crosschain_transfer_event;
 
         // NOTE: for some reason, ethers-rs's `encode_packed` does not properly encode the data
         // (it does not pad uint to 32 bytes, but uses the actual number of bytes required to store the value)
