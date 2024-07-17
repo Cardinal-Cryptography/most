@@ -1,11 +1,14 @@
 import fs from "fs";
 
-import {ApiPromise, Keyring} from "@polkadot/api";
-import {Abi} from "@polkadot/api-contract";
-import {KeyringPair} from "@polkadot/keyring/types";
-import {HexString} from "@polkadot/util/types";
-import {hexToU8a, u8aToHex} from "@polkadot/util";
-import {ContractInstantiateResult, WeightV2,} from "@polkadot/types/interfaces";
+import { ApiPromise, Keyring } from "@polkadot/api";
+import { Abi } from "@polkadot/api-contract";
+import { KeyringPair } from "@polkadot/keyring/types";
+import { HexString } from "@polkadot/util/types";
+import { hexToU8a, u8aToHex } from "@polkadot/util";
+import {
+  ContractInstantiateResult,
+  WeightV2,
+} from "@polkadot/types/interfaces";
 
 export type Addresses = {
   most: string;
@@ -66,8 +69,11 @@ export async function loadAddresses(): Promise<Addresses> {
   return await import_azero_addresses();
 }
 
-export function getAddressForEthToken(addresses: Addresses, symbol: string): string | undefined {
-  return addresses.ethTokens.find(v => v.symbol === symbol)?.address;
+export function getAddressForEthToken(
+  addresses: Addresses,
+  symbol: string,
+): string | undefined {
+  return addresses.ethTokens.find((v) => v.symbol === symbol)?.address;
 }
 
 export function findTokenBySymbol(symbol: string, tokens: any[]) {

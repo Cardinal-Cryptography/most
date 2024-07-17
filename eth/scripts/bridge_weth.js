@@ -26,7 +26,7 @@ async function main() {
 
   console.log(
     "wETH [",
-      addresses.ethTokens[0].address,
+    addresses.ethTokens[0].address,
     "]",
     "balance of:",
     accounts[0],
@@ -36,7 +36,13 @@ async function main() {
 
   if (balance < amount) {
     // if not enough balance, deposit some
-    console.log("Wrapping", amount, "of pETH", "as", addresses.ethTokens[0].address);
+    console.log(
+      "Wrapping",
+      amount,
+      "of pETH",
+      "as",
+      addresses.ethTokens[0].address,
+    );
     await weth.deposit({ value: amount });
   }
 

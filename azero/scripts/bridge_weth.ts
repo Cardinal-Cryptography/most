@@ -5,7 +5,9 @@ import {
   import_env,
   import_azero_addresses,
   accountIdToHex,
-  hexToBytes, loadAddresses, getAddressForEthToken,
+  hexToBytes,
+  loadAddresses,
+  getAddressForEthToken,
 } from "./utils";
 import { ethers } from "ethers";
 
