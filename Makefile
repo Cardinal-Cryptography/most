@@ -219,6 +219,10 @@ setup-azero: compile-azero typechain-azero
 deploy: # Deploy all contracts
 deploy: deploy-eth deploy-azero setup-eth setup-azero
 
+.PHONY: deploy-docker
+deploy-docker: # Deploy all contracts, use docker compilation for azero
+deploy-docker: deploy-eth deploy-azero-docker setup-eth setup-azero-docker
+
 .PHONY: watch-relayer
 watch-relayer:
 	cd relayer && cargo watch -s 'cargo clippy' -c
