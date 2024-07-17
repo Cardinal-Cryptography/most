@@ -126,7 +126,8 @@ async function main() {
     const weth = WETH.attach(wethAddress);
 
     await weth.deposit({ value: 1000000000000000 });
-    await weth.transfer(addresses.most, 1000000000000000);
+    /// Gas estimation fails here 1_000_000 is more than enough to make this work.
+    await weth.transfer(addresses.most, 100000000000, { gasLimit: 1000000 });
 
     const usdtAddress = getTokenAddressBySymbol("USDT", addresses.ethTokens);
     const USDT = await ethers.getContractFactory("TetherToken");

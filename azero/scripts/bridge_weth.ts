@@ -5,7 +5,7 @@ import {
   import_env,
   import_azero_addresses,
   accountIdToHex,
-  hexToBytes,
+  hexToBytes, loadAddresses, getAddressForEthToken,
 } from "./utils";
 import { ethers } from "ethers";
 
@@ -24,10 +24,10 @@ async function main(): Promise<void> {
   const config = await import_env(envFile);
   const { ws_node, deployer_seed } = config;
 
-  const addresses = await import_azero_addresses();
-  const weth_azero = getTokenAddresses(addresses, "wETH")[1];
+  const addresses = await loadAddresses();
+  const weth_azero = getAddressForEthToken(addresses, "WETH");
 
-  const { most: most_azero } = await import_azero_addresses();
+  const { most: most_azero } = addresses;
 
   const wsProvider = new WsProvider(ws_node);
   const keyring = new Keyring({ type: "sr25519" });
@@ -79,7 +79,7 @@ async function main(): Promise<void> {
     ethers.zeroPadValue(ethers.getBytes(receiver), 32),
   );
 
-  const fee = 1000000000000000;
+  const fee = 8000000000000000;
 
   console.log(
     "Requesting transfer of",
