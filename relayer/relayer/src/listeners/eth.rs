@@ -158,21 +158,21 @@ impl EthereumListener {
     }
 }
 
-#[cfg(feature = "evm")]
+#[cfg(feature = "l2")]
 pub async fn get_next_finalized_block_number(
     eth_connection: Arc<EthConnection>,
     not_older_than: u32,
 ) -> u32 {
-    // In evm context we treat latest block as finalized.
+    // In L2 context we treat latest block as finalized.
     get_block_not_older_than(eth_connection, not_older_than, BlockNumber::Latest).await
 }
 
-#[cfg(not(feature = "evm"))]
+#[cfg(not(feature = "l2"))]
 pub async fn get_next_finalized_block_number(
     eth_connection: Arc<EthConnection>,
     not_older_than: u32,
 ) -> u32 {
-    // In ethereum context we treat finalized block as, well, finalized :).
+    // In ethereum l1 context we treat finalized block as, well, finalized :).
     get_block_not_older_than(eth_connection, not_older_than, BlockNumber::Finalized).await
 }
 

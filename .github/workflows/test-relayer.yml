@@ -26,4 +26,4 @@ jobs:
         shell: bash
         run: |
           make test-relayer
-          make test-relayer-evm
+          make test-relayer-l2
