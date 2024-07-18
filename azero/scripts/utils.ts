@@ -62,6 +62,20 @@ export function storeAddresses(addresses: Addresses): void {
   );
 }
 
+/**
+ * Load addresses from the json file
+ */
+export async function loadAddresses(): Promise<Addresses> {
+  return await import_azero_addresses();
+}
+
+export function getAddressForEthToken(
+  addresses: Addresses,
+  symbol: string,
+): string | undefined {
+  return addresses.ethTokens.find((v) => v.symbol === symbol)?.address;
+}
+
 export function findTokenBySymbol(symbol: string, tokens: any[]) {
   return tokens.find((token) => token.symbol === symbol);
 }

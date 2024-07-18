@@ -1,0 +1,48 @@
+# Runs bridge and perform transfers from and to ethereum.
+
+name: Transfer test
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test transfers
+    runs-on: [self-hosted, Linux, X64, large]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: "Install Rust toolchain"
+        uses: Cardinal-Cryptography/github-actions/install-rust-toolchain@v6
+
+      - name: Run tests
+        timeout-minutes: 30
+        shell: bash
+        run: |
+          make local-bridgenet
+          sleep 60 # wait 1 minute for everything to be running
+          make deploy-docker
+          DOCKER_RELAYER_COMPILE_CONTRACTS=no-compile make run-relayers
+          
+          make ethereum-azero-transfer
+          sleep 300 # wait 5 minutes for transfer to register on both chains
+          make azero-ethereum-transfer
+
+  slack-notification:
+    name: Slack notification
+    runs-on: ubuntu-20.04
+    needs: [test]
+    if: >
+      !cancelled() &&
+      github.event_name != 'workflow_dispatch'
+    steps:
+      - name: Send Slack message
+        uses: Cardinal-Cryptography/github-actions/slack-notification@v7
+        with:
+          notify-on: "failure"
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_INCOMING_WEBHOOK_MOST_CI_NOTIFICATIONS }}
