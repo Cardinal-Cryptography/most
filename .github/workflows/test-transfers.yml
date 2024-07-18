@@ -3,6 +3,9 @@
 name: Transfer test
 
 on:
+  pull_request:
+    branches:
+      - master
   push:
     branches:
       - master
@@ -23,6 +26,7 @@ jobs:
         timeout-minutes: 30
         shell: bash
         run: |
+          exit 1
           make local-bridgenet
           sleep 60 # wait 1 minute for everything to be running
           make deploy-docker
@@ -31,3 +35,18 @@ jobs:
           make ethereum-azero-transfer
           sleep 300 # wait 5 minutes for transfer to register on both chains
           make azero-ethereum-transfer
+
+  slack-notification:
+    name: Slack notification
+    runs-on: ubuntu-20.04
+    needs: [test]
+    if: >
+      !cancelled() &&
+      github.event_name != 'workflow_dispatch'
+    steps:
+      - name: Send Slack message
+        uses: Cardinal-Cryptography/github-actions/slack-notification@v7
+        with:
+          notify-on: "failure"
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_INCOMING_WEBHOOK_MOST_CI_NOTIFICATIONS }}
