@@ -18,7 +18,7 @@ async function main() {
   const receiver = "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY";
 
   const WETH = artifacts.require("WETH9");
-  const weth = await WETH.at(addresses.weth);
+  const weth = await WETH.at(addresses.ethTokens[0].address);
 
   // check senders balance
   let query = await weth.balanceOf(accounts[0]);
@@ -26,7 +26,7 @@ async function main() {
 
   console.log(
     "wETH [",
-    addresses.weth,
+    addresses.ethTokens[0].address,
     "]",
     "balance of:",
     accounts[0],
@@ -36,7 +36,13 @@ async function main() {
 
   if (balance < amount) {
     // if not enough balance, deposit some
-    console.log("Wrapping", amount, "of pETH", "as", addresses.weth);
+    console.log(
+      "Wrapping",
+      amount,
+      "of pETH",
+      "as",
+      addresses.ethTokens[0].address,
+    );
     await weth.deposit({ value: amount });
   }
 
@@ -47,7 +53,7 @@ async function main() {
   await weth.approve(addresses.most, amount);
 
   let srcTokenAddress = ethers.zeroPadValue(
-    ethers.getBytes(addresses.weth),
+    ethers.getBytes(addresses.ethTokens[0].address),
     32,
   );
 
@@ -66,7 +72,7 @@ async function main() {
     "Requesting transfer of",
     amount,
     "units of",
-    addresses.weth,
+    addresses.ethTokens[0].address,
     "to",
     receiver,
   );
