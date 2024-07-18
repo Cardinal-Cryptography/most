@@ -1,13 +1,15 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc, time::Duration};
 
 use ethers::{
     abi::Address,
     core::{types::H256, utils::hash_message},
+    middleware::Middleware,
     prelude::{
         gas_escalator::{Frequency, GeometricGasPrice},
         nonce_manager::NonceManagerError,
         signer::SignerMiddlewareError,
-        GasEscalatorMiddleware, MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware,
+        BlockNumber, GasEscalatorMiddleware, MiddlewareBuilder, NonceManagerMiddleware,
+        SignerMiddleware,
     },
     providers::{Http, Provider, ProviderExt},
     signers::{LocalWallet, Signer},
@@ -16,10 +18,11 @@ use ethers::{
         Signature,
     },
 };
+use log::{debug, warn};
 use thiserror::Error;
-use tokio::sync::Mutex;
+use tokio::{sync::Mutex, time::sleep};
 
-use crate::config::Config;
+use crate::{config::Config, listeners::ETH_BLOCK_PROD_TIME_SEC};
 
 pub type EthConnection = Provider<Http>;
 pub type GasEscalatingEthConnection = GasEscalatorMiddleware<EthConnection>;
@@ -251,4 +254,48 @@ pub async fn with_nonce_manager(
 pub async fn with_gas_escalator(connection: EthConnection) -> GasEscalatingEthConnection {
     let escalator = GeometricGasPrice::new(1.125, 25u64, None::<u64>);
     GasEscalatorMiddleware::new(connection, escalator, Frequency::Duration(15000))
+}
+
+#[cfg(feature = "l2")]
+pub async fn get_next_finalized_block_number(
+    eth_connection: Arc<EthConnection>,
+    not_older_than: u32,
+) -> u32 {
+    // In L2 context we treat latest block as finalized.
+    get_block_not_older_than(eth_connection, not_older_than, BlockNumber::Latest).await
+}
+
+#[cfg(not(feature = "l2"))]
+pub async fn get_next_finalized_block_number(
+    eth_connection: Arc<EthConnection>,
+    not_older_than: u32,
+) -> u32 {
+    // In ethereum l1 context we treat finalized block as, well, finalized :).
+    get_block_not_older_than(eth_connection, not_older_than, BlockNumber::Finalized).await
+}
+
+pub async fn get_block_not_older_than(
+    eth_connection: Arc<EthConnection>,
+    not_older_than: u32,
+    block: BlockNumber,
+) -> u32 {
+    loop {
+        match eth_connection.get_block(block).await {
+            Ok(Some(block)) => {
+                let block_number = block.number.expect("Block has a number.").as_u32();
+                if block_number >= not_older_than {
+                    return block_number;
+                }
+            }
+            Ok(None) => {
+                warn!("No block found.");
+            }
+            Err(e) => {
+                warn!("Client error when getting block: {e}");
+            }
+        };
+
+        debug!("Waiting for a next block");
+        sleep(Duration::from_secs(ETH_BLOCK_PROD_TIME_SEC)).await;
+    }
 }
