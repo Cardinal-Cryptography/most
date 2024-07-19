@@ -32,6 +32,7 @@ use crate::{
         azero,
         eth::{self, with_gas_escalator},
     },
+    contracts::MostInstance,
     handlers::{AlephZeroEventsHandler, EthereumEventsHandler},
     listeners::{
         AdvisoryListener, AlephZeroHaltedListener, AlephZeroListener, AzeroMostEvents,
@@ -264,6 +265,22 @@ async fn run_relayer(
     let (eth_connection, eth_signed_connection) =
         create_eth_connections(&config, persistent_eth_connection).await?;
     info!("Established connection to the Ethereum node");
+
+    let most_azero = MostInstance::new(
+        &config.azero_contract_address,
+        &config.azero_contract_metadata,
+        config.azero_ref_time_limit,
+        config.azero_proof_size_limit,
+    )?;
+
+    let current_committee_id = most.current_committee_id().await?;
+    most_azero
+        .set_payout_account(
+            azero_connection,
+            current_committee_id,
+            config.payout_account,
+        )
+        .await?;
 
     // Create channels
     let (eth_events_sender, eth_events_receiver) = mpsc::channel::<EthMostEvents>(1);

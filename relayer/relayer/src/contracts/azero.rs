@@ -125,6 +125,29 @@ impl MostInstance {
         call_result
     }
 
+    pub async fn set_payout_account(
+        &self,
+        signed_connection: &AzeroConnectionWithSigner,
+        committee_id: u128,
+        payout_account: AccountId,
+    ) -> Result<TxInfo, AzeroContractError> {
+        let gas_limit = Weight {
+            ref_time: self.ref_time_limit,
+            proof_size: self.proof_size_limit,
+        };
+        let args = [committee_id.to_string(), payout_account.to_string()];
+        let params = ExecCallParams::new().gas_limit(gas_limit);
+
+        // Exec does dry run first, so there's no need to repeat it here
+        let call_result = self
+            .contract
+            .exec(signed_connection, "set_payout_account", &args, params)
+            .await
+            .map_err(AzeroContractError::AlephClient);
+        debug!("set_payout_account: {:?}", call_result);
+        call_result
+    }
+
     pub async fn is_halted(&self, connection: &Connection) -> Result<bool, AzeroContractError> {
         Ok(self
             .contract
