@@ -26,5 +26,4 @@ tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "test
 tracing = { workspace = true, features = ["log", "log-always"] }
 
 [features]
-evm = []
-
+l2 = []
