@@ -26,7 +26,6 @@ use tokio::{
     task::{JoinError, JoinSet},
     time::sleep,
 };
-use trader::TraderError;
 
 use crate::{
     connections::{
@@ -39,7 +38,6 @@ use crate::{
         EthMostEvents, EthereumListener, EthereumPausedListener,
     },
     redis::RedisManager,
-    trader::Trader,
 };
 
 mod config;
@@ -49,7 +47,6 @@ mod handlers;
 mod helpers;
 mod listeners;
 mod redis;
-mod trader;
 
 const DEV_MNEMONIC: &str =
     "harsh master island dirt equip search awesome double turn crush wool grant";
@@ -103,9 +100,6 @@ enum RelayerError {
 
     #[error("Ethereum's Most paused listener failure")]
     EthereumPausedListener(#[from] EthereumPausedListenerError),
-
-    #[error("Trader component failure")]
-    TraderComponent(#[from] TraderError),
 }
 
 #[derive(Debug, Clone)]
@@ -246,9 +240,6 @@ async fn main() -> Result<(), RelayerError> {
                     tick = Instant::now();
                 }
             }
-            Err(RelayerError::TraderComponent(why)) => {
-                error!("Trader component exited with an error {why:?}. Restart is required to run Trader again.");
-            }
             Err(why) => {
                 error!("One of the core components exited with an error {why:?}. This is fatal");
                 std::process::exit(1);
@@ -312,7 +303,6 @@ async fn run_relayer(
     let eth_events_handler_circuit_breaker_receiver = circuit_breaker_sender.subscribe();
     let aleph_listener_circuit_breaker_receiver = circuit_breaker_sender.subscribe();
     let aleph_events_handler_circuit_breaker_receiver = circuit_breaker_sender.subscribe();
-    let trader_circuit_breaker_receiver = circuit_breaker_sender.subscribe();
 
     let redis_manager_eth_block_number_receiver = eth_block_number_sender.subscribe();
     let eth_listener_eth_block_number_receiver = eth_block_number_sender.subscribe();
@@ -408,16 +398,5 @@ async fn run_relayer(
         .map_err(RelayerError::from),
     );
 
-    if config.run_trader_component {
-        tasks.spawn(
-            Trader::run(
-                config,
-                azero_signed_connection.clone(),
-                eth_signed_connection,
-                trader_circuit_breaker_receiver,
-            )
-            .map_err(RelayerError::from),
-        );
-    }
     Ok(())
 }

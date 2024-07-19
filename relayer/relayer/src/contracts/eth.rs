@@ -6,7 +6,6 @@ use ethers::{
 };
 
 abigen!(Most, "../eth/artifacts/contracts/Most.sol/Most.json");
-abigen!(WETH9, "../eth/artifacts/contracts/WETH9.sol/WETH9.json");
 
 pub enum SignatureState {
     Signed { finalized: bool },
