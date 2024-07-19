@@ -4,7 +4,7 @@ DOCKER_RELAYER_NAME ?= most-relayer
 DOCKER_RELAYER_COPY_ADDRESSES ?= copy
 DOCKER_RELAYER_COMPILE_CONTRACTS ?= compile
 DOCKER_SIGNER_NAME ?= most-signer
-EVM ?= false
+L2 ?= false
 
 export CONTRACT_VERSION ?=`git rev-parse HEAD`
 
@@ -227,8 +227,8 @@ deploy-docker: deploy-eth deploy-azero-docker setup-eth setup-azero-docker
 watch-relayer:
 	cd relayer && cargo watch -s 'cargo clippy' -c
 
-.PHONY: watch-relayer-evm
-watch-relayer-evm:
+.PHONY: watch-relayer-l2
+watch-relayer-l2:
 	cd relayer && cargo watch -s 'cargo clippy --all-targets --all-features' -c
 
 .PHONY: run-relayer
@@ -292,10 +292,10 @@ test-relayer: # Run relayer tests
 test-relayer: compile-azero-docker compile-eth
 	cd relayer && cargo test
 
-.PHONY: test-relayer-evm
-test-relayer-evm: # Run relayer tests
-test-relayer-evm: compile-azero-docker compile-eth
-	cd relayer && cargo test --features evm
+.PHONY: test-relayer-l2
+test-relayer-l2: # Run relayer tests
+test-relayer-l2: compile-azero-docker compile-eth
+	cd relayer && cargo test --features l2
 
 .PHONY: e2e-tests
 e2e-tests: # Run specific e2e test. Requires: `TEST_CASE=test_module::test_name`.
@@ -397,9 +397,9 @@ format: rust-format js-format solidity-format
 build-relayer: # Build relayer
 	cd relayer && cargo build --release
 
-.PHONY: build-relayer-evm
-build-relayer-evm: # Build relayer with evm feature
-	cd relayer && cargo build --release --features evm
+.PHONY: build-relayer-l2
+build-relayer-l2: # Build relayer with l2 feature
+	cd relayer && cargo build --release --features l2
 
 
 .PHONY: build-docker-relayer
@@ -407,8 +407,8 @@ build-docker-relayer: # Build relayer docker image
 ifeq ($(DOCKER_RELAYER_COMPILE_CONTRACTS),compile)
 build-docker-relayer: compile-azero compile-eth
 endif
-ifeq ($(EVM),true)
-build-docker-relayer: build-relayer-evm
+ifeq ($(L2),true)
+build-docker-relayer: build-relayer-l2
 else
 build-docker-relayer: build-relayer
 endif
