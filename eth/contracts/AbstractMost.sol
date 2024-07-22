@@ -86,12 +86,6 @@ abstract contract AbstractMost is
     error ZeroAddress();
     error AzeroAddressNotSet();
 
-    /**
-     * @dev Sets the values for {name} and {symbol}.
-     *
-     * All two of these values are immutable: they can only be set once during
-     * construction.
-     */
     function __AbstractMost_init(
         address[] calldata _committee,
         uint256 _signatureThreshold,
