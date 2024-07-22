@@ -826,4 +826,4 @@ function MostTests(mostString = "Most") {
 }
 
 MostTests("Most");
-MostTests("L2Most");
+MostTests("MostL2");
