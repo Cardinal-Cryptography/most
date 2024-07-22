@@ -1,5 +1,5 @@
 ---
-name: Bridgenet - deploy contracts
+name: Testnet - deploy contracts
 
 on:
   workflow_call:
@@ -39,19 +39,19 @@ jobs:
 
       - name: Deploy eth contracts
         shell: bash
-        run: make deploy-eth NETWORK=bridgenet
+        run: make deploy-eth NETWORK=testnet
 
       - name: Deploy azero contracts
         shell: bash
-        run: AZERO_ENV=bridgenet make deploy-azero-docker
+        run: make deploy-azero-docker AZERO_ENV=testnet
 
       - name: Setup eth contracts
         shell: bash
-        run: make setup-eth NETWORK=bridgenet
+        run: make setup-eth NETWORK=testnet
 
       - name: Setup azero contracts
         shell: bash
-        run: AZERO_ENV=bridgenet make setup-azero-docker
+        run: make setup-azero-docker AZERO_ENV=testnet
 
       - uses: actions/upload-artifact@v4
         with:
@@ -175,7 +175,7 @@ jobs:
           aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
           s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
           project: most
-          chain-environment: bridgenet
-          frontend-environment: dev
+          chain-environment: testnet
+          frontend-environment: most
           src-addresses: contract_spec.json
           if-exist: overwrite
