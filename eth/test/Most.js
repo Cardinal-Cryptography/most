@@ -742,77 +742,80 @@ function MostTests(mostString = "Most") {
 
     describe("Upgrade", function () {
       it("Most contract can be upgraded", async () => {
-        exec(`cp ./contracts/${mostString}.sol ./contracts/${mostString}V2.sol`, (error) => {
-          if (error !== null) {
-            console.log("exec error: " + error);
-          }
-          exec(
-            `sed -i "17 a     uint256 public test;" ./contracts/${mostString}V2.sol`,
-            async (error) => {
-              if (error !== null) {
-                console.log("exec error: " + error);
-              }
+        exec(
+          `cp ./contracts/${mostString}.sol ./contracts/${mostString}V2.sol`,
+          (error) => {
+            if (error !== null) {
+              console.log("exec error: " + error);
+            }
+            exec(
+              `sed -i "17 a     uint256 public test;" ./contracts/${mostString}V2.sol`,
+              async (error) => {
+                if (error !== null) {
+                  console.log("exec error: " + error);
+                }
 
-              const { most, mostAddress, token, tokenAddressBytes32 } =
-                await loadFixture(deployEightGuardianMostFixture);
+                const { most, mostAddress, token, tokenAddressBytes32 } =
+                  await loadFixture(deployEightGuardianMostFixture);
 
-              await token.approve(mostAddress, TOKEN_AMOUNT);
+                await token.approve(mostAddress, TOKEN_AMOUNT);
 
-              // sending request works before the upgrade
-              await expect(
-                most.sendRequest(
-                  tokenAddressBytes32,
-                  TOKEN_AMOUNT,
-                  ALEPH_ACCOUNT,
-                ),
-              )
-                .to.emit(most, "CrosschainTransferRequest")
-                .withArgs(
-                  0,
-                  WRAPPED_TOKEN_ADDRESS,
-                  TOKEN_AMOUNT,
-                  ALEPH_ACCOUNT,
-                  0,
-                );
+                // sending request works before the upgrade
+                await expect(
+                  most.sendRequest(
+                    tokenAddressBytes32,
+                    TOKEN_AMOUNT,
+                    ALEPH_ACCOUNT,
+                  ),
+                )
+                  .to.emit(most, "CrosschainTransferRequest")
+                  .withArgs(
+                    0,
+                    WRAPPED_TOKEN_ADDRESS,
+                    TOKEN_AMOUNT,
+                    ALEPH_ACCOUNT,
+                    0,
+                  );
 
-              const accounts = await ethers.getSigners();
-              let committee = accounts.slice(2, 9).map((x) => x.address);
-              let threshold = 4;
-              await most.setCommittee(committee, threshold);
+                const accounts = await ethers.getSigners();
+                let committee = accounts.slice(2, 9).map((x) => x.address);
+                let threshold = 4;
+                await most.setCommittee(committee, threshold);
 
-              const MostV2 = await ethers.getContractFactory("MostV2");
-              const mostV2 = await upgrades.upgradeProxy(mostAddress, MostV2);
+                const MostV2 = await ethers.getContractFactory("MostV2");
+                const mostV2 = await upgrades.upgradeProxy(mostAddress, MostV2);
 
-              const address = await mostV2.getAddress();
-              // address is preserved
-              expect(address).to.be.equal(mostAddress);
+                const address = await mostV2.getAddress();
+                // address is preserved
+                expect(address).to.be.equal(mostAddress);
 
-              // state is preserved
-              expect(most.isInCommittee(committee[0]));
+                // state is preserved
+                expect(most.isInCommittee(committee[0]));
 
-              // no state overwrite
-              expect(most.test()).to.be.equal(0);
+                // no state overwrite
+                expect(most.test()).to.be.equal(0);
 
-              // sending request works after the upgrade
-              await token.approve(mostAddress, TOKEN_AMOUNT);
-              await expect(
-                most.sendRequest(
-                  tokenAddressBytes32,
-                  TOKEN_AMOUNT,
-                  ALEPH_ACCOUNT,
-                ),
-              )
-                .to.emit(most, "CrosschainTransferRequest")
-                .withArgs(
-                  0,
-                  WRAPPED_TOKEN_ADDRESS,
-                  TOKEN_AMOUNT,
-                  ALEPH_ACCOUNT,
-                  1,
-                );
-            },
-          );
-        });
+                // sending request works after the upgrade
+                await token.approve(mostAddress, TOKEN_AMOUNT);
+                await expect(
+                  most.sendRequest(
+                    tokenAddressBytes32,
+                    TOKEN_AMOUNT,
+                    ALEPH_ACCOUNT,
+                  ),
+                )
+                  .to.emit(most, "CrosschainTransferRequest")
+                  .withArgs(
+                    0,
+                    WRAPPED_TOKEN_ADDRESS,
+                    TOKEN_AMOUNT,
+                    ALEPH_ACCOUNT,
+                    1,
+                  );
+              },
+            );
+          },
+        );
 
         // clean up
         exec(`rm ./contracts/${mostString}V2.sol`, (error) => {
