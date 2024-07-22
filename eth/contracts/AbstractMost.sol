@@ -86,6 +86,36 @@ abstract contract AbstractMost is
     error ZeroAddress();
     error AzeroAddressNotSet();
 
+    /**
+     * @dev Sets the values for {name} and {symbol}.
+     *
+     * All two of these values are immutable: they can only be set once during
+     * construction.
+     */
+    function __AbstractMost_init(
+        address[] calldata _committee,
+        uint256 _signatureThreshold,
+        address payable _wethAddress
+    ) internal onlyInitializing {
+        __AbstractMost_init_unchained(
+            _committee,
+            _signatureThreshold,
+            _wethAddress
+        );
+    }
+
+    function __AbstractMost_init_unchained(
+        address[] calldata _committee,
+        uint256 _signatureThreshold,
+        address payable _wethAddress
+    ) internal onlyInitializing {
+        requestNonce = 0;
+        committeeId = 0;
+        wethAddress = _wethAddress;
+
+        _setCommittee(_committee, _signatureThreshold);
+    }
+
     /// @dev required by the OZ UUPS module
     function _authorizeUpgrade(address) internal override onlyOwner {}
 

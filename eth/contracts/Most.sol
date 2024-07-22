@@ -18,14 +18,10 @@ contract Most is AbstractMost {
         address owner,
         address payable _wethAddress
     ) public initializer {
-        requestNonce = 0;
-        committeeId = 0;
-        wethAddress = _wethAddress;
-
-        _setCommittee(_committee, _signatureThreshold);
-
+        __AbstractMost_init(_committee, _signatureThreshold, _wethAddress);
         __Ownable_init(owner);
         __Pausable_init();
+
         _pause();
     }
 }
