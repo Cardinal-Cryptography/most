@@ -223,48 +223,6 @@ abstract contract AbstractMost is
         ++requestNonce;
     }
 
-    function _receiveRequestThresholdMet(
-        bytes32 requestHash,
-        bytes32 destTokenAddress,
-        bytes32 destReceiverAddress,
-        uint256 amount
-    ) private {
-        processedRequests[requestHash] = true;
-        delete pendingRequests[requestHash];
-
-        address _destTokenAddress = bytes32ToAddress(destTokenAddress);
-        address _destReceiverAddress = bytes32ToAddress(destReceiverAddress);
-
-        // return the locked tokens
-        // address(0) indicates bridging native ether
-        if (_destTokenAddress == address(0)) {
-            (bool unwrapSuccess, ) = wethAddress.call(
-                abi.encodeCall(IWETH9.withdraw, (amount))
-            );
-            if (!unwrapSuccess) revert UnwrappingEth();
-            (bool sendNativeEthSuccess, ) = _destReceiverAddress.call{
-                value: amount,
-                gas: GAS_LIMIT
-            }("");
-            if (!sendNativeEthSuccess) {
-                emit EthTransferFailed(requestHash);
-            }
-        } else if (!isLocalToken[_destTokenAddress]) {
-            // Mint representation of the remote token
-            IWrappedToken mintableToken = IWrappedToken(_destTokenAddress);
-            mintableToken.mint(_destReceiverAddress, amount);
-        } else {
-            IERC20 token = IERC20(_destTokenAddress);
-            if (
-                !tokenTransferReturnSuccess(token, _destReceiverAddress, amount)
-            ) {
-                emit TokenTransferFailed(requestHash);
-            }
-        }
-
-        emit RequestProcessed(requestHash);
-    }
-
     /// @notice Aggregates relayer signatures and returns the locked tokens.
     /// @dev When the ether is being bridged and the receiver is a contract
     /// that does not accept ether or fallback function consumes more than `GAS_LIMIT` gas units,
@@ -309,12 +267,46 @@ abstract contract AbstractMost is
         emit RequestSigned(requestHash, msg.sender);
 
         if (request.signatureCount >= signatureThreshold[_committeeId]) {
-            _receiveRequestThresholdMet(
-                requestHash,
-                destTokenAddress,
-                destReceiverAddress,
-                amount
+            processedRequests[requestHash] = true;
+            delete pendingRequests[requestHash];
+
+            address _destTokenAddress = bytes32ToAddress(destTokenAddress);
+            address _destReceiverAddress = bytes32ToAddress(
+                destReceiverAddress
             );
+
+            // return the locked tokens
+            // address(0) indicates bridging native ether
+            if (_destTokenAddress == address(0)) {
+                (bool unwrapSuccess, ) = wethAddress.call(
+                    abi.encodeCall(IWETH9.withdraw, (amount))
+                );
+                if (!unwrapSuccess) revert UnwrappingEth();
+                (bool sendNativeEthSuccess, ) = _destReceiverAddress.call{
+                    value: amount,
+                    gas: GAS_LIMIT
+                }("");
+                if (!sendNativeEthSuccess) {
+                    emit EthTransferFailed(requestHash);
+                }
+            } else if (!isLocalToken[_destTokenAddress]) {
+                // Mint representation of the remote token
+                IWrappedToken mintableToken = IWrappedToken(_destTokenAddress);
+                mintableToken.mint(_destReceiverAddress, amount);
+            } else {
+                IERC20 token = IERC20(_destTokenAddress);
+                if (
+                    !tokenTransferReturnSuccess(
+                        token,
+                        _destReceiverAddress,
+                        amount
+                    )
+                ) {
+                    emit TokenTransferFailed(requestHash);
+                }
+            }
+
+            emit RequestProcessed(requestHash);
         }
     }
 
