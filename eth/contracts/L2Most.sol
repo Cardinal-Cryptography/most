@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 
 import {AbstractMost} from "./AbstractMost.sol";
 
-/// @title Most
+/// @title L2Most
 /// @author Cardinal Cryptography
 contract L2Most is AbstractMost {
     /// @custom:oz-upgrades-unsafe-allow constructor
