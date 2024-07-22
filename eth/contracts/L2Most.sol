@@ -6,7 +6,7 @@ import {AbstractMost} from "./AbstractMost.sol";
 
 /// @title Most
 /// @author Cardinal Cryptography
-contract Most is AbstractMost {
+contract L2Most is AbstractMost {
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
