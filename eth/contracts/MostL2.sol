@@ -4,9 +4,9 @@ pragma solidity ^0.8.20;
 
 import {AbstractMost} from "./AbstractMost.sol";
 
-/// @title Most
+/// @title MostL2.sol
 /// @author Cardinal Cryptography
-contract Most is AbstractMost {
+contract MostL2 is AbstractMost {
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
