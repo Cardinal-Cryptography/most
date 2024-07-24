@@ -20,8 +20,8 @@ contract PancakeStableSwapTwoPoolDeployer is Ownable {
 
     /**
      * @notice createSwapPair
-     * @param _tokenA: Addresses of ERC20 conracts .
-     * @param _tokenB: Addresses of ERC20 conracts .
+     * @param _tokenA: Addresses of ERC20 contracts .
+     * @param _tokenB: Addresses of ERC20 contracts .
      * @param _A: Amplification coefficient multiplied by n * (n - 1)
      * @param _fee: Fee to charge for exchanges
      * @param _admin_fee: Admin fee
