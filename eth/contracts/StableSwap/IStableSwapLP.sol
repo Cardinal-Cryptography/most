@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.10;
 
-interface IPancakeStableSwapLP {
+interface IStableSwapLP {
     /**
      * @dev Returns the amount of tokens in existence.
      */

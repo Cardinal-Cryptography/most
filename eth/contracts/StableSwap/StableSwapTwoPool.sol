@@ -25,9 +25,9 @@ import "@openzeppelin-4.5.0/contracts/access/Ownable.sol";
 import "@openzeppelin-4.5.0/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin-4.5.0/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin-4.5.0/contracts/security/ReentrancyGuard.sol";
-import "./IPancakeStableSwapLP.sol";
+import "./IStableSwapLP.sol";
 
-contract PancakeStableSwapTwoPool is Ownable, ReentrancyGuard {
+contract StableSwapTwoPool is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     uint256 public constant N_COINS = 2;
@@ -54,7 +54,7 @@ contract PancakeStableSwapTwoPool is Ownable, ReentrancyGuard {
     uint256 public admin_fee; // admin_fee * 1e10.
     uint256 public bnb_gas = 4029; // transfer bnb gas.
 
-    IPancakeStableSwapLP public token;
+    IStableSwapLP public token;
 
     address constant BNB_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
@@ -164,7 +164,7 @@ contract PancakeStableSwapTwoPool is Ownable, ReentrancyGuard {
         fee = _fee;
         admin_fee = _admin_fee;
         kill_deadline = block.timestamp + KILL_DEADLINE_DT;
-        token = IPancakeStableSwapLP(_LP);
+        token = IStableSwapLP(_LP);
 
         transferOwnership(_owner);
     }
