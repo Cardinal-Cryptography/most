@@ -13,9 +13,14 @@ contract StableSwapTwoPoolDeployer is Ownable {
     constructor() {}
 
     // returns sorted token addresses, used to handle return values from pairs sorted in this order
-    function sortTokens(address tokenA, address tokenB) internal pure returns (address token0, address token1) {
+    function sortTokens(
+        address tokenA,
+        address tokenB
+    ) internal pure returns (address token0, address token1) {
         require(tokenA != tokenB, "IDENTICAL_ADDRESSES");
-        (token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
+        (token0, token1) = tokenA < tokenB
+            ? (tokenA, tokenB)
+            : (tokenB, tokenA);
     }
 
     /**
@@ -37,17 +42,31 @@ contract StableSwapTwoPoolDeployer is Ownable {
         address _admin,
         address _LP
     ) external onlyOwner returns (address) {
-        require(_tokenA != address(0) && _tokenB != address(0) && _tokenA != _tokenB, "Illegal token");
+        require(
+            _tokenA != address(0) &&
+                _tokenB != address(0) &&
+                _tokenA != _tokenB,
+            "Illegal token"
+        );
         (address t0, address t1) = sortTokens(_tokenA, _tokenB);
         address[N_COINS] memory coins = [t0, t1];
         // create swap contract
         bytes memory bytecode = type(StableSwapTwoPool).creationCode;
-        bytes32 salt = keccak256(abi.encodePacked(t0, t1, msg.sender, block.timestamp, block.chainid));
+        bytes32 salt = keccak256(
+            abi.encodePacked(t0, t1, msg.sender, block.timestamp, block.chainid)
+        );
         address swapContract;
         assembly {
             swapContract := create2(0, add(bytecode, 32), mload(bytecode), salt)
         }
-        StableSwapTwoPool(swapContract).initialize(coins, _A, _fee, _admin_fee, _admin, _LP);
+        StableSwapTwoPool(swapContract).initialize(
+            coins,
+            _A,
+            _fee,
+            _admin_fee,
+            _admin,
+            _LP
+        );
 
         return swapContract;
     }
