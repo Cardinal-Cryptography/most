@@ -316,7 +316,7 @@ check-js-format:
 .PHONY: solidity-lint
 solidity-lint: # Lint solidity contracts
 solidity-lint: eth-deps
-	cd eth && npx solhint 'contracts/*.sol'
+	cd eth && npx solhint 'contracts/**/*.sol'
 
 .PHONY: relayer-lint
 relayer-lint: # Lint relayer
@@ -341,7 +341,7 @@ contracts-lint: solidity-lint ink-lint
 .PHONY: solidity-format
 solidity-format: # Format solidity contracts
 solidity-format: eth-deps
-	cd eth && npx prettier --write --plugin=prettier-plugin-solidity 'contracts/*.sol'
+	cd eth && npx prettier --write --plugin=prettier-plugin-solidity 'contracts/**/*.sol'
 
 .PHONY: rust-format-check
 rust-format-check: # Check rust code formatting
