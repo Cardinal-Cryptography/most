@@ -157,7 +157,7 @@ contract StableSwapTwoPool is Ownable, ReentrancyGuard {
         require(msg.sender == STABLESWAP_FACTORY, "Operations: Not factory");
         require(
             _amplification_coefficient <= MAX_AMPLIFICATION_COEFFICIENT,
-            "_A exceeds maximum"
+            "_amplification_coefficient exceeds maximum"
         );
         require(_fee <= MAX_FEE, "_fee exceeds maximum");
         require(_admin_fee <= MAX_ADMIN_FEE, "_admin_fee exceeds maximum");
@@ -461,18 +461,19 @@ contract StableSwapTwoPool is Ownable, ReentrancyGuard {
         return y;
     }
 
-    function get_dy(
-        uint256 i,
-        uint256 j,
-        uint256 dx
+    function get_amount_out(
+        uint256 source_token,
+        uint256 dest_token,
+        uint256 amount_in
     ) external view returns (uint256) {
         // dx and dy in c-units
         uint256[N_COINS] memory rates = RATES;
         uint256[N_COINS] memory xp = _xp();
 
-        uint256 x = xp[i] + ((dx * rates[i]) / PRECISION);
-        uint256 y = get_y(i, j, x, xp);
-        uint256 dy = ((xp[j] - y - 1) * PRECISION) / rates[j];
+        uint256 x = xp[source_token] +
+            ((amount_in * rates[source_token]) / PRECISION);
+        uint256 y = get_y(source_token, dest_token, x, xp);
+        uint256 dy = ((xp[dest_token] - y - 1) * PRECISION) / rates[dest_token];
         uint256 _fee = (fee * dy) / FEE_DENOMINATOR;
         return dy - _fee;
     }
@@ -494,10 +495,10 @@ contract StableSwapTwoPool is Ownable, ReentrancyGuard {
     }
 
     function exchange(
-        uint256 i,
-        uint256 j,
-        uint256 dx,
-        uint256 min_dy
+        uint256 source_token,
+        uint256 dest_token,
+        uint256 amount_in,
+        uint256 amount_out
     ) external payable nonReentrant {
         require(!is_killed, "Killed");
         if (!support_native) {
@@ -507,33 +508,42 @@ contract StableSwapTwoPool is Ownable, ReentrancyGuard {
         uint256[N_COINS] memory old_balances = balances;
         uint256[N_COINS] memory xp = _xp_mem(old_balances);
 
-        uint256 x = xp[i] + (dx * RATES[i]) / PRECISION;
-        uint256 y = get_y(i, j, x, xp);
+        uint256 x = xp[source_token] +
+            (amount_in * RATES[source_token]) /
+            PRECISION;
+        uint256 y = get_y(source_token, dest_token, x, xp);
 
-        uint256 dy = xp[j] - y - 1; //  -1 just in case there were some rounding errors
+        uint256 dy = xp[dest_token] - y - 1; //  -1 just in case there were some rounding errors
         uint256 dy_fee = (dy * fee) / FEE_DENOMINATOR;
 
         // Convert all to real units
-        dy = ((dy - dy_fee) * PRECISION) / RATES[j];
-        require(dy >= min_dy, "Exchange resulted in fewer coins than expected");
+        dy = ((dy - dy_fee) * PRECISION) / RATES[dest_token];
+        require(
+            dy >= amount_out,
+            "Exchange resulted in fewer coins than expected"
+        );
 
         uint256 dy_admin_fee = (dy_fee * admin_fee) / FEE_DENOMINATOR;
-        dy_admin_fee = (dy_admin_fee * PRECISION) / RATES[j];
+        dy_admin_fee = (dy_admin_fee * PRECISION) / RATES[dest_token];
 
         // Change balances exactly in same way as we change actual ERC20 coin amounts
-        balances[i] = old_balances[i] + dx;
+        balances[source_token] = old_balances[source_token] + amount_in;
         // When rounding errors happen, we undercharge admin fee in favor of LP
-        balances[j] = old_balances[j] - dy - dy_admin_fee;
+        balances[dest_token] = old_balances[dest_token] - dy - dy_admin_fee;
 
-        address iAddress = coins[i];
+        address iAddress = coins[source_token];
         if (iAddress == NATIVE_ADDRESS) {
-            require(dx == msg.value, "Inconsistent quantity");
+            require(amount_in == msg.value, "Inconsistent quantity");
         } else {
-            IERC20(iAddress).safeTransferFrom(msg.sender, address(this), dx);
+            IERC20(iAddress).safeTransferFrom(
+                msg.sender,
+                address(this),
+                amount_in
+            );
         }
-        address jAddress = coins[j];
+        address jAddress = coins[dest_token];
         transfer_out(jAddress, dy);
-        emit TokenExchange(msg.sender, i, dx, j, dy);
+        emit TokenExchange(msg.sender, source_token, amount_in, dest_token, dy);
     }
 
     function remove_liquidity(
