@@ -4,6 +4,7 @@ DOCKER_RELAYER_NAME ?= most-relayer
 DOCKER_RELAYER_COPY_ADDRESSES ?= copy
 DOCKER_RELAYER_COMPILE_CONTRACTS ?= compile
 DOCKER_SIGNER_NAME ?= most-signer
+L2 ?= false
 
 export CONTRACT_VERSION ?=`git rev-parse HEAD`
 
@@ -158,7 +159,7 @@ print-azero-codehashes: compile-azero-docker
 
 .PHONY: deploy-azero-docker
 deploy-azero-docker: # Deploy azero contracts compiling in docker
-deploy-azero-docker: azero-deps compile-azero-docker
+deploy-azero-docker: azero-deps compile-azero-docker typechain-azero
 	cd azero && AZERO_ENV=$(AZERO_ENV) npm run deploy
 
 .PHONY: setup-azero-docker
@@ -218,9 +219,17 @@ setup-azero: compile-azero typechain-azero
 deploy: # Deploy all contracts
 deploy: deploy-eth deploy-azero setup-eth setup-azero
 
+.PHONY: deploy-docker
+deploy-docker: # Deploy all contracts, use docker compilation for azero
+deploy-docker: deploy-eth deploy-azero-docker setup-eth setup-azero-docker
+
 .PHONY: watch-relayer
 watch-relayer:
 	cd relayer && cargo watch -s 'cargo clippy' -c
+
+.PHONY: watch-relayer-l2
+watch-relayer-l2:
+	cd relayer && cargo watch -s 'cargo clippy --all-targets --all-features' -c
 
 .PHONY: run-relayer
 run-relayer: # Run a single relayer
@@ -283,6 +292,11 @@ test-relayer: # Run relayer tests
 test-relayer: compile-azero-docker compile-eth
 	cd relayer && cargo test
 
+.PHONY: test-relayer-l2
+test-relayer-l2: # Run relayer tests
+test-relayer-l2: compile-azero-docker compile-eth
+	cd relayer && cargo test --features l2
+
 .PHONY: e2e-test
 e2e-test: # Run specific e2e test. Requires: `TEST_CASE=test_module::test_name`.
 e2e-test:
@@ -308,23 +322,23 @@ check-js-format:
 .PHONY: solidity-lint
 solidity-lint: # Lint solidity contracts
 solidity-lint: eth-deps
-	cd eth && npx solhint 'contracts/*.sol'
+	cd eth && npx solhint 'contracts/**/*.sol'
 
 .PHONY: relayer-lint
 relayer-lint: # Lint relayer
 relayer-lint: compile-azero-docker compile-eth
-	cd relayer && cargo clippy -- --no-deps -D warnings
+	cd relayer && cargo clippy --all-targets --all-features -- --no-deps -D warnings
 
 .PHONY: ink-lint
 ink-lint: # Lint ink contracts
 ink-lint:
-	cd azero/contracts/most && cargo clippy -- --no-deps -D warnings
-	cd azero/contracts/token && cargo clippy -- --no-deps -D warnings
-	cd azero/contracts/psp22-traits && cargo clippy -- --no-deps -D warnings
-	cd azero/contracts/tests && cargo clippy -- --no-deps -D warnings
-	cd azero/contracts/gas-price-oracle/contract && cargo clippy -- --no-deps -D warnings
-	cd azero/contracts/gas-price-oracle/trait && cargo clippy -- --no-deps -D warnings
-	cd azero/contracts/ownable2step && cargo clippy -- --no-deps -D warnings
+	cd azero/contracts/most && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
+	cd azero/contracts/token && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
+	cd azero/contracts/psp22-traits && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
+	cd azero/contracts/tests && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
+	cd azero/contracts/gas-price-oracle/contract && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
+	cd azero/contracts/gas-price-oracle/trait && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
+	cd azero/contracts/ownable2step && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
 
 .PHONY: contracts-lint
 contracts-lint: # Lint contracts
@@ -333,7 +347,7 @@ contracts-lint: solidity-lint ink-lint
 .PHONY: solidity-format
 solidity-format: # Format solidity contracts
 solidity-format: eth-deps
-	cd eth && npx prettier --write --plugin=prettier-plugin-solidity 'contracts/*.sol'
+	cd eth && npx prettier --write --plugin=prettier-plugin-solidity 'contracts/**/*.sol'
 
 .PHONY: rust-format-check
 rust-format-check: # Check rust code formatting
@@ -385,12 +399,26 @@ format-check: rust-format-check js-format-check
 format: # Format code
 format: rust-format js-format solidity-format
 
+.PHONY: build-relayer
+build-relayer: # Build relayer
+	cd relayer && cargo build --release
+
+.PHONY: build-relayer-l2
+build-relayer-l2: # Build relayer with l2 feature
+	cd relayer && cargo build --release --features l2
+
+
 .PHONY: build-docker-relayer
 build-docker-relayer: # Build relayer docker image
 ifeq ($(DOCKER_RELAYER_COMPILE_CONTRACTS),compile)
 build-docker-relayer: compile-azero compile-eth
 endif
-	cd relayer && cargo build --release
+ifeq ($(L2),true)
+build-docker-relayer: build-relayer-l2
+else
+build-docker-relayer: build-relayer
+endif
+
 ifeq ($(DOCKER_RELAYER_COPY_ADDRESSES),copy)
 	cp azero/addresses.json relayer/azero_addresses.json
 	cp eth/addresses.json relayer/eth_addresses.json

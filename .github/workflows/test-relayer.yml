@@ -24,4 +24,6 @@ jobs:
 
       - name: Run tests
         shell: bash
-        run: make test-relayer
+        run: |
+          make test-relayer
+          make test-relayer-l2

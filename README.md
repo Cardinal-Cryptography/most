@@ -287,3 +287,9 @@ C-c C-e l p
 ```
 
 to render the whole document and evaluate plantuml code blocks (this will produce png files).
+
+## Acknowledgments
+
+This project includes code from the following MIT-licensed project:
+
+- [pancake-smart-contracts](https://github.com/pancakeswap/pancake-smart-contracts)
