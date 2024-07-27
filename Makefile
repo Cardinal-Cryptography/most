@@ -297,11 +297,17 @@ test-relayer-l2: # Run relayer tests
 test-relayer-l2: compile-azero-docker compile-eth
 	cd relayer && cargo test --features l2
 
-.PHONY: e2e-tests
-e2e-tests: # Run specific e2e test. Requires: `TEST_CASE=test_module::test_name`.
-e2e-tests:
+.PHONY: e2e-test
+e2e-test: # Run specific e2e test. Requires: `TEST_CASE=test_module::test_name`.
+e2e-test:
 	cd e2e-tests && \
-		RUST_LOG=info cargo test test::$(TEST_CASE) -- --color always --exact --nocapture --test-threads=1
+		cargo test test::$(TEST_CASE) -- --color always --exact --nocapture --test-threads=1
+
+.PHONY: e2e-tests
+e2e-tests: # Run e2e tests
+e2e-tests:
+	TEST_CASE=eth_to_azero::weth_to_weth make e2e-test
+	TEST_CASE=azero_to_eth::weth_to_weth make e2e-test
 
 .PHONY: drink-tests
 drink-tests: # Run drink tests
