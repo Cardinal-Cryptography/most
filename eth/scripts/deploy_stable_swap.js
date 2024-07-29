@@ -1,61 +1,52 @@
 const { ethers } = require("hardhat");
 
 async function main() {
+  const signers = await ethers.getSigners();
+  const accounts = signers.map((s) => s.address);
+
   const WrappedToken = await ethers.getContractFactory("WrappedToken");
-  const wrappedToken = await WrappedToken.deploy(
+  const bazero = await WrappedToken.deploy(
     "Bridge Azero",
-    "BAzero",
+    "bazero",
     12,
-    "0x929b4B89021Fa9cfA4317CF5a0C6A9821ed9295b", // Todo: set to MostL2
+    accounts[0],
   );
-  wrappedToken.waitForDeployment();
+  await bazero.waitForDeployment();
+  console.log("bazero deployed to:", bazero.target);
 
-  console.log("Bazero deployed to:", wrappedToken.target);
-
-  const StableSwapLPFactory = await ethers.getContractFactory(
-    "StableSwapLPFactory",
+  // Replace later with native L2 token
+  const testToken = await WrappedToken.deploy(
+    "testToken",
+    "ttoken",
+    18,
+    accounts[0],
   );
-  const stableSwapLPFactory = await StableSwapLPFactory.deploy();
-  stableSwapLPFactory.waitForDeployment();
+  await testToken.waitForDeployment();
+  console.log("testToken deployed to:", testToken.target);
 
-  console.log("StableSwapLPFactory deployed to:", stableSwapLPFactory.target);
+  const LP = await ethers.getContractFactory("StableSwapLP");
+  const lp = await LP.deploy();
+  await lp.waitForDeployment();
 
-  const StableSwapTwoPoolDeployer = await ethers.getContractFactory(
-    "StableSwapTwoPoolDeployer",
-  );
-  const stableSwapTwoPoolDeployer = await StableSwapTwoPoolDeployer.deploy();
-  stableSwapTwoPoolDeployer.waitForDeployment();
+  console.log("LP deployed to:", lp.target);
 
-  console.log(
-    "StableSwapTwoPoolDeployer deployed to:",
-    stableSwapTwoPoolDeployer.target,
-  );
+  const Pool = await ethers.getContractFactory("StableSwapTwoPool");
+  const pool = await Pool.deploy();
+  await pool.waitForDeployment();
+  console.log("Pool deployed to:", pool.target);
 
-  const StableSwapFactory =
-    await ethers.getContractFactory("StableSwapFactory");
-  const stableSwapFactory = await StableSwapFactory.deploy(
-    stableSwapLPFactory.target,
-    stableSwapTwoPoolDeployer.target,
-  );
-  await stableSwapFactory.waitForDeployment();
+  const setMinterTX = await lp.setMinter(pool.target);
+  await setMinterTX.wait(1);
 
-  console.log("StableSwapFactory deployed to:", stableSwapFactory.target);
-
-  await stableSwapLPFactory.transferOwnership(stableSwapFactory.target);
-  await (
-    await stableSwapTwoPoolDeployer.transferOwnership(stableSwapFactory.target)
-  ).wait(1);
-
-  const tx = await stableSwapFactory.createSwapPair(
-    wrappedToken.target,
-    "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+  const initializeTx = await pool.initialize(
+    [bazero.target, testToken.target],
+    1, // Todo set constants, fees etc
     1,
     1,
-    1,
+    accounts[0],
+    lp.target,
   );
-  await tx.wait(1);
-
-  console.log(tx);
+  await initializeTx.wait(1);
 }
 
 main().catch((error) => {
