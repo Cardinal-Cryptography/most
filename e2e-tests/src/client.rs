@@ -25,7 +25,7 @@ pub struct Balance {
 }
 
 impl Balance {
-    pub fn wrap_weth_eth(&self, transfer_amount: u128) -> Result<Self> {
+    pub fn wrap_weth(&self, transfer_amount: u128) -> Result<Self> {
         let mut balance = self.clone();
         balance.eth = balance
             .eth
@@ -35,6 +35,19 @@ impl Balance {
             .weth_eth
             .checked_add(transfer_amount)
             .ok_or(anyhow!("wETH overflow."))?;
+        Ok(balance)
+    }
+
+    pub fn wrap_wazero(&self, transfer_amount: u128) -> Result<Self> {
+        let mut balance = self.clone();
+        balance.azero = balance
+            .azero
+            .checked_sub(transfer_amount.into())
+            .ok_or(anyhow!("Insufficient AZERO."))?;
+        balance.wazero_azero = balance
+            .wazero_azero
+            .checked_add(transfer_amount)
+            .ok_or(anyhow!("wAZERO overflow."))?;
         Ok(balance)
     }
 
@@ -64,7 +77,20 @@ impl Balance {
         Ok(balance)
     }
 
-    pub fn bridge_weth_azero_to_weth(&self, transfer_amount: u128) -> Result<Self> {
+    pub fn bridge_wazero_eth_to_azero(&self, transfer_amount: u128) -> Result<Self> {
+        let mut balance = self.clone();
+        balance.wazero_eth = balance
+            .wazero_eth
+            .checked_sub(transfer_amount)
+            .ok_or(anyhow!("Insufficient wAZERO."))?;
+        balance.wazero_azero = balance
+            .wazero_azero
+            .checked_add(transfer_amount)
+            .ok_or(anyhow!("wAZERO overflow."))?;
+        Ok(balance)
+    }
+
+    pub fn bridge_weth_azero_to_eth(&self, transfer_amount: u128) -> Result<Self> {
         let mut balance = self.clone();
         balance.weth_azero = balance
             .weth_azero
@@ -74,6 +100,32 @@ impl Balance {
             .weth_eth
             .checked_add(transfer_amount)
             .ok_or(anyhow!("wETH overflow."))?;
+        Ok(balance)
+    }
+
+    pub fn bridge_usdt_azero_to_eth(&self, transfer_amount: u128) -> Result<Self> {
+        let mut balance = self.clone();
+        balance.usdt_azero = balance
+            .usdt_azero
+            .checked_sub(transfer_amount)
+            .ok_or(anyhow!("Insufficient wETH."))?;
+        balance.usdt_eth = balance
+            .usdt_eth
+            .checked_add(transfer_amount)
+            .ok_or(anyhow!("wETH overflow."))?;
+        Ok(balance)
+    }
+
+    pub fn bridge_wazero_azero_to_eth(&self, transfer_amount: u128) -> Result<Self> {
+        let mut balance = self.clone();
+        balance.wazero_azero = balance
+            .wazero_azero
+            .checked_sub(transfer_amount)
+            .ok_or(anyhow!("Insufficient wAZERO."))?;
+        balance.wazero_eth = balance
+            .wazero_eth
+            .checked_add(transfer_amount)
+            .ok_or(anyhow!("wAZERO overflow."))?;
         Ok(balance)
     }
 
@@ -196,7 +248,7 @@ impl Client {
     }
 
     // Wrap some ETH into wETH
-    pub async fn wrap_weth_eth(&self, transfer_amount: U256) -> Result<()> {
+    pub async fn wrap_weth(&self, transfer_amount: U256) -> Result<()> {
         info!("Attempting to wrap ETH into wETH");
         info!("Transfer amount: {}", transfer_amount);
         let wrap_receipt = eth::send_ether(
@@ -213,6 +265,20 @@ impl Client {
         } else {
             return Err(anyhow!("Failed to wrap ETH: {:?}", wrap_receipt));
         }
+    }
+
+    pub async fn wrap_wazero(&self, transfer_amount: u128) -> Result<()> {
+        info!("Attempting to wrap Azero into wAzero");
+        info!("Transfer amount: {}", transfer_amount);
+        let deposit_info = self.wazero_azero
+            .exec0(
+                &self.azero_signed_connection,
+                "WrappedAZERO::deposit",
+                ExecCallParams::new().value(transfer_amount),
+            )
+            .await?;
+        info!("`deposit` tx info: {:?}", deposit_info);
+        Ok(())
     }
 
     async fn approve_azero(
@@ -243,6 +309,23 @@ impl Client {
             transfer_amount
         );
         self.approve_azero(&self.weth_azero, transfer_amount).await
+    }
+
+    pub async fn approve_usdt_azero(&self, transfer_amount: u128) -> Result<()> {
+        info!(
+            "Attempting to approve the 'most' contract to use {} of the USDT funds",
+            transfer_amount
+        );
+        self.approve_azero(&self.usdt_azero, transfer_amount).await
+    }
+
+    pub async fn approve_wazero_azero(&self, transfer_amount: u128) -> Result<()> {
+        info!(
+            "Attempting to approve the 'most' contract to use {} of the wAZERO funds",
+            transfer_amount
+        );
+        self.approve_azero(&self.wazero_azero, transfer_amount)
+            .await
     }
 
     async fn approve_eth(
@@ -320,6 +403,16 @@ impl Client {
 
     pub async fn request_weth_transfer_azero(&self, transfer_amount: u128) -> Result<()> {
         self.request_transfer_azero(&self.weth_azero, transfer_amount)
+            .await
+    }
+
+    pub async fn request_usdt_transfer_azero(&self, transfer_amount: u128) -> Result<()> {
+        self.request_transfer_azero(&self.usdt_azero, transfer_amount)
+            .await
+    }
+
+    pub async fn request_wazero_transfer_azero(&self, transfer_amount: u128) -> Result<()> {
+        self.request_transfer_azero(&self.wazero_azero, transfer_amount)
             .await
     }
 
