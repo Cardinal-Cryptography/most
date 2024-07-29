@@ -1,6 +1,7 @@
 use std::{future::Future, ops::AddAssign};
 
 use anyhow::{anyhow, Error, Result};
+use ethers::types::U256;
 use log::info;
 use tokio::time::{sleep, Duration};
 
@@ -9,6 +10,8 @@ use crate::client::Balance;
 pub async fn wait_for_balance_change<F, R>(
     get_current_balance: F,
     target_balance: Balance,
+    max_eth_fee: Option<U256>,
+    max_azero_fee: Option<u128>,
     wait_max_minutes: u64,
 ) -> Result<()>
 where
@@ -30,7 +33,7 @@ where
         wait.add_assign(tick);
         let current_balance = get_current_balance().await?;
         info!("Current balance: {:?}", current_balance);
-        if current_balance.satisfies_target(&target_balance) {
+        if current_balance.satisfies_target(&target_balance, max_eth_fee, max_azero_fee) {
             info!("Required balance change detected");
             return Ok(());
         }

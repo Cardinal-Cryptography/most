@@ -2,7 +2,7 @@ use aleph_client::{contract::ExecCallParams, pallets::system::SystemApi};
 use anyhow::{anyhow, Result};
 use ethers::{
     providers::Middleware,
-    types::{Address, U256, U64},
+    types::{Address, H256, U256, U64},
 };
 use log::info;
 
@@ -42,12 +42,25 @@ impl Balance {
         let mut balance = self.clone();
         balance.azero = balance
             .azero
-            .checked_sub(transfer_amount.into())
+            .checked_sub(transfer_amount)
             .ok_or(anyhow!("Insufficient AZERO."))?;
         balance.wazero_azero = balance
             .wazero_azero
             .checked_add(transfer_amount)
             .ok_or(anyhow!("wAZERO overflow."))?;
+        Ok(balance)
+    }
+
+    pub fn bridge_eth_eth_to_azero(&self, transfer_amount: u128) -> Result<Self> {
+        let mut balance = self.clone();
+        balance.eth = balance
+            .eth
+            .checked_sub(transfer_amount.into())
+            .ok_or(anyhow!("Insufficient wETH."))?;
+        balance.weth_azero = balance
+            .weth_azero
+            .checked_add(transfer_amount)
+            .ok_or(anyhow!("wETH overflow."))?;
         Ok(balance)
     }
 
@@ -129,15 +142,27 @@ impl Balance {
         Ok(balance)
     }
 
-    pub fn satisfies_target(&self, target: &Self) -> bool {
-        self.eth <= target.eth
+    pub fn satisfies_target(
+        &self,
+        target: &Self,
+        max_eth_fee: Option<U256>,
+        max_azero_fee: Option<u128>,
+    ) -> bool {
+        let mut output = self.eth <= target.eth
             && self.weth_eth == target.weth_eth
             && self.wazero_eth == target.wazero_eth
             && self.usdt_eth == target.usdt_eth
             && self.azero <= target.azero
             && self.weth_azero == target.weth_azero
             && self.wazero_azero == target.wazero_azero
-            && self.usdt_azero == target.usdt_azero
+            && self.usdt_azero == target.usdt_azero;
+        if let Some(tolerance) = max_eth_fee {
+            output = output && self.eth + tolerance >= target.eth;
+        }
+        if let Some(tolerance) = max_azero_fee {
+            output = output && self.azero + tolerance >= target.azero;
+        }
+        output
     }
 }
 
@@ -218,19 +243,19 @@ impl Client {
             .await;
         let weth_azero: u128 = get_psp22_balance_of(
             &self.weth_azero,
-            &azero_account,
+            azero_account,
             self.azero_signed_connection.clone(),
         )
         .await?;
         let usdt_azero: u128 = get_psp22_balance_of(
             &self.usdt_azero,
-            &azero_account,
+            azero_account,
             self.azero_signed_connection.clone(),
         )
         .await?;
         let wazero_azero: u128 = get_psp22_balance_of(
             &self.wazero_azero,
-            &azero_account,
+            azero_account,
             self.azero_signed_connection.clone(),
         )
         .await?;
@@ -252,7 +277,7 @@ impl Client {
         info!("Attempting to wrap ETH into wETH");
         info!("Transfer amount: {}", transfer_amount);
         let wrap_receipt = eth::send_ether(
-            self.eth_account_address.clone(),
+            self.eth_account_address,
             self.weth_eth.address(),
             transfer_amount,
             &self.eth_signed_connection,
@@ -261,16 +286,17 @@ impl Client {
 
         if wrap_receipt.status.unwrap_or_default() == U64::from(1) {
             info!("Successfully wrapped {} ETH", transfer_amount);
-            return Ok(());
+            Ok(())
         } else {
-            return Err(anyhow!("Failed to wrap ETH: {:?}", wrap_receipt));
+            Err(anyhow!("Failed to wrap ETH: {:?}", wrap_receipt))
         }
     }
 
     pub async fn wrap_wazero(&self, transfer_amount: u128) -> Result<()> {
         info!("Attempting to wrap Azero into wAzero");
         info!("Transfer amount: {}", transfer_amount);
-        let deposit_info = self.wazero_azero
+        let deposit_info = self
+            .wazero_azero
             .exec0(
                 &self.azero_signed_connection,
                 "WrappedAZERO::deposit",
@@ -338,12 +364,12 @@ impl Client {
 
         if approve_receipt.status.unwrap_or_default() == U64::from(1) {
             info!("Successfully approved the `most` contract to use wrapped token");
-            return Ok(());
+            Ok(())
         } else {
-            return Err(anyhow!(
+            Err(anyhow!(
                 "Failed to approve the `most` contract to use wrapped token: {:?}",
                 approve_receipt
-            ));
+            ))
         }
     }
 
@@ -416,6 +442,33 @@ impl Client {
             .await
     }
 
+    pub async fn request_eth_transfer_eth(&self, transfer_amount: U256) -> Result<()> {
+        info!(
+            "Attempting to transfer {} of the ETH funds",
+            transfer_amount
+        );
+        let send_request_args = (self.azero_account_address_bytes,);
+        let call = self
+            .most_eth
+            .method::<_, H256>("sendRequestNative", send_request_args)?
+            .value(transfer_amount);
+        let pending_tx = call.send().await?;
+        let send_request_receipt = pending_tx
+            .confirmations(1)
+            .await?
+            .ok_or(anyhow!("tx receipt not available."))?;
+
+        if send_request_receipt.status.unwrap_or_default() == U64::from(1) {
+            info!("Successfully requested the transfer to the Aleph Zero chain",);
+            Ok(())
+        } else {
+            Err(anyhow!(
+                "Failed to request the transfer to the Aleph Zero chain: {:?}",
+                send_request_receipt
+            ))
+        }
+    }
+
     async fn request_transfer_eth(
         &self,
         contract: &eth::ContractInstance,
@@ -432,12 +485,12 @@ impl Client {
             eth::contract_exec(&self.most_eth, "sendRequest", send_request_args).await?;
         if send_request_receipt.status.unwrap_or_default() == U64::from(1) {
             info!("Successfully requested the transfer to the Aleph Zero chain",);
-            return Ok(());
+            Ok(())
         } else {
-            return Err(anyhow!(
+            Err(anyhow!(
                 "Failed to request the transfer to the Aleph Zero chain: {:?}",
                 send_request_receipt
-            ));
+            ))
         }
     }
 

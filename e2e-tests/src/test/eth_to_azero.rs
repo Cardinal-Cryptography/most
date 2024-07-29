@@ -44,6 +44,40 @@ pub async fn weth_to_weth() -> Result<()> {
     wait_for_balance_change(
         get_current_balance,
         target_balance,
+        Some(transfer_amount / 100),
+        Some(0),
+        config.test_args.wait_max_minutes,
+    )
+    .await
+}
+
+#[tokio::test]
+pub async fn eth_to_weth() -> Result<()> {
+    let config = setup_test();
+    let test_context = config.create_test_context().await?;
+    let transfer_amount = utils::parse_ether(config.test_args.transfer_amount.clone())?;
+    let client = Client::new(test_context);
+    let initial_balance = client.balance().await?;
+
+    info!("{:?}", client.balance().await?);
+
+    info!("Request the transfer of ETH to the Aleph Zero chain");
+    client.request_eth_transfer_eth(transfer_amount).await?;
+    info!("{:?}", client.balance().await?);
+
+    info!("Wait for balance change");
+
+    let target_balance = initial_balance
+        .wrap_weth(transfer_amount.as_u128())?
+        .bridge_eth_eth_to_azero(transfer_amount.as_u128())?;
+    info!("Target balance: {:?}", target_balance);
+
+    let get_current_balance = || async { client.balance().await };
+    wait_for_balance_change(
+        get_current_balance,
+        target_balance,
+        Some(transfer_amount / 100),
+        Some(0),
         config.test_args.wait_max_minutes,
     )
     .await
@@ -76,6 +110,8 @@ pub async fn usdt_to_usdt() -> Result<()> {
     wait_for_balance_change(
         get_current_balance,
         target_balance,
+        Some(transfer_amount / 100),
+        Some(0),
         config.test_args.wait_max_minutes,
     )
     .await
@@ -85,8 +121,7 @@ pub async fn usdt_to_usdt() -> Result<()> {
 pub async fn wazero_to_wazero() -> Result<()> {
     let config = setup_test();
     let test_context = config.create_test_context().await?;
-    let transfer_amount =
-        utils::parse_ether(config.test_args.transfer_amount.clone())?;
+    let transfer_amount = utils::parse_ether(config.test_args.transfer_amount.clone())?;
     let client = Client::new(test_context);
     let initial_balance = client.balance().await?;
 
@@ -106,6 +141,8 @@ pub async fn wazero_to_wazero() -> Result<()> {
     wait_for_balance_change(
         get_current_balance,
         target_balance,
+        Some(transfer_amount / 100),
+        Some(0),
         config.test_args.wait_max_minutes,
     )
     .await
