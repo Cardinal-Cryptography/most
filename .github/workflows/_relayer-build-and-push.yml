@@ -135,7 +135,7 @@ jobs:
           # There are two types of relayers: L1 and L2
           if [[ '${{ inputs.layer }}' == 'L2' ]]; then
             docker_name=most-l2-relayer-${docker_tag}
-            make build-docker-l2-relayer \
+            make build-docker-relayer \
               L2=true \
               DOCKER_RELAYER_NAME=${docker_name} \
               DOCKER_RELAYER_COPY_ADDRESSES=no_copy \
