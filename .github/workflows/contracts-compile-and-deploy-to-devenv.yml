@@ -1,5 +1,5 @@
 ---
-name: Bridgenet - deploy contracts
+name: Devenv - deploy contracts
 
 on:
   workflow_call:
@@ -39,7 +39,7 @@ jobs:
 
       - name: Deploy eth contracts
         shell: bash
-        run: make deploy-eth NETWORK=bridgenet
+        run: make deploy-eth NETWORK=sepolia SEPOLIA_KEY="${{ secrets.DEVENV_TESTNET_SEPOLIA_KEY }}" SEPOLIA_ACCOUNT_NUMBER=${{ secrets.DEVENV_TESTNET_SEPOLIA_ACCOUNT_NUMBER }}
 
       - name: Deploy azero contracts
         shell: bash

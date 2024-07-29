@@ -117,17 +117,17 @@ var config = {
 
 if (SEPOLIA_KEY) {
   config.networks.sepolia = {
-    url: (SEPOLIA_URL == "" ? "https://ethereum-sepolia-rpc.publicnode.com" : SEPOLIA_URL),
+    url: (typeof SEPOLIA_URL == 'undefined' || SEPOLIA_URL == "" ? "https://ethereum-sepolia-rpc.publicnode.com" : SEPOLIA_URL),
     accounts: {
-      SEPOLIA_KEY
+      mnemonic: SEPOLIA_KEY
     },
     deploymentConfig: {
       guardianIds: [
-        (SEPOLIA_ACCOUNT_NUMBER == "" ? "0xc4E0B92Df2DE77C077D060e49ec63DC196980716" : SEPOLIA_ACCOUNT_NUMBER), // sepolia account address corresponding to SEPOLIA_KEY
+        (typeof SEPOLIA_ACCOUNT_NUMBER == 'undefined' || SEPOLIA_ACCOUNT_NUMBER == "" ? "0xc4E0B92Df2DE77C077D060e49ec63DC196980716" : SEPOLIA_ACCOUNT_NUMBER), // sepolia account address corresponding to SEPOLIA_KEY
       ],
-      threshold: (SEPOLIA_THRESHOLD == "" ? 1 : parseInt(SEPOLIA_THRESHOLD, 10)),
-      weth: (SEPOLIA_WETH == "" ? "0xd91aE8FD2Be53F74876a9cc4aFb416645A0c8420" : SEPOLIA_WETH),
-      tokenConfigPath: (SEPOLIA_TOKEN_CONFIG_PATH == "" ? "../cfg/tokens_testnet_example.json" : SEPOLIA_TOKEN_CONFIG_PATH),
+      threshold: (typeof SEPOLIA_THRESHOLD == 'undefined' || SEPOLIA_THRESHOLD == "" ? 1 : parseInt(SEPOLIA_THRESHOLD, 10)),
+      weth: (typeof SEPOLIA_WETH == 'undefined' || SEPOLIA_WETH == "" ? "0xd91aE8FD2Be53F74876a9cc4aFb416645A0c8420" : SEPOLIA_WETH),
+      tokenConfigPath: (typeof SEPOLIA_TOKEN_CONFIG_PATH == 'undefined' || SEPOLIA_TOKEN_CONFIG_PATH == "" ? "../cfg/tokens_testnet_example.json" : SEPOLIA_TOKEN_CONFIG_PATH),
     },
   };
 }
