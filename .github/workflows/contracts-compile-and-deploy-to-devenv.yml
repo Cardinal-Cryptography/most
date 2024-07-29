@@ -175,14 +175,6 @@ jobs:
           name: eth-deployed-contracts
           path: eth
 
-      - name: Debug
-        shell: bash
-        run: |
-          find azero/artifacts
-          find eth/artifacts
-          ls -al azero/
-          ls -al eth/
-
       - name: Store artifact in S3 bucket
         uses: Cardinal-Cryptography/github-actions/store-contract-artifact@v6
         with:
@@ -214,14 +206,6 @@ jobs:
           name: eth-deployed-contracts
           path: eth
 
-      - name: Debug
-        shell: bash
-        run: |
-          find azero/artifacts
-          find eth/artifacts
-          ls -al azero/
-          ls -al eth/
-
       - name: Prepare contract_spec JSON
         uses: Cardinal-Cryptography/github-actions/generate-contract-spec@v6
         with:
@@ -237,7 +221,7 @@ jobs:
         run: |
           ETH_START_BLOCK=$(cat eth/block_latest.json | jq -r '.number')
           AZERO_START_BLOCK=$(cat azero/block_latest.json | jq -r '.number')
-          cat contract_spec.json | jq '.start_blocks = { eth: "$ETH_START_BLOCK", azero: "$AZERO_START_BLOCK" }' | \
+          cat contract_spec.json | jq '.start_blocks = { eth: "$ETH_START_BLOCK", azero: "$AZERO_START_BLOCK" }' \
             > contract_spec_with_block_numbers.json
 
       - name: Print out contract_spec JSON
