@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - master
+      - MOST-93-deploy-contracts-to-testnet
 
 jobs:
   check-vars-and-secrets:
