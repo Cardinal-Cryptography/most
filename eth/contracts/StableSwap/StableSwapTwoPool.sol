@@ -25,7 +25,7 @@ import "@openzeppelin-4.5.0/contracts/access/Ownable.sol";
 import "@openzeppelin-4.5.0/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin-4.5.0/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin-4.5.0/contracts/security/ReentrancyGuard.sol";
-import "./IStableSwapLP.sol";
+import "./interfaces/IStableSwapLP.sol";
 
 contract StableSwapTwoPool is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -494,12 +494,25 @@ contract StableSwapTwoPool is Ownable, ReentrancyGuard {
         return dy - _fee;
     }
 
+    function exchange_native(
+        uint256 amount_in,
+        uint256 native_min_amount_out
+    ) external payable nonReentrant {
+        require(support_native, "Cant exchange native without native support");
+
+        if (coins[0] == NATIVE_ADDRESS) {
+            exchange(1, 0, amount_in, native_min_amount_out);
+        } else {
+            exchange(0, 1, amount_in, native_min_amount_out);
+        }
+    }
+
     function exchange(
         uint256 source_token,
         uint256 dest_token,
         uint256 amount_in,
         uint256 amount_out
-    ) external payable nonReentrant {
+    ) internal {
         require(!is_killed, "Killed");
         if (!support_native) {
             require(msg.value == 0, "Inconsistent quantity"); // Avoid sending native by mistake.
