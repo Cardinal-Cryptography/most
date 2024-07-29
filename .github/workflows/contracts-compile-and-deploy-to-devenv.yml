@@ -209,7 +209,7 @@ jobs:
             eth/addresses.json|eth_
             azero/addresses.json|azero_
           dst-file: contract_spec.json
-          spec-version: '0.2'
+          spec-version: '0.1'
           contract-version: '${{ github.sha }}'
 
       - name: Add block numbers to contract_spec JSON
