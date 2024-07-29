@@ -68,12 +68,14 @@ jobs:
           SEPOLIA_ACCOUNT_NUMBER: ${{ secrets.DEVENV_TESTNET_SEPOLIA_ACCOUNT_NUMBER }}
           SEPOLIA_TOKEN_CONFIG_PATH: "../cfg/tokens_testnet.json"
         run: |
+          make eth-deps
           cd eth
           npx hardhat run --network sepolia scripts/get_latest_block.js
 
       - name: Get latest azero block
         shell: bash
         run: |
+          make azero-deps
           cd azero
           AZERO_ENV=testnet npm run get-latest-block
 
