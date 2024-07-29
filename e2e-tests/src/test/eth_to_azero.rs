@@ -1,13 +1,8 @@
-use anyhow::{anyhow, Result};
-use ethers::{types::U64, utils};
+use anyhow::Result;
+use ethers::utils;
 use log::info;
 
-use crate::{
-    azero::get_psp22_balance_of,
-    config::{setup_test, TestContext},
-    eth,
-    wait::wait_for_balance_change,
-};
+use crate::{client::Client, config::setup_test, wait::wait_for_balance_change};
 
 /// One-way `Ethereum` -> `Aleph Zero` transfer through `most`.
 /// Wraps the required funds into wETH for an Ethereum account.
@@ -20,93 +15,67 @@ use crate::{
 pub async fn weth_to_weth() -> Result<()> {
     let config = setup_test();
     let test_context = config.create_test_context().await?;
-
-    let TestContext {
-        azero_signed_connection,
-        eth_signed_connection,
-        weth_eth,
-        most_eth,
-        weth_azero,
-        ..
-    } = test_context;
-
-    info!("Running test of Ethereum -> Aleph Zero ETH transfer...");
-
-    let eth_account_address = eth_signed_connection.address();
-    let azero_account = azero_signed_connection.signer.account_id();
-
-    let mut weth_eth_address_bytes = [0_u8; 32];
-    weth_eth_address_bytes[12..].copy_from_slice(weth_eth.address().as_fixed_bytes());
-    let azero_account_address_bytes: [u8; 32] = (*azero_account).clone().into();
-
-    // Wrap some ETH into wETH
     let transfer_amount = utils::parse_ether(config.test_args.transfer_amount)?;
-    let wrap_receipt = eth::send_ether(
-        eth_account_address,
-        weth_eth.address(),
-        transfer_amount + 100,
-        &eth_signed_connection,
-    )
-    .await?;
+    let client = Client::new(test_context);
+    let initial_balance = client.balance().await?;
 
-    if wrap_receipt.status.unwrap_or_default() == U64::from(1) {
-        info!(
-            "Successfully wrapped {} ETH into wETH",
-            transfer_amount + 100
-        );
-    } else {
-        return Err(anyhow!("Failed to wrap ETH into wETH: {:?}", wrap_receipt));
-    }
+    info!("{:?}", client.balance().await?);
 
-    // Approve the `most` contract to use the wETH funds
-    let approve_args = (most_eth.address(), transfer_amount);
-    let approve_receipt = eth::contract_exec(weth_eth, "approve", approve_args).await?;
+    info!("Wrap some ETH into wETH");
+    client.wrap_weth_eth(transfer_amount).await?;
+    info!("{:?}", client.balance().await?);
 
-    if approve_receipt.status.unwrap_or_default() == U64::from(1) {
-        info!("Successfully approved the `most` contract to use wETH");
-    } else {
-        return Err(anyhow!(
-            "Failed to approve the `most` contract to use wETH: {:?}",
-            approve_receipt
-        ));
-    }
+    info!("Approve the `most` contract to use the wETH funds");
+    client.approve_weth_eth(transfer_amount).await?;
+    info!("{:?}", client.balance().await?);
 
-    let balance_pre_transfer: u128 =
-        get_psp22_balance_of(&weth_azero, azero_account, azero_signed_connection.clone()).await?;
+    info!("Request the transfer of wETH to the Aleph Zero chain");
+    client.request_weth_transfer_eth(transfer_amount).await?;
+    info!("{:?}", client.balance().await?);
 
-    info!(
-        "wETH (Aleph Zero) balance pre transfer: {:?}",
-        balance_pre_transfer
-    );
+    info!("Wait for balance change");
 
-    // Request the transfer of wETH to the Aleph Zero chain
-    let send_request_args = (
-        weth_eth_address_bytes,
-        transfer_amount,
-        azero_account_address_bytes,
-    );
-    let send_request_receipt =
-        eth::contract_exec(most_eth, "sendRequest", send_request_args).await?;
-    if send_request_receipt.status.unwrap_or_default() == U64::from(1) {
-        info!(
-            "Successfully requested the transfer of {} wETH to the Aleph Zero chain",
-            transfer_amount
-        );
-    } else {
-        return Err(anyhow!(
-            "Failed to request the transfer of wETH to the Aleph Zero chain: {:?}",
-            send_request_receipt
-        ));
-    }
+    let target_balance = initial_balance
+        .wrap_weth_eth(transfer_amount.as_u128())?
+        .bridge_weth_eth_to_azero(transfer_amount.as_u128())?;
+    info!("Target balance: {:?}", target_balance);
 
-    let get_current_balance = || async {
-        get_psp22_balance_of(&weth_azero, azero_account, azero_signed_connection.clone()).await
-    };
-
+    let get_current_balance = || async { client.balance().await };
     wait_for_balance_change(
-        transfer_amount.as_u128(),
-        balance_pre_transfer,
         get_current_balance,
+        target_balance,
+        config.test_args.wait_max_minutes,
+    )
+    .await
+}
+
+#[tokio::test]
+pub async fn usdt_to_usdt() -> Result<()> {
+    let config = setup_test();
+    let test_context = config.create_test_context().await?;
+    let transfer_amount = utils::parse_ether(config.test_args.transfer_amount)? / 1_000_u128;
+    let client = Client::new(test_context);
+    let initial_balance = client.balance().await?;
+
+    info!("{:?}", client.balance().await?);
+
+    info!("Approve the `most` contract to use the USDT funds");
+    client.approve_usdt_eth(transfer_amount).await?;
+    info!("{:?}", client.balance().await?);
+
+    info!("Request the transfer of USDT to the Aleph Zero chain");
+    client.request_usdt_transfer_eth(transfer_amount).await?;
+    info!("{:?}", client.balance().await?);
+
+    info!("Wait for balance change");
+
+    let target_balance = initial_balance.bridge_usdt_eth_to_azero(transfer_amount.as_u128())?;
+    info!("Target balance: {:?}", target_balance);
+
+    let get_current_balance = || async { client.balance().await };
+    wait_for_balance_change(
+        get_current_balance,
+        target_balance,
         config.test_args.wait_max_minutes,
     )
     .await

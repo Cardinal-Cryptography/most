@@ -92,7 +92,7 @@ pub fn contract_from_deployed(
 }
 
 pub async fn contract_exec<T: Tokenize>(
-    contract: ContractInstance,
+    contract: &ContractInstance,
     method: &str,
     args: T,
 ) -> Result<TransactionReceipt> {

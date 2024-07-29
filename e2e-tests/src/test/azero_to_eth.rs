@@ -1,13 +1,8 @@
-use aleph_client::contract::ExecCallParams;
-use anyhow::{Error, Result};
+use anyhow::Result;
 use ethers::utils;
 use log::info;
 
-use crate::{
-    azero,
-    config::{setup_test, TestContext},
-    wait::wait_for_balance_change,
-};
+use crate::{client::Client, config::setup_test, wait::wait_for_balance_change};
 
 /// One-way `Aleph Zero` -> `Ethereum` transfer through `most`.
 /// Requires a prior transaction in the other direction to have completed.
@@ -22,72 +17,26 @@ use crate::{
 pub async fn weth_to_weth() -> Result<()> {
     let config = setup_test();
     let test_context = config.create_test_context().await?;
-
-    let TestContext {
-        azero_signed_connection,
-        eth_signed_connection,
-        weth_azero,
-        weth_eth,
-        most_azero,
-        ..
-    } = test_context;
-
     let transfer_amount = utils::parse_ether(config.test_args.transfer_amount)?.as_u128();
+    let client = Client::new(test_context);
+    let initial_balance = client.balance().await?;
 
-    let approve_args = [
-        most_azero.address().to_string(),
-        transfer_amount.to_string(),
-    ];
+    info!("{:?}", initial_balance);
 
-    let approve_info = weth_azero
-        .exec(
-            &azero_signed_connection,
-            "PSP22::approve",
-            &approve_args,
-            Default::default(),
-        )
-        .await?;
-    info!("`approve` tx info: {:?}", approve_info);
+    info!("Approve the `most` contract to use the wETH funds on the Azero chain");
+    client.approve_weth_azero(transfer_amount).await?;
 
-    let eth_account_address = eth_signed_connection.address();
-    let mut eth_account_address_bytes = [0_u8; 32];
-    eth_account_address_bytes[12..].copy_from_slice(eth_account_address.as_fixed_bytes());
+    info!("Request the transfer of wETH to the Ethereum chain");
+    client.request_weth_transfer_azero(transfer_amount).await?;
 
-    let balance_pre_transfer = weth_eth
-        .method::<_, u128>("balanceOf", eth_account_address)?
-        .call()
-        .await?;
-    info!("ETH balance pre transfer: {:?}", balance_pre_transfer);
+    info!("Wait for balance change");
+    let target_balance = initial_balance.bridge_weth_azero_to_weth(transfer_amount)?;
+    info!("Target balance: {:?}", target_balance);
 
-    let weth_azero_address_bytes: [u8; 32] = (*weth_azero.address()).clone().into();
-    let send_request_args = [
-        azero::bytes32_to_string(&weth_azero_address_bytes),
-        transfer_amount.to_string(),
-        azero::bytes32_to_string(&eth_account_address_bytes),
-    ];
-
-    let send_request_info = most_azero
-        .exec(
-            &azero_signed_connection,
-            "send_request",
-            &send_request_args,
-            ExecCallParams::new().value(10_000_000_000_000_000),
-        )
-        .await?;
-    info!("`send_request` tx info: {:?}", send_request_info);
-
-    let get_current_balance = || async {
-        let balance_current = weth_eth
-            .method::<_, u128>("balanceOf", eth_account_address)?
-            .call()
-            .await?;
-        Ok::<u128, Error>(balance_current)
-    };
-
+    let get_current_balance = || async { client.balance().await };
     wait_for_balance_change(
-        transfer_amount,
-        balance_pre_transfer,
         get_current_balance,
+        target_balance,
         config.test_args.wait_max_minutes,
     )
     .await
