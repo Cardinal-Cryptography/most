@@ -1,7 +1,6 @@
 import fs from "fs";
 
-import { ApiPromise, WsProvider, Keyring } from "@polkadot/api";
-import { import_env } from "./utils";
+import { ApiPromise, WsProvider } from "@polkadot/api";
 import "dotenv/config";
 import "@polkadot/api-augment";
 
@@ -12,7 +11,7 @@ async function main(): Promise<void> {
     throw new Error("Please provide an env file");
   }
 
-  const config = await import_env(envFile);
+  const config = await import(`../env/${envFile}.json`)
   const { ws_node } = config;
   const wsProvider = new WsProvider(ws_node);
   const api = await ApiPromise.create({ provider: wsProvider });
