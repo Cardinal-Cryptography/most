@@ -68,11 +68,15 @@ jobs:
 
       - name: Setup eth contracts
         shell: bash
-        run: make setup-eth NETWORK=bridgenet
+        env:
+          SEPOLIA_KEY: ${{ secrets.DEVENV_TESTNET_SEPOLIA_KEY }}
+          SEPOLIA_ACCOUNT_NUMBER: ${{ secrets.DEVENV_TESTNET_SEPOLIA_ACCOUNT_NUMBER }}
+          SEPOLIA_TOKEN_CONFIG_PATH: "../cfg/tokens_testnet.json"
+        run: make setup-eth NETWORK=sepolia
 
       - name: Setup azero contracts
         shell: bash
-        run: AZERO_ENV=bridgenet make setup-azero-docker
+        run: AZERO_ENV=testnet make setup-azero-docker
 
       - uses: actions/upload-artifact@v4
         with:
