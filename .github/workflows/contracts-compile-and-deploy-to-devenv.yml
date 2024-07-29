@@ -45,15 +45,7 @@ jobs:
             #jq '.eth[0].deployed = false' | jq '.aleph[0].deployed = false'
             #jq 'del(.eth[0].address)' | jq 'del(.aleph[0].address)'
 
-      - name: Deploy eth contracts
-        shell: bash
-        env:
-          SEPOLIA_KEY: ${{ secrets.DEVENV_TESTNET_SEPOLIA_KEY }}
-          SEPOLIA_ACCOUNT_NUMBER: ${{ secrets.DEVENV_TESTNET_SEPOLIA_ACCOUNT_NUMBER }}
-          SEPOLIA_TOKEN_CONFIG_PATH: "../cfg/tokens_testnet.json"
-        run: make deploy-eth NETWORK=sepolia
-
-      - name: Deploy azero contracts
+      - name: Create azero env file
         shell: bash
         env:
           AZERO1: ${{ secrets.DEVENV_TESTNET_AZERO1_ACCOUNT_NUMBER }}
@@ -64,6 +56,35 @@ jobs:
           cat azero/env/testnet.json.example | \
             jq '.relayers = ["${{ env.AZERO1 }}", "${{ env.AZERO2 }}", "${{ env.AZERO3 }}"]' | \
             jq '.deployer_seed = "${{ env.AZERO1_SEED }}"' | jq '.dev = true' > azero/env/testnet.json
+
+      - name: Get latest eth block
+        shell: bash
+        env:
+          SEPOLIA_KEY: ${{ secrets.DEVENV_TESTNET_SEPOLIA_KEY }}
+          SEPOLIA_ACCOUNT_NUMBER: ${{ secrets.DEVENV_TESTNET_SEPOLIA_ACCOUNT_NUMBER }}
+          SEPOLIA_TOKEN_CONFIG_PATH: "../cfg/tokens_testnet.json"
+        run: |
+          cd eth
+          npx hardhat run --network sepolia scripts/get_latest_block.js
+
+      - name: Get latest azero block
+        shell: bash
+        run: |
+          cd azero
+          AZERO_ENV=testnet npm run get-latest-block
+
+      - name: Deploy eth contracts
+        shell: bash
+        env:
+          SEPOLIA_KEY: ${{ secrets.DEVENV_TESTNET_SEPOLIA_KEY }}
+          SEPOLIA_ACCOUNT_NUMBER: ${{ secrets.DEVENV_TESTNET_SEPOLIA_ACCOUNT_NUMBER }}
+          SEPOLIA_TOKEN_CONFIG_PATH: "../cfg/tokens_testnet.json"
+        run: |
+          make deploy-eth NETWORK=sepolia
+
+      - name: Deploy azero contracts
+        shell: bash
+        run: |
           AZERO_ENV=testnet make deploy-azero-docker
 
       - name: Setup eth contracts
@@ -195,12 +216,12 @@ jobs:
       - name: Store addresses in S3 bucket
         uses: Cardinal-Cryptography/github-actions/store-contract-addresses@v6
         with:
-          aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ADDRESSES_BRIDGENET_DEV_RW_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ADDRESSES_BRIDGENET_DEV_RW_AWS_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ADDRESSES_TESTNET_MOST0_RW_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ADDRESSES_TESTNET_MOST0_RW_AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
           s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
           project: most
-          chain-environment: bridgenet
-          frontend-environment: dev
+          chain-environment: testnet
+          frontend-environment: most0
           src-addresses: contract_spec.json
           if-exist: overwrite
