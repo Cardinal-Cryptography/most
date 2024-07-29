@@ -217,7 +217,7 @@ jobs:
         run: |
           ETH_START_BLOCK=$(cat eth/block_latest.json | jq -r '.number')
           AZERO_START_BLOCK=$(cat azero/block_latest.json | jq -r '.number')
-          cat contract_spec.json | jq ".start_blocks = { eth: '$ETH_START_BLOCK', azero: '$AZERO_START_BLOCK' }" \
+          cat contract_spec.json | jq ".start_blocks = { eth: \"$ETH_START_BLOCK\", azero: \"$AZERO_START_BLOCK\" }" \
             > contract_spec_with_block_numbers.json
 
       - name: Print out contract_spec JSON
