@@ -15,7 +15,7 @@ use crate::{client::Client, config::setup_test, wait::wait_for_balance_change};
 pub async fn weth_to_weth() -> Result<()> {
     let config = setup_test();
     let test_context = config.create_test_context().await?;
-    let transfer_amount = utils::parse_ether(config.test_args.transfer_amount)?;
+    let transfer_amount = utils::parse_ether(config.test_args.transfer_amount.clone())?;
     let client = Client::new(test_context);
     let initial_balance = client.balance().await?;
 
@@ -53,7 +53,7 @@ pub async fn weth_to_weth() -> Result<()> {
 pub async fn usdt_to_usdt() -> Result<()> {
     let config = setup_test();
     let test_context = config.create_test_context().await?;
-    let transfer_amount = utils::parse_ether(config.test_args.transfer_amount)? / 20_u128;
+    let transfer_amount = utils::parse_ether(config.test_args.transfer_amount.clone())?;
     let client = Client::new(test_context);
     let initial_balance = client.balance().await?;
 
@@ -86,7 +86,7 @@ pub async fn wazero_to_wazero() -> Result<()> {
     let config = setup_test();
     let test_context = config.create_test_context().await?;
     let transfer_amount =
-        utils::parse_ether(config.test_args.transfer_amount)?;
+        utils::parse_ether(config.test_args.transfer_amount.clone())?;
     let client = Client::new(test_context);
     let initial_balance = client.balance().await?;
 
