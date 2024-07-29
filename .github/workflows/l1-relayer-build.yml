@@ -1,4 +1,4 @@
-name: Relayer - build and deploy to devnet
+name: L1 Relayer - build
 
 on:
   workflow_call:
@@ -20,14 +20,4 @@ jobs:
     uses: ./.github/workflows/_relayer-build-and-push.yml
     secrets: inherit
     with:
-      environment: bridgenet
-      frontend-environment: dev
-
-  deploy-to-devnet:
-    needs: [build-and-push]
-    name: Deploy to devnet
-    uses: ./.github/workflows/_relayer-deploy.yml
-    secrets: inherit
-    with:
-      environment: devnet
-      docker-tag: ${{ needs.build-and-push.outputs.docker-tag }}
+      layer: 'L1'

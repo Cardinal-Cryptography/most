@@ -4,9 +4,6 @@ name: Devenv - deploy contracts
 on:
   workflow_call:
   workflow_dispatch:
-  push:
-    branches:
-      - MOST-93-deploy-contracts-to-testnet
 
 concurrency:
   group: "${{ github.ref }}-${{ github.workflow }}"
@@ -18,19 +15,18 @@ jobs:
     uses: ./.github/workflows/_check-vars-and-secrets.yml
     secrets: inherit
 
-#  test-azero-contracts:
-#    needs: [check-vars-and-secrets]
-#    uses: ./.github/workflows/test-azero-contracts.yml
-#
-#  test-eth-contracts:
-#    needs: [check-vars-and-secrets]
-#    uses: ./.github/workflows/test-eth-contracts.yml
+  test-azero-contracts:
+    needs: [check-vars-and-secrets]
+    uses: ./.github/workflows/test-azero-contracts.yml
+
+  test-eth-contracts:
+    needs: [check-vars-and-secrets]
+    uses: ./.github/workflows/test-eth-contracts.yml
 
   deploy-contracts:
     name: Deploy and setup contracts
     runs-on: [self-hosted, Linux, X64, large]
-    #needs: [test-eth-contracts, test-azero-contracts]
-    needs: [check-vars-and-secrets]
+    needs: [test-eth-contracts, test-azero-contracts]
     outputs:
       artifact-matrix-json: ${{ steps.get-artifact-matrix.outputs.artifact-matrix }}
 
@@ -213,7 +209,7 @@ jobs:
             eth/addresses.json|eth_
             azero/addresses.json|azero_
           dst-file: contract_spec.json
-          spec-version: '0.1'
+          spec-version: '0.2'
           contract-version: '${{ github.sha }}'
 
       - name: Add block numbers to contract_spec JSON
@@ -221,7 +217,7 @@ jobs:
         run: |
           ETH_START_BLOCK=$(cat eth/block_latest.json | jq -r '.number')
           AZERO_START_BLOCK=$(cat azero/block_latest.json | jq -r '.number')
-          cat contract_spec.json | jq '.start_blocks = { eth: "$ETH_START_BLOCK", azero: "$AZERO_START_BLOCK" }' \
+          cat contract_spec.json | jq ".start_blocks = { eth: '$ETH_START_BLOCK', azero: '$AZERO_START_BLOCK' }" \
             > contract_spec_with_block_numbers.json
 
       - name: Print out contract_spec JSON

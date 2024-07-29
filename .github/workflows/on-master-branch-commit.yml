@@ -18,8 +18,14 @@ jobs:
     uses: ./.github/workflows/contracts-compile-and-deploy-to-devenv.yml
     secrets: inherit
 
-  #build-and-deploy-relayer-to-devnet:
-  #  needs: [compile-contracts-and-deploy-to-bridgenet]
-  #  name: Build and deploy relayer to devnet
-  #  uses: ./.github/workflows/relayer-build-and-deploy-to-devnet.yml
-  #  secrets: inherit
+  build-l1-relayer:
+    needs: [compile-contracts-and-deploy-to-devenv]
+    name: Build L1 relayer
+    uses: ./.github/workflows/l1-relayer-build.yml
+    secrets: inherit
+
+  build-l2-relayer:
+    needs: [compile-contracts-and-deploy-to-devenv]
+    name: Build L2 relayer
+    uses: ./.github/workflows/l2-relayer-build.yml
+    secrets: inherit
