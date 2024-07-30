@@ -147,3 +147,34 @@ pub async fn wazero_to_wazero() -> Result<()> {
     )
     .await
 }
+
+#[tokio::test]
+pub async fn wazero_to_azero() -> Result<()> {
+    let config = setup_test();
+    let test_context = config.create_test_context().await?;
+    let transfer_amount = utils::parse_ether(config.test_args.transfer_amount.clone())?;
+    let client = Client::new(test_context);
+    let initial_balance = client.balance().await?;
+
+    info!("{:?}", initial_balance);
+
+    info!("Approve the `most` contract to use the wAZERO funds on the Ethereum chain");
+    client.approve_wazero_eth(transfer_amount).await?;
+
+    info!("Request the transfer of wAZERO to the Azero chain");
+    client.request_azero_transfer_eth(transfer_amount).await?;
+
+    info!("Wait for balance change");
+    let target_balance = initial_balance.bridge_azero_eth_to_azero(transfer_amount.as_u128())?;
+    info!("Target balance: {:?}", target_balance);
+
+    let get_current_balance = || async { client.balance().await };
+    wait_for_balance_change(
+        get_current_balance,
+        target_balance,
+        Some(transfer_amount / 100),
+        Some(0),
+        config.test_args.wait_max_minutes,
+    )
+    .await
+}

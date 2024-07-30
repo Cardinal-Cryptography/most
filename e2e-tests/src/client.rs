@@ -12,6 +12,8 @@ use crate::{
     eth,
 };
 
+const BASE_FEE: u128 = 1_000_000_000_000_000_000;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Balance {
     pub eth: U256,
@@ -64,6 +66,19 @@ impl Balance {
         Ok(balance)
     }
 
+    pub fn bridge_eth_azero_to_eth(&self, transfer_amount: u128) -> Result<Self> {
+        let mut balance = self.clone();
+        balance.weth_azero = balance
+            .weth_azero
+            .checked_sub(transfer_amount)
+            .ok_or(anyhow!("Insufficient wETH."))?;
+        balance.eth = balance
+            .eth
+            .checked_add(transfer_amount.into())
+            .ok_or(anyhow!("ETH overflow."))?;
+        Ok(balance)
+    }
+
     pub fn bridge_weth_eth_to_azero(&self, transfer_amount: u128) -> Result<Self> {
         let mut balance = self.clone();
         balance.weth_eth = balance
@@ -103,6 +118,19 @@ impl Balance {
         Ok(balance)
     }
 
+    pub fn bridge_azero_eth_to_azero(&self, transfer_amount: u128) -> Result<Self> {
+        let mut balance = self.clone();
+        balance.wazero_eth = balance
+            .wazero_eth
+            .checked_sub(transfer_amount)
+            .ok_or(anyhow!("Insufficient wAZERO."))?;
+        balance.azero = balance
+            .azero
+            .checked_add(transfer_amount)
+            .ok_or(anyhow!("AZERO overflow."))?;
+        Ok(balance)
+    }
+
     pub fn bridge_weth_azero_to_eth(&self, transfer_amount: u128) -> Result<Self> {
         let mut balance = self.clone();
         balance.weth_azero = balance
@@ -135,6 +163,19 @@ impl Balance {
             .wazero_azero
             .checked_sub(transfer_amount)
             .ok_or(anyhow!("Insufficient wAZERO."))?;
+        balance.wazero_eth = balance
+            .wazero_eth
+            .checked_add(transfer_amount)
+            .ok_or(anyhow!("wAZERO overflow."))?;
+        Ok(balance)
+    }
+
+    pub fn bridge_azero_azero_to_eth(&self, transfer_amount: u128) -> Result<Self> {
+        let mut balance = self.clone();
+        balance.azero = balance
+            .azero
+            .checked_sub(transfer_amount)
+            .ok_or(anyhow!("Insufficient AZERO."))?;
         balance.wazero_eth = balance
             .wazero_eth
             .checked_add(transfer_amount)
@@ -179,6 +220,7 @@ pub struct Client {
     wazero_azero: azero::ContractInstance,
     azero_account_address_bytes: [u8; 32],
     eth_account_address: Address,
+    eth_account_address_bytes: [u8; 32],
 }
 
 impl Client {
@@ -196,6 +238,8 @@ impl Client {
             most_azero,
         } = context;
         let eth_account_address = eth_signed_connection.address();
+        let mut eth_account_address_bytes = [0_u8; 32];
+        eth_account_address_bytes[12..].copy_from_slice(eth_account_address.as_fixed_bytes());
         let azero_account = azero_signed_connection.signer.account_id();
         let azero_account_address_bytes: [u8; 32] = (*azero_account).clone().into();
         Self {
@@ -211,6 +255,7 @@ impl Client {
             wazero_azero,
             azero_account_address_bytes,
             eth_account_address,
+            eth_account_address_bytes,
         }
     }
 
@@ -271,8 +316,10 @@ impl Client {
             usdt_azero,
         })
     }
+}
 
-    // Wrap some ETH into wETH
+// Wrapping native coins
+impl Client {
     pub async fn wrap_weth(&self, transfer_amount: U256) -> Result<()> {
         info!("Attempting to wrap ETH into wETH");
         info!("Transfer amount: {}", transfer_amount);
@@ -306,7 +353,10 @@ impl Client {
         info!("`deposit` tx info: {:?}", deposit_info);
         Ok(())
     }
+}
 
+// Approving the `most` contract to use wrapped funds (Aleph)
+impl Client {
     async fn approve_azero(
         &self,
         contract: &azero::ContractInstance,
@@ -353,7 +403,10 @@ impl Client {
         self.approve_azero(&self.wazero_azero, transfer_amount)
             .await
     }
+}
 
+// Approving the `most` contract to use wrapped funds (Aleph)
+impl Client {
     async fn approve_eth(
         &self,
         contract: &eth::ContractInstance,
@@ -399,6 +452,51 @@ impl Client {
         );
         self.approve_eth(&self.usdt_eth, transfer_amount).await
     }
+}
+
+// Requesting cross-chain transfers (Aleph)
+impl Client {
+    pub async fn request_azero_transfer_azero(&self, transfer_amount: u128) -> Result<()> {
+        let send_request_args = [
+            transfer_amount.to_string(),
+            azero::bytes32_to_string(&self.eth_account_address_bytes),
+        ];
+        let send_request_info = self
+            .most_azero
+            .exec(
+                &self.azero_signed_connection,
+                "send_request_native_azero",
+                &send_request_args,
+                ExecCallParams::new().value(BASE_FEE),
+            )
+            .await?;
+        info!(
+            "`send_request_native_azero` tx info: {:?}",
+            send_request_info
+        );
+        Ok(())
+    }
+
+    pub async fn request_eth_transfer_azero(&self, transfer_amount: u128) -> Result<()> {
+        let send_request_args = [
+            transfer_amount.to_string(),
+            azero::bytes32_to_string(&self.eth_account_address_bytes),
+        ];
+        let send_request_info = self
+            .most_azero
+            .exec(
+                &self.azero_signed_connection,
+                "send_request_native_ether",
+                &send_request_args,
+                ExecCallParams::new().value(BASE_FEE),
+            )
+            .await?;
+        info!(
+            "`send_request_native_ether` tx info: {:?}",
+            send_request_info
+        );
+        Ok(())
+    }
 
     async fn request_transfer_azero(
         &self,
@@ -406,13 +504,10 @@ impl Client {
         transfer_amount: u128,
     ) -> Result<()> {
         let contract_address_bytes: [u8; 32] = (contract.address()).clone().into();
-        let eth_account_address = self.eth_signed_connection.address();
-        let mut eth_account_address_bytes = [0_u8; 32];
-        eth_account_address_bytes[12..].copy_from_slice(eth_account_address.as_fixed_bytes());
         let send_request_args = [
             azero::bytes32_to_string(&contract_address_bytes),
             transfer_amount.to_string(),
-            azero::bytes32_to_string(&eth_account_address_bytes),
+            azero::bytes32_to_string(&self.eth_account_address_bytes),
         ];
         let send_request_info = self
             .most_azero
@@ -420,7 +515,7 @@ impl Client {
                 &self.azero_signed_connection,
                 "send_request",
                 &send_request_args,
-                ExecCallParams::new().value(transfer_amount),
+                ExecCallParams::new().value(BASE_FEE),
             )
             .await?;
         info!("`send_request` tx info: {:?}", send_request_info);
@@ -440,6 +535,35 @@ impl Client {
     pub async fn request_wazero_transfer_azero(&self, transfer_amount: u128) -> Result<()> {
         self.request_transfer_azero(&self.wazero_azero, transfer_amount)
             .await
+    }
+}
+
+// Requesting cross-chain transfers (Ethereum)
+impl Client {
+    pub async fn request_azero_transfer_eth(&self, transfer_amount: U256) -> Result<()> {
+        info!(
+            "Attempting to transfer {} of the wAZERO funds",
+            transfer_amount
+        );
+        let send_request_args = (transfer_amount, self.azero_account_address_bytes);
+        let call = self
+            .most_eth
+            .method::<_, H256>("sendRequestAzeroToNative", send_request_args)?;
+        let pending_tx = call.send().await?;
+        let send_request_receipt = pending_tx
+            .confirmations(1)
+            .await?
+            .ok_or(anyhow!("tx receipt not available."))?;
+
+        if send_request_receipt.status.unwrap_or_default() == U64::from(1) {
+            info!("Successfully requested the transfer to the Aleph Zero chain",);
+            Ok(())
+        } else {
+            Err(anyhow!(
+                "Failed to request the transfer to the Aleph Zero chain: {:?}",
+                send_request_receipt
+            ))
+        }
     }
 
     pub async fn request_eth_transfer_eth(&self, transfer_amount: U256) -> Result<()> {

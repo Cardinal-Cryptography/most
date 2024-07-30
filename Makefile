@@ -306,12 +306,17 @@ e2e-test:
 .PHONY: e2e-tests
 e2e-tests: # Run e2e tests
 e2e-tests:
+	# TEST_CASE=eth_to_azero::eth_to_weth make e2e-test # not working
+	TEST_CASE=eth_to_azero::weth_to_weth make e2e-test # substitute
+	TEST_CASE=azero_to_eth::weth_to_eth make e2e-test
 	TEST_CASE=eth_to_azero::weth_to_weth make e2e-test
-	TEST_CASE=eth_to_azero::usdt_to_usdt make e2e-test
 	TEST_CASE=azero_to_eth::weth_to_weth make e2e-test
+	TEST_CASE=eth_to_azero::usdt_to_usdt make e2e-test
 	TEST_CASE=azero_to_eth::usdt_to_usdt make e2e-test
 	TEST_CASE=azero_to_eth::wazero_to_wazero make e2e-test
 	TEST_CASE=eth_to_azero::wazero_to_wazero make e2e-test
+	TEST_CASE=azero_to_eth::azero_to_wazero make e2e-test
+	TEST_CASE=eth_to_azero::wazero_to_azero make e2e-test
 
 .PHONY: drink-tests
 drink-tests: # Run drink tests
