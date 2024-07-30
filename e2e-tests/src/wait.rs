@@ -5,8 +5,11 @@ use ethers::types::U256;
 use log::info;
 use tokio::time::{sleep, Duration};
 
-use crate::client::Balance;
+use crate::balance::Balance;
 
+/// Poll the chains periodically until the current balance matches the requested target balance.
+/// Checking the balances of native coins will not be exact, since the fees are unpredictable.
+/// See the `Balance::satisfies_target` for more information.
 pub async fn wait_for_balance_change<F, R>(
     get_current_balance: F,
     target_balance: Balance,
