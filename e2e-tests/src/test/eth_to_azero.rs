@@ -67,9 +67,7 @@ pub async fn eth_to_weth() -> Result<()> {
 
     info!("Wait for balance change");
 
-    let target_balance = initial_balance
-        .wrap_weth(transfer_amount.as_u128())?
-        .bridge_eth_eth_to_azero(transfer_amount.as_u128())?;
+    let target_balance = initial_balance.bridge_eth_eth_to_azero(transfer_amount.as_u128())?;
     info!("Target balance: {:?}", target_balance);
 
     let get_current_balance = || async { client.balance().await };
