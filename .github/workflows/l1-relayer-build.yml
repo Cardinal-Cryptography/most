@@ -1,0 +1,23 @@
+name: L1 Relayer - build
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}-l1
+  cancel-in-progress: true
+
+jobs:
+  check-vars-and-secrets:
+    name: Check vars and secrets
+    uses: ./.github/workflows/_check-vars-and-secrets.yml
+    secrets: inherit
+
+  build-and-push:
+    needs: [check-vars-and-secrets]
+    name: Build and push
+    uses: ./.github/workflows/_relayer-build-and-push.yml
+    secrets: inherit
+    with:
+      layer: 'L1'
