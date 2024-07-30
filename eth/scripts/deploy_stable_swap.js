@@ -33,7 +33,7 @@ async function main() {
   const Pool = await ethers.getContractFactory("StableSwapTwoPool");
   const pool = await Pool.deploy();
   await pool.waitForDeployment();
-  console.log("Pool deployed to:", pool.target);
+  console.log("Stable Swap deployed to:", pool.target);
 
   const setMinterTX = await lp.setMinter(pool.target);
   await setMinterTX.wait(1);
