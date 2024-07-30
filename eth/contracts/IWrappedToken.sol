@@ -8,4 +8,7 @@ interface IWrappedToken {
 
     /// @notice Burn a given amount of remote PSP22 token representation
     function burn(uint256) external;
+
+    /// @notice Approve spedning a given amount of token to the spender
+    function approve(address spender, uint256 value) external returns (bool);
 }
