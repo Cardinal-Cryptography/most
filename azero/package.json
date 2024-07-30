@@ -11,7 +11,8 @@
         "deploy": "npm config set script-shell \"/bin/bash\"; ts-node scripts/0_upload_code.ts; ts-node scripts/1_deploy.ts",
         "upload": "npm config set script-shell \"/bin/bash\"; ts-node scripts/0_upload_code.ts",
         "setup": "npm config set script-shell \"/bin/bash\"; ts-node scripts/2_setup.ts",
-        "bridge-weth": "npm config set script-shell \"/bin/bash\"; ts-node scripts/bridge_weth.ts"
+        "bridge-weth": "npm config set script-shell \"/bin/bash\"; ts-node scripts/bridge_weth.ts",
+        "get-latest-block": "npm config set script-shell \"/bin/bash\"; ts-node scripts/get_latest_block.ts"
     },
     "dependencies": {
         "@727-ventures/typechain-compiler": "^1.1.0",

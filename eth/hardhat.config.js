@@ -11,6 +11,11 @@ const DEV_MNEMONIC =
 
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY;
 const SEPOLIA_KEY = process.env.SEPOLIA_KEY;
+const SEPOLIA_ACCOUNT_NUMBER = process.env.SEPOLIA_ACCOUNT_NUMBER;
+const SEPOLIA_WETH = process.env.SEPOLIA_WETH;
+const SEPOLIA_TOKEN_CONFIG_PATH = process.env.SEPOLIA_TOKEN_CONFIG_PATH;
+const SEPOLIA_URL = process.env.SEPOLIA_URL;
+const SEPOLIA_THRESHOLD = process.env.SEPOLIA_THRESHOLD;
 const ETHEREUM_PRIVATE_KEY = process.env.ETHEREUM_PRIVATE_KEY;
 const ETHEREUM_GUARDIAN_ADDRESS = process.env.ETHEREUM_GUARDIAN_ADDRESS;
 
@@ -112,15 +117,33 @@ var config = {
 
 if (SEPOLIA_KEY) {
   config.networks.sepolia = {
-    url: "https://ethereum-sepolia-rpc.publicnode.com",
-    accounts: [SEPOLIA_KEY],
+    url:
+      typeof SEPOLIA_URL == "undefined" || SEPOLIA_URL == ""
+        ? "https://ethereum-sepolia-rpc.publicnode.com"
+        : SEPOLIA_URL,
+    accounts: {
+      mnemonic: SEPOLIA_KEY,
+    },
     deploymentConfig: {
       guardianIds: [
-        "0xc4E0B92Df2DE77C077D060e49ec63DC196980716", // sepolia account address corresponding to SEPOLIA_KEY
+        typeof SEPOLIA_ACCOUNT_NUMBER == "undefined" ||
+        SEPOLIA_ACCOUNT_NUMBER == ""
+          ? "0xc4E0B92Df2DE77C077D060e49ec63DC196980716"
+          : SEPOLIA_ACCOUNT_NUMBER, // sepolia account address corresponding to SEPOLIA_KEY
       ],
-      threshold: 1,
-      weth: "0xd91aE8FD2Be53F74876a9cc4aFb416645A0c8420",
-      tokenConfigPath: "../cfg/tokens_testnet_example.json",
+      threshold:
+        typeof SEPOLIA_THRESHOLD == "undefined" || SEPOLIA_THRESHOLD == ""
+          ? 1
+          : parseInt(SEPOLIA_THRESHOLD, 10),
+      weth:
+        typeof SEPOLIA_WETH == "undefined" || SEPOLIA_WETH == ""
+          ? "0xd91aE8FD2Be53F74876a9cc4aFb416645A0c8420"
+          : SEPOLIA_WETH,
+      tokenConfigPath:
+        typeof SEPOLIA_TOKEN_CONFIG_PATH == "undefined" ||
+        SEPOLIA_TOKEN_CONFIG_PATH == ""
+          ? "../cfg/tokens_testnet_example.json"
+          : SEPOLIA_TOKEN_CONFIG_PATH,
     },
   };
 }
