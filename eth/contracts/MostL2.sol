@@ -52,7 +52,7 @@ contract MostL2 is AbstractMost {
         // Allow swap to spend that many tokens
         bazero.approve(address(stableSwapAddress), amount);
         // At least half of amount_in
-        uint256 min_amount_out = 0;
+        uint256 min_amount_out = amount / 2;
 
         (bool swapSuccess, bytes memory returndata) = address(stablePool).call(
             abi.encodeCall(
@@ -69,7 +69,7 @@ contract MostL2 is AbstractMost {
 
     function swap_for_bazero(uint256 amount) internal returns (uint256) {
         StableSwapTwoPool stablePool = StableSwapTwoPool(stableSwapAddress);
-        uint256 min_amount_out = 0;
+        uint256 min_amount_out = amount / 2;
         return stablePool.exchange_from_native{value: amount}(min_amount_out);
     }
 
@@ -96,7 +96,11 @@ contract MostL2 is AbstractMost {
 
         // transfer native
         if (_destTokenAddress == bAzeroAddress) {
-            // Mint representation of the remote token to this contract
+            // So what we do here is:
+            // 1. Mint `amount` Bazero
+            // 2. Allow spending that many Bazero for swap contract
+            // 3. exchange bazero for native tokens, here the swap spends its allowance and sends native to this contract
+            // 4. transfer exchanged native to the receiver.
             IWrappedToken bazero = IWrappedToken(_destTokenAddress);
             bazero.mint(address(this), amount);
 
