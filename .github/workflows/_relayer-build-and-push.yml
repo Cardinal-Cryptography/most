@@ -3,12 +3,8 @@ name: Build and push relayer
 on:
   workflow_call:
     inputs:
-      environment:
-        description: One of 'bridgenet', 'testnet', 'mainnet'
-        type: string
-        required: true
-      frontend-environment:
-        description: Environment name for frontend
+      layer:
+        description: Relayer to build - L1 or L2
         type: string
         required: true
     outputs:
@@ -36,37 +32,9 @@ jobs:
         shell: bash
         run: |
           if [[ \
-            '${{ inputs.environment }}' != 'bridgenet' && \
-            '${{ inputs.environment }}' != 'testnet' && \
-            '${{ inputs.environment }}' != 'mainnet' \
+            '${{ inputs.layer }}' != 'L1' && '${{ inputs.layer }}' != 'L2'
           ]]; then
-            echo 'Invalid environment'
-            exit 1
-          fi
-
-          if [[ \
-            '${{ inputs.frontend-environment }}' != 'dev' && \
-            '${{ inputs.frontend-environment }}' != 'stage' && \
-            '${{ inputs.frontend-environment }}' != 'prod'
-          ]]; then
-            echo 'Invalid frontend environment'
-            exit 1
-          fi
-
-          # TODO: Remove when implemented
-          if [[ \
-            '${{ inputs.frontend-environment }}' != 'dev'
-          ]]; then
-            echo 'Only dev frontend environment is implemented at this moment'
-            exit 1          
-          fi
-
-          # TODO: Remove when implemented
-          if [[ \
-            '${{ inputs.environment }}' == 'testnet' || \
-            '${{ inputs.environment }}' == 'mainnet' \
-          ]]; then
-            echo 'testnet and mainnet are not implemented yet'
+            echo 'Invalid layer'
             exit 1
           fi
 
@@ -163,12 +131,22 @@ jobs:
           cp -rf '${{ env.TMP_ARTIFACT_ETH_WETH9_DIR }}'/WETH9.json eth/artifacts/contracts/WETH9.sol/WETH9.json
 
           docker_tag=${{ steps.get-ref-properties.outputs.sha }}
-          docker_name=most-relayer-${docker_tag}
 
-          make build-docker-relayer \
-            DOCKER_RELAYER_NAME=${docker_name} \
-            DOCKER_RELAYER_COPY_ADDRESSES=no_copy \
-            DOCKER_RELAYER_COMPILE_CONTRACTS=no_compile
+          # There are two types of relayers: L1 and L2
+          if [[ '${{ inputs.layer }}' == 'L2' ]]; then
+            docker_name=most-l2-relayer-${docker_tag}
+            make build-docker-relayer \
+              L2=true \
+              DOCKER_RELAYER_NAME=${docker_name} \
+              DOCKER_RELAYER_COPY_ADDRESSES=no_copy \
+              DOCKER_RELAYER_COMPILE_CONTRACTS=no_compile
+          else
+            docker_name=most-relayer-${docker_tag}
+            make build-docker-relayer \
+              DOCKER_RELAYER_NAME=${docker_name} \
+              DOCKER_RELAYER_COPY_ADDRESSES=no_copy \
+              DOCKER_RELAYER_COMPILE_CONTRACTS=no_compile
+          fi
 
           echo "docker-name=${docker_name}" >> $GITHUB_OUTPUT
           echo "docker-tag=${docker_tag}" >> $GITHUB_OUTPUT
@@ -185,7 +163,11 @@ jobs:
       - name: Push docker image to ECR
         shell: bash
         run: |
-          docker_image='${{ vars.ECR_CC_RES_PUBLIC_REGISTRY }}most-relayer:${{ steps.build.outputs.docker-tag }}'
+          if [[ '${{ inputs.layer }}' == 'L2' ]]; then
+            docker_image='${{ vars.ECR_CC_RES_PUBLIC_REGISTRY }}most-l2-relayer:${{ steps.build.outputs.docker-tag }}'
+          else
+            docker_image='${{ vars.ECR_CC_RES_PUBLIC_REGISTRY }}most-relayer:${{ steps.build.outputs.docker-tag }}'
+          fi
 
           docker tag '${{ steps.build.outputs.docker-name }}' "${docker_image}"
           docker push "${docker_image}"

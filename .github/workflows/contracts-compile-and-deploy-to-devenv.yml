@@ -1,5 +1,5 @@
 ---
-name: Bridgenet - deploy contracts
+name: Devenv - deploy contracts
 
 on:
   workflow_call:
@@ -37,21 +37,69 @@ jobs:
       - name: Setup node
         uses: asdf-vm/actions/install@v3
 
+      - name: Create token config
+        shell: bash
+        run: |
+          cat cfg/tokens_testnet_example.json > cfg/tokens_testnet.json
+            # Commented out for now, in case contracts should be marked as not deployed
+            #jq '.eth[0].deployed = false' | jq '.aleph[0].deployed = false'
+            #jq 'del(.eth[0].address)' | jq 'del(.aleph[0].address)'
+
+      - name: Create azero env file
+        shell: bash
+        env:
+          AZERO1: ${{ secrets.DEVENV_TESTNET_AZERO1_ACCOUNT_NUMBER }}
+          AZERO2: ${{ secrets.DEVENV_TESTNET_AZERO2_ACCOUNT_NUMBER }}
+          AZERO3: ${{ secrets.DEVENV_TESTNET_AZERO3_ACCOUNT_NUMBER }}
+          AZERO1_SEED: ${{ secrets.DEVENV_TESTNET_AZERO1_KEY }}
+        run: |
+          cat azero/env/testnet.json.example | \
+            jq '.relayers = ["${{ env.AZERO1 }}", "${{ env.AZERO2 }}", "${{ env.AZERO3 }}"]' | \
+            jq '.deployer_seed = "${{ env.AZERO1_SEED }}"' | jq '.dev = true' > azero/env/testnet.json
+
+      - name: Get latest eth block
+        shell: bash
+        env:
+          SEPOLIA_KEY: ${{ secrets.DEVENV_TESTNET_SEPOLIA_KEY }}
+          SEPOLIA_ACCOUNT_NUMBER: ${{ secrets.DEVENV_TESTNET_SEPOLIA_ACCOUNT_NUMBER }}
+          SEPOLIA_TOKEN_CONFIG_PATH: "../cfg/tokens_testnet.json"
+        run: |
+          make eth-deps
+          cd eth
+          npx hardhat run --network sepolia scripts/get_latest_block.js
+
+      - name: Get latest azero block
+        shell: bash
+        run: |
+          make azero-deps
+          cd azero
+          AZERO_ENV=testnet npm run get-latest-block
+
       - name: Deploy eth contracts
         shell: bash
-        run: make deploy-eth NETWORK=bridgenet
+        env:
+          SEPOLIA_KEY: ${{ secrets.DEVENV_TESTNET_SEPOLIA_KEY }}
+          SEPOLIA_ACCOUNT_NUMBER: ${{ secrets.DEVENV_TESTNET_SEPOLIA_ACCOUNT_NUMBER }}
+          SEPOLIA_TOKEN_CONFIG_PATH: "../cfg/tokens_testnet.json"
+        run: |
+          make deploy-eth NETWORK=sepolia
 
       - name: Deploy azero contracts
         shell: bash
-        run: AZERO_ENV=bridgenet make deploy-azero-docker
+        run: |
+          AZERO_ENV=testnet make deploy-azero-docker
 
       - name: Setup eth contracts
         shell: bash
-        run: make setup-eth NETWORK=bridgenet
+        env:
+          SEPOLIA_KEY: ${{ secrets.DEVENV_TESTNET_SEPOLIA_KEY }}
+          SEPOLIA_ACCOUNT_NUMBER: ${{ secrets.DEVENV_TESTNET_SEPOLIA_ACCOUNT_NUMBER }}
+          SEPOLIA_TOKEN_CONFIG_PATH: "../cfg/tokens_testnet.json"
+        run: make setup-eth NETWORK=sepolia
 
       - name: Setup azero contracts
         shell: bash
-        run: AZERO_ENV=bridgenet make setup-azero-docker
+        run: AZERO_ENV=testnet make setup-azero-docker
 
       - uses: actions/upload-artifact@v4
         with:
@@ -61,6 +109,7 @@ jobs:
           path: |
             eth/artifacts
             eth/addresses.json
+            eth/block_latest.json
 
       - uses: actions/upload-artifact@v4
         with:
@@ -70,6 +119,7 @@ jobs:
           path: |
             azero/artifacts
             azero/addresses.json
+            azero/block_latest.json
 
       - name: Get list of contracts
         shell: bash
@@ -162,20 +212,28 @@ jobs:
           spec-version: '0.1'
           contract-version: '${{ github.sha }}'
 
+      - name: Add block numbers to contract_spec JSON
+        shell: bash
+        run: |
+          ETH_START_BLOCK=$(cat eth/block_latest.json | jq -r '.number')
+          AZERO_START_BLOCK=$(cat azero/block_latest.json | jq -r '.number')
+          cat contract_spec.json | jq ".start_blocks = { eth: \"$ETH_START_BLOCK\", azero: \"$AZERO_START_BLOCK\" }" \
+            > contract_spec_with_block_numbers.json
+
       - name: Print out contract_spec JSON
         shell: bash
         run: |
-          cat contract_spec.json
+          cat contract_spec_with_block_numbers.json
 
       - name: Store addresses in S3 bucket
         uses: Cardinal-Cryptography/github-actions/store-contract-addresses@v6
         with:
-          aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ADDRESSES_BRIDGENET_DEV_RW_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ADDRESSES_BRIDGENET_DEV_RW_AWS_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ADDRESSES_TESTNET_MOST0_RW_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ADDRESSES_TESTNET_MOST0_RW_AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
           s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
           project: most
-          chain-environment: bridgenet
-          frontend-environment: dev
-          src-addresses: contract_spec.json
+          chain-environment: testnet
+          frontend-environment: most0
+          src-addresses: contract_spec_with_block_numbers.json
           if-exist: overwrite
