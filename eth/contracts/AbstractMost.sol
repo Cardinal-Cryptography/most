@@ -188,7 +188,7 @@ abstract contract AbstractMost is
     /// & forward to the destination chain.
     function sendRequestNative(
         bytes32 destReceiverAddress
-    ) external payable whenNotPaused {
+    ) external payable virtual whenNotPaused {
         uint256 amount = msg.value;
         if (amount == 0) revert ZeroAmount();
         if (destReceiverAddress == bytes32(0)) revert ZeroAddress();
@@ -290,7 +290,7 @@ abstract contract AbstractMost is
     }
 
     /// @notice Aggregates relayer signatures and returns the locked tokens.
-    /// @dev When the ether is being bridged and the receiver is a contract
+    /// @dev When the ether is being bridged and the receiver is a contractRequestSigned
     /// that does not accept ether or fallback function consumes more than `GAS_LIMIT` gas units,
     /// the request is processed without revert and the ether is locked
     /// in this contract. Governance action must be taken to retrieve the tokens.
@@ -456,7 +456,7 @@ abstract contract AbstractMost is
     }
 
     /// @dev Accept ether only from weth contract or through payable methods
-    receive() external payable {
+    receive() external payable virtual {
         require(msg.sender == wethAddress);
     }
 }

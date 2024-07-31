@@ -12,15 +12,11 @@ contract MostL2 is AbstractMost {
     address payable public stableSwapAddress;
     address public bAzeroAddress;
 
-    // todo: I have no idea...
-    uint256 public constant SWAP_GAS_LIMIT = 3500;
-
     event NativeTransferFailed(bytes32 requestHash);
     event NativeTransferSwap(bytes32 requestHash, uint256 amount_out);
-    event SwapFailed(
-        bytes32 requestHash,
-        uint256 amount_in
-    );
+    event SwapFailed(bytes32 requestHash, uint256 amount_in);
+
+    error SwapError();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -31,38 +27,50 @@ contract MostL2 is AbstractMost {
         address[] calldata _committee,
         uint256 _signatureThreshold,
         address owner,
-        address payable _wethAddress,
         address payable _stableSwapAddress,
         address _bAzeroAddress
     ) public initializer {
         stableSwapAddress = _stableSwapAddress;
         bAzeroAddress = _bAzeroAddress;
 
-        __AbstractMost_init(_committee, _signatureThreshold, _wethAddress);
+        // Set the weth address to zero address. We dont use this in L2 most
+        __AbstractMost_init(
+            _committee,
+            _signatureThreshold,
+            payable(address(0))
+        );
         __Ownable_init(owner);
         __Pausable_init();
 
         _pause();
     }
 
-    function swap_bazero(uint256 amount) internal returns(bool, uint256) {
+    function swap_from_bazero(uint256 amount) internal returns (bool, uint256) {
         IWrappedToken bazero = IWrappedToken(bAzeroAddress);
+        StableSwapTwoPool stablePool = StableSwapTwoPool(stableSwapAddress);
+
         // Allow swap to spend that many tokens
         bazero.approve(address(stableSwapAddress), amount);
-
         // At least half of amount_in
-        uint256 min_amount_out = amount / 2;
-        StableSwapTwoPool stablePool = StableSwapTwoPool(stableSwapAddress);
-        (bool swapSuccess, bytes memory returndata) = address(stablePool)
-            .call{gas: SWAP_GAS_LIMIT}(
+        uint256 min_amount_out = 0;
+
+        (bool swapSuccess, bytes memory returndata) = address(stablePool).call(
             abi.encodeCall(
-                stablePool.exchange_native,
+                stablePool.exchange_to_native,
                 (amount, min_amount_out)
             )
         );
-        uint256 amount_out = abi.decode(returndata, (uint256));
+        if (swapSuccess) {
+            uint256 amount_out = abi.decode(returndata, (uint256));
+            return (swapSuccess, amount_out);
+        }
+        return (swapSuccess, 0);
+    }
 
-        return (swapSuccess, amount_out);
+    function swap_for_bazero(uint256 amount) internal returns (uint256) {
+        StableSwapTwoPool stablePool = StableSwapTwoPool(stableSwapAddress);
+        uint256 min_amount_out = 0;
+        return stablePool.exchange_from_native{value: amount}(min_amount_out);
     }
 
     function onReceiveRequestThresholdMet(
@@ -92,9 +100,7 @@ contract MostL2 is AbstractMost {
             IWrappedToken bazero = IWrappedToken(_destTokenAddress);
             bazero.mint(address(this), amount);
 
-            // Allow swap to spend that many tokens
-            bazero.approve(address(stableSwapAddress), amount);
-            (bool swapSuccess, uint256 amount_out) = swap_bazero(amount);
+            (bool swapSuccess, uint256 amount_out) = swap_from_bazero(amount);
 
             if (!swapSuccess) {
                 emit SwapFailed(requestHash, amount);
@@ -116,5 +122,55 @@ contract MostL2 is AbstractMost {
         } else {
             // TODO non native transfer
         }
+    }
+
+    function burn_bazero(uint256 amount) internal {
+        IWrappedToken bazero = IWrappedToken(bAzeroAddress);
+        bazero.burn(amount);
+    }
+
+    /// @notice Invoke this tx to transfer funds to the destination chain.
+    /// Account needs to send native Azero which are swapped for bazero
+    /// tokens.
+    ///
+    /// @dev Tx emits a CrosschainTransferRequest event that the relayers listen to
+    /// & forward to the destination chain.
+    function sendRequestNative(
+        bytes32 destReceiverAddress
+    ) external payable override whenNotPaused {
+        uint256 amount = msg.value;
+        require(amount != 0, "Zero amount");
+        if (amount == 0) revert ZeroAmount();
+        require(destReceiverAddress != bytes32(0), "revert ZeroAddress()");
+
+        bytes32 destTokenAddress = supportedPairs[
+            addressToBytes32(bAzeroAddress)
+        ];
+
+        require(destTokenAddress != 0x0, "revert UnsupportedPair()");
+
+        uint256 amount_out = swap_for_bazero(amount);
+        burn_bazero(amount_out);
+
+        emit CrosschainTransferRequest(
+            committeeId,
+            destTokenAddress,
+            amount_out,
+            destReceiverAddress,
+            requestNonce
+        );
+
+        ++requestNonce;
+    }
+
+    function setBridgedAzeroAddress(
+        address _bAzeroAddress
+    ) external onlyOwner whenPaused {
+        bAzeroAddress = _bAzeroAddress;
+    }
+
+    /// @dev Accept ether only from pool contract or through payable methods
+    receive() external payable override {
+        require(msg.sender == stableSwapAddress);
     }
 }
