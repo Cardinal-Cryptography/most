@@ -91,7 +91,7 @@ async function main() {
   await tx.wait(1);
 
   await most.sendRequestNative(bazeroAdrressBytes, {
-    value: ethers.parseEther("10.0").toString(),
+    value: ethers.parseEther("10.0"),
   });
 
   const _dest = ethers.zeroPadValue(ethers.getBytes(accounts[0]), 32);

@@ -51,8 +51,8 @@ contract MostL2 is AbstractMost {
 
         // Allow swap to spend that many tokens
         bazero.approve(address(stableSwapAddress), amount);
-        // At least half of amount_in
-        uint256 min_amount_out = amount / 2;
+        // any exchange rate is fine. Todo: fix this
+        uint256 min_amount_out = 0;
 
         (bool swapSuccess, bytes memory returndata) = address(stablePool).call(
             abi.encodeCall(
@@ -68,8 +68,10 @@ contract MostL2 is AbstractMost {
     }
 
     function swap_for_bazero(uint256 amount) internal returns (uint256) {
+        // any exchange rate is fine. Todo: fix this
+        uint256 min_amount_out = 0;
+
         StableSwapTwoPool stablePool = StableSwapTwoPool(stableSwapAddress);
-        uint256 min_amount_out = amount / 2;
         return stablePool.exchange_from_native{value: amount}(min_amount_out);
     }
 
@@ -145,13 +147,17 @@ contract MostL2 is AbstractMost {
         uint256 amount = msg.value;
         require(amount != 0, "Zero amount");
         if (amount == 0) revert ZeroAmount();
-        require(destReceiverAddress != bytes32(0), "revert ZeroAddress()");
+        if (destReceiverAddress == bytes32(0)) {
+            revert ZeroAddress();
+        }
 
         bytes32 destTokenAddress = supportedPairs[
             addressToBytes32(bAzeroAddress)
         ];
 
-        require(destTokenAddress != 0x0, "revert UnsupportedPair()");
+        if (destTokenAddress == 0x0) {
+            revert UnsupportedPair();
+        }
 
         uint256 amount_out = swap_for_bazero(amount);
         burn_bazero(amount_out);
