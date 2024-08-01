@@ -189,6 +189,7 @@ compile-azero: azero-deps
 	mkdir -p azero/artifacts
 	make compile-azero-single-contract CONTRACT_DIR=advisory CONTRACT_NAME=advisory
 	make compile-azero-single-contract CONTRACT_DIR=most CONTRACT_NAME=most
+	make compile-azero-single-contract CONTRACT_DIR=most-l2 CONTRACT_NAME=most-l2
 	make compile-azero-single-contract CONTRACT_DIR=token CONTRACT_NAME=token
 	make compile-azero-single-contract CONTRACT_DIR=gas-price-oracle/contract CONTRACT_NAME=oracle
 	cd azero && cp external_artifacts/wrapped_azero.contract artifacts/
@@ -284,6 +285,7 @@ test-ink-e2e: bootstrap-azero
 test-ink-unit: # Run ink unit tests
 test-ink-unit:
 	cd azero/contracts/most && cargo test
+	cd azero/contracts/most-l2 && cargo test
 	cd azero/contracts/token && cargo test
 	cd azero/contracts/gas-price-oracle/contract && cargo test
 
@@ -354,6 +356,7 @@ rust-format-check: # Check rust code formatting
 rust-format-check:
 	cd relayer && cargo fmt -- --check
 	cd azero/contracts/most && cargo fmt -- --check
+	cd azero/contracts/most-l2 && cargo fmt -- --check
 	cd azero/contracts/token && cargo fmt -- --check
 	cd azero/contracts/psp22-traits && cargo fmt -- --check
 	cd azero/contracts/tests && cargo fmt -- --check
@@ -367,6 +370,7 @@ rust-format: # Format rust code
 rust-format:
 	cd relayer && cargo fmt
 	cd azero/contracts/most && cargo fmt
+	cd azero/contracts/most-l2 && cargo fmt
 	cd azero/contracts/token && cargo fmt
 	cd azero/contracts/psp22-traits && cargo fmt
 	cd azero/contracts/tests && cargo fmt
