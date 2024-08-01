@@ -189,7 +189,7 @@ compile-azero: azero-deps
 	mkdir -p azero/artifacts
 	make compile-azero-single-contract CONTRACT_DIR=advisory CONTRACT_NAME=advisory
 	make compile-azero-single-contract CONTRACT_DIR=most CONTRACT_NAME=most
-	make compile-azero-single-contract CONTRACT_DIR=most-l2 CONTRACT_NAME=most-l2
+	make compile-azero-single-contract CONTRACT_DIR=most-l2 CONTRACT_NAME=most_l2
 	make compile-azero-single-contract CONTRACT_DIR=token CONTRACT_NAME=token
 	make compile-azero-single-contract CONTRACT_DIR=gas-price-oracle/contract CONTRACT_NAME=oracle
 	cd azero && cp external_artifacts/wrapped_azero.contract artifacts/
@@ -335,6 +335,7 @@ relayer-lint: compile-azero-docker compile-eth
 ink-lint: # Lint ink contracts
 ink-lint:
 	cd azero/contracts/most && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
+	cd azero/contracts/most-l2 && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
 	cd azero/contracts/token && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
 	cd azero/contracts/psp22-traits && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
 	cd azero/contracts/tests && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
