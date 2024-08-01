@@ -64,7 +64,7 @@ contract MostL2 is AbstractMost {
             uint256 amount_out = abi.decode(returndata, (uint256));
             return (swapSuccess, amount_out);
         }
-        return (swapSuccess, 0);
+        return (false, 0);
     }
 
     function swap_for_bazero(uint256 amount) internal returns (uint256) {
