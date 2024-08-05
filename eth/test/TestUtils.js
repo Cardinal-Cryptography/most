@@ -18,9 +18,14 @@ function ethToWei(ethAmount) {
   return hre.ethers.parseEther(ethAmount.toString());
 }
 
+function getRandomAddress() {
+  return hre.ethers.Wallet.createRandom().address;
+}
+
 module.exports = {
   addressToBytes32,
   bytes32ToAddress,
   ethToWei,
   getRandomAlephAccount,
+  getRandomAddress,
 };

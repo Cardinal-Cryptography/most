@@ -18,6 +18,7 @@ const SEPOLIA_URL = process.env.SEPOLIA_URL;
 const SEPOLIA_THRESHOLD = process.env.SEPOLIA_THRESHOLD;
 const ETHEREUM_PRIVATE_KEY = process.env.ETHEREUM_PRIVATE_KEY;
 const ETHEREUM_GUARDIAN_ADDRESS = process.env.ETHEREUM_GUARDIAN_ADDRESS;
+const L2_KEY = process.env.L2_KEY;
 
 var config = {
   defaultNetwork: "hardhat",
@@ -144,6 +145,21 @@ if (SEPOLIA_KEY) {
         SEPOLIA_TOKEN_CONFIG_PATH == ""
           ? "../cfg/tokens_testnet_example.json"
           : SEPOLIA_TOKEN_CONFIG_PATH,
+    },
+  };
+}
+
+if (L2_KEY) {
+  config.networks.ldwa = {
+    url: "https://rpc.alephzero-testnet.gelato.digital",
+    accounts: [L2_KEY],
+    deploymentConfig: {
+      guardianIds: [
+        "0x5027E6E6548b2eb986D4CC440C2a0dBB05D88946", // L2 account address corresponding to L2_KEY
+      ],
+      threshold: 1,
+      weth: "0xd91aE8FD2Be53F74876a9cc4aFb416645A0c8420",
+      tokenConfigPath: "../cfg/tokens_testnet_example.json",
     },
   };
 }
