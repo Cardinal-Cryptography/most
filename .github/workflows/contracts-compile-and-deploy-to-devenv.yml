@@ -237,3 +237,25 @@ jobs:
           frontend-environment: most0
           src-addresses: contract_spec_with_block_numbers.json
           if-exist: overwrite
+
+      - name: Mock contract spec JSON for L2
+        shell: bash
+        run: |
+          ETH_START_BLOCK=$(cat eth/block_latest.json | jq -r '.number')
+          AZERO_START_BLOCK=$(cat azero/block_latest.json | jq -r '.number')
+          cp contract_spec_with_block_numbers.json l2_contract_spec.json
+          cat l2_contract_spec.json | jq '.addresses = {}' | jq ".start_blocks = { evm: \"$ETH_START_BLOCK\", l2_azero: \"$AZERO_START_BLOCK\" }" \
+            > l2_contract_spec_with_block_numbers.json
+
+      - name: Store L2 addresses in S3 bucket
+        uses: Cardinal-Cryptography/github-actions/store-contract-addresses@v6
+        with:
+          aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ADDRESSES_TESTNET_MOST0_RW_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ADDRESSES_TESTNET_MOST0_RW_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
+          s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
+          project: most
+          chain-environment: testnet
+          frontend-environment: l2_most0
+          src-addresses: l2_contract_spec_with_block_numbers.json
+          if-exist: overwrite

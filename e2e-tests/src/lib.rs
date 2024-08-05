@@ -2,6 +2,12 @@
 mod azero;
 
 #[cfg(test)]
+mod balance;
+
+#[cfg(test)]
+mod client;
+
+#[cfg(test)]
 mod config;
 
 #[cfg(test)]

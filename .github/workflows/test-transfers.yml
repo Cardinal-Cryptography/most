@@ -27,10 +27,7 @@ jobs:
           sleep 60 # wait 1 minute for everything to be running
           make deploy-docker
           DOCKER_RELAYER_COMPILE_CONTRACTS=no-compile make run-relayers
-          
-          make ethereum-azero-transfer
-          sleep 300 # wait 5 minutes for transfer to register on both chains
-          make azero-ethereum-transfer
+          make e2e-tests
 
   slack-notification:
     name: Slack notification

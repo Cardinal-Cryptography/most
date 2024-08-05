@@ -35,7 +35,7 @@ static GLOBAL_CONFIG: Lazy<Config> = Lazy::new(|| Config {
     ),
     test_args: TestArgs {
         wait_max_minutes: get_env("WAIT_MAX_MINUTES").unwrap_or(15),
-        transfer_amount: get_env("TRANSFER_AMOUNT").unwrap_or(1),
+        transfer_amount: get_env("TRANSFER_AMOUNT").unwrap_or("0.1".to_string()),
     },
 });
 
@@ -170,5 +170,5 @@ pub struct ContractMetadataPaths {
 
 pub struct TestArgs {
     pub wait_max_minutes: u64,
-    pub transfer_amount: u128,
+    pub transfer_amount: String,
 }
