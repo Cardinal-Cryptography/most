@@ -241,6 +241,8 @@ jobs:
       - name: Mock contract spec JSON for L2
         shell: bash
         run: |
+          ETH_START_BLOCK=$(cat eth/block_latest.json | jq -r '.number')
+          AZERO_START_BLOCK=$(cat azero/block_latest.json | jq -r '.number')
           cp contract_spec_with_block_numbers.json l2_contract_spec.json
           cat l2_contract_spec.json | jq '.addresses = {}' | jq ".start_blocks = { evm: \"$ETH_START_BLOCK\", l2_azero: \"$AZERO_START_BLOCK\" }" \
             > l2_contract_spec_with_block_numbers.json
