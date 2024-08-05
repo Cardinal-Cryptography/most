@@ -12,6 +12,11 @@ In order to use the e2e test suite, we need to have *most* running in the backgr
 - A committee of *guardians*.
 - A *relayer* for communication between the chains.
 
+This can be achieved by running:
+```bash
+$ make bridge
+```
+
 Running one specific test using default config values:
 ```bash
 $ RUST_LOG=info cargo test test::test_module::test_name -- --color always --exact --nocapture
@@ -19,5 +24,10 @@ $ RUST_LOG=info cargo test test::test_module::test_name -- --color always --exac
 
 There is also a convenience `make` instruction to run with default parameters:
 ```bash
-$ make e2e-tests TEST_CASE=test_module::test_name
+$ make e2e-test TEST_CASE=test_module::test_name
+```
+
+Running the full e2e test suite:
+```bash
+$ make e2e-tests
 ```
