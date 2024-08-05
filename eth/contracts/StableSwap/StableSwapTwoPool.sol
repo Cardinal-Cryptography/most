@@ -494,12 +494,37 @@ contract StableSwapTwoPool is Ownable, ReentrancyGuard {
         return dy - _fee;
     }
 
+    function exchange_to_native(
+        uint256 amount_in,
+        uint256 native_min_amount_out
+    ) external payable nonReentrant returns (uint256) {
+        require(support_native, "Cant exchange native without native support");
+
+        if (coins[0] == NATIVE_ADDRESS) {
+            return exchange(1, 0, amount_in, native_min_amount_out);
+        } else {
+            return exchange(0, 1, amount_in, native_min_amount_out);
+        }
+    }
+
+    function exchange_from_native(
+        uint256 min_amount_out
+    ) external payable nonReentrant returns (uint256) {
+        require(support_native, "Cant exchange native without native support");
+
+        if (coins[0] == NATIVE_ADDRESS) {
+            return exchange(0, 1, msg.value, min_amount_out);
+        } else {
+            return exchange(1, 0, msg.value, min_amount_out);
+        }
+    }
+
     function exchange(
         uint256 source_token,
         uint256 dest_token,
         uint256 amount_in,
         uint256 amount_out
-    ) external payable nonReentrant {
+    ) internal returns (uint256) {
         require(!is_killed, "Killed");
         if (!support_native) {
             require(msg.value == 0, "Inconsistent quantity"); // Avoid sending native by mistake.
@@ -543,7 +568,7 @@ contract StableSwapTwoPool is Ownable, ReentrancyGuard {
         }
         address jAddress = coins[dest_token];
         transfer_out(jAddress, dy);
-        emit TokenExchange(msg.sender, source_token, amount_in, dest_token, dy);
+        return dy;
     }
 
     function remove_liquidity(

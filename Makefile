@@ -267,7 +267,7 @@ devnet-relayers-logs:
 .PHONY: test-solidity
 test-solidity: # Run solidity tests
 test-solidity: eth-deps
-	cd eth && npx hardhat test ./test/Most.js ./test/WrappedEther.js ./test/WrappedToken.js
+	cd eth && npx hardhat test ./test/Most.js ./test/WrappedEther.js ./test/WrappedToken.js ./test/MostL2.js
 
 .PHONY: test-ink
 test-ink: # Run ink tests
