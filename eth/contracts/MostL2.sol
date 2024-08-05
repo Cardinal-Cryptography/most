@@ -13,11 +13,14 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 contract MostL2 is AbstractMost {
     using SafeERC20 for IERC20;
 
-    /// Ration betweem Bazero (12 decimals) and native token (18 decimals)
-    uint256 public constant BAZERO_RATIO = 10e6;
+    /// Ration betweem bridged azero (12 decimals) and native token on L2 (18 decimals)
+    uint256 public constant BAZERO_TO_NATIVE_RATIO = 10e6;
 
     address payable public stableSwapAddress;
     address public bAzeroAddress;
+
+    /// Rate of swap in stable swap we are content with
+    uint256 public constant MIN_SWAP_RATE = 99;
 
     event NativeTransferFailed(bytes32 requestHash);
     event NativeTransferSwap(bytes32 requestHash, uint256 amount_out);
@@ -52,6 +55,19 @@ contract MostL2 is AbstractMost {
         _pause();
     }
 
+    /// Calculates min value of the swap we are happy with.
+    /// Takes into the account decimals between bazero and native token.
+    function calc_min_amount_out_swap(
+        uint256 amount,
+        bool to_bazero
+    ) internal returns (uint256) {
+        if (to_bazero) {
+            return ((amount / 100) * MIN_SWAP_RATE) / BAZERO_TO_NATIVE_RATIO;
+        } else {
+            return (amount / 100) * MIN_SWAP_RATE * BAZERO_TO_NATIVE_RATIO;
+        }
+    }
+
     function swap_from_bazero(uint256 amount) internal returns (bool, uint256) {
         IWrappedToken bazero = IWrappedToken(bAzeroAddress);
         StableSwapTwoPool stablePool = StableSwapTwoPool(stableSwapAddress);
@@ -59,7 +75,7 @@ contract MostL2 is AbstractMost {
         // Allow swap to spend that many tokens
         bazero.approve(address(stableSwapAddress), amount);
         // at least 99% of what we gave to the swap
-        uint256 min_amount_out = (amount / 100 * 99) * BAZERO_RATIO;
+        uint256 min_amount_out = calc_min_amount_out_swap(amount, false);
 
         (bool swapSuccess, bytes memory returndata) = address(stablePool).call(
             abi.encodeCall(
@@ -71,12 +87,12 @@ contract MostL2 is AbstractMost {
             uint256 amount_out = abi.decode(returndata, (uint256));
             return (swapSuccess, amount_out);
         }
-        return (swapSuccess, 0);
+        return (false, 0);
     }
 
     function swap_for_bazero(uint256 amount) internal returns (uint256) {
         // at least 99% of what we gave to the swap
-        uint256 min_amount_out = (amount / 100 * 99) / BAZERO_RATIO;
+        uint256 min_amount_out = calc_min_amount_out_swap(amount, true);
 
         StableSwapTwoPool stablePool = StableSwapTwoPool(stableSwapAddress);
         return stablePool.exchange_from_native{value: amount}(min_amount_out);
@@ -178,7 +194,10 @@ contract MostL2 is AbstractMost {
         uint256 amount = msg.value;
         require(amount != 0, "Zero amount");
         if (amount == 0) revert ZeroAmount();
-        require(amount >= 1000000, "Value must be at least 1000000");
+        require(
+            amount >= BAZERO_TO_NATIVE_RATIO,
+            "Value must be at least 10e6"
+        );
         if (destReceiverAddress == bytes32(0)) {
             revert ZeroAddress();
         }
