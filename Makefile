@@ -304,7 +304,7 @@ e2e-test:
 		cargo test test::$(TEST_CASE) -- --color always --exact --nocapture --test-threads=1
 
 .PHONY: e2e-tests
-e2e-tests: # Run cross-chain transfer e2e tests. All tests must be run without interruption, the order is important.
+e2e-tests: # Run cross-chain transfer e2e tests. All tests must be run without interruption, the order is important. Requires the bridge and both chains to be running locally, e.g. these can be set up by executing `make bridge`.
 e2e-tests:
 	TEST_CASE=eth_to_azero::weth_to_weth make e2e-test
 	TEST_CASE=azero_to_eth::weth_to_weth make e2e-test

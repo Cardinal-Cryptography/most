@@ -3,6 +3,8 @@ use ethers::types::U256;
 
 /// Struct holding the current balances on both chains for a given account pair.
 /// It includes the native coins, and all the wrapped tokens we're concerned with.
+/// It also serves as a model for the transfers we want to test, each such transfer
+/// being simulated by a method.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Balance {
     pub eth: U256,
