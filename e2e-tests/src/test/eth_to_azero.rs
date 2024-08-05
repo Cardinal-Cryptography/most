@@ -5,6 +5,11 @@ use log::info;
 use crate::{client::Client, config::setup_test, wait::wait_for_balance_change};
 
 /// One-way `Ethereum` -> `Aleph Zero` transfer of wETH through `most`.
+/// 1. Wraps the required funds into wETH for an Ethereum account.
+/// 2. Approves the `most` contract to use the wETH funds.
+/// 3. Transfers `transfer_amount` of wETH to a specified Aleph Zero account over the bridge.
+/// 4. Waits for the transfer to complete.
+/// Finally, it checks if every account has proper balance.
 /// It relies on all the relevant contracts being deployed on both ends and the (wETH_ETH:wETH_AZERO) pair having been added to `most`.
 #[tokio::test]
 pub async fn weth_to_weth() -> Result<()> {
@@ -44,6 +49,10 @@ pub async fn weth_to_weth() -> Result<()> {
 }
 
 /// One-way `Ethereum` -> `Aleph Zero` transfer of USDT through `most`.
+/// 1. Approves the `most` contract to use the USDT funds.
+/// 2. Transfers `transfer_amount` of burned USDT over the bridge.
+/// 3. Waits for the transfer to complete.
+/// Finally, it checks if every account has proper balance.
 /// It relies on all the relevant contracts being deployed on both ends and the (USDT_ETH:USDT_AZERO) pair having been added to `most`.
 #[tokio::test]
 pub async fn usdt_to_usdt() -> Result<()> {
@@ -82,6 +91,10 @@ pub async fn usdt_to_usdt() -> Result<()> {
 /// One-way `Ethereum` -> `Aleph Zero` transfer of wAZERO through `most`.
 /// Requires a prior transaction in the other direction to have completed.
 /// This is easily done by running the test for the other direction first.
+/// 1. Approves the `most` contract to use the wAZERO funds.
+/// 2. Transfers `transfer_amount` of burned wAZERO over the bridge.
+/// 3. Waits for the transfer to complete.
+/// Finally, it checks if every account has proper balance.
 /// It relies on all the relevant contracts being deployed on both ends and the (wAZERO_ETH:wAZERO_AZERO) pair having been added to `most`.
 #[tokio::test]
 pub async fn wazero_to_wazero() -> Result<()> {
@@ -115,6 +128,9 @@ pub async fn wazero_to_wazero() -> Result<()> {
 }
 
 /// One-way `Ethereum` -> `Aleph Zero` transfer of ETH to wETH through `most`.
+/// 1. Transfers `transfer_amount` of native ETH over the bridge.
+/// 2. Waits for the transfer to complete.
+/// Finally, it checks if every account has proper balance.
 /// It relies on all the relevant contracts being deployed on both ends and the (wETH_ETH:wETH_AZERO) pair having been added to `most`.
 #[tokio::test]
 pub async fn eth_to_weth() -> Result<()> {
@@ -149,6 +165,10 @@ pub async fn eth_to_weth() -> Result<()> {
 /// One-way `Ethereum` -> `Aleph Zero` transfer of wAZERO to AZERO through `most`.
 /// Requires a prior transaction in the other direction to have completed.
 /// This is easily done by running the test for the other direction first.
+/// 1. Approves the `most` contract to use the wAZERO funds.
+/// 2. Transfers `transfer_amount` of burned wAZERO over the bridge, the Aleph account receives native AZERO.
+/// 3. Waits for the transfer to complete.
+/// Finally, it checks if every account has proper balance.
 /// It relies on all the relevant contracts being deployed on both ends and the (wAZERO_ETH:wAZERO_AZERO) pair having been added to `most`.
 #[tokio::test]
 pub async fn wazero_to_azero() -> Result<()> {
