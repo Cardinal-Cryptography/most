@@ -32,7 +32,7 @@ clean-eth:
 .PHONY: clean
 clean: # Remove all node data
 clean: stop-local-bridgenet clean-eth clean-azero
-	
+
 .PHONY: full-clean
 full-clean: # Remove all build and node data
 full-clean: stop-local-bridgenet
@@ -268,7 +268,7 @@ devnet-relayers-logs:
 .PHONY: test-solidity
 test-solidity: # Run solidity tests
 test-solidity: eth-deps
-	cd eth && npx hardhat test ./test/Most.js ./test/WrappedEther.js ./test/WrappedToken.js
+	cd eth && npx hardhat test ./test/Most.js ./test/WrappedEther.js ./test/WrappedToken.js ./test/MostL2.js
 
 .PHONY: test-ink
 test-ink: # Run ink tests
@@ -306,10 +306,18 @@ e2e-test:
 		cargo test test::$(TEST_CASE) -- --color always --exact --nocapture --test-threads=1
 
 .PHONY: e2e-tests
-e2e-tests: # Run e2e tests
+e2e-tests: # Run cross-chain transfer e2e tests. All tests must be run without interruption, the order is important. Requires the bridge and both chains to be running locally, e.g. these can be set up by executing `make bridge`.
 e2e-tests:
 	TEST_CASE=eth_to_azero::weth_to_weth make e2e-test
 	TEST_CASE=azero_to_eth::weth_to_weth make e2e-test
+	TEST_CASE=eth_to_azero::usdt_to_usdt make e2e-test
+	TEST_CASE=azero_to_eth::usdt_to_usdt make e2e-test
+	TEST_CASE=azero_to_eth::wazero_to_wazero make e2e-test
+	TEST_CASE=eth_to_azero::wazero_to_wazero make e2e-test
+	TEST_CASE=eth_to_azero::eth_to_weth make e2e-test
+	TEST_CASE=azero_to_eth::weth_to_eth make e2e-test
+	TEST_CASE=azero_to_eth::azero_to_wazero make e2e-test
+	TEST_CASE=eth_to_azero::wazero_to_azero make e2e-test
 
 .PHONY: drink-tests
 drink-tests: # Run drink tests
