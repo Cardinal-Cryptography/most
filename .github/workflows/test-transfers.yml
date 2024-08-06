@@ -24,3 +24,56 @@ jobs:
 
       - name: "Install Rust toolchain"
         uses: Cardinal-Cryptography/github-actions/install-rust-toolchain@v6
+
+      - name: Run tests
+        if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.environment != 'testnet-most0') }}
+        timeout-minutes: 30
+        shell: bash
+        run: |
+          make local-bridgenet
+          sleep 60 # wait 1 minute for everything to be running
+          make deploy-docker
+          DOCKER_RELAYER_COMPILE_CONTRACTS=no-compile make run-relayers
+          make e2e-tests
+
+      - name: Create token config for testnet
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'testnet-most0' }}
+        shell: bash
+        run: |
+          cat cfg/tokens_testnet_example.json > cfg/tokens_testnet.json
+
+      - name: Create azero env file for testnet
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'testnet-most0' }}
+        shell: bash
+        env:
+          AZERO1: ${{ secrets.DEVENV_TESTNET_AZERO1_ACCOUNT_NUMBER }}
+          AZERO2: ${{ secrets.DEVENV_TESTNET_AZERO2_ACCOUNT_NUMBER }}
+          AZERO3: ${{ secrets.DEVENV_TESTNET_AZERO3_ACCOUNT_NUMBER }}
+          AZERO1_SEED: ${{ secrets.DEVENV_TESTNET_AZERO1_KEY }}
+        run: |
+          cat azero/env/testnet.json.example | \
+            jq '.relayers = ["${{ env.AZERO1 }}", "${{ env.AZERO2 }}", "${{ env.AZERO3 }}"]' | \
+            jq '.deployer_seed = "${{ env.AZERO1_SEED }}"' | jq '.dev = true' > azero/env/testnet.json
+
+      - name: Run tests for 'testnet-most0' env
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'testnet-most0' }}
+        shell: bash
+        timeout-minutes: 30
+        run: |
+          AZERO_ENV=testnet make e2e-tests
+
+  slack-notification:
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.environment != 'testnet-most0') }}
+    name: Slack notification
+    runs-on: ubuntu-20.04
+    needs: [test]
+    if: >
+      !cancelled() &&
+      github.event_name != 'workflow_dispatch'
+    steps:
+      - name: Send Slack message
+        uses: Cardinal-Cryptography/github-actions/slack-notification@v7
+        with:
+          notify-on: "failure"
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_INCOMING_WEBHOOK_MOST_CI_NOTIFICATIONS }}
