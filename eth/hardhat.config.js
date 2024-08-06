@@ -158,8 +158,15 @@ if (L2_KEY) {
         "0x5027E6E6548b2eb986D4CC440C2a0dBB05D88946", // L2 account address corresponding to L2_KEY
       ],
       threshold: 1,
-      weth: "0xd91aE8FD2Be53F74876a9cc4aFb416645A0c8420",
-      tokenConfigPath: "../cfg/tokens_testnet_example.json",
+      bazero_decimals: 12,
+      bazero_token_mint: 10e6, // Mint 1 million tokens - will be scalled by decimals.
+      pool_config: {
+        amplification_coefficient: 2000,
+        admin_fee: 0,
+        fee: 0,
+        initial_token_supply: 10_000,
+        initial_native_supply: 10_000,
+      },
     },
   };
 }
