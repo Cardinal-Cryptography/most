@@ -63,7 +63,6 @@ jobs:
           AZERO_ENV=testnet make e2e-tests
 
   slack-notification:
-    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.environment != 'testnet-most0') }}
     name: Slack notification
     runs-on: ubuntu-20.04
     needs: [test]
