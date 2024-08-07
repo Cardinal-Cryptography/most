@@ -150,7 +150,7 @@ abstract contract AbstractMost is
         bytes32 srcTokenAddress,
         uint256 amount,
         bytes32 destReceiverAddress
-    ) external whenNotPaused {
+    ) external virtual whenNotPaused {
         if (amount == 0) revert ZeroAmount();
         if (destReceiverAddress == bytes32(0)) revert ZeroAddress();
 
@@ -219,7 +219,7 @@ abstract contract AbstractMost is
     function sendRequestAzeroToNative(
         uint256 amount,
         bytes32 destReceiverAddress
-    ) external {
+    ) external virtual {
         if (amount == 0) revert ZeroAmount();
         if (destReceiverAddress == bytes32(0)) revert ZeroAddress();
         if (wrappedAzeroAddress == address(0)) revert AzeroAddressNotSet();
@@ -385,7 +385,7 @@ abstract contract AbstractMost is
         bytes32 from,
         bytes32 to,
         bool isLocal
-    ) external onlyOwner whenPaused {
+    ) external virtual onlyOwner whenPaused {
         supportedPairs[from] = to;
         isLocalToken[bytes32ToAddress(from)] = isLocal;
     }
