@@ -27,7 +27,7 @@ jobs:
         shell: bash
         run: |
           wget https://public-chain-contracts.s3.eu-central-1.amazonaws.com/most/addresses/testnet/most0.json
-          commit_hash=$(cat most0.json | jq '.contract_version')
+          commit_hash=$(cat most0.json | jq -r '.contract_version')
           for net in eth azero; do
             mkdir -p "$net"
             sudo cat "most0.json" | \
