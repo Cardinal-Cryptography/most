@@ -15,83 +15,8 @@ on:
         type: string
 
 jobs:
-  get-testnet-addresses:
-    name: Download testnet contract addresses
-    runs-on: [self-hosted, Linux, X64, small]
-    outputs:
-      commit-sha: ${{ steps.addresses.outputs.commit-sha }}
-    steps:
-      - name: Download addresses for 'testnet-most0' env
-        id: addresses
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'testnet-most0' }}
-        shell: bash
-        run: |
-          wget https://public-chain-contracts.s3.eu-central-1.amazonaws.com/most/addresses/testnet/most0.json
-          commit_hash=$(cat most0.json | jq -r '.contract_version')
-          for net in eth azero; do
-            mkdir -p "$net"
-            sudo cat "most0.json" | \
-              sudo jq --arg NET "$net" '.addresses | to_entries | map(select(.key | contains($NET + "_"))) | map({(.key | sub($NET + "_";"")): .value.address}) | add' \
-              | sudo tee "$net"/addresses.json
-          done
-          echo "commit-sha=$commit_hash" > $GITHUB_OUTPUT
-      - uses: actions/upload-artifact@v4
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'testnet-most0' }}
-        with:
-          name: testnet-addresses
-          if-no-files-found: error
-          retention-days: 1
-          path: |
-            eth/addresses.json
-            azero/addresses.json
-
-  get-testnet-contracts:
-    name: Download testnet contracts
-    needs: [get-testnet-addresses]
-    runs-on: [self-hosted, Linux, X64, small]
-    strategy:
-      matrix:
-        contract_path:
-          - azero_most/
-          - azero_token/
-          - azero_wrapped_azero/
-          - eth_most/
-          - eth_weth9/
-          - eth_tethertoken/
-          - eth_wrappedtoken/
-    steps:
-      - name: Create dirs for artifacts
-        shell: bash
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'testnet-most0' }}
-        run: |
-          mkdir -p testnet-artifacts/"$(dirname ${{ matrix.contract_path }})"
-
-      - name: Download most artifact from S3 bucket
-        uses: Cardinal-Cryptography/github-actions/download-contract-artifact@v6
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'testnet-most0' }}
-        with:
-          aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RW_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RW_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
-          s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
-          project: most
-          version: ${{ needs.get-testnet-addresses.outputs.commit-sha }}
-          contract: ${{ matrix.contract_path }}
-          if-not-exist: fallback
-          dst-artifact: testnet-artifacts/${{ matrix.contract_path }}
-
-      - uses: actions/upload-artifact@v4
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'testnet-most0' }}
-        with:
-          name: testnet-artifacts
-          if-no-files-found: error
-          retention-days: 1
-          path: |
-            testnet-artifacts
-
   test:
     name: Test transfers
-    needs: [get-testnet-contracts]
     runs-on: [self-hosted, Linux, X64, large]
     steps:
       - name: Checkout code
@@ -111,23 +36,41 @@ jobs:
           DOCKER_RELAYER_COMPILE_CONTRACTS=no-compile make run-relayers
           make e2e-tests
 
-      - uses: actions/download-artifact@v4
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'testnet-most0' }}
-        with:
-          name: testnet-addresses
-          path: eth
 
-      - uses: actions/download-artifact@v4
+      - name: Download addresses for 'testnet-most0' env
+        id: addresses
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'testnet-most0' }}
-        with:
-          name: testnet-addresses
-          path: azero
+        shell: bash
+        run: |
+          wget https://public-chain-contracts.s3.eu-central-1.amazonaws.com/most/addresses/testnet/most0.json
+          commit_hash=$(cat most0.json | jq -r '.contract_version')
+          for net in eth azero; do
+            mkdir -p "$net"
+            sudo cat "most0.json" | \
+              sudo jq --arg NET "$net" '.addresses | to_entries | map(select(.key | contains($NET + "_"))) | map({(.key | sub($NET + "_";"")): .value.address}) | add' \
+              | sudo tee "$net"/addresses.json
+          done
+          echo "commit-sha=$commit_hash" > $GITHUB_OUTPUT
 
-      - uses: actions/download-artifact@v4
+      - name: Download contract artifacts from AWS S3 bucket
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'testnet-most0' }}
-        with:
-          name: testnet-artifacts
-          path: testnet-artifacts
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RW_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RW_AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
+        shell: bash
+        run: |
+          mkdir -p azero/artifacts
+          aws s3 cp s3://${{ secrets.CONTRACTS_S3BUCKET_REGION }}/most/artifacts/${{ steps.addresses.outputs.commit-sha }}/azero_most/most.json azero/artifacts/most.json
+          aws s3 cp s3://${{ secrets.CONTRACTS_S3BUCKET_REGION }}/most/artifacts/${{ steps.addresses.outputs.commit-sha }}/azero_token/token.json azero/artifacts/token.json
+          aws s3 cp s3://${{ secrets.CONTRACTS_S3BUCKET_REGION }}/most/artifacts/${{ steps.addresses.outputs.commit-sha }}/azero_wrapped_azero/wrapped_azero.json azero/artifacts/wrapped_azero.json
+
+          mkdir -p eth/artifacts/contracts/{Most.sol,WETH9.sol,USDT.sol,WrappedToken.sol}
+          aws s3 cp s3://${{ secrets.CONTRACTS_S3BUCKET_REGION }}/most/artifacts/${{ steps.addresses.outputs.commit-sha }}/eth_most/Most.json eth/artifacts/contracts/Most.sol/Most.json
+          aws s3 cp s3://${{ secrets.CONTRACTS_S3BUCKET_REGION }}/most/artifacts/${{ steps.addresses.outputs.commit-sha }}/eth_weth9/WETH9.json eth/artifacts/contracts/WETH9.sol/WETH9.json
+          aws s3 cp s3://${{ secrets.CONTRACTS_S3BUCKET_REGION }}/most/artifacts/${{ steps.addresses.outputs.commit-sha }}/eth_tethertoken/TetherToken.json eth/artifacts/contracts/USDT.sol/TetherToken.json
+          aws s3 cp s3://${{ secrets.CONTRACTS_S3BUCKET_REGION }}/most/artifacts/${{ steps.addresses.outputs.commit-sha }}/eth_wrappedtoken/WrappedToken.json eth/artifacts/contracts/WrappedToken.sol/WrappedToken.json
+
 
       - name: List downloaded files
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'testnet-most0' }}
