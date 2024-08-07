@@ -385,7 +385,7 @@ abstract contract AbstractMost is
         bytes32 from,
         bytes32 to,
         bool isLocal
-    ) external onlyOwner whenPaused {
+    ) external virtual onlyOwner whenPaused {
         supportedPairs[from] = to;
         isLocalToken[bytes32ToAddress(from)] = isLocal;
     }

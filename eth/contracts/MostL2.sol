@@ -28,6 +28,8 @@ contract MostL2 is AbstractMost {
 
     error SwapError();
 
+    bytes32 internal constant EMPTY_STORAGE = 0x0;
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -60,7 +62,7 @@ contract MostL2 is AbstractMost {
     function calc_min_amount_out_swap(
         uint256 amount,
         bool to_bazero
-    ) internal returns (uint256) {
+    ) internal pure returns (uint256) {
         if (to_bazero) {
             return ((amount / 100) * MIN_SWAP_RATE) / BAZERO_TO_NATIVE_RATIO;
         } else {
@@ -241,7 +243,9 @@ contract MostL2 is AbstractMost {
         address token = bytes32ToAddress(srcTokenAddress);
 
         bytes32 destTokenAddress = supportedPairs[srcTokenAddress];
-        if (destTokenAddress == 0x0) revert UnsupportedPair();
+        if (destTokenAddress == EMPTY_STORAGE) revert UnsupportedPair();
+
+        // Should not happen, see `addPair` function where we allow only nonLocal tokens.
         require(
             !isLocalToken[token],
             "We dont bridge local tokens on L2 bridge"
@@ -273,6 +277,16 @@ contract MostL2 is AbstractMost {
 
     function sendRequestAzeroToNative(uint256, bytes32) external pure override {
         revert("Not supported on L2 bridge");
+    }
+
+    function addPair(
+        bytes32 from,
+        bytes32 to,
+        bool isLocal
+    ) external override onlyOwner whenPaused {
+        require(!isLocal, "L2 Most dont bridge local tokens");
+        supportedPairs[from] = to;
+        isLocalToken[bytes32ToAddress(from)] = false;
     }
 
     /// @dev Accept ether only from pool contract or through payable methods
