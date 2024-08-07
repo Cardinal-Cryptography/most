@@ -634,6 +634,18 @@ pub mod most {
             Ok(())
         }
 
+        /// Method used to change pocket_money value.
+        #[ink(message)]
+        pub fn set_pocket_money(&mut self, new_pocket_value: u128) -> Result<(), MostError> {
+            self.ensure_owner()?;
+            let mut data = self.data()?;
+
+            data.pocket_money = new_pocket_value;
+            self.data.set(&data);
+
+            Ok(())
+        }
+
         /// Upgrades contract code
         #[ink(message)]
         pub fn set_code(&mut self, code_hash: [u8; 32]) -> Result<(), MostError> {
@@ -1488,6 +1500,56 @@ pub mod most {
             assert_eq!(most.set_committee(vec![accounts.alice], 1), Ok(()));
             assert_eq!(most.committee_sizes.get(1), Some(1));
             assert!(!most.is_in_committee(most.get_current_committee_id().unwrap(), accounts.bob));
+        }
+
+        #[ink::test]
+        fn set_pocket_money_test() {
+            let accounts = default_accounts::<DefEnv>();
+            set_caller::<DefEnv>(accounts.alice);
+            let mut most = Most::new(
+                guardian_accounts(),
+                THRESHOLD,
+                POCKET_MONEY,
+                RELAY_GAS_USAGE,
+                MIN_FEE,
+                MAX_FEE,
+                DEFAULT_FEE,
+                GAS_ORACLE_MAX_AGE,
+                ORACLE_CALL_GAS_LIMIT,
+                BASE_FEE_BUFFER_PERCENTAGE,
+                None,
+                accounts.alice,
+            )
+            .expect("Threshold is valid.");
+
+            assert_eq!(most.get_pocket_money(), Ok(POCKET_MONEY));
+            assert_eq!(most.set_pocket_money(420), Ok(()));
+            assert_eq!(most.get_pocket_money(), Ok(420));
+        }
+
+        #[ink::test]
+        fn set_pocket_money_test_fails() {
+            let accounts = default_accounts::<DefEnv>();
+            set_caller::<DefEnv>(accounts.bob);
+            let mut most = Most::new(
+                guardian_accounts(),
+                THRESHOLD,
+                POCKET_MONEY,
+                RELAY_GAS_USAGE,
+                MIN_FEE,
+                MAX_FEE,
+                DEFAULT_FEE,
+                GAS_ORACLE_MAX_AGE,
+                ORACLE_CALL_GAS_LIMIT,
+                BASE_FEE_BUFFER_PERCENTAGE,
+                None,
+                accounts.alice,
+            )
+            .expect("Threshold is valid.");
+
+            assert_eq!(most.get_pocket_money(), Ok(POCKET_MONEY));
+            assert!(most.set_pocket_money(420).is_err());
+            assert_eq!(most.get_pocket_money(), Ok(POCKET_MONEY));
         }
     }
 }
