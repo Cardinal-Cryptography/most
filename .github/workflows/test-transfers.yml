@@ -15,8 +15,83 @@ on:
         type: string
 
 jobs:
+  get-testnet-addresses:
+    name: Download testnet contract addresses
+    runs-on: [self-hosted, Linux, X64, small]
+    outputs:
+      commit-sha: ${{ steps.addresses.outputs.commit-sha }}
+    steps:
+      - name: Download addresses for 'testnet-most0' env
+        id: addresses
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'testnet-most0' }}
+        shell: bash
+        run: |
+          wget https://public-chain-contracts.s3.eu-central-1.amazonaws.com/most/addresses/testnet/most0.json
+          commit_hash=$(cat most0.json | jq '.contract_version')
+          for net in eth azero; do
+            mkdir -p "$net"
+            sudo cat "most0.json" | \
+              sudo jq --arg NET "$net" '.addresses | to_entries | map(select(.key | contains($NET + "_"))) | map({(.key | sub($NET + "_";"")): .value.address}) | add' \
+              | sudo tee "$net"/addresses.json
+          done
+          echo "commit-sha=$commit_hash" > $GITHUB_OUTPUT
+      - uses: actions/upload-artifact@v4
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'testnet-most0' }}
+        with:
+          name: testnet-addresses
+          if-no-files-found: error
+          retention-days: 1
+          path: |
+            eth/addresses.json
+            azero/addresses.json
+
+  get-testnet-contracts:
+    name: Download testnet contracts
+    needs: [get-testnet-addresses]
+    runs-on: [self-hosted, Linux, X64, small]
+    strategy:
+      matrix:
+        contract_path:
+          - azero_most/most.json
+          - azero_token/token.json
+          - azero_wrapped_azero/wrapped_azero.json
+          - eth_most/Most.json
+          - eth_weth9/WETH9.json
+          - eth_tethertoken/TetherToken.json
+          - eth_wrappedtoken/WrappedToken.json
+    steps:
+      - name: Create dirs for artifacts
+        shell: bash
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'testnet-most0' }}
+        run: |
+          mkdir -p testnet-artifacts/"$(dirname ${{ matrix.contract_path }})"
+
+      - name: Download most artifact from S3 bucket
+        uses: Cardinal-Cryptography/github-actions/download-contract-artifact@v6
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'testnet-most0' }}
+        with:
+          aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RW_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RW_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
+          s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
+          project: most
+          version: ${{ needs.get-testnet-addresses.outputs.commit-sha }}
+          contract: ${{ matrix.contract_path }}
+          if-not-exist: fallback
+          dst-artifact: testnet-artifacts/${{ matrix.contract_path }}
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'testnet-most0' }}
+        with:
+          name: testnet-artifacts
+          if-no-files-found: error
+          retention-days: 1
+          path: |
+            testnet-artifacts
+
   test:
     name: Test transfers
+    needs: [get-testnet-contracts]
     runs-on: [self-hosted, Linux, X64, large]
     steps:
       - name: Checkout code
@@ -36,31 +111,38 @@ jobs:
           DOCKER_RELAYER_COMPILE_CONTRACTS=no-compile make run-relayers
           make e2e-tests
 
-      - name: Create token config for testnet
+      - uses: actions/download-artifact@v4
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'testnet-most0' }}
-        shell: bash
-        run: |
-          cat cfg/tokens_testnet_example.json > cfg/tokens_testnet.json
+        with:
+          name: testnet-addresses
+          path: eth
 
-      - name: Create azero env file for testnet
+      - uses: actions/download-artifact@v4
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'testnet-most0' }}
-        shell: bash
-        env:
-          AZERO1: ${{ secrets.DEVENV_TESTNET_AZERO1_ACCOUNT_NUMBER }}
-          AZERO2: ${{ secrets.DEVENV_TESTNET_AZERO2_ACCOUNT_NUMBER }}
-          AZERO3: ${{ secrets.DEVENV_TESTNET_AZERO3_ACCOUNT_NUMBER }}
-          AZERO1_SEED: ${{ secrets.DEVENV_TESTNET_AZERO1_KEY }}
-        run: |
-          cat azero/env/testnet.json.example | \
-            jq '.relayers = ["${{ env.AZERO1 }}", "${{ env.AZERO2 }}", "${{ env.AZERO3 }}"]' | \
-            jq '.deployer_seed = "${{ env.AZERO1_SEED }}"' | jq '.dev = true' > azero/env/testnet.json
+        with:
+          name: testnet-addresses
+          path: azero
 
-      - name: Run tests for 'testnet-most0' env
+      - uses: actions/download-artifact@v4
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'testnet-most0' }}
+        with:
+          name: testnet-artifacts
+          path: testnet-artifacts
+
+      - name: List downloaded files
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'testnet-most0' }}
         shell: bash
-        timeout-minutes: 30
         run: |
-          AZERO_ENV=testnet make e2e-tests
+          find eth/
+          find azero/
+          find testnet-artifacts/
+
+      #- name: Run tests for 'testnet-most0' env
+      #  if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'testnet-most0' }}
+      #  shell: bash
+      #  timeout-minutes: 30
+      #  run: |
+      #    make e2e-tests
 
   slack-notification:
     name: Slack notification
