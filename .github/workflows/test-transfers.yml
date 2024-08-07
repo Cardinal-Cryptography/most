@@ -77,7 +77,7 @@ jobs:
         shell: bash
         timeout-minutes: 30
         env:
-          AZERO_NODE_WS: wss://test.azero.dev:443
+          AZERO_NODE_WS: wss://ws.test.azero.dev
           ETH_NODE_HTTP: ${{ secrets.DEVENV_RPC_ETH_ENDPOINT }}
           ETH_DEV_ACCOUNT_INDEX: 0
           AZERO_ACCOUNT_SEED: ${{ secrets.DEVENV_TESTNET_AZERO1_KEY }}
