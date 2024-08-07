@@ -636,11 +636,11 @@ pub mod most {
 
         /// Method used to change pocket_money value.
         #[ink(message)]
-        pub fn set_pocket_money(&mut self, new_pocket_value: u128) -> Result<(), MostError> {
+        pub fn set_pocket_money(&mut self, new_pocket_money: u128) -> Result<(), MostError> {
             self.ensure_owner()?;
             let mut data = self.data()?;
 
-            data.pocket_money = new_pocket_value;
+            data.pocket_money = new_pocket_money;
             self.data.set(&data);
 
             Ok(())
@@ -1503,7 +1503,7 @@ pub mod most {
         }
 
         #[ink::test]
-        fn set_pocket_money_test() {
+        fn owner_calling_set_pocket_money_test() {
             let accounts = default_accounts::<DefEnv>();
             set_caller::<DefEnv>(accounts.alice);
             let mut most = Most::new(
@@ -1528,7 +1528,7 @@ pub mod most {
         }
 
         #[ink::test]
-        fn set_pocket_money_test_fails() {
+        fn not_owner_calling_set_pocket_money() {
             let accounts = default_accounts::<DefEnv>();
             set_caller::<DefEnv>(accounts.bob);
             let mut most = Most::new(
@@ -1548,7 +1548,12 @@ pub mod most {
             .expect("Threshold is valid.");
 
             assert_eq!(most.get_pocket_money(), Ok(POCKET_MONEY));
-            assert!(most.set_pocket_money(420).is_err());
+            assert_eq!(
+                most.set_pocket_money(420),
+                Err(MostError::Ownable(Ownable2StepError::CallerNotOwner(
+                    accounts.bob
+                )))
+            );
             assert_eq!(most.get_pocket_money(), Ok(POCKET_MONEY));
         }
     }
