@@ -36,13 +36,14 @@ jobs:
           DOCKER_RELAYER_COMPILE_CONTRACTS=no-compile make run-relayers
           make e2e-tests
 
-
       - name: Download addresses for 'testnet-most0' env
         id: addresses
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'testnet-most0' }}
         shell: bash
         run: |
           wget https://public-chain-contracts.s3.eu-central-1.amazonaws.com/most/addresses/testnet/most0.json
+
+          # Unfortunately, contract spec JSON must be split into two separate addresses.json files
           commit_hash=$(cat most0.json | jq -r '.contract_version')
           for net in eth azero; do
             mkdir -p "$net"
@@ -61,16 +62,15 @@ jobs:
         shell: bash
         run: |
           mkdir -p azero/artifacts
-          aws s3 cp s3://${{ secrets.CONTRACTS_S3BUCKET_REGION }}/most/artifacts/${{ steps.addresses.outputs.commit-sha }}/azero_most/most.json azero/artifacts/most.json
-          aws s3 cp s3://${{ secrets.CONTRACTS_S3BUCKET_REGION }}/most/artifacts/${{ steps.addresses.outputs.commit-sha }}/azero_token/token.json azero/artifacts/token.json
-          aws s3 cp s3://${{ secrets.CONTRACTS_S3BUCKET_REGION }}/most/artifacts/${{ steps.addresses.outputs.commit-sha }}/azero_wrapped_azero/wrapped_azero.json azero/artifacts/wrapped_azero.json
+          aws s3 cp s3://${{ secrets.CONTRACTS_S3BUCKET_NAME }}/most/artifacts/${{ steps.addresses.outputs.commit-sha }}/azero_most/most.json azero/artifacts/most.json
+          aws s3 cp s3://${{ secrets.CONTRACTS_S3BUCKET_NAME }}/most/artifacts/${{ steps.addresses.outputs.commit-sha }}/azero_token/token.json azero/artifacts/token.json
+          aws s3 cp s3://${{ secrets.CONTRACTS_S3BUCKET_NAME }}/most/artifacts/${{ steps.addresses.outputs.commit-sha }}/azero_wrapped_azero/wrapped_azero.json azero/artifacts/wrapped_azero.json
 
           mkdir -p eth/artifacts/contracts/{Most.sol,WETH9.sol,USDT.sol,WrappedToken.sol}
-          aws s3 cp s3://${{ secrets.CONTRACTS_S3BUCKET_REGION }}/most/artifacts/${{ steps.addresses.outputs.commit-sha }}/eth_most/Most.json eth/artifacts/contracts/Most.sol/Most.json
-          aws s3 cp s3://${{ secrets.CONTRACTS_S3BUCKET_REGION }}/most/artifacts/${{ steps.addresses.outputs.commit-sha }}/eth_weth9/WETH9.json eth/artifacts/contracts/WETH9.sol/WETH9.json
-          aws s3 cp s3://${{ secrets.CONTRACTS_S3BUCKET_REGION }}/most/artifacts/${{ steps.addresses.outputs.commit-sha }}/eth_tethertoken/TetherToken.json eth/artifacts/contracts/USDT.sol/TetherToken.json
-          aws s3 cp s3://${{ secrets.CONTRACTS_S3BUCKET_REGION }}/most/artifacts/${{ steps.addresses.outputs.commit-sha }}/eth_wrappedtoken/WrappedToken.json eth/artifacts/contracts/WrappedToken.sol/WrappedToken.json
-
+          aws s3 cp s3://${{ secrets.CONTRACTS_S3BUCKET_NAME }}/most/artifacts/${{ steps.addresses.outputs.commit-sha }}/eth_most/Most.json eth/artifacts/contracts/Most.sol/Most.json
+          aws s3 cp s3://${{ secrets.CONTRACTS_S3BUCKET_NAME }}/most/artifacts/${{ steps.addresses.outputs.commit-sha }}/eth_weth9/WETH9.json eth/artifacts/contracts/WETH9.sol/WETH9.json
+          aws s3 cp s3://${{ secrets.CONTRACTS_S3BUCKET_NAME }}/most/artifacts/${{ steps.addresses.outputs.commit-sha }}/eth_tethertoken/TetherToken.json eth/artifacts/contracts/USDT.sol/TetherToken.json
+          aws s3 cp s3://${{ secrets.CONTRACTS_S3BUCKET_NAME }}/most/artifacts/${{ steps.addresses.outputs.commit-sha }}/eth_wrappedtoken/WrappedToken.json eth/artifacts/contracts/WrappedToken.sol/WrappedToken.json
 
       - name: List downloaded files
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'testnet-most0' }}
