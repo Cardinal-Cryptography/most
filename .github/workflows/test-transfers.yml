@@ -72,6 +72,12 @@ jobs:
           aws s3 cp s3://${{ secrets.CONTRACTS_S3BUCKET_NAME }}/most/artifacts/${{ steps.addresses.outputs.commit-sha }}/eth_tethertoken/TetherToken.json eth/artifacts/contracts/USDT.sol/TetherToken.json
           aws s3 cp s3://${{ secrets.CONTRACTS_S3BUCKET_NAME }}/most/artifacts/${{ steps.addresses.outputs.commit-sha }}/eth_wrappedtoken/WrappedToken.json eth/artifacts/contracts/WrappedToken.sol/WrappedToken.json
 
+      - name: List files
+        shell: bash
+        run: |
+          find azero/
+          find eth/
+
       - name: Run tests for 'testnet-most0' env
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'testnet-most0' }}
         shell: bash
