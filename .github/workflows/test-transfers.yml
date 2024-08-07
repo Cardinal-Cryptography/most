@@ -52,13 +52,13 @@ jobs:
     strategy:
       matrix:
         contract_path:
-          - azero_most
-          - azero_token
-          - azero_wrapped_azero
-          - eth_most
-          - eth_weth9
-          - eth_tethertoken
-          - eth_wrappedtoken
+          - azero_most/
+          - azero_token/
+          - azero_wrapped_azero/
+          - eth_most/
+          - eth_weth9/
+          - eth_tethertoken/
+          - eth_wrappedtoken/
     steps:
       - name: Create dirs for artifacts
         shell: bash
