@@ -13,7 +13,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 contract MostL2 is AbstractMost {
     using SafeERC20 for IERC20;
 
-    /// Ration betweem bridged azero (12 decimals) and native token on L2 (18 decimals)
+    /// Ratio between bridged azero (12 decimals) and native token on L2 (18 decimals)
     uint256 public constant BAZERO_TO_NATIVE_RATIO = 10e6;
 
     address payable public stableSwapAddress;
@@ -56,7 +56,7 @@ contract MostL2 is AbstractMost {
     }
 
     /// Calculates min value of the swap we are happy with.
-    /// Takes into the account decimals between bazero and native token.
+    /// Takes into account the difference in number of decimals between bazero and native token.
     function calc_min_amount_out_swap(
         uint256 amount,
         bool to_bazero
@@ -103,7 +103,7 @@ contract MostL2 is AbstractMost {
         uint256 amount,
         address _destReceiverAddress
     ) internal {
-        // So what we do here is:
+        // What we do here is:
         // 1. Mint `amount` Bazero
         // 2. Allow spending that many Bazero for swap contract
         // 3. exchange bazero for native tokens, here the swap spends its allowance and sends native to this contract
