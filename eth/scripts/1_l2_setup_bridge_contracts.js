@@ -2,6 +2,21 @@ const { ethers, network } = require("hardhat");
 const fs = require("node:fs");
 
 const NATIVE_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
+
+async function assert_signer_has_funds(signer, config) {
+  const needed = tokenToRaw(config.pool_config.initial_native_supply, 18);
+  const balance = await ethers.provider.getBalance(signer);
+
+  if (needed > balance) {
+    console.log(
+      `The account ${signer} does not have enough funds.
+      At least ${needed} is needed.
+      Balance: ${balance}`,
+    );
+    throw "Not enough funds";
+  }
+}
+
 async function load_contracts() {
   const { lp, pool, most, bazero } = JSON.parse(
     fs.readFileSync("l2_addresses.json", { encoding: "utf8", flag: "r" }),
@@ -92,7 +107,9 @@ async function most_add_bazero_pair(most, bazeroAddress) {
   /// TODO: switch this for actual address of wrapped azero on L1
   const destBazeroAddressBytes = bazeroAddressBytes;
 
-  console.log("Adding `Bazero` pair to the most");
+  console.log(
+    `Adding \`Bazero\` pair to the most ${bazeroAddressBytes} <-> ${destBazeroAddressBytes}`,
+  );
   await most.addPair(bazeroAddressBytes, destBazeroAddressBytes, false);
 }
 
@@ -108,6 +125,9 @@ async function main() {
   const owner = accounts[0];
 
   const config = network.config.deploymentConfig;
+
+  await assert_signer_has_funds(owner, config);
+
   const [bazero, lp, pool, most] = await load_contracts();
 
   await mintInitialBazero(bazero, owner, config);

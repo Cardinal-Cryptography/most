@@ -159,7 +159,7 @@ if (L2_KEY) {
       ],
       threshold: 1,
       bazero_decimals: 12,
-      bazero_token_mint: 10e6, // Mint 1 million tokens - will be scalled by decimals.
+      bazero_token_mint: 10e6, // Mint 1 million tokens - will be scaled by decimals.
       pool_config: {
         amplification_coefficient: 2000,
         admin_fee: 0,
