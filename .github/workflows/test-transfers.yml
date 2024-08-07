@@ -82,6 +82,7 @@ jobs:
           ETH_DEV_ACCOUNT_INDEX: 0
           AZERO_ACCOUNT_SEED: ${{ secrets.DEVENV_TESTNET_AZERO1_KEY }}
           ETH_MNEMONIC: ${{ secrets.DEVENV_TESTNET_SEPOLIA_KEY }}
+          RUST_LOG: info
         run: |
           make e2e-tests
 
