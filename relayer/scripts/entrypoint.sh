@@ -33,6 +33,9 @@ ETH_MOST_ADDRESS=${ETH_MOST_ADDRESS:-""}
 # --- Signer's CID
 SIGNER_CID=${SIGNER_CID:-""}
 
+# --- Signer's port
+SIGNER_PORT=${SIGNER_PORT:-"1234"}
+
 # --- RELAYER ID from MY_POD_NAME coming from statefulset's pod, such as
 # --- relayer-0, relayer-1 etc.
 if [[ "${MY_POD_NAME}" =~ ^relayer-[0-9]+$ && "${RELAYER_ID}" == 0 ]]; then
@@ -57,6 +60,7 @@ ARGS=(
   --azero-contract-metadata=${AZERO_MOST_METADATA}
   --azero-ether-metadata=${TOKEN_METADATA}
   --router-metadata=${ROUTER_METADATA}
+  --signer-port=${SIGNER_PORT}
 )
 
 # --- Addresses can be passed as environment variables.

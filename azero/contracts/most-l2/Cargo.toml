@@ -1,0 +1,38 @@
+[package]
+name = "most-l2"
+version = "1.0.0"
+authors = ["Cardinal Cryptography"]
+edition = "2021"
+
+[dependencies]
+ink = { version = "=4.3.0", default-features = false }
+psp22 = { version = "0.2.2", default-features = false }
+
+scale = { package = "parity-scale-codec", version = "3", default-features = false, features = [
+    "derive",
+] }
+scale-info = { version = "2.5", default-features = false, features = [
+    "derive",
+], optional = true }
+
+ownable2step = { path = "../ownable2step", default-features = false }
+psp22-traits = { path = "../psp22-traits" , default-features = false }
+shared = { path = "../shared" }
+
+[lib]
+path = "lib.rs"
+
+[features]
+default = ["std"]
+std = [
+    "ink/std",
+    "scale/std",
+    "scale-info/std",
+    "ownable2step/std",
+    "psp22/std",
+    "psp22-traits/std",
+]
+ink-as-dependency = []
+
+[profile.release]
+overflow-checks = false
