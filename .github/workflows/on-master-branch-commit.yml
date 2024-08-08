@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - master
+      - MOST-93-simplify-contract-workflows
 
 jobs:
   check-vars-and-secrets:
