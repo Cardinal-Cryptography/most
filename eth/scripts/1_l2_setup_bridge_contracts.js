@@ -1,5 +1,7 @@
 const { ethers, network } = require("hardhat");
 const fs = require("node:fs");
+const { u8aToHex } = require("@polkadot/util");
+const { Keyring } = require("@polkadot/keyring");
 
 const NATIVE_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 
@@ -99,18 +101,31 @@ async function initializePool(config, pool, lpAddress, bazero, owner) {
   });
 }
 
+function getWazeroAddress() {
+  const { alephTokens } = JSON.parse(
+    fs.readFileSync("../azero/l2_addresses.json", {
+      encoding: "utf8",
+      flag: "r",
+    }),
+  );
+
+  return alephTokens[0].address;
+}
+
 async function most_add_bazero_pair(most, bazeroAddress) {
   const bazeroAddressBytes = ethers.zeroPadValue(
     ethers.getBytes(bazeroAddress),
     32,
   );
-  /// TODO: switch this for actual address of wrapped azero on L1
-  const destBazeroAddressBytes = bazeroAddressBytes;
+  const wazero = getWazeroAddress();
+  const azeroTokenAddressBytes = u8aToHex(
+    new Keyring({ type: "sr25519" }).decodeAddress(wazero),
+  );
 
   console.log(
-    `Adding \`Bazero\` pair to the most ${bazeroAddressBytes} <-> ${destBazeroAddressBytes}`,
+    `Adding \`Bazero\` pair to the most ${bazeroAddressBytes} <-> ${azeroTokenAddressBytes}`,
   );
-  await most.addPair(bazeroAddressBytes, destBazeroAddressBytes, false);
+  await most.addPair(bazeroAddressBytes, azeroTokenAddressBytes, false);
 }
 
 /// 1. Mint Bazero.
