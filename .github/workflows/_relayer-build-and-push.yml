@@ -46,90 +46,40 @@ jobs:
         # yamllint disable-line rule:line-length
         uses: Cardinal-Cryptography/github-actions/get-ref-properties@v6
 
-      - name: Download azero_most artifact from S3 bucket
-        uses: Cardinal-Cryptography/github-actions/download-contract-artifact@v6
-        with:
-          aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
-          s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
-          project: most
-          version: ${{ github.sha }}
-          contract: azero_most
-          dst-artifact: downloaded-artifact-azero-most
+      - name: Download artifacts from S3 bucket
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
+        shell: bash
+        run: |
+          # Download artifacts from S3 bucket
+          mkdir -p {downloaded_azero_artifacts,downloaded_eth_artifacts}
+          for c in azero_most azero_advisory azero_token; do
+            aws s3 cp --recursive s3://${{ secrets.CONTRACTS_S3BUCKET_NAME }}/most/artifacts/${{ github.sha }}/$c downloaded_azero_artifacts
+          done
+          for c in eth_most eth_weth9; do
+            aws s3 cp --recursive s3://${{ secrets.CONTRACTS_S3BUCKET_NAME }}/most/artifacts/${{ github.sha }}/$c downloaded_eth_artifacts
+          done
 
-      - name: Download azero_advisory artifact from S3 bucket
-        uses: Cardinal-Cryptography/github-actions/download-contract-artifact@v6
-        with:
-          aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
-          s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
-          project: most
-          version: ${{ github.sha }}
-          contract: azero_advisory
-          dst-artifact: downloaded-artifact-azero-advisory
+          # Put artifacts in the same directories as they would have been compiled locally (that is how relayer searches for them)
+          mkdir -p azero/artifacts
+          cp -rf downloaded_azero_artifacts/*.json azero/artifacts/
 
-      - name: Download azero_token artifact from S3 bucket
-        uses: Cardinal-Cryptography/github-actions/download-contract-artifact@v6
-        with:
-          aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
-          s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
-          project: most
-          version: ${{ github.sha }}
-          contract: azero_token
-          dst-artifact: downloaded-artifact-azero-token
+          mkdir -p eth/artifacts/contracts/{Most.sol,WETH9.sol}
+          cp -rf downloaded_eth_artifacts/Most.json eth/artifacts/contracts/Most.sol/Most.json
+          cp -rf downloaded_eth_artifacts/WETH9.json eth/artifacts/contracts/WETH9.sol/WETH9.json
 
-      - name: Download eth_most artifact from S3 bucket
-        uses: Cardinal-Cryptography/github-actions/download-contract-artifact@v6
-        with:
-          aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
-          s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
-          project: most
-          version: ${{ github.sha }}
-          contract: eth_most
-          dst-artifact: downloaded-artifact-eth-most
-      
-      - name: Download eth_weth9 artifact from S3 bucket
-        uses: Cardinal-Cryptography/github-actions/download-contract-artifact@v6
-        with:
-          aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
-          s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
-          project: most
-          version: ${{ github.sha }}
-          contract: eth_weth9
-          dst-artifact: downloaded-artifact-eth-weth9
+          # Print out all the files
+          find eth/artifacts
+          find azero/artifacts
 
       - name: Install Rust toolchain
         uses: Cardinal-Cryptography/github-actions/install-rust-toolchain@v6
 
       - name: Build relayer
         id: build
-        env:
-          TMP_ARTIFACT_AZERO_MOST_DIR: downloaded-artifact-azero-most
-          TMP_ARTIFACT_AZERO_ADVISORY_DIR: downloaded-artifact-azero-advisory
-          TMP_ARTIFACT_AZERO_TOKEN_DIR: downloaded-artifact-azero-token
-          TMP_ARTIFACT_AZERO_ROUTER_DIR: azero/external_artifacts
-          TMP_ARTIFACT_ETH_MOST_DIR: downloaded-artifact-eth-most
-          TMP_ARTIFACT_ETH_WETH9_DIR: downloaded-artifact-eth-weth9
         run: |
-          mkdir -p azero/artifacts
-          cp -rf '${{ env.TMP_ARTIFACT_AZERO_MOST_DIR }}'/* azero/artifacts/
-          cp -rf '${{ env.TMP_ARTIFACT_AZERO_ADVISORY_DIR }}'/* azero/artifacts/
-          cp -rf '${{ env.TMP_ARTIFACT_AZERO_TOKEN_DIR }}'/* azero/artifacts/
-          cp -rf '${{ env.TMP_ARTIFACT_AZERO_ROUTER_DIR }}'/* azero/artifacts/
-
-          mkdir -p eth/artifacts/contracts/Most.sol
-          cp -rf '${{ env.TMP_ARTIFACT_ETH_MOST_DIR }}'/Most.json eth/artifacts/contracts/Most.sol/Most.json
-          mkdir -p eth/artifacts/contracts/WETH9.sol
-          cp -rf '${{ env.TMP_ARTIFACT_ETH_WETH9_DIR }}'/WETH9.json eth/artifacts/contracts/WETH9.sol/WETH9.json
-
           docker_tag=${{ steps.get-ref-properties.outputs.sha }}
 
           # There are two types of relayers: L1 and L2
