@@ -7,7 +7,7 @@ use ethers::{
 
 use crate::contracts::SignatureState;
 
-abigen!(Most, "../eth/artifacts/contracts/Most.sol/Most.json");
+abigen!(Most, "../eth/artifacts/contracts/MostL2.sol/MostL2.json");
 
 pub async fn contract_signature_state<C: Middleware + 'static>(
     contract: &Most<C>,
