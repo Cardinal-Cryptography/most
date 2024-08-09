@@ -41,8 +41,6 @@ impl RedisManager {
     ) -> Result<CircuitBreakerEvent, RedisManagerError> {
         let Config {
             redis_node,
-            redis_azero_block_key,
-            redis_eth_block_key,
             name,
             default_sync_from_block_eth,
             default_sync_from_block_azero,
