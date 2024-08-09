@@ -14,7 +14,7 @@ contract MostL2 is AbstractMost {
     using SafeERC20 for IERC20;
 
     /// Ratio between bridged azero (12 decimals) and native token on L2 (18 decimals)
-    uint256 public constant BAZERO_TO_NATIVE_RATIO = 10e6;
+    uint256 public constant BAZERO_TO_NATIVE_RATIO = 1e6;
 
     address payable public stableSwapAddress;
     address public bAzeroAddress;
@@ -116,6 +116,7 @@ contract MostL2 is AbstractMost {
         (bool swapSuccess, uint256 amount_out) = swap_from_bazero(amount);
 
         if (!swapSuccess) {
+            IERC20(bAzeroAddress).safeTransfer(_destReceiverAddress, amount);
             emit SwapFailed(requestHash, amount);
             return;
         }
