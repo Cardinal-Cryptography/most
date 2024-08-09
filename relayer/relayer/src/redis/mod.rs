@@ -10,9 +10,6 @@ use tokio::{
 
 use crate::{config::Config, CircuitBreakerEvent};
 
-pub const ETH_BLOCK_KEY: &str = "ethereum_next_block_number";
-pub const ALEPH_BLOCK_KEY: &str = "alephzero_next_block_number";
-
 #[derive(Debug, Error)]
 #[error(transparent)]
 #[non_exhaustive]
