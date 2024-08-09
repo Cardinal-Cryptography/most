@@ -2,12 +2,11 @@
 
 pub use ownable2step::Ownable2StepError;
 
-pub use self::most::{MostError, MostRef};
+pub use self::most_l2::{MostError, MostL2Ref};
 
 #[ink::contract]
-pub mod most {
+pub mod most_l2 {
 
-    use gas_oracle_trait::EthGasPriceOracle;
     use ink::{
         codegen::TraitCallBuilder,
         contract_ref,
@@ -17,7 +16,7 @@ pub mod most {
     };
     use ownable2step::*;
     use psp22::{PSP22Error, PSP22};
-    use psp22_traits::{Burnable, Mintable, WrappedAZERO};
+    use psp22_traits::WrappedAZERO;
     use scale::{Decode, Encode};
     use shared::{hash_request_data, Keccak256HashOutput as HashedRequest};
 
@@ -100,16 +99,6 @@ pub mod most {
         pub signer: AccountId,
     }
 
-    #[ink(event)]
-    #[derive(Debug)]
-    #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
-    pub struct PayoutAccountSet {
-        #[ink(topic)]
-        pub member: AccountId,
-        #[ink(topic)]
-        pub account: AccountId,
-    }
-
     #[derive(Default, Debug, Encode, Decode, Clone, Copy, PartialEq, Eq)]
     #[cfg_attr(
         feature = "std",
@@ -134,33 +123,12 @@ pub mod most {
         request_nonce: u128,
         /// accounting helper
         committee_id: CommitteeId,
-        /// a fixed subsidy transferred along with the bridged tokens to the destination account on aleph zero to bootstrap
-        pocket_money: u128,
-        /// balance that can be paid out as pocket money
-        pocket_money_balance: u128,
-        /// How much gas does a single confirmation of a cross-chain transfer request use on the destination chain on average.
-        /// This value is calculated by summing the total gas usage of *all* the transactions it takes to relay a single request and dividing it by the current committee size and multiplying by 1.2
-        relay_gas_usage: u128,
-        /// minimum gas price used to calculate the fee that can be charged for a cross-chain transfer request
-        min_gas_price: u128,
-        /// maximum gas price used to calculate the fee that can be charged for a cross-chain transfer request
-        max_gas_price: u128,
-        /// default gas price used to calculate the fee that is charged for a cross-chain transfer request if the gas price oracle is not available/malfunctioning
-        default_gas_price: u128,
-        /// maximum time in milliseconds since last oracle update
-        gas_oracle_max_age: u64,
-        /// maximum limit on gas for a call to the oracle
-        oracle_call_gas_limit: u64,
-        /// percentage buffer over the estimated cost
-        base_fee_buffer_percentage: u128,
-        /// gas price oracle that is used to calculate the fee for a cross-chain transfer request
-        gas_price_oracle: Option<AccountId>,
         /// Is the bridge in a halted state
         is_halted: bool,
     }
 
     #[ink(storage)]
-    pub struct Most {
+    pub struct MostL2 {
         data: Lazy<Data, ManualKey<0x44415441>>,
         /// stores the data used by the Ownable2Step trait
         ownable_data: Lazy<Ownable2StepData, ManualKey<0xDEADBEEF>>,
@@ -178,16 +146,6 @@ pub mod most {
         signature_thresholds: Mapping<CommitteeId, u128, ManualKey<0x54485245>>,
         /// source - destination token pairs that can be transferred across the bridge
         supported_pairs: Mapping<[u8; 32], [u8; 32], ManualKey<0x53555050>>,
-        /// rewards collected by the commitee for relaying cross-chain transfer requests
-        collected_committee_rewards: Mapping<CommitteeId, u128, ManualKey<0x434F4C4C>>,
-        /// rewards collected by the individual commitee members for relaying cross-chain transfer requests
-        paid_out_member_rewards: Mapping<(AccountId, CommitteeId), u128, ManualKey<0x50414944>>,
-        /// committe members can specify a special account for collecting the rewards, different from the one used for signing
-        payout_accounts: Mapping<AccountId, AccountId, ManualKey<0x18f97340>>,
-        /// Wrapped ethereum (azero) address. Necessary to perform bridging weth(azero) -> ether(eth).
-        weth: Lazy<AccountId, ManualKey<0x7CD95FED>>,
-        /// Mapping holding the information wheter a specific token originates on Aleph Zero chain
-        local_token: Mapping<AccountId, (), ManualKey<0x6c6f6361>>,
         /// Wrapped AZERO address
         wazero: Lazy<AccountId, ManualKey<0x77617a65>>,
     }
@@ -237,21 +195,12 @@ pub mod most {
         }
     }
 
-    impl Most {
+    impl MostL2 {
         #[allow(clippy::too_many_arguments)]
         #[ink(constructor)]
         pub fn new(
             committee: Vec<AccountId>,
             signature_threshold: u128,
-            pocket_money: Balance,
-            relay_gas_usage: u128,
-            min_gas_price: u128,
-            max_gas_price: u128,
-            default_gas_price: u128,
-            gas_oracle_max_age: u64,
-            oracle_call_gas_limit: u64,
-            base_fee_buffer_percentage: u128,
-            gas_price_oracle: Option<AccountId>,
             owner: AccountId,
         ) -> Result<Self, MostError> {
             Self::check_committee(&committee, signature_threshold)?;
@@ -273,22 +222,11 @@ pub mod most {
             data.set(&Data {
                 request_nonce: 0,
                 committee_id,
-                pocket_money,
-                pocket_money_balance: 0,
-                relay_gas_usage,
-                min_gas_price,
-                max_gas_price,
-                default_gas_price,
-                gas_oracle_max_age,
-                oracle_call_gas_limit,
-                base_fee_buffer_percentage,
-                gas_price_oracle,
                 is_halted: true,
             });
 
             let mut ownable_data = Lazy::new();
             ownable_data.set(&Ownable2StepData::new(owner));
-            let weth = Lazy::new();
             let wazero = Lazy::new();
 
             Ok(Self {
@@ -301,11 +239,6 @@ pub mod most {
                 signatures: Mapping::new(),
                 processed_requests: Mapping::new(),
                 supported_pairs: Mapping::new(),
-                collected_committee_rewards: Mapping::new(),
-                paid_out_member_rewards: Mapping::new(),
-                payout_accounts: Mapping::new(),
-                weth,
-                local_token: Mapping::new(),
                 wazero,
             })
         }
@@ -318,7 +251,6 @@ pub mod most {
             amount: u128,
             dest_receiver_address: [u8; 32],
             native_azero_request: bool,
-            transferred_fee: u128,
         ) -> Result<(), MostError> {
             if dest_receiver_address == ZERO_ADDRESS {
                 return Err(MostError::ZeroAddress);
@@ -328,48 +260,19 @@ pub mod most {
                 return Err(MostError::ZeroTransferAmount);
             }
 
-            let current_base_fee = self.get_base_fee()?;
-
-            if transferred_fee.lt(&current_base_fee) {
-                return Err(MostError::BaseFeeTooLow);
-            }
-
             let sender = self.env().caller();
 
-            if self.local_token.get(src_token_address).is_none() {
-                self.burn_from(src_token_address, sender, amount)?;
-            } else if !native_azero_request {
+            if !native_azero_request {
                 // lock the tokens in the contract
                 self.transfer_from(src_token_address, sender, amount)?;
             } // if the transfer is done in native AZERO, then the tokens are already in the contract, so no action is needed
 
             let mut data = self.data()?;
-            // NOTE: this allows the committee members to take a payout for requests that are not neccessarily finished
-            // by that time (no signature threshold reached yet).
-            // We could be recording the base fee when the request collects quorum, but it could change in the meantime
-            // which is potentially even worse
-            let base_fee_total = self
-                .collected_committee_rewards
-                .get(data.committee_id)
-                .unwrap_or(0)
-                .checked_add(current_base_fee)
-                .ok_or(MostError::Arithmetic)?;
-
-            self.collected_committee_rewards
-                .insert(data.committee_id, &base_fee_total);
 
             let request_nonce = data.request_nonce;
             data.request_nonce = request_nonce.checked_add(1).ok_or(MostError::Arithmetic)?;
 
             self.data.set(&data);
-
-            // return surplus if any
-            if let Some(surplus) = transferred_fee.checked_sub(current_base_fee) {
-                if surplus > 0 {
-                    self.env().transfer(sender, surplus)?;
-                }
-            };
-
             self.env().emit_event(CrosschainTransferRequest {
                 committee_id: data.committee_id,
                 dest_token_address,
@@ -385,7 +288,7 @@ pub mod most {
         ///
         /// Upon checking basic conditions the contract will burn the `amount` number of `src_token_address` tokens from the caller
         /// and emit an event which is to be picked up & acted on up by the bridge guardians.
-        #[ink(message, payable)]
+        #[ink(message)]
         pub fn send_request(
             &mut self,
             src_token_address: [u8; 32],
@@ -405,31 +308,6 @@ pub mod most {
                 amount,
                 dest_receiver_address,
                 false,
-                self.env().transferred_value(),
-            )
-        }
-
-        /// Invoke this tx to initiate weth -> ether transfer to the destination chain.
-        ///
-        /// Upon checking basic conditions the contract will burn the `amount` number of weth tokens from the caller
-        /// and emit an event which is to be picked up & acted on up by the bridge guardians.
-        #[ink(message, payable)]
-        pub fn send_request_native_ether(
-            &mut self,
-            amount: u128,
-            dest_receiver_address: [u8; 32],
-        ) -> Result<(), MostError> {
-            self.ensure_not_halted()?;
-
-            let src_token_address = self.weth.get().ok_or(MostError::WrappedEthNotSet)?;
-
-            self._send_request(
-                src_token_address,
-                NATIVE_MARKER_ADDRESS,
-                amount,
-                dest_receiver_address,
-                false,
-                self.env().transferred_value(),
             )
         }
 
@@ -440,11 +318,16 @@ pub mod most {
             dest_receiver_address: [u8; 32],
         ) -> Result<(), MostError> {
             self.ensure_not_halted()?;
-            let transferred_fee = self
+            let surplus = self
                 .env()
                 .transferred_value()
                 .checked_sub(amount_to_bridge)
                 .ok_or(MostError::ValueTransferredLowerThanAmount)?;
+            // Return surplus fee
+            if surplus > 0 {
+                let sender = self.env().caller();
+                self.env().transfer(sender, surplus)?;
+            }
 
             let wrapped_azero_address = self.wazero.get().ok_or(MostError::WrappedAzeroNotSet)?;
             let wrapped_azero_address_bytes: [u8; 32] = *wrapped_azero_address.as_ref();
@@ -467,7 +350,6 @@ pub mod most {
                 amount_to_bridge,
                 dest_receiver_address,
                 true,
-                transferred_fee,
             )
         }
 
@@ -537,41 +419,14 @@ pub mod most {
                 .ok_or(MostError::InvalidThreshold)?;
 
             if request.signature_count >= signature_threshold {
-                let is_local_token = self
-                    .local_token
-                    .contains::<AccountId>(dest_token_address.into());
-
                 if dest_token_address == NATIVE_MARKER_ADDRESS {
                     self.unwrap_azero_to(dest_receiver_address.into(), amount)?;
-                } else if is_local_token {
+                } else {
                     self.transfer(
                         dest_token_address.into(),
                         dest_receiver_address.into(),
                         amount,
                     )?;
-                } else {
-                    self.mint_to(
-                        dest_token_address.into(),
-                        dest_receiver_address.into(),
-                        amount,
-                    )?;
-                }
-
-                let mut data = self.data()?;
-                // bootstrap account with pocket money
-                if data.pocket_money_balance >= data.pocket_money {
-                    // don't revert if the transfer fails
-                    if self
-                        .env()
-                        .transfer(dest_receiver_address.into(), data.pocket_money)
-                        .is_ok()
-                    {
-                        data.pocket_money_balance = data
-                            .pocket_money_balance
-                            .checked_sub(data.pocket_money)
-                            .ok_or(MostError::Arithmetic)?;
-                        self.data.set(&data);
-                    }
                 }
 
                 // mark it as processed
@@ -588,64 +443,6 @@ pub mod most {
 
             Ok(())
         }
-
-        /// Request payout of rewards for signing & relaying cross-chain transfers.
-        ///
-        /// Reverts if `member_id` account is not in the committee with `committee_id`
-        #[ink(message)]
-        pub fn payout_rewards(
-            &mut self,
-            committee_id: CommitteeId,
-            member_id: AccountId,
-        ) -> Result<(), MostError> {
-            self.ensure_not_halted()?;
-            self.only_committee_member(committee_id, member_id)?;
-
-            let paid_out_rewards = self.get_paid_out_member_rewards(committee_id, member_id);
-
-            let outstanding_rewards =
-                self.get_outstanding_member_rewards(committee_id, member_id)?;
-
-            if outstanding_rewards.gt(&0) {
-                let payout_account = self.payout_accounts.get(member_id).unwrap_or(member_id);
-                self.env().transfer(payout_account, outstanding_rewards)?;
-
-                self.paid_out_member_rewards.insert(
-                    (member_id, committee_id),
-                    &paid_out_rewards
-                        .checked_add(outstanding_rewards)
-                        .ok_or(MostError::Arithmetic)?,
-                );
-            }
-
-            Ok(())
-        }
-
-        /// Method used to provide the contract with funds for pocket money
-        #[ink(message, payable)]
-        pub fn fund_pocket_money(&mut self) -> Result<(), MostError> {
-            let funds = self.env().transferred_value();
-            let mut data = self.data()?;
-            data.pocket_money_balance = data
-                .pocket_money_balance
-                .checked_add(funds)
-                .ok_or(MostError::Arithmetic)?;
-            self.data.set(&data);
-            Ok(())
-        }
-
-        /// Method used to change pocket_money value.
-        #[ink(message)]
-        pub fn set_pocket_money(&mut self, new_pocket_money: u128) -> Result<(), MostError> {
-            self.ensure_owner()?;
-            let mut data = self.data()?;
-
-            data.pocket_money = new_pocket_money;
-            self.data.set(&data);
-
-            Ok(())
-        }
-
         /// Upgrades contract code
         #[ink(message)]
         pub fn set_code(&mut self, code_hash: [u8; 32]) -> Result<(), MostError> {
@@ -655,67 +452,10 @@ pub mod most {
         }
 
         // --- getters
-
-        /// Query average gas it takes for a confirmation of a single cross-chain transfer request on the destination chain
-        ///
-        /// Sum of the total gas usage of *all* the relay transactions divided it by the current committee size and multiplied by 1.2
-        #[ink(message)]
-        pub fn get_relay_gas_usage(&self) -> Result<u128, MostError> {
-            Ok(self.data()?.relay_gas_usage)
-        }
-
-        /// Query minimum gas price used to calculate the fee that can be charged for a cross-chain transfer request
-        #[ink(message)]
-        pub fn get_min_gas_price(&self) -> Result<u128, MostError> {
-            Ok(self.data()?.min_gas_price)
-        }
-
-        /// Query maximum gas price used to calculate the fee that can be charged for a cross-chain transfer request
-        #[ink(message)]
-        pub fn get_max_gas_price(&self) -> Result<u128, MostError> {
-            Ok(self.data()?.max_gas_price)
-        }
-
-        /// Query default gas price used to calculate the fee that is charged for a cross-chain transfer request if the gas price oracle is not available
-        #[ink(message)]
-        pub fn get_default_gas_price(&self) -> Result<u128, MostError> {
-            Ok(self.data()?.default_gas_price)
-        }
-
-        /// Query maximum time in milliseconds since last oracle update
-        #[ink(message)]
-        pub fn get_gas_oracle_max_age(&self) -> Result<u64, MostError> {
-            Ok(self.data()?.gas_oracle_max_age)
-        }
-
-        /// Query maximum limit on gas for a call to the oracle
-        #[ink(message)]
-        pub fn get_oracle_call_gas_limit(&self) -> Result<u64, MostError> {
-            Ok(self.data()?.oracle_call_gas_limit)
-        }
-
-        /// Query percentage buffer over the estimated cost
-        #[ink(message)]
-        pub fn get_base_fee_buffer_percentage(&self) -> Result<u128, MostError> {
-            Ok(self.data()?.base_fee_buffer_percentage)
-        }
-
-        /// Query gas price oracle address
-        #[ink(message)]
-        pub fn get_gas_price_oracle(&self) -> Result<Option<AccountId>, MostError> {
-            Ok(self.data()?.gas_price_oracle)
-        }
-
         /// Query token pair
         #[ink(message)]
         pub fn get_supported_pair(&self, src_token: [u8; 32]) -> Option<[u8; 32]> {
             self.supported_pairs.get(src_token)
-        }
-
-        /// Query payout_account for a committee member (if any)
-        #[ink(message)]
-        pub fn get_payout_account(&self, member_id: AccountId) -> Option<AccountId> {
-            self.payout_accounts.get(member_id)
         }
 
         /// Query request nonce
@@ -726,120 +466,10 @@ pub mod most {
             Ok(self.data()?.request_nonce)
         }
 
-        /// Query pocket money
-        ///
-        /// An amount of the native token that is tranferred with every request
-        #[ink(message)]
-        pub fn get_pocket_money(&self) -> Result<Balance, MostError> {
-            Ok(self.data()?.pocket_money)
-        }
-
-        /// Query pocket money balance
-        ///
-        /// An amount of the native token that can be used for pocket money transfers
-        #[ink(message)]
-        pub fn get_pocket_money_balance(&self) -> Result<Balance, MostError> {
-            Ok(self.data()?.pocket_money_balance)
-        }
-
         /// Returns current active committee id
         #[ink(message)]
         pub fn get_current_committee_id(&self) -> Result<u128, MostError> {
             Ok(self.data()?.committee_id)
-        }
-
-        /// Query total rewards for this committee
-        ///
-        /// Denominated in AZERO
-        #[ink(message)]
-        pub fn get_collected_committee_rewards(&self, committee_id: CommitteeId) -> u128 {
-            self.collected_committee_rewards
-                .get(committee_id)
-                .unwrap_or_default()
-        }
-
-        /// Query already paid out committee member rewards
-        ///
-        /// Denominated in AZERO
-        #[ink(message)]
-        pub fn get_paid_out_member_rewards(
-            &self,
-            committee_id: CommitteeId,
-            member_id: AccountId,
-        ) -> u128 {
-            self.paid_out_member_rewards
-                .get((member_id, committee_id))
-                .unwrap_or_default()
-        }
-
-        /// Query outstanding committee member rewards
-        ///
-        /// The amount that can still be requested.
-        /// Denominated in AZERO
-        /// Returns 0 if the `member_id` account is not in the committee with `committee_id`
-        #[ink(message)]
-        pub fn get_outstanding_member_rewards(
-            &self,
-            committee_id: CommitteeId,
-            member_id: AccountId,
-        ) -> Result<u128, MostError> {
-            if self.is_in_committee(committee_id, member_id) {
-                let total_amount = self
-                    .get_collected_committee_rewards(committee_id)
-                    .checked_div(
-                        self.committee_sizes
-                            .get(committee_id)
-                            .ok_or(MostError::NoSuchCommittee)?,
-                    )
-                    .ok_or(MostError::Arithmetic)?;
-
-                let collected_amount = self.get_paid_out_member_rewards(committee_id, member_id);
-
-                return Ok(total_amount.saturating_sub(collected_amount));
-            }
-            Ok(0)
-        }
-
-        /// Queries a gas price oracle and returns the current base_fee charged per cross chain transfer denominated in AZERO
-        #[ink(message)]
-        pub fn get_base_fee(&self) -> Result<Balance, MostError> {
-            let gas_price = if let Some(gas_price_oracle_address) = self.data()?.gas_price_oracle {
-                let gas_price_oracle: contract_ref!(EthGasPriceOracle) =
-                    gas_price_oracle_address.into();
-
-                match gas_price_oracle
-                    .call()
-                    .get_price()
-                    .gas_limit(self.data()?.oracle_call_gas_limit)
-                    .try_invoke()
-                {
-                    Ok(Ok((gas_price, timestamp))) => {
-                        if timestamp + self.data()?.gas_oracle_max_age
-                            < self.env().block_timestamp()
-                        {
-                            self.data()?.default_gas_price
-                        } else if gas_price < self.data()?.min_gas_price {
-                            self.data()?.min_gas_price
-                        } else if gas_price > self.data()?.max_gas_price {
-                            self.data()?.max_gas_price
-                        } else {
-                            gas_price
-                        }
-                    }
-                    _ => self.data()?.default_gas_price,
-                }
-            } else {
-                self.data()?.default_gas_price
-            };
-
-            let base_fee = gas_price
-                .checked_mul(self.data()?.relay_gas_usage)
-                .ok_or(MostError::Arithmetic)?
-                .checked_mul(100u128 + self.data()?.base_fee_buffer_percentage)
-                .ok_or(MostError::Arithmetic)?
-                .checked_div(100u128)
-                .ok_or(MostError::Arithmetic)?;
-            Ok(base_fee)
         }
 
         /// Returns whether an account is in the committee with `committee_id`
@@ -914,32 +544,6 @@ pub mod most {
         }
 
         // ---  setter txs
-
-        #[allow(clippy::too_many_arguments)]
-        #[ink(message)]
-        pub fn set_base_fee_constraints(
-            &mut self,
-            relay_gas_usage: u128,
-            min_gas_price: u128,
-            max_gas_price: u128,
-            default_gas_price: u128,
-            gas_oracle_max_age: u64,
-            oracle_call_gas_limit: u64,
-            base_fee_buffer_percentage: u128,
-        ) -> Result<(), MostError> {
-            self.ensure_owner()?;
-            let mut data = self.data()?;
-            data.relay_gas_usage = relay_gas_usage;
-            data.min_gas_price = min_gas_price;
-            data.max_gas_price = max_gas_price;
-            data.default_gas_price = default_gas_price;
-            data.gas_oracle_max_age = gas_oracle_max_age;
-            data.oracle_call_gas_limit = oracle_call_gas_limit;
-            data.base_fee_buffer_percentage = base_fee_buffer_percentage;
-            self.data.set(&data);
-            Ok(())
-        }
-
         /// Removes a supported pair from bridging
         ///
         /// Can only be called by the contracts owner
@@ -955,37 +559,11 @@ pub mod most {
         ///
         /// Can only be called by the contracts owner
         #[ink(message)]
-        pub fn add_pair(
-            &mut self,
-            from: [u8; 32],
-            to: [u8; 32],
-            local_token: bool,
-        ) -> Result<(), MostError> {
+        pub fn add_pair(&mut self, from: [u8; 32], to: [u8; 32]) -> Result<(), MostError> {
             self.ensure_owner()?;
             self.ensure_halted()?;
 
-            // Check if MOST has mint permission to the PSP22 token
-            if local_token {
-                self.local_token.insert::<AccountId, ()>(from.into(), &());
-            } else {
-                let psp22_address: AccountId = from.into();
-                let psp22: ink::contract_ref!(Mintable) = psp22_address.into();
-                if psp22.minter() != self.env().account_id() {
-                    return Err(MostError::NoMintPermission);
-                }
-            }
-
             self.supported_pairs.insert(from, &to);
-            Ok(())
-        }
-
-        /// Set weth(azero) psp22 token contract
-        ///
-        /// Can only be called by the contracts owner
-        #[ink(message)]
-        pub fn set_weth(&mut self, weth_address: AccountId) -> Result<(), MostError> {
-            self.ensure_owner()?;
-            self.weth.set(&weth_address);
             Ok(())
         }
 
@@ -997,44 +575,6 @@ pub mod most {
             self.ensure_owner()?;
             self.ensure_halted()?;
             self.wazero.set(&wazero_address);
-            Ok(())
-        }
-
-        /// Sets address of the account that receives rewards on behalf of the committee member.
-        ///
-        /// Can only be called by an account that was a committee member in `committee_id`.
-        /// All the unpaid rewards will then be paid out to this account address when `payout_request` is called.
-        /// Comittee members that have set the `payout_account` do not need to call this method again when the committee changes, unless they want to change the payouts account.
-        #[ink(message)]
-        pub fn set_payout_account(
-            &mut self,
-            committee_id: CommitteeId,
-            account: AccountId,
-        ) -> Result<(), MostError> {
-            let caller = self.env().caller();
-            self.only_committee_member(committee_id, caller)?;
-            self.payout_accounts.insert(caller, &account);
-
-            self.env().emit_event(PayoutAccountSet {
-                member: caller,
-                account,
-            });
-
-            Ok(())
-        }
-
-        /// Sets address of the gas price oracle
-        ///
-        /// Can only be called by the contracts owner
-        #[ink(message)]
-        pub fn set_gas_price_oracle(
-            &mut self,
-            gas_price_oracle: AccountId,
-        ) -> Result<(), MostError> {
-            self.ensure_owner()?;
-            let mut data = self.data()?;
-            data.gas_price_oracle = Some(gas_price_oracle);
-            self.data.set(&data);
             Ok(())
         }
 
@@ -1160,14 +700,6 @@ pub mod most {
             Ok(())
         }
 
-        /// Mints the specified amount of token to the designated account
-        ///
-        /// Most contract needs to have a Minter role on the token contract
-        fn mint_to(&self, token: AccountId, to: AccountId, amount: u128) -> Result<(), PSP22Error> {
-            let mut psp22: ink::contract_ref!(Mintable) = token.into();
-            psp22.mint(to, amount)
-        }
-
         /// Transfers the specified amount of token to the designated account
         fn transfer(
             &self,
@@ -1187,21 +719,6 @@ pub mod most {
             wrapped_azero.withdraw(amount)?;
             self.env().transfer(to, amount)?;
             Ok(())
-        }
-
-        /// Burn the specified amount of token from the designated account
-        ///
-        /// Most contract needs to have a Burner role on the token contract
-        fn burn_from(
-            &self,
-            token: AccountId,
-            from: AccountId,
-            amount: u128,
-        ) -> Result<(), PSP22Error> {
-            self.transfer_from(token, from, amount)?;
-
-            let mut psp22_burnable: ink::contract_ref!(Burnable) = token.into();
-            psp22_burnable.burn(amount)
         }
 
         /// Transfers the specified amount of token from the designated account
@@ -1226,7 +743,7 @@ pub mod most {
         }
     }
 
-    impl Ownable2Step for Most {
+    impl Ownable2Step for MostL2 {
         #[ink(message)]
         fn get_owner(&self) -> Ownable2StepResult<AccountId> {
             self.ownable_data()?.get_owner()
@@ -1274,15 +791,6 @@ pub mod most {
         use super::*;
 
         const THRESHOLD: u128 = 3;
-        const POCKET_MONEY: Balance = 1000000000000;
-        const RELAY_GAS_USAGE: u128 = 50000;
-        const MIN_FEE: Balance = 1000000000000;
-        const MAX_FEE: Balance = 100000000000000;
-        const DEFAULT_FEE: Balance = 30000000000000;
-        const GAS_ORACLE_MAX_AGE: u64 = 86400000;
-        const ORACLE_CALL_GAS_LIMIT: u64 = 2000000000;
-        const BASE_FEE_BUFFER_PERCENTAGE: u128 = 20;
-
         type DefEnv = DefaultEnvironment;
         type AccountId = <DefEnv as Environment>::AccountId;
 
@@ -1303,21 +811,8 @@ pub mod most {
             set_caller::<DefEnv>(alice);
 
             assert_eq!(
-                Most::new(
-                    guardian_accounts(),
-                    0,
-                    POCKET_MONEY,
-                    RELAY_GAS_USAGE,
-                    MIN_FEE,
-                    MAX_FEE,
-                    DEFAULT_FEE,
-                    GAS_ORACLE_MAX_AGE,
-                    ORACLE_CALL_GAS_LIMIT,
-                    BASE_FEE_BUFFER_PERCENTAGE,
-                    None,
-                    alice
-                )
-                .expect_err("Threshold is zero, instantiation should fail."),
+                MostL2::new(guardian_accounts(), 0, alice)
+                    .expect_err("Threshold is zero, instantiation should fail."),
                 MostError::InvalidThreshold
             );
         }
@@ -1328,18 +823,9 @@ pub mod most {
             set_caller::<DefEnv>(alice);
 
             assert_eq!(
-                Most::new(
+                MostL2::new(
                     guardian_accounts(),
                     (guardian_accounts().len() + 1) as u128,
-                    POCKET_MONEY,
-                    RELAY_GAS_USAGE,
-                    MIN_FEE,
-                    MAX_FEE,
-                    DEFAULT_FEE,
-                    GAS_ORACLE_MAX_AGE,
-                    ORACLE_CALL_GAS_LIMIT,
-                    BASE_FEE_BUFFER_PERCENTAGE,
-                    None,
                     alice
                 )
                 .expect_err("Threshold is larger than guardians, instantiation should fail."),
@@ -1352,21 +838,8 @@ pub mod most {
             let alice = default_accounts::<DefEnv>().alice;
             set_caller::<DefEnv>(alice);
 
-            let most = Most::new(
-                guardian_accounts(),
-                THRESHOLD,
-                POCKET_MONEY,
-                RELAY_GAS_USAGE,
-                MIN_FEE,
-                MAX_FEE,
-                DEFAULT_FEE,
-                GAS_ORACLE_MAX_AGE,
-                ORACLE_CALL_GAS_LIMIT,
-                BASE_FEE_BUFFER_PERCENTAGE,
-                None,
-                alice,
-            )
-            .expect("Threshold is valid.");
+            let most =
+                MostL2::new(guardian_accounts(), THRESHOLD, alice).expect("Threshold is valid.");
 
             assert_eq!(most.ensure_owner(), Ok(()));
             set_caller::<DefEnv>(guardian_accounts()[0]);
@@ -1381,21 +854,8 @@ pub mod most {
             let accounts = default_accounts::<DefEnv>();
             set_caller::<DefEnv>(accounts.alice);
 
-            let most = Most::new(
-                guardian_accounts(),
-                THRESHOLD,
-                POCKET_MONEY,
-                RELAY_GAS_USAGE,
-                MIN_FEE,
-                MAX_FEE,
-                DEFAULT_FEE,
-                GAS_ORACLE_MAX_AGE,
-                ORACLE_CALL_GAS_LIMIT,
-                BASE_FEE_BUFFER_PERCENTAGE,
-                None,
-                accounts.alice,
-            )
-            .expect("Threshold is valid.");
+            let most = MostL2::new(guardian_accounts(), THRESHOLD, accounts.alice)
+                .expect("Threshold is valid.");
 
             for account in guardian_accounts() {
                 assert!(most.is_in_committee(most.get_current_committee_id().unwrap(), account));
@@ -1408,21 +868,8 @@ pub mod most {
             let accounts = default_accounts::<DefEnv>();
             set_caller::<DefEnv>(accounts.alice);
 
-            let mut most = Most::new(
-                guardian_accounts(),
-                THRESHOLD,
-                POCKET_MONEY,
-                RELAY_GAS_USAGE,
-                MIN_FEE,
-                MAX_FEE,
-                DEFAULT_FEE,
-                GAS_ORACLE_MAX_AGE,
-                ORACLE_CALL_GAS_LIMIT,
-                BASE_FEE_BUFFER_PERCENTAGE,
-                None,
-                accounts.alice,
-            )
-            .expect("Threshold is valid.");
+            let mut most = MostL2::new(guardian_accounts(), THRESHOLD, accounts.alice)
+                .expect("Threshold is valid.");
             set_caller::<DefEnv>(accounts.bob);
             assert_eq!(
                 most.ensure_owner(),
@@ -1452,21 +899,8 @@ pub mod most {
         fn add_guardian_works() {
             let accounts = default_accounts::<DefEnv>();
             set_caller::<DefEnv>(accounts.alice);
-            let mut most = Most::new(
-                guardian_accounts(),
-                THRESHOLD,
-                POCKET_MONEY,
-                RELAY_GAS_USAGE,
-                MIN_FEE,
-                MAX_FEE,
-                DEFAULT_FEE,
-                GAS_ORACLE_MAX_AGE,
-                ORACLE_CALL_GAS_LIMIT,
-                BASE_FEE_BUFFER_PERCENTAGE,
-                None,
-                accounts.alice,
-            )
-            .expect("Threshold is valid.");
+            let mut most = MostL2::new(guardian_accounts(), THRESHOLD, accounts.alice)
+                .expect("Threshold is valid.");
 
             assert!(!most.is_in_committee(most.get_current_committee_id().unwrap(), accounts.alice));
             assert_eq!(most.committee_sizes.get(0), Some(5));
@@ -1479,82 +913,14 @@ pub mod most {
         fn remove_guardian_works() {
             let accounts = default_accounts::<DefEnv>();
             set_caller::<DefEnv>(accounts.alice);
-            let mut most = Most::new(
-                guardian_accounts(),
-                THRESHOLD,
-                POCKET_MONEY,
-                RELAY_GAS_USAGE,
-                MIN_FEE,
-                MAX_FEE,
-                DEFAULT_FEE,
-                GAS_ORACLE_MAX_AGE,
-                ORACLE_CALL_GAS_LIMIT,
-                BASE_FEE_BUFFER_PERCENTAGE,
-                None,
-                accounts.alice,
-            )
-            .expect("Threshold is valid.");
+            let mut most = MostL2::new(guardian_accounts(), THRESHOLD, accounts.alice)
+                .expect("Threshold is valid.");
 
             assert!(most.is_in_committee(most.get_current_committee_id().unwrap(), accounts.bob));
             assert_eq!(most.committee_sizes.get(0), Some(5));
             assert_eq!(most.set_committee(vec![accounts.alice], 1), Ok(()));
             assert_eq!(most.committee_sizes.get(1), Some(1));
             assert!(!most.is_in_committee(most.get_current_committee_id().unwrap(), accounts.bob));
-        }
-
-        #[ink::test]
-        fn owner_calling_set_pocket_money_test() {
-            let accounts = default_accounts::<DefEnv>();
-            set_caller::<DefEnv>(accounts.alice);
-            let mut most = Most::new(
-                guardian_accounts(),
-                THRESHOLD,
-                POCKET_MONEY,
-                RELAY_GAS_USAGE,
-                MIN_FEE,
-                MAX_FEE,
-                DEFAULT_FEE,
-                GAS_ORACLE_MAX_AGE,
-                ORACLE_CALL_GAS_LIMIT,
-                BASE_FEE_BUFFER_PERCENTAGE,
-                None,
-                accounts.alice,
-            )
-            .expect("Threshold is valid.");
-
-            assert_eq!(most.get_pocket_money(), Ok(POCKET_MONEY));
-            assert_eq!(most.set_pocket_money(420), Ok(()));
-            assert_eq!(most.get_pocket_money(), Ok(420));
-        }
-
-        #[ink::test]
-        fn not_owner_calling_set_pocket_money() {
-            let accounts = default_accounts::<DefEnv>();
-            set_caller::<DefEnv>(accounts.bob);
-            let mut most = Most::new(
-                guardian_accounts(),
-                THRESHOLD,
-                POCKET_MONEY,
-                RELAY_GAS_USAGE,
-                MIN_FEE,
-                MAX_FEE,
-                DEFAULT_FEE,
-                GAS_ORACLE_MAX_AGE,
-                ORACLE_CALL_GAS_LIMIT,
-                BASE_FEE_BUFFER_PERCENTAGE,
-                None,
-                accounts.alice,
-            )
-            .expect("Threshold is valid.");
-
-            assert_eq!(most.get_pocket_money(), Ok(POCKET_MONEY));
-            assert_eq!(
-                most.set_pocket_money(420),
-                Err(MostError::Ownable(Ownable2StepError::CallerNotOwner(
-                    accounts.bob
-                )))
-            );
-            assert_eq!(most.get_pocket_money(), Ok(POCKET_MONEY));
         }
     }
 }

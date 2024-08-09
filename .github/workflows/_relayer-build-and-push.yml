@@ -3,12 +3,8 @@ name: Build and push relayer
 on:
   workflow_call:
     inputs:
-      environment:
-        description: One of 'bridgenet', 'testnet', 'mainnet'
-        type: string
-        required: true
-      frontend-environment:
-        description: Environment name for frontend
+      layer:
+        description: Relayer to build - L1 or L2
         type: string
         required: true
     outputs:
@@ -36,10 +32,9 @@ jobs:
         shell: bash
         run: |
           if [[ \
-            '${{ inputs.environment }}' != 'bridgenet' && \
-            '${{ inputs.environment }}' != 'testnet' && \
-            '${{ inputs.environment }}' != 'mainnet' \
+            '${{ inputs.layer }}' != 'L1' && '${{ inputs.layer }}' != 'L2'
           ]]; then
+<<<<<<< HEAD
             echo 'Invalid environment'
             exit 1
           fi
@@ -67,6 +62,9 @@ jobs:
             '${{ inputs.environment }}' == 'mainnet' \
           ]]; then
             echo 'testnet and mainnet are not implemented yet'
+=======
+            echo 'Invalid layer'
+>>>>>>> origin/master
             exit 1
           fi
 
@@ -78,30 +76,27 @@ jobs:
         # yamllint disable-line rule:line-length
         uses: Cardinal-Cryptography/github-actions/get-ref-properties@v6
 
-      - name: Download azero_most artifact from S3 bucket
-        uses: Cardinal-Cryptography/github-actions/download-contract-artifact@v6
-        with:
-          aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
-          s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
-          project: most
-          version: ${{ github.sha }}
-          contract: azero_most
-          dst-artifact: downloaded-artifact-azero-most
+      - name: Download artifacts from S3 bucket
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
+        shell: bash
+        run: |
+          # Download artifacts from S3 bucket
+          mkdir -p {downloaded_azero_artifacts,downloaded_eth_artifacts}
+          for c in azero_most azero_advisory azero_token; do
+            aws s3 cp --recursive s3://${{ secrets.CONTRACTS_S3BUCKET_NAME }}/most/artifacts/${{ github.sha }}/$c downloaded_azero_artifacts
+          done
+          for c in eth_most eth_weth9; do
+            aws s3 cp --recursive s3://${{ secrets.CONTRACTS_S3BUCKET_NAME }}/most/artifacts/${{ github.sha }}/$c downloaded_eth_artifacts
+          done
 
-      - name: Download azero_advisory artifact from S3 bucket
-        uses: Cardinal-Cryptography/github-actions/download-contract-artifact@v6
-        with:
-          aws-access-key-id: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
-          s3-bucket: ${{ secrets.CONTRACTS_S3BUCKET_NAME }}
-          project: most
-          version: ${{ github.sha }}
-          contract: azero_advisory
-          dst-artifact: downloaded-artifact-azero-advisory
+          # Put artifacts in the same directories as they would have been compiled locally (that is how relayer searches for them)
+          mkdir -p azero/artifacts
+          cp -rf downloaded_azero_artifacts/*.json azero/artifacts/
 
+<<<<<<< HEAD
       - name: Download eth_most artifact from S3 bucket
         uses: Cardinal-Cryptography/github-actions/download-contract-artifact@v6
         with:
@@ -113,12 +108,22 @@ jobs:
           version: ${{ github.sha }}
           contract: eth_most
           dst-artifact: downloaded-artifact-eth-most
+=======
+          mkdir -p eth/artifacts/contracts/{Most.sol,WETH9.sol}
+          cp -rf downloaded_eth_artifacts/Most.json eth/artifacts/contracts/Most.sol/Most.json
+          cp -rf downloaded_eth_artifacts/WETH9.json eth/artifacts/contracts/WETH9.sol/WETH9.json
+
+          # Print out all the files
+          find eth/artifacts
+          find azero/artifacts
+>>>>>>> origin/master
 
       - name: Install Rust toolchain
         uses: Cardinal-Cryptography/github-actions/install-rust-toolchain@v6
 
       - name: Build relayer
         id: build
+<<<<<<< HEAD
         env:
           TMP_ARTIFACT_AZERO_MOST_DIR: downloaded-artifact-azero-most
           TMP_ARTIFACT_AZERO_ADVISORY_DIR: downloaded-artifact-azero-advisory
@@ -131,13 +136,26 @@ jobs:
           mkdir -p eth/artifacts/contracts/Most.sol
           cp -rf '${{ env.TMP_ARTIFACT_ETH_MOST_DIR }}'/Most.json eth/artifacts/contracts/Most.sol/Most.json
 
+=======
+        run: |
+>>>>>>> origin/master
           docker_tag=${{ steps.get-ref-properties.outputs.sha }}
-          docker_name=most-relayer-${docker_tag}
 
-          make build-docker-relayer \
-            DOCKER_RELAYER_NAME=${docker_name} \
-            DOCKER_RELAYER_COPY_ADDRESSES=no_copy \
-            DOCKER_RELAYER_COMPILE_CONTRACTS=no_compile
+          # There are two types of relayers: L1 and L2
+          if [[ '${{ inputs.layer }}' == 'L2' ]]; then
+            docker_name=most-l2-relayer-${docker_tag}
+            make build-docker-relayer \
+              L2=true \
+              DOCKER_RELAYER_NAME=${docker_name} \
+              DOCKER_RELAYER_COPY_ADDRESSES=no_copy \
+              DOCKER_RELAYER_COMPILE_CONTRACTS=no_compile
+          else
+            docker_name=most-relayer-${docker_tag}
+            make build-docker-relayer \
+              DOCKER_RELAYER_NAME=${docker_name} \
+              DOCKER_RELAYER_COPY_ADDRESSES=no_copy \
+              DOCKER_RELAYER_COMPILE_CONTRACTS=no_compile
+          fi
 
           echo "docker-name=${docker_name}" >> $GITHUB_OUTPUT
           echo "docker-tag=${docker_tag}" >> $GITHUB_OUTPUT
@@ -154,7 +172,11 @@ jobs:
       - name: Push docker image to ECR
         shell: bash
         run: |
-          docker_image='${{ vars.ECR_CC_RES_PUBLIC_REGISTRY }}most-relayer:${{ steps.build.outputs.docker-tag }}'
+          if [[ '${{ inputs.layer }}' == 'L2' ]]; then
+            docker_image='${{ vars.ECR_CC_RES_PUBLIC_REGISTRY }}most-l2-relayer:${{ steps.build.outputs.docker-tag }}'
+          else
+            docker_image='${{ vars.ECR_CC_RES_PUBLIC_REGISTRY }}most-relayer:${{ steps.build.outputs.docker-tag }}'
+          fi
 
           docker tag '${{ steps.build.outputs.docker-name }}' "${docker_image}"
           docker push "${docker_image}"

@@ -189,6 +189,7 @@ compile-azero: azero-deps
 	mkdir -p azero/artifacts
 	make compile-azero-single-contract CONTRACT_DIR=advisory CONTRACT_NAME=advisory
 	make compile-azero-single-contract CONTRACT_DIR=most CONTRACT_NAME=most
+	make compile-azero-single-contract CONTRACT_DIR=most-l2 CONTRACT_NAME=most_l2
 	make compile-azero-single-contract CONTRACT_DIR=token CONTRACT_NAME=token
 	make compile-azero-single-contract CONTRACT_DIR=gas-price-oracle/contract CONTRACT_NAME=oracle
 	cd azero && cp external_artifacts/wrapped_azero.contract artifacts/
@@ -267,7 +268,7 @@ devnet-relayers-logs:
 .PHONY: test-solidity
 test-solidity: # Run solidity tests
 test-solidity: eth-deps
-	cd eth && npx hardhat test ./test/Most.js ./test/WrappedEther.js ./test/WrappedToken.js
+	cd eth && npx hardhat test ./test/Most.js ./test/WrappedEther.js ./test/WrappedToken.js ./test/MostL2.js
 
 .PHONY: test-ink
 test-ink: # Run ink tests
@@ -284,6 +285,7 @@ test-ink-e2e: bootstrap-azero
 test-ink-unit: # Run ink unit tests
 test-ink-unit:
 	cd azero/contracts/most && cargo test
+	cd azero/contracts/most-l2 && cargo test
 	cd azero/contracts/token && cargo test
 	cd azero/contracts/gas-price-oracle/contract && cargo test
 
@@ -297,11 +299,25 @@ test-relayer-l2: # Run relayer tests
 test-relayer-l2: compile-azero-docker compile-eth
 	cd relayer && cargo test --features l2
 
-.PHONY: e2e-tests
-e2e-tests: # Run specific e2e test. Requires: `TEST_CASE=test_module::test_name`.
-e2e-tests:
+.PHONY: e2e-test
+e2e-test: # Run specific e2e test. Requires: `TEST_CASE=test_module::test_name`.
+e2e-test:
 	cd e2e-tests && \
-		RUST_LOG=info cargo test test::$(TEST_CASE) -- --color always --exact --nocapture --test-threads=1
+		cargo test test::$(TEST_CASE) -- --color always --exact --nocapture --test-threads=1
+
+.PHONY: e2e-tests
+e2e-tests: # Run cross-chain transfer e2e tests. All tests must be run without interruption, the order is important. Requires the bridge and both chains to be running locally, e.g. these can be set up by executing `make bridge`.
+e2e-tests:
+	TEST_CASE=eth_to_azero::weth_to_weth make e2e-test
+	TEST_CASE=azero_to_eth::weth_to_weth make e2e-test
+	TEST_CASE=eth_to_azero::usdt_to_usdt make e2e-test
+	TEST_CASE=azero_to_eth::usdt_to_usdt make e2e-test
+	TEST_CASE=azero_to_eth::wazero_to_wazero make e2e-test
+	TEST_CASE=eth_to_azero::wazero_to_wazero make e2e-test
+	TEST_CASE=eth_to_azero::eth_to_weth make e2e-test
+	TEST_CASE=azero_to_eth::weth_to_eth make e2e-test
+	TEST_CASE=azero_to_eth::azero_to_wazero make e2e-test
+	TEST_CASE=eth_to_azero::wazero_to_azero make e2e-test
 
 .PHONY: drink-tests
 drink-tests: # Run drink tests
@@ -316,7 +332,7 @@ check-js-format:
 .PHONY: solidity-lint
 solidity-lint: # Lint solidity contracts
 solidity-lint: eth-deps
-	cd eth && npx solhint 'contracts/*.sol'
+	cd eth && npx solhint 'contracts/**/*.sol'
 
 .PHONY: relayer-lint
 relayer-lint: # Lint relayer
@@ -327,6 +343,7 @@ relayer-lint: compile-azero-docker compile-eth
 ink-lint: # Lint ink contracts
 ink-lint:
 	cd azero/contracts/most && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
+	cd azero/contracts/most-l2 && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
 	cd azero/contracts/token && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
 	cd azero/contracts/psp22-traits && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
 	cd azero/contracts/tests && cargo clippy -- --no-deps -D warnings -A unexpected-cfgs -A non-local-definitions
@@ -341,13 +358,14 @@ contracts-lint: solidity-lint ink-lint
 .PHONY: solidity-format
 solidity-format: # Format solidity contracts
 solidity-format: eth-deps
-	cd eth && npx prettier --write --plugin=prettier-plugin-solidity 'contracts/*.sol'
+	cd eth && npx prettier --write --plugin=prettier-plugin-solidity 'contracts/**/*.sol'
 
 .PHONY: rust-format-check
 rust-format-check: # Check rust code formatting
 rust-format-check:
 	cd relayer && cargo fmt -- --check
 	cd azero/contracts/most && cargo fmt -- --check
+	cd azero/contracts/most-l2 && cargo fmt -- --check
 	cd azero/contracts/token && cargo fmt -- --check
 	cd azero/contracts/psp22-traits && cargo fmt -- --check
 	cd azero/contracts/tests && cargo fmt -- --check
@@ -361,6 +379,7 @@ rust-format: # Format rust code
 rust-format:
 	cd relayer && cargo fmt
 	cd azero/contracts/most && cargo fmt
+	cd azero/contracts/most-l2 && cargo fmt
 	cd azero/contracts/token && cargo fmt
 	cd azero/contracts/psp22-traits && cargo fmt
 	cd azero/contracts/tests && cargo fmt

@@ -1,0 +1,241 @@
+---
+name: Devenv - deploy contracts
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+concurrency:
+  group: "${{ github.ref }}-${{ github.workflow }}"
+  cancel-in-progress: false
+
+jobs:
+  check-vars-and-secrets:
+    name: Check vars and secrets
+    uses: ./.github/workflows/_check-vars-and-secrets.yml
+    secrets: inherit
+
+  test-azero-contracts:
+    needs: [check-vars-and-secrets]
+    uses: ./.github/workflows/test-azero-contracts.yml
+
+  test-eth-contracts:
+    needs: [check-vars-and-secrets]
+    uses: ./.github/workflows/test-eth-contracts.yml
+
+  deploy-contracts:
+    name: Deploy and setup contracts
+    runs-on: [self-hosted, Linux, X64, large]
+    needs: [test-eth-contracts, test-azero-contracts]
+    outputs:
+      artifact-matrix-json: ${{ steps.get-artifact-matrix.outputs.artifact-matrix }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup node
+        uses: asdf-vm/actions/install@v3
+
+      - name: Create token config
+        shell: bash
+        run: |
+          cat cfg/tokens_testnet_example.json > cfg/tokens_testnet.json
+            # Commented out for now, in case contracts should be marked as not deployed
+            #jq '.eth[0].deployed = false' | jq '.aleph[0].deployed = false'
+            #jq 'del(.eth[0].address)' | jq 'del(.aleph[0].address)'
+
+      - name: Create azero env file
+        shell: bash
+        env:
+          AZERO1: ${{ secrets.DEVENV_TESTNET_AZERO1_ACCOUNT_NUMBER }}
+          AZERO2: ${{ secrets.DEVENV_TESTNET_AZERO2_ACCOUNT_NUMBER }}
+          AZERO3: ${{ secrets.DEVENV_TESTNET_AZERO3_ACCOUNT_NUMBER }}
+          AZERO1_SEED: ${{ secrets.DEVENV_TESTNET_AZERO1_KEY }}
+        run: |
+          cat azero/env/testnet.json.example | \
+            jq '.relayers = ["${{ env.AZERO1 }}", "${{ env.AZERO2 }}", "${{ env.AZERO3 }}"]' | \
+            jq '.deployer_seed = "${{ env.AZERO1_SEED }}"' | jq '.dev = true' > azero/env/testnet.json
+
+      - name: Get latest eth block
+        shell: bash
+        env:
+          SEPOLIA_KEY: ${{ secrets.DEVENV_TESTNET_SEPOLIA_KEY }}
+          SEPOLIA_ACCOUNT_NUMBER: ${{ secrets.DEVENV_TESTNET_SEPOLIA_ACCOUNT_NUMBER }}
+          SEPOLIA_TOKEN_CONFIG_PATH: "../cfg/tokens_testnet.json"
+        run: |
+          make eth-deps
+          cd eth
+          npx hardhat run --network sepolia scripts/get_latest_block.js
+
+      - name: Get latest azero block
+        shell: bash
+        run: |
+          make azero-deps
+          cd azero
+          AZERO_ENV=testnet npm run get-latest-block
+
+      - name: Deploy eth contracts
+        shell: bash
+        env:
+          SEPOLIA_KEY: ${{ secrets.DEVENV_TESTNET_SEPOLIA_KEY }}
+          SEPOLIA_ACCOUNT_NUMBER: ${{ secrets.DEVENV_TESTNET_SEPOLIA_ACCOUNT_NUMBER }}
+          SEPOLIA_TOKEN_CONFIG_PATH: "../cfg/tokens_testnet.json"
+        run: |
+          make deploy-eth NETWORK=sepolia
+
+      - name: Deploy azero contracts
+        shell: bash
+        run: |
+          AZERO_ENV=testnet make deploy-azero-docker
+
+      - name: Setup eth contracts
+        shell: bash
+        env:
+          SEPOLIA_KEY: ${{ secrets.DEVENV_TESTNET_SEPOLIA_KEY }}
+          SEPOLIA_ACCOUNT_NUMBER: ${{ secrets.DEVENV_TESTNET_SEPOLIA_ACCOUNT_NUMBER }}
+          SEPOLIA_TOKEN_CONFIG_PATH: "../cfg/tokens_testnet.json"
+        run: make setup-eth NETWORK=sepolia
+
+      - name: Setup azero contracts
+        shell: bash
+        run: AZERO_ENV=testnet make setup-azero-docker
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eth-deployed-contracts
+          if-no-files-found: error
+          retention-days: 1
+          path: |
+            eth/artifacts
+            eth/addresses.json
+            eth/block_latest.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: azero-deployed-contracts
+          if-no-files-found: error
+          retention-days: 1
+          path: |
+            azero/artifacts
+            azero/addresses.json
+            azero/block_latest.json
+
+      - name: Get list of contract artifacts
+        shell: bash
+        id: get-artifact-matrix
+        run: |
+          find eth/artifacts/contracts -maxdepth 2 -regex '.*\/[a-zA-Z0-9_-]*\.json$' \
+            > tmp-files.txt
+          find azero/artifacts -maxdepth 1 -type f -regex '.*\/[a-zA-Z0-9_-]*\.json$' -o -regex '.*\/[a-zA-Z0-9_-]*\.contract$' \
+            >> tmp-files.txt
+
+          touch tmp-artifacts-matrix.txt
+
+          for filepath in `cat tmp-files.txt | grep .json`; do
+            filename=$(basename ${filepath});
+            filename_without_ext=${filename%.json};
+            filename_without_ext=${filename_without_ext%.contract};
+            filename_without_ext_lc=$(echo "${filename_without_ext}" | tr '[:upper:]' '[:lower:]')
+            contract_type=$(echo "${filepath}" | cut -d/ -f1)
+            contract_name="${contract_type}_${filename_without_ext_lc}"
+
+            echo "${filepath}|${contract_name}" >> tmp-artifacts-matrix.txt
+          done
+
+          cat tmp-artifacts-matrix.txt | \
+            jq -nRc '{"include":[ inputs | split("|") | { "from":(.[0]), "to": (.[1]) } ]}' \
+            > tmp-artifacts-matrix.json
+
+          # Print out the list of artifacts
+          cat tmp-artifacts-matrix.json | jq
+
+          echo "artifact-matrix=$(cat tmp-artifacts-matrix.json)" >> $GITHUB_OUTPUT
+
+  upload-contract-artifacts:
+    name: Upload contract artifacts to S3
+    runs-on: [self-hosted, Linux, X64, small]
+    needs: [deploy-contracts]
+    strategy:
+      matrix: ${{ fromJson(needs.deploy-contracts.outputs.artifact-matrix-json) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: azero-deployed-contracts
+          path: azero
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: eth-deployed-contracts
+          path: eth
+
+      - name: Store artifact in S3 bucket
+        shell: bash
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RW_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RW_AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
+        run: |
+          aws s3 cp ${{ matrix.from }} s3://${{ secrets.CONTRACTS_S3BUCKET_NAME }}/most/artifacts/${{ github.sha }}/${{ matrix.to }}/
+
+  upload-contract-addresses:
+    name: Upload contract addresses to S3
+    runs-on: [self-hosted, Linux, X64, small]
+    needs: [deploy-contracts]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: azero-deployed-contracts
+          path: azero
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: eth-deployed-contracts
+          path: eth
+
+      - name: Prepare contract_spec JSON
+        uses: Cardinal-Cryptography/github-actions/generate-contract-spec@v6
+        with:
+          src-files: |-
+            eth/addresses.json|eth_
+            azero/addresses.json|azero_
+          dst-file: contract_spec.json
+          spec-version: '0.1'
+          contract-version: '${{ github.sha }}'
+
+      - name: Add block numbers to contract_spec JSON
+        shell: bash
+        run: |
+          ETH_START_BLOCK=$(cat eth/block_latest.json | jq -r '.number')
+          AZERO_START_BLOCK=$(cat azero/block_latest.json | jq -r '.number')
+          cat contract_spec.json | jq ".start_blocks = { eth: \"$ETH_START_BLOCK\", azero: \"$AZERO_START_BLOCK\" }" \
+            > contract_spec_with_block_numbers.json
+
+          cat contract_spec_with_block_numbers.json
+
+      - name: Mock contract spec JSON for L2
+        shell: bash
+        run: |
+          ETH_START_BLOCK=$(cat eth/block_latest.json | jq -r '.number')
+          AZERO_START_BLOCK=$(cat azero/block_latest.json | jq -r '.number')
+          cp contract_spec_with_block_numbers.json l2_contract_spec.json
+          cat l2_contract_spec.json | jq '.addresses = {}' | jq ".start_blocks = { evm: \"$ETH_START_BLOCK\", l2_azero: \"$AZERO_START_BLOCK\" }" \
+            > l2_contract_spec_with_block_numbers.json
+
+          cat l2_contract_spec_with_block_numbers.json
+
+      - name: Store addresses in S3 bucket
+        shell: bash
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CONTRACTS_MOST_ADDRESSES_TESTNET_MOST0_RW_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CONTRACTS_MOST_ADDRESSES_TESTNET_MOST0_RW_AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.CONTRACTS_S3BUCKET_REGION }}
+        run: |
+          aws s3 cp contract_spec_with_block_numbers.json s3://${{ secrets.CONTRACTS_S3BUCKET_NAME }}/most/addresses/testnet/most0.json
+          aws s3 cp l2_contract_spec_with_block_numbers.json s3://${{ secrets.CONTRACTS_S3BUCKET_NAME }}/most/addresses/testnet/l2_most0.json

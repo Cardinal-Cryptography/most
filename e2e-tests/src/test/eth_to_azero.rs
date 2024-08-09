@@ -1,120 +1,201 @@
-use std::str::FromStr;
-
-use aleph_client::{contract::ContractInstance, keypair_from_string, sp_runtime::AccountId32};
-use ethers::{
-    core::types::Address,
-    signers::{coins_bip39::English, MnemonicBuilder, Signer},
-    utils,
-};
+use anyhow::Result;
+use ethers::utils;
 use log::info;
 
-use crate::{azero, config::setup_test, eth, wait::wait_for_balance_change};
+use crate::{client::Client, config::setup_test, wait::wait_for_balance_change};
 
-/// One-way `Ethereum` -> `Aleph Zero` transfer through `most`.
-/// Wraps the required funds into wETH for an Ethereum account.
-/// Approves the `most` contract to use the wETH funds.
-/// Transfers `transfer_amount` of wETH to a specified Aleph Zero account over the bridge.
-/// Waits for the transfer to complete - bottlenecked by Ethereum finalization.
-/// Verifies that the correct amount of wETH is present on the Aleph Zero chain.
+/// One-way `Ethereum` -> `Aleph Zero` transfer of wETH through `most`.
+/// 1. Wraps the required funds into wETH for an Ethereum account.
+/// 2. Approves the `most` contract to use the wETH funds.
+/// 3. Transfers `transfer_amount` of wETH to a specified Aleph Zero account over the bridge.
+/// 4. Waits for the transfer to complete.
+/// Finally, it checks if every account has proper balance.
 /// It relies on all the relevant contracts being deployed on both ends and the (wETH_ETH:wETH_AZERO) pair having been added to `most`.
 #[tokio::test]
-pub async fn eth_to_azero() -> anyhow::Result<()> {
+pub async fn weth_to_weth() -> Result<()> {
     let config = setup_test();
+    let test_context = config.create_test_context().await?;
+    let transfer_amount = utils::parse_ether(config.test_args.transfer_amount.clone())?;
+    let client = Client::new(test_context);
+    let initial_balance = client.balance().await?;
 
-    let wallet = MnemonicBuilder::<English>::default()
-        .phrase(&*config.eth_mnemonic)
-        .index(config.eth_dev_account_index)?
-        .build()?;
-    let eth_account_address = wallet.address();
+    info!("Initial balance: {:?}", initial_balance);
 
-    let eth_signed_connection = eth::signed_connection(&config.eth_node_http, wallet).await?;
+    info!("Wrap native ETH into wETH");
+    client.wrap_weth(transfer_amount).await?;
 
-    let eth_contract_addresses = eth::contract_addresses(&config.eth_contract_addresses_path)?;
-    let weth_eth_address = eth_contract_addresses.weth.parse::<Address>()?;
+    info!("Approve the `most` contract to use the wETH funds on the Ethereum chain");
+    client.approve_weth_eth(transfer_amount).await?;
 
-    let weth_abi = eth::contract_abi(&config.contract_metadata_paths.eth_weth)?;
-    let weth_eth = eth::contract_from_deployed(weth_eth_address, weth_abi, &eth_signed_connection)?;
+    info!("Request the transfer of wETH to the Aleph chain");
+    client.request_weth_transfer_eth(transfer_amount).await?;
 
-    let transfer_amount = utils::parse_ether(config.test_args.transfer_amount)?;
-    let send_receipt = eth::send_tx(
-        eth_account_address,
-        weth_eth_address,
-        transfer_amount + 100,
-        &eth_signed_connection,
-    )
-    .await?;
-    info!("Send tx receipt: {:?}", send_receipt);
+    info!("Wait for balance change");
 
-    let most_address = eth_contract_addresses.most.parse::<Address>()?;
+    let target_balance = initial_balance
+        .wrap_weth(transfer_amount.as_u128())?
+        .bridge_weth_eth_to_azero(transfer_amount.as_u128())?;
+    info!("Target balance: {:?}", target_balance);
 
-    let approve_args = (most_address, transfer_amount);
-
-    let approve_receipt =
-        eth::call_contract_method(weth_eth, "approve", config.eth_gas_limit, approve_args).await?;
-    info!("`Approve` tx receipt: {:?}", approve_receipt);
-
-    let azero_contract_addresses =
-        azero::contract_addresses(&config.azero_contract_addresses_path)?;
-    let weth_azero_address = AccountId32::from_str(&azero_contract_addresses.weth)
-        .map_err(|e| anyhow::anyhow!("Cannot parse account id from string: {:?}", e))?;
-
-    let weth_azero = ContractInstance::new(
-        weth_azero_address,
-        &config.contract_metadata_paths.azero_token,
-    )?;
-
-    let azero_connection = azero::connection(&config.azero_node_ws).await;
-
-    let azero_account_keypair = keypair_from_string("//Alice");
-    let azero_account = azero_account_keypair.account_id();
-
-    let balance_pre_transfer: u128 = weth_azero
-        .read(
-            &azero_connection,
-            "PSP22::balance_of",
-            &[azero_account.to_string()],
-            Default::default(),
-        )
-        .await?;
-    info!(
-        "wETH (Aleph Zero) balance pre transfer: {:?}",
-        balance_pre_transfer
-    );
-
-    let most_abi = eth::contract_abi(&config.contract_metadata_paths.eth_most)?;
-    let most = eth::contract_from_deployed(most_address, most_abi, &eth_signed_connection)?;
-
-    let mut weth_eth_address_bytes = [0_u8; 32];
-    weth_eth_address_bytes[12..].copy_from_slice(weth_eth_address.as_fixed_bytes());
-
-    let azero_account_address_bytes: [u8; 32] = (*azero_account).clone().into();
-
-    let send_request_args = (
-        weth_eth_address_bytes,
-        transfer_amount,
-        azero_account_address_bytes,
-    );
-    let send_request_receipt =
-        eth::call_contract_method(most, "sendRequest", config.eth_gas_limit, send_request_args)
-            .await?;
-    info!("`sendRequest` tx receipt: {:?}", send_request_receipt);
-
-    let get_current_balance = || async {
-        let balance_current: u128 = weth_azero
-            .read(
-                &azero_connection,
-                "PSP22::balance_of",
-                &[azero_account.to_string()],
-                Default::default(),
-            )
-            .await?;
-        Ok(balance_current)
-    };
-
+    let get_current_balance = || async { client.balance().await };
     wait_for_balance_change(
-        transfer_amount.as_u128(),
-        balance_pre_transfer,
         get_current_balance,
+        target_balance,
+        Some(transfer_amount / 100),
+        Some(0),
+        config.test_args.wait_max_minutes,
+    )
+    .await
+}
+
+/// One-way `Ethereum` -> `Aleph Zero` transfer of USDT through `most`.
+/// 1. Approves the `most` contract to use the USDT funds.
+/// 2. Transfers `transfer_amount` of burned USDT over the bridge.
+/// 3. Waits for the transfer to complete.
+/// Finally, it checks if every account has proper balance.
+/// It relies on all the relevant contracts being deployed on both ends and the (USDT_ETH:USDT_AZERO) pair having been added to `most`.
+#[tokio::test]
+pub async fn usdt_to_usdt() -> Result<()> {
+    let config = setup_test();
+    let test_context = config.create_test_context().await?;
+    let transfer_amount = utils::parse_ether(config.test_args.transfer_amount.clone())?;
+    let client = Client::new(test_context);
+    let initial_balance = client.balance().await?;
+
+    info!("Initial balance: {:?}", initial_balance);
+
+    info!("Approve the `most` contract to use the USDT funds on the Ethereum chain");
+    client.approve_usdt_eth(transfer_amount).await?;
+    info!("{:?}", client.balance().await?);
+
+    info!("Request the transfer of USDT to the Aleph chain");
+    client.request_usdt_transfer_eth(transfer_amount).await?;
+    info!("{:?}", client.balance().await?);
+
+    info!("Wait for balance change");
+
+    let target_balance = initial_balance.bridge_usdt_eth_to_azero(transfer_amount.as_u128())?;
+    info!("Target balance: {:?}", target_balance);
+
+    let get_current_balance = || async { client.balance().await };
+    wait_for_balance_change(
+        get_current_balance,
+        target_balance,
+        Some(transfer_amount / 100),
+        Some(0),
+        config.test_args.wait_max_minutes,
+    )
+    .await
+}
+
+/// One-way `Ethereum` -> `Aleph Zero` transfer of wAZERO through `most`.
+/// Requires a prior transaction in the other direction to have completed.
+/// This is easily done by running the test for the other direction first.
+/// 1. Approves the `most` contract to use the wAZERO funds.
+/// 2. Transfers `transfer_amount` of burned wAZERO over the bridge.
+/// 3. Waits for the transfer to complete.
+/// Finally, it checks if every account has proper balance.
+/// It relies on all the relevant contracts being deployed on both ends and the (wAZERO_ETH:wAZERO_AZERO) pair having been added to `most`.
+#[tokio::test]
+pub async fn wazero_to_wazero() -> Result<()> {
+    let config = setup_test();
+    let test_context = config.create_test_context().await?;
+    let transfer_amount = utils::parse_ether(config.test_args.transfer_amount.clone())?;
+    let client = Client::new(test_context);
+    let initial_balance = client.balance().await?;
+
+    info!("Initial balance: {:?}", initial_balance);
+
+    info!("Approve the `most` contract to use the wAZERO funds on the Ethereum chain");
+    client.approve_wazero_eth(transfer_amount).await?;
+
+    info!("Request the transfer of wAZERO to the Aleph chain");
+    client.request_wazero_transfer_eth(transfer_amount).await?;
+
+    info!("Wait for balance change");
+    let target_balance = initial_balance.bridge_wazero_eth_to_azero(transfer_amount.as_u128())?;
+    info!("Target balance: {:?}", target_balance);
+
+    let get_current_balance = || async { client.balance().await };
+    wait_for_balance_change(
+        get_current_balance,
+        target_balance,
+        Some(transfer_amount / 100),
+        Some(0),
+        config.test_args.wait_max_minutes,
+    )
+    .await
+}
+
+/// One-way `Ethereum` -> `Aleph Zero` transfer of ETH to wETH through `most`.
+/// 1. Transfers `transfer_amount` of native ETH over the bridge.
+/// 2. Waits for the transfer to complete.
+/// Finally, it checks if every account has proper balance.
+/// It relies on all the relevant contracts being deployed on both ends and the (wETH_ETH:wETH_AZERO) pair having been added to `most`.
+#[tokio::test]
+pub async fn eth_to_weth() -> Result<()> {
+    let config = setup_test();
+    let test_context = config.create_test_context().await?;
+    let transfer_amount = utils::parse_ether(config.test_args.transfer_amount.clone())?;
+    let client = Client::new(test_context);
+    let initial_balance = client.balance().await?;
+
+    info!("Initial balance: {:?}", initial_balance);
+
+    info!("Request the transfer of ETH to the Aleph Zero chain");
+    client.request_eth_transfer_eth(transfer_amount).await?;
+    info!("{:?}", client.balance().await?);
+
+    info!("Wait for balance change");
+
+    let target_balance = initial_balance.bridge_eth_eth_to_azero(transfer_amount.as_u128())?;
+    info!("Target balance: {:?}", target_balance);
+
+    let get_current_balance = || async { client.balance().await };
+    wait_for_balance_change(
+        get_current_balance,
+        target_balance,
+        Some(transfer_amount / 100),
+        Some(0),
+        config.test_args.wait_max_minutes,
+    )
+    .await
+}
+
+/// One-way `Ethereum` -> `Aleph Zero` transfer of wAZERO to AZERO through `most`.
+/// Requires a prior transaction in the other direction to have completed.
+/// This is easily done by running the test for the other direction first.
+/// 1. Approves the `most` contract to use the wAZERO funds.
+/// 2. Transfers `transfer_amount` of burned wAZERO over the bridge, the Aleph account receives native AZERO.
+/// 3. Waits for the transfer to complete.
+/// Finally, it checks if every account has proper balance.
+/// It relies on all the relevant contracts being deployed on both ends and the (wAZERO_ETH:wAZERO_AZERO) pair having been added to `most`.
+#[tokio::test]
+pub async fn wazero_to_azero() -> Result<()> {
+    let config = setup_test();
+    let test_context = config.create_test_context().await?;
+    let transfer_amount = utils::parse_ether(config.test_args.transfer_amount.clone())?;
+    let client = Client::new(test_context);
+    let initial_balance = client.balance().await?;
+
+    info!("Initial balance: {:?}", initial_balance);
+
+    info!("Approve the `most` contract to use the wAZERO funds on the Ethereum chain");
+    client.approve_wazero_eth(transfer_amount).await?;
+
+    info!("Request the transfer of wAZERO to the Aleph chain");
+    client.request_azero_transfer_eth(transfer_amount).await?;
+
+    info!("Wait for balance change");
+    let target_balance = initial_balance.bridge_azero_eth_to_azero(transfer_amount.as_u128())?;
+    info!("Target balance: {:?}", target_balance);
+
+    let get_current_balance = || async { client.balance().await };
+    wait_for_balance_change(
+        get_current_balance,
+        target_balance,
+        Some(transfer_amount / 100),
+        Some(0),
         config.test_args.wait_max_minutes,
     )
     .await

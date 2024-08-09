@@ -731,12 +731,12 @@ describe("Most", function () {
 
   describe("Upgrade", function () {
     it("Most contract can be upgraded", async () => {
-      exec("cp ./contracts/Most.sol ./contracts/MostV2.sol", (error) => {
+      exec(`cp ./contracts/Most.sol ./contracts/MostV2.sol`, (error) => {
         if (error !== null) {
           console.log("exec error: " + error);
         }
         exec(
-          'sed -i "17 a     uint256 public test;" ./contracts/MostV2.sol',
+          `sed -i "17 a     uint256 public test;" ./contracts/MostV2.sol`,
           async (error) => {
             if (error !== null) {
               console.log("exec error: " + error);
@@ -804,7 +804,7 @@ describe("Most", function () {
       });
 
       // clean up
-      exec("rm ./contracts/MostV2.sol", (error) => {
+      exec(`rm ./contracts/MostV2.sol`, (error) => {
         if (error !== null) {
           console.log("exec error: " + error);
         }

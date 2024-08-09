@@ -30,8 +30,14 @@ ADVISORY_ADDRESSES=${ADVISORY_ADDRESSES:-""}
 AZERO_MOST_ADDRESS=${AZERO_MOST_ADDDRESS:-""}
 ETH_MOST_ADDRESS=${ETH_MOST_ADDRESS:-""}
 
+# --- ETH Gas Limit
+ETH_GAS_LIMIT=${ETH_GAS_LIMIT:-""}
+
 # --- Signer's CID
 SIGNER_CID=${SIGNER_CID:-""}
+
+# --- Signer's port
+SIGNER_PORT=${SIGNER_PORT:-"1234"}
 
 # --- RELAYER ID from MY_POD_NAME coming from statefulset's pod, such as
 # --- relayer-0, relayer-1 etc.
@@ -53,6 +59,7 @@ ARGS=(
   --dev-account-index=${RELAYER_ID}
   --redis-node=${REDIS}
   --azero-contract-metadata=${AZERO_MOST_METADATA}
+  --signer-port=${SIGNER_PORT}
 )
 
 # --- Addresses can be passed as environment variables.
@@ -130,5 +137,9 @@ if [[ -n "${ETH_MIN_CONFIRMATIONS}" ]]; then
   ARGS+=(--eth-tx-min-confirmations=${ETH_MIN_CONFIRMATIONS})
 fi
 
+if [[ "${ETH_GAS_LIMIT}" != "" && "${ETH_GAS_LIMIT}" =~ ^[0-9]+$ ]]; then
+  echo "Setting --eth-gas-limit to ${ETH_GAS_LIMIT}"
+  ARGS+=(--eth-gas-limit=${ETH_GAS_LIMIT})
+fi
 # --- RUN
 xargs most-relayer "${ARGS[@]}"
