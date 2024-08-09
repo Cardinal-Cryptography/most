@@ -30,6 +30,9 @@ ADVISORY_ADDRESSES=${ADVISORY_ADDRESSES:-""}
 AZERO_MOST_ADDRESS=${AZERO_MOST_ADDDRESS:-""}
 ETH_MOST_ADDRESS=${ETH_MOST_ADDRESS:-""}
 
+# --- ETH Gas Limit
+ETH_GAS_LIMIT=${ETH_GAS_LIMIT:-""}
+
 # --- Signer's CID
 SIGNER_CID=${SIGNER_CID:-""}
 
@@ -158,6 +161,11 @@ if [[ -n "${RUN_TRADER}" ]]; then
     ARGS+=(--reward-withdrawal-threshold=${REWARD_WITHDRAWAL_THRESHOLD})
   fi
 
+fi
+
+if [[ "${ETH_GAS_LIMIT}" != "" && "${ETH_GAS_LIMIT}" =~ ^[0-9]+$ ]]; then
+  echo "Setting --eth-gas-limit to ${ETH_GAS_LIMIT}"
+  ARGS+=(--eth-gas-limit=${ETH_GAS_LIMIT})
 fi
 
 # --- RUN
