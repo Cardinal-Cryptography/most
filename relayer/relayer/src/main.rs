@@ -4,7 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use aleph_client::AccountId;
+use aleph_client::{AccountId, AsConnection, Ss58Codec};
 use clap::Parser;
 use config::Config;
 use connections::{
@@ -32,7 +32,7 @@ use crate::{
         azero,
         eth::{self, with_gas_escalator},
     },
-    contracts::MostInstance,
+    contracts::{AzeroContractError, MostInstance},
     handlers::{AlephZeroEventsHandler, EthereumEventsHandler},
     listeners::{
         AdvisoryListener, AlephZeroHaltedListener, AlephZeroListener, AzeroMostEvents,
@@ -101,6 +101,9 @@ enum RelayerError {
 
     #[error("Ethereum's Most paused listener failure")]
     EthereumPausedListener(#[from] EthereumPausedListenerError),
+
+    #[error("AlephZero contract error")]
+    AzeroContract(#[from] AzeroContractError),
 }
 
 #[derive(Debug, Clone)]
@@ -273,12 +276,15 @@ async fn run_relayer(
         config.azero_proof_size_limit,
     )?;
 
-    let current_committee_id = most.current_committee_id().await?;
+    let current_committee_id = most_azero
+        .current_committee_id(azero_connection.as_connection())
+        .await?;
     most_azero
         .set_payout_account(
-            azero_connection,
+            &azero_signed_connection,
             current_committee_id,
-            config.payout_account,
+            AccountId::from_string(&config.payout_address)
+                .map_err(|why| AzeroContractError::NotAccountId(why.to_string()))?,
         )
         .await?;
 
