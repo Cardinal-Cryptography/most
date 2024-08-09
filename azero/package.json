@@ -9,8 +9,11 @@
         "predrink-tests": "npm config set script-shell \"/bin/bash\"; ./scripts/predrink_tests.sh",
         "drink-tests": "npm config set script-shell \"/bin/bash\"; ./scripts/drink_tests.sh",
         "deploy": "npm config set script-shell \"/bin/bash\"; ts-node scripts/0_upload_code.ts; ts-node scripts/1_deploy.ts",
+        "deploy-l2": "npm config set script-shell \"/bin/bash\"; ts-node scripts/0_l2_upload_code.ts; ts-node scripts/1_l2_deploy.ts",
         "upload": "npm config set script-shell \"/bin/bash\"; ts-node scripts/0_upload_code.ts",
+        "upload-l2": "npm config set script-shell \"/bin/bash\"; ts-node scripts/0_l2_upload_code.ts",
         "setup": "npm config set script-shell \"/bin/bash\"; ts-node scripts/2_setup.ts",
+        "setup-l2": "npm config set script-shell \"/bin/bash\"; ts-node scripts/2_l2_setup.ts",
         "bridge-weth": "npm config set script-shell \"/bin/bash\"; ts-node scripts/bridge_weth.ts",
         "get-latest-block": "npm config set script-shell \"/bin/bash\"; ts-node scripts/get_latest_block.ts"
     },
