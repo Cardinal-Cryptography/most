@@ -206,14 +206,6 @@ contract MostL2 is AbstractMost {
             revert ZeroAddress();
         }
 
-        bytes32 destTokenAddress = supportedPairs[
-            addressToBytes32(bAzeroAddress)
-        ];
-
-        if (destTokenAddress == 0x0) {
-            revert UnsupportedPair();
-        }
-
         uint256 amount_out = swap_for_bazero(amount);
         burn_bazero(amount_out);
 

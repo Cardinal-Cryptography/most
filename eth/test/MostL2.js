@@ -152,20 +152,6 @@ describe("MostL2", function () {
   }
 
   describe("sendRequestNative", function () {
-    it("Reverts if token is not whitelisted", async () => {
-      const { most, bazeroAdrressBytes } = await loadFixture(
-        deployEightGuardianMostFixture,
-      );
-
-      await most.pause();
-      await most.removePair(bazeroAdrressBytes);
-      await most.unpause();
-
-      await expect(
-        most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
-      ).to.be.revertedWithCustomError(most, "UnsupportedPair");
-    });
-
     it("Transfers tokens to Most", async () => {
       const { most, bazero } = await loadFixture(
         deployEightGuardianMostFixture,
