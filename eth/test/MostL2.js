@@ -180,9 +180,7 @@ describe("MostL2", function () {
     });
 
     it("Emits correct event", async () => {
-      const { most, bazeroAdrressBytes } = await loadFixture(
-        deployEightGuardianMostFixture,
-      );
+      const { most } = await loadFixture(deployEightGuardianMostFixture);
 
       function at_least_half(amount_out) {
         return amount_out >= BigInt(TOKEN_AMOUNT / 10 ** 6 / 2);
@@ -191,7 +189,13 @@ describe("MostL2", function () {
         most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
       )
         .to.emit(most, "CrosschainTransferRequest")
-        .withArgs(0, bazeroAdrressBytes, at_least_half, ALEPH_ACCOUNT, 0);
+        .withArgs(
+          0,
+          "0x0000000000000000000000000000000000000000000000000000000000000000",
+          at_least_half,
+          ALEPH_ACCOUNT,
+          0,
+        );
     });
   });
 
