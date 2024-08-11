@@ -29,7 +29,8 @@ contract MostL2 is AbstractMost {
     error SwapError();
 
     bytes32 internal constant EMPTY_STORAGE = 0x0;
-    bytes32 internal constant NATIVE_MARKER_ADDRESS = 0x0;
+    bytes32 internal constant NATIVE_MARKER_BYTES = 0x0;
+    address internal constant NATIVE_MARKER_ADDRESS = address(0);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -211,7 +212,7 @@ contract MostL2 is AbstractMost {
 
         emit CrosschainTransferRequest(
             committeeId,
-            NATIVE_MARKER_ADDRESS,
+            NATIVE_MARKER_BYTES,
             amount_out,
             destReceiverAddress,
             requestNonce
