@@ -167,7 +167,7 @@ contract MostL2 is AbstractMost {
         );
 
         // transfer native
-        if (_destTokenAddress == bAzeroAddress) {
+        if (_destTokenAddress == NATIVE_MARKER_ADDRESS) {
             native_transfer(requestHash, amount, _destReceiverAddress);
         } else {
             remote_token_transfer(
