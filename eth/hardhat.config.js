@@ -128,7 +128,8 @@ if (SEPOLIA_MNEMONIC) {
     },
     deploymentConfig: {
       guardianIds: [
-        typeof SEPOLIA_ACCOUNT_NUMBER == "undefined" || SEPOLIA_ACCOUNT_NUMBER == ""
+        typeof SEPOLIA_ACCOUNT_NUMBER == "undefined" ||
+        SEPOLIA_ACCOUNT_NUMBER == ""
           ? "0xc4E0B92Df2DE77C077D060e49ec63DC196980716"
           : SEPOLIA_ACCOUNT_NUMBER, // sepolia account address corresponding to SEPOLIA_KEY
       ],
@@ -141,7 +142,8 @@ if (SEPOLIA_MNEMONIC) {
           ? "0xd91aE8FD2Be53F74876a9cc4aFb416645A0c8420"
           : SEPOLIA_WETH,
       tokenConfigPath:
-        typeof SEPOLIA_TOKEN_CONFIG_PATH == "undefined" || SEPOLIA_TOKEN_CONFIG_PATH == ""
+        typeof SEPOLIA_TOKEN_CONFIG_PATH == "undefined" ||
+        SEPOLIA_TOKEN_CONFIG_PATH == ""
           ? "../cfg/tokens_testnet_example.json"
           : SEPOLIA_TOKEN_CONFIG_PATH,
     },
@@ -154,7 +156,8 @@ if (EVM_TESTNET_KEY) {
     accounts: [EVM_TESTNET_KEY],
     deploymentConfig: {
       guardianIds: [
-        typeof EVM_TESTNET_ACCOUNT_NUMBER == "undefined" || EVM_TESTNET_ACCOUNT_NUMBER == ""
+        typeof EVM_TESTNET_ACCOUNT_NUMBER == "undefined" ||
+        EVM_TESTNET_ACCOUNT_NUMBER == ""
           ? "0x5027E6E6548b2eb986D4CC440C2a0dBB05D88946"
           : EVM_TESTNET_ACCOUNT_NUMBER, // L2 (evm testnet) account address corresponding to EVM_TESTNET_KEY
       ],
