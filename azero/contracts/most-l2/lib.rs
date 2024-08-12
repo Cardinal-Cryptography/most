@@ -330,7 +330,6 @@ pub mod most_l2 {
             }
 
             let wrapped_azero_address = self.wazero.get().ok_or(MostError::WrappedAzeroNotSet)?;
-            let wrapped_azero_address_bytes: [u8; 32] = *wrapped_azero_address.as_ref();
             let mut wrapped_azero: contract_ref!(WrappedAZERO) = wrapped_azero_address.into();
 
             wrapped_azero
