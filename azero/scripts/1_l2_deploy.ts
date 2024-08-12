@@ -1,22 +1,15 @@
 import { ApiPromise, WsProvider, Keyring } from "@polkadot/api";
-import { KeyringPair } from "@polkadot/keyring/types";
 import MostL2Constructors from "../types/constructors/most_l2";
-import TokenConstructors from "../types/constructors/token";
-import OracleConstructors from "../types/constructors/oracle";
 import AdvisoryConstructors from "../types/constructors/advisory";
 import WrappedAzeroConstructors from "../types/constructors/wrapped_azero";
 import {
   estimateContractInit,
   import_env,
-  storeAddresses,
-  Addresses,
   import_token_config,
   findTokenBySymbol,
 } from "./utils";
 import "dotenv/config";
 import "@polkadot/api-augment";
-import { AccountId } from "../types/types-arguments/token";
-import type BN from "bn.js";
 import fs from "fs";
 
 const envFile = process.env.AZERO_ENV;
@@ -99,12 +92,10 @@ async function main(): Promise<void> {
 
   var alephTokenAddresses = [];
 
-  if (!isWrappedAzeroDeployed) {
-    alephTokenAddresses.push({
-      symbol: "wAZERO",
-      address: wrappedAzeroAddress,
-    });
-  }
+  alephTokenAddresses.push({
+    symbol: "wAZERO",
+    address: wrappedAzeroAddress,
+  });
 
   const addresses = {
     mostL2: mostL2Address,

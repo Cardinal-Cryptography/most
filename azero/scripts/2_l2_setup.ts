@@ -17,28 +17,6 @@ import type BN from "bn.js";
 
 const envFile = process.env.AZERO_ENV;
 
-async function addTokenPair(
-  tokenEth: string,
-  tokenAzero: string,
-  mostContract: MostL2,
-) {
-  const tokenEthAddress = ethers.zeroPadValue(ethers.getBytes(tokenEth), 32);
-  const tokenAzeroAddress = accountIdToHex(tokenAzero);
-  console.log(
-    `Adding token pair to Most: ${tokenAzeroAddress} => ${tokenEthAddress}`,
-  );
-  await mostContract.tx.addPair(
-    hexToBytes(tokenAzeroAddress),
-    hexToBytes(tokenEthAddress),
-  );
-}
-
-async function bAzeroAddress() {
-  const addresses = await import(`../../eth/l2_addresses.json`);
-  console.log(addresses);
-  return addresses.bazero;
-}
-
 async function main(): Promise<void> {
   if (!envFile) {
     throw new Error("Please provide an env file");
@@ -46,7 +24,7 @@ async function main(): Promise<void> {
 
   const config = await import_env(envFile);
 
-  const { ws_node, deployer_seed, dev } = config;
+  const { ws_node, deployer_seed } = config;
 
   const alephAddresses = await import(__dirname + "/../l2_addresses.json");
   const most_azero = alephAddresses.mostL2;
@@ -60,18 +38,16 @@ async function main(): Promise<void> {
   console.log("Using ", deployer.address, "as the transaction signer");
 
   const most = new MostL2(most_azero, deployer, api);
-
-  const bazeroL2Address = await bAzeroAddress();
   const wAzeroAddress = findTokenBySymbol(
     "wAZERO",
     alephAddresses.alephTokens,
   ).address;
-  console.log(bazeroL2Address, wAzeroAddress);
 
   // Set WAZERO address
+  console.log(`wAZERO address set to ${wAzeroAddress}`);
   await most.tx.setWazero(wAzeroAddress);
-  await addTokenPair(bazeroL2Address, wAzeroAddress, most);
 
+  console.log("Unpausing Most");
   await most.tx.setHalted(false);
 
   await api.disconnect();
