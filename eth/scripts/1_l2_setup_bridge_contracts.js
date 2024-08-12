@@ -1,7 +1,5 @@
 const { ethers, network } = require("hardhat");
 const fs = require("node:fs");
-const { u8aToHex } = require("@polkadot/util");
-const { Keyring } = require("@polkadot/keyring");
 
 const NATIVE_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 
@@ -101,39 +99,11 @@ async function initializePool(config, pool, lpAddress, bazero, owner) {
   });
 }
 
-function getWazeroAddress() {
-  const { alephTokens } = JSON.parse(
-    fs.readFileSync("../azero/l2_addresses.json", {
-      encoding: "utf8",
-      flag: "r",
-    }),
-  );
-
-  return alephTokens[0].address;
-}
-
-async function most_add_bazero_pair(most, bazeroAddress) {
-  const bazeroAddressBytes = ethers.zeroPadValue(
-    ethers.getBytes(bazeroAddress),
-    32,
-  );
-  const wazero = getWazeroAddress();
-  const azeroTokenAddressBytes = u8aToHex(
-    new Keyring({ type: "sr25519" }).decodeAddress(wazero),
-  );
-
-  console.log(
-    `Adding \`Bazero\` pair to the most ${bazeroAddressBytes} <-> ${azeroTokenAddressBytes}`,
-  );
-  await most.addPair(bazeroAddressBytes, azeroTokenAddressBytes, false);
-}
-
 /// 1. Mint Bazero.
 /// 2. Sets minter for LpToken to Pool.
 /// 3. Sets minter for bazero to Most.
 /// 4. Initialize pool, providing it with some initial liquidity.
-/// 5. Add Bazero pair to the most contract.
-/// 6. Unpause the most.
+/// 5. Unpause the most.
 async function main() {
   const signers = await ethers.getSigners();
   const accounts = signers.map((s) => s.address);
@@ -151,7 +121,6 @@ async function main() {
   await setMinterBurnerTo(bazero, most.target);
 
   await initializePool(config, pool, lp.target, bazero, owner);
-  await most_add_bazero_pair(most, bazero.target);
 
   console.log("Unpause the most...");
   await most.unpause();

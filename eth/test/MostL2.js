@@ -134,38 +134,19 @@ describe("MostL2", function () {
     await pool.add_liquidity([100n * 10n ** 12n, 100n * 10n ** 18n], 0, {
       value: ethers.parseEther("100.0"),
     });
-    const bazeroAdrressBytes = ethers.zeroPadValue(
-      ethers.getBytes(bazero.target),
-      32,
-    );
-
-    await most.addPair(bazeroAdrressBytes, bazeroAdrressBytes, false);
-
     await most.unpause();
+
+    const native_address = ethers.zeroPadBytes("0x", 32);
 
     return {
       most,
       bazero,
-      bazeroAdrressBytes,
+      native_address,
       pool,
     };
   }
 
   describe("sendRequestNative", function () {
-    it("Reverts if token is not whitelisted", async () => {
-      const { most, bazeroAdrressBytes } = await loadFixture(
-        deployEightGuardianMostFixture,
-      );
-
-      await most.pause();
-      await most.removePair(bazeroAdrressBytes);
-      await most.unpause();
-
-      await expect(
-        most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
-      ).to.be.revertedWithCustomError(most, "UnsupportedPair");
-    });
-
     it("Transfers tokens to Most", async () => {
       const { most, bazero } = await loadFixture(
         deployEightGuardianMostFixture,
@@ -180,7 +161,7 @@ describe("MostL2", function () {
     });
 
     it("Emits correct event", async () => {
-      const { most, bazeroAdrressBytes } = await loadFixture(
+      const { most, native_address } = await loadFixture(
         deployEightGuardianMostFixture,
       );
 
@@ -191,20 +172,20 @@ describe("MostL2", function () {
         most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
       )
         .to.emit(most, "CrosschainTransferRequest")
-        .withArgs(0, bazeroAdrressBytes, at_least_half, ALEPH_ACCOUNT, 0);
+        .withArgs(0, native_address, at_least_half, ALEPH_ACCOUNT, 0);
     });
   });
 
   describe("receiveRequest", function () {
     it("Reverts if caller is not a guardian", async () => {
-      const { most, bazeroAdrressBytes } = await loadFixture(
+      const { most, native_address } = await loadFixture(
         deployEightGuardianMostFixture,
       );
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
       const requestHash = ethers.solidityPackedKeccak256(
         ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
-        [0, bazeroAdrressBytes, TOKEN_AMOUNT, ethAddress, 0],
+        [0, native_address, TOKEN_AMOUNT, ethAddress, 0],
       );
 
       await expect(
@@ -213,7 +194,7 @@ describe("MostL2", function () {
           .receiveRequest(
             requestHash,
             0,
-            bazeroAdrressBytes,
+            native_address,
             TOKEN_AMOUNT,
             ethAddress,
             0,
@@ -222,14 +203,14 @@ describe("MostL2", function () {
     });
 
     it("Ignores consecutive signatures", async () => {
-      const { most, bazeroAdrressBytes } = await loadFixture(
+      const { most, native_address } = await loadFixture(
         deployEightGuardianMostFixture,
       );
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
       const requestHash = ethers.solidityPackedKeccak256(
         ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
-        [0, bazeroAdrressBytes, TOKEN_AMOUNT, ethAddress, 0],
+        [0, native_address, TOKEN_AMOUNT, ethAddress, 0],
       );
 
       await most
@@ -237,7 +218,7 @@ describe("MostL2", function () {
         .receiveRequest(
           requestHash,
           0,
-          bazeroAdrressBytes,
+          native_address,
           TOKEN_AMOUNT,
           ethAddress,
           0,
@@ -248,7 +229,7 @@ describe("MostL2", function () {
           .receiveRequest(
             requestHash,
             0,
-            bazeroAdrressBytes,
+            native_address,
             TOKEN_AMOUNT,
             ethAddress,
             0,
@@ -259,14 +240,14 @@ describe("MostL2", function () {
     });
 
     it("Ignores already executed requests", async () => {
-      const { most, bazeroAdrressBytes } = await loadFixture(
+      const { most, native_address } = await loadFixture(
         deployEightGuardianMostFixture,
       );
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
       const requestHash = ethers.solidityPackedKeccak256(
         ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
-        [0, bazeroAdrressBytes, TOKEN_AMOUNT, ethAddress, 0],
+        [0, native_address, TOKEN_AMOUNT, ethAddress, 0],
       );
 
       for (let i = 1; i < 6; i++) {
@@ -275,7 +256,7 @@ describe("MostL2", function () {
           .receiveRequest(
             requestHash,
             0,
-            bazeroAdrressBytes,
+            native_address,
             TOKEN_AMOUNT,
             ethAddress,
             0,
@@ -288,7 +269,7 @@ describe("MostL2", function () {
           .receiveRequest(
             requestHash,
             0,
-            bazeroAdrressBytes,
+            native_address,
             TOKEN_AMOUNT,
             ethAddress,
             0,
@@ -299,14 +280,14 @@ describe("MostL2", function () {
     });
 
     it("Unlocks tokens for the user", async () => {
-      const { most, bazeroAdrressBytes } = await loadFixture(
+      const { most, native_address } = await loadFixture(
         deployEightGuardianMostFixture,
       );
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
       const requestHash = ethers.solidityPackedKeccak256(
         ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
-        [0, bazeroAdrressBytes, TOKEN_AMOUNT, ethAddress, 0],
+        [0, native_address, TOKEN_AMOUNT, ethAddress, 0],
       );
 
       let balance_before = await ethers.provider.getBalance(
@@ -319,7 +300,7 @@ describe("MostL2", function () {
           .receiveRequest(
             requestHash,
             0,
-            bazeroAdrressBytes,
+            native_address,
             TOKEN_AMOUNT,
             ethAddress,
             0,
@@ -330,20 +311,28 @@ describe("MostL2", function () {
         accounts[10].address,
       );
 
+      function bn_abs(a, b) {
+        if (a < b) {
+          return b - a;
+        } else {
+          return a - b;
+        }
+      }
+
       expect(
-        balance_after - (balance_before + BigInt(TOKEN_AMOUNT * 10 ** 6)),
-      ).to.be.lt(10);
+        bn_abs(balance_after, balance_before + BigInt(TOKEN_AMOUNT * 10 ** 6)),
+      ).to.be.lt(BigInt(TOKEN_AMOUNT * 10 ** 6) / 100n); // we allow to lose or gain 1%
     });
 
     it("Reverts on non-matching hash", async () => {
-      const { most, bazeroAdrressBytes } = await loadFixture(
+      const { most, native_address } = await loadFixture(
         deployEightGuardianMostFixture,
       );
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
       const requestHash = ethers.solidityPackedKeccak256(
         ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
-        [0, bazeroAdrressBytes, TOKEN_AMOUNT, ethAddress, 1],
+        [0, native_address, TOKEN_AMOUNT, ethAddress, 1],
       );
 
       await expect(
@@ -352,7 +341,7 @@ describe("MostL2", function () {
           .receiveRequest(
             requestHash,
             0,
-            bazeroAdrressBytes,
+            native_address,
             TOKEN_AMOUNT,
             ethAddress,
             0,
@@ -361,18 +350,18 @@ describe("MostL2", function () {
     });
 
     it("Committee rotation", async () => {
-      const { most, bazeroAdrressBytes } = await loadFixture(
+      const { most, native_address } = await loadFixture(
         deployEightGuardianMostFixture,
       );
       const accounts = await ethers.getSigners();
       const ethAddress = addressToBytes32(accounts[10].address);
       const requestHashOld = ethers.solidityPackedKeccak256(
         ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
-        [0, bazeroAdrressBytes, TOKEN_AMOUNT, ethAddress, 0],
+        [0, native_address, TOKEN_AMOUNT, ethAddress, 0],
       );
       const requestHashNew = ethers.solidityPackedKeccak256(
         ["uint256", "bytes32", "uint256", "bytes32", "uint256"],
-        [1, bazeroAdrressBytes, TOKEN_AMOUNT, ethAddress, 0],
+        [1, native_address, TOKEN_AMOUNT, ethAddress, 0],
       );
 
       // Check committee size
@@ -391,7 +380,7 @@ describe("MostL2", function () {
         .receiveRequest(
           requestHashOld,
           0,
-          bazeroAdrressBytes,
+          native_address,
           TOKEN_AMOUNT,
           ethAddress,
           0,
@@ -402,7 +391,7 @@ describe("MostL2", function () {
         .receiveRequest(
           requestHashNew,
           1,
-          bazeroAdrressBytes,
+          native_address,
           TOKEN_AMOUNT,
           ethAddress,
           0,
@@ -414,7 +403,7 @@ describe("MostL2", function () {
           .receiveRequest(
             requestHashNew,
             1,
-            bazeroAdrressBytes,
+            native_address,
             TOKEN_AMOUNT,
             ethAddress,
             0,
@@ -427,7 +416,7 @@ describe("MostL2", function () {
           .receiveRequest(
             requestHashOld,
             0,
-            bazeroAdrressBytes,
+            native_address,
             TOKEN_AMOUNT,
             ethAddress,
             0,

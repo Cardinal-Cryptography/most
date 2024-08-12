@@ -29,6 +29,8 @@ contract MostL2 is AbstractMost {
     error SwapError();
 
     bytes32 internal constant EMPTY_STORAGE = 0x0;
+    bytes32 internal constant NATIVE_MARKER_BYTES = 0x0;
+    address internal constant NATIVE_MARKER_ADDRESS = address(0);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -157,16 +159,12 @@ contract MostL2 is AbstractMost {
         address _destReceiverAddress = bytes32ToAddress(destReceiverAddress);
 
         require(
-            _destTokenAddress != address(0),
-            "We dont bridge native from L2"
-        );
-        require(
             !isLocalToken[_destTokenAddress],
             "We dont bridge non local token"
         );
 
         // transfer native
-        if (_destTokenAddress == bAzeroAddress) {
+        if (_destTokenAddress == NATIVE_MARKER_ADDRESS) {
             native_transfer(requestHash, amount, _destReceiverAddress);
         } else {
             remote_token_transfer(
@@ -205,20 +203,12 @@ contract MostL2 is AbstractMost {
             revert ZeroAddress();
         }
 
-        bytes32 destTokenAddress = supportedPairs[
-            addressToBytes32(bAzeroAddress)
-        ];
-
-        if (destTokenAddress == 0x0) {
-            revert UnsupportedPair();
-        }
-
         uint256 amount_out = swap_for_bazero(amount);
         burn_bazero(amount_out);
 
         emit CrosschainTransferRequest(
             committeeId,
-            destTokenAddress,
+            NATIVE_MARKER_BYTES,
             amount_out,
             destReceiverAddress,
             requestNonce
