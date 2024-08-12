@@ -15,7 +15,7 @@ import { KeyringPair } from "@polkadot/keyring/types";
 import type BN from "bn.js";
 
 // Moved away from utils.ts as L2 scripts do not require it
-// and it they keep on crashing when the JSON file is non-existent
+// and they keep on crashing when the JSON file is non-existent
 async function import_eth_addresses() {
   return await import(`../../eth/addresses.json`);
 }
