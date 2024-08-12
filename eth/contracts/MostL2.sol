@@ -159,10 +159,6 @@ contract MostL2 is AbstractMost {
         address _destReceiverAddress = bytes32ToAddress(destReceiverAddress);
 
         require(
-            _destTokenAddress != address(0),
-            "We dont bridge native from L2"
-        );
-        require(
             !isLocalToken[_destTokenAddress],
             "We dont bridge non local token"
         );
