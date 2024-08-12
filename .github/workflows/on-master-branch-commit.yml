@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - master
+      - fix-l2-relayer-build
 
 jobs:
   check-vars-and-secrets:
