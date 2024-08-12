@@ -99,7 +99,6 @@ async function initializePool(config, pool, lpAddress, bazero, owner) {
   });
 }
 
-
 /// 1. Mint Bazero.
 /// 2. Sets minter for LpToken to Pool.
 /// 3. Sets minter for bazero to Most.
