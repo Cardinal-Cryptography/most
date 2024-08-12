@@ -27,6 +27,7 @@ target/
 
 # contracts
 code_hashes.json
+l2_code_hashes.json
 addresses.json
 l2_addresses.json
 contract_spec.json
