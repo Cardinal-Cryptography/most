@@ -84,10 +84,6 @@ export async function import_env(envFile: string) {
   return await import(`../env/${envFile}.json`);
 }
 
-export async function import_eth_addresses() {
-  return await import(`../../eth/addresses.json`);
-}
-
 export async function import_azero_addresses() {
   return await import(__dirname + "/../addresses.json");
 }

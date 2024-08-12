@@ -6,7 +6,6 @@ import {
   import_azero_addresses,
   accountIdToHex,
   hexToBytes,
-  import_eth_addresses,
   findTokenBySymbol,
 } from "./utils";
 import "dotenv/config";
@@ -14,6 +13,12 @@ import "@polkadot/api-augment";
 import { ethers } from "ethers";
 import { KeyringPair } from "@polkadot/keyring/types";
 import type BN from "bn.js";
+
+// Moved away from utils.ts as L2 scripts do not require it
+// and it they keep on crashing when the JSON file is non-existent
+async function import_eth_addresses() {
+  return await import(`../../eth/addresses.json`);
+}
 
 const envFile = process.env.AZERO_ENV;
 
