@@ -252,7 +252,7 @@ pub mod most_l2 {
             dest_receiver_address: [u8; 32],
             native_azero_request: bool,
         ) -> Result<(), MostError> {
-            if dest_receiver_address == ZERO_ADDRESS {
+            if dest_receiver_address == ZERO_ADDRESS && !native_azero_request {
                 return Err(MostError::ZeroAddress);
             }
 
