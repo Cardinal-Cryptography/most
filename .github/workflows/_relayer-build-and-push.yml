@@ -66,7 +66,7 @@ jobs:
           mkdir -p azero/artifacts
           cp -rf downloaded_azero_artifacts/*.json azero/artifacts/
 
-          mkdir -p eth/artifacts/contracts/{Most.sol,WETH9.sol}
+          mkdir -p eth/artifacts/contracts/{Most.sol,MostL2.sol,WETH9.sol}
           cp -rf downloaded_eth_artifacts/Most.json eth/artifacts/contracts/Most.sol/Most.json
           cp -rf downloaded_eth_artifacts/MostL2.json eth/artifacts/contracts/MostL2.sol/MostL2.json
           cp -rf downloaded_eth_artifacts/WETH9.json eth/artifacts/contracts/WETH9.sol/WETH9.json
