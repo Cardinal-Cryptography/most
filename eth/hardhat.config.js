@@ -18,7 +18,8 @@ const SEPOLIA_URL = process.env.SEPOLIA_URL;
 const SEPOLIA_THRESHOLD = process.env.SEPOLIA_THRESHOLD;
 const ETHEREUM_PRIVATE_KEY = process.env.ETHEREUM_PRIVATE_KEY;
 const ETHEREUM_GUARDIAN_ADDRESS = process.env.ETHEREUM_GUARDIAN_ADDRESS;
-const L2_KEY = process.env.L2_KEY;
+const EVM_TESTNET = process.env.EVM_TESTNET;
+const EVM_TESTNET_ACCOUNT_NUMBER = process.env.EVM_TESTNET_ACCOUNT_NUMBER;
 
 var config = {
   defaultNetwork: "hardhat",
@@ -128,7 +129,7 @@ if (SEPOLIA_KEY) {
     deploymentConfig: {
       guardianIds: [
         typeof SEPOLIA_ACCOUNT_NUMBER == "undefined" ||
-        SEPOLIA_ACCOUNT_NUMBER == ""
+          SEPOLIA_ACCOUNT_NUMBER == ""
           ? "0xc4E0B92Df2DE77C077D060e49ec63DC196980716"
           : SEPOLIA_ACCOUNT_NUMBER, // sepolia account address corresponding to SEPOLIA_KEY
       ],
@@ -142,20 +143,23 @@ if (SEPOLIA_KEY) {
           : SEPOLIA_WETH,
       tokenConfigPath:
         typeof SEPOLIA_TOKEN_CONFIG_PATH == "undefined" ||
-        SEPOLIA_TOKEN_CONFIG_PATH == ""
+          SEPOLIA_TOKEN_CONFIG_PATH == ""
           ? "../cfg/tokens_testnet_example.json"
           : SEPOLIA_TOKEN_CONFIG_PATH,
     },
   };
 }
 
-if (L2_KEY) {
-  config.networks.ldwa = {
+if (EVM_TESTNET) {
+  config.networks.evm_testnet = {
     url: "https://rpc.alephzero-testnet.gelato.digital",
-    accounts: [L2_KEY],
+    accounts: [EVM_TESTNET],
     deploymentConfig: {
       guardianIds: [
-        "0x5027E6E6548b2eb986D4CC440C2a0dBB05D88946", // L2 account address corresponding to L2_KEY
+        typeof EVM_TESTNET_ACCOUNT_NUMBER == "undefined" ||
+          EVM_TESTNET_ACCOUNT_NUMBER == ""
+          ? "0x5027E6E6548b2eb986D4CC440C2a0dBB05D88946"
+          : EVM_TESTNET_ACCOUNT_NUMBER, // L2 (evm testnet) account address corresponding to EVM_TESTNET
       ],
       threshold: 1,
       bazero_decimals: 12,
