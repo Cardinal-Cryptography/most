@@ -144,6 +144,12 @@ pub struct Config {
     #[arg(long, default_value = "redis://127.0.0.1:6379")]
     pub redis_node: String,
 
+    #[arg(long, default_value = "alephzero_next_block_number")]
+    pub redis_azero_block_key: String,
+
+    #[arg(long, default_value = "ethereum_next_block_number")]
+    pub redis_eth_block_key: String,
+
     #[arg(long, default_value = "info")]
     pub rust_log: log::Level,
 }
