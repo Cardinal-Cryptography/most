@@ -339,14 +339,9 @@ pub mod most_l2 {
                 .transferred_value(amount_to_bridge)
                 .invoke()?;
 
-            let dest_token_address = self
-                .supported_pairs
-                .get(wrapped_azero_address_bytes)
-                .ok_or(MostError::UnsupportedPair)?;
-
             self._send_request(
                 wrapped_azero_address,
-                dest_token_address,
+                NATIVE_MARKER_ADDRESS,
                 amount_to_bridge,
                 dest_receiver_address,
                 true,
