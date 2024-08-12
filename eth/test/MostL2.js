@@ -139,8 +139,6 @@ describe("MostL2", function () {
       32,
     );
 
-    await most.addPair(bazeroAdrressBytes, bazeroAdrressBytes, false);
-
     await most.unpause();
 
     return {
