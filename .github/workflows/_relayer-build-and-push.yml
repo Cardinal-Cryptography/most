@@ -58,7 +58,7 @@ jobs:
           for c in azero_most azero_advisory azero_token; do
             aws s3 cp --recursive s3://${{ secrets.CONTRACTS_S3BUCKET_NAME }}/most/artifacts/${{ github.sha }}/$c downloaded_azero_artifacts
           done
-          for c in eth_most eth_weth9; do
+          for c in eth_most eth_mostl2 eth_weth9; do
             aws s3 cp --recursive s3://${{ secrets.CONTRACTS_S3BUCKET_NAME }}/most/artifacts/${{ github.sha }}/$c downloaded_eth_artifacts
           done
 
