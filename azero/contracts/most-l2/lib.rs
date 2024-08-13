@@ -330,7 +330,6 @@ pub mod most_l2 {
             }
 
             let wrapped_azero_address = self.wazero.get().ok_or(MostError::WrappedAzeroNotSet)?;
-            let wrapped_azero_address_bytes: [u8; 32] = *wrapped_azero_address.as_ref();
             let mut wrapped_azero: contract_ref!(WrappedAZERO) = wrapped_azero_address.into();
 
             wrapped_azero
@@ -339,14 +338,9 @@ pub mod most_l2 {
                 .transferred_value(amount_to_bridge)
                 .invoke()?;
 
-            let dest_token_address = self
-                .supported_pairs
-                .get(wrapped_azero_address_bytes)
-                .ok_or(MostError::UnsupportedPair)?;
-
             self._send_request(
                 wrapped_azero_address,
-                dest_token_address,
+                NATIVE_MARKER_ADDRESS,
                 amount_to_bridge,
                 dest_receiver_address,
                 true,

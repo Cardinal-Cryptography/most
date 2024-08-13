@@ -22,6 +22,8 @@ function get_address {
 ETH_NETWORK=${ETH_NETWORK:-"http://127.0.0.1:8545"}
 AZERO_NETWORK=${AZERO_NETWORK:-"ws://127.0.0.1:9944"}
 REDIS=${REDIS:-"redis://127.0.0.1:6379"}
+REDIS_AZERO_BLOCK_KEY=${REDIS_AZERO_BLOCK_KEY:-""}
+REDIS_ETH_BLOCK_KEY=${REDIS_ETH_BLOCK_KEY:-""}
 
 KEYSTORE_PATH=${KEYSTORE_PATH:-""}
 RELAYER_ID=${RELAYER_ID:-0}
@@ -137,7 +139,7 @@ if [[ -n "${ETH_MIN_CONFIRMATIONS}" ]]; then
   ARGS+=(--eth-tx-min-confirmations=${ETH_MIN_CONFIRMATIONS})
 fi
 
-if [[ "${ETH_GAS_LIMIT}" != "" && "${ETH_GAS_LIMIT}" =~ ^[0-9]+$ ]]; then
+if [[ "${ETH_GAS_LIMIT}" =~ ^[0-9]+$ ]]; then
   echo "Setting --eth-gas-limit to ${ETH_GAS_LIMIT}"
   ARGS+=(--eth-gas-limit=${ETH_GAS_LIMIT})
 fi
@@ -147,6 +149,15 @@ if [[ -n "${PAYOUT_ADDRESS}" ]]; then
 else
   echo "Payout address required but not provided." 1>&2
   exit 1
+
+  if [[ "${REDIS_AZERO_BLOCK_KEY}" =~ ^[a-z0-9_]+$ ]]; then
+  echo "Setting --redis-azero-block-key to ${REDIS_AZERO_BLOCK_KEY}"
+  ARGS+=(--redis-azero-block-key=${REDIS_AZERO_BLOCK_KEY})
+fi
+
+if [[ "${REDIS_ETH_BLOCK_KEY}" =~ ^[a-z0-9_]+$ ]]; then
+  echo "Setting --redis-eth-block-key to ${REDIS_ETH_BLOCK_KEY}"
+  ARGS+=(--redis-eth-block-key=${REDIS_ETH_BLOCK_KEY})
 fi
 
 # --- RUN

@@ -99,26 +99,11 @@ async function initializePool(config, pool, lpAddress, bazero, owner) {
   });
 }
 
-async function most_add_bazero_pair(most, bazeroAddress) {
-  const bazeroAddressBytes = ethers.zeroPadValue(
-    ethers.getBytes(bazeroAddress),
-    32,
-  );
-  /// TODO: switch this for actual address of wrapped azero on L1
-  const destBazeroAddressBytes = bazeroAddressBytes;
-
-  console.log(
-    `Adding \`Bazero\` pair to the most ${bazeroAddressBytes} <-> ${destBazeroAddressBytes}`,
-  );
-  await most.addPair(bazeroAddressBytes, destBazeroAddressBytes, false);
-}
-
 /// 1. Mint Bazero.
 /// 2. Sets minter for LpToken to Pool.
 /// 3. Sets minter for bazero to Most.
 /// 4. Initialize pool, providing it with some initial liquidity.
-/// 5. Add Bazero pair to the most contract.
-/// 6. Unpause the most.
+/// 5. Unpause the most.
 async function main() {
   const signers = await ethers.getSigners();
   const accounts = signers.map((s) => s.address);
@@ -136,7 +121,6 @@ async function main() {
   await setMinterBurnerTo(bazero, most.target);
 
   await initializePool(config, pool, lp.target, bazero, owner);
-  await most_add_bazero_pair(most, bazero.target);
 
   console.log("Unpause the most...");
   await most.unpause();
