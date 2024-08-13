@@ -150,7 +150,7 @@ else
   echo "Payout address required but not provided." 1>&2
   exit 1
 
-  if [[ "${REDIS_AZERO_BLOCK_KEY}" =~ ^[a-z0-9_]+$ ]]; then
+if [[ "${REDIS_AZERO_BLOCK_KEY}" =~ ^[a-z0-9_]+$ ]]; then
   echo "Setting --redis-azero-block-key to ${REDIS_AZERO_BLOCK_KEY}"
   ARGS+=(--redis-azero-block-key=${REDIS_AZERO_BLOCK_KEY})
 fi
