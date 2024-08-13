@@ -34,37 +34,7 @@ jobs:
           if [[ \
             '${{ inputs.layer }}' != 'L1' && '${{ inputs.layer }}' != 'L2'
           ]]; then
-<<<<<<< HEAD
-            echo 'Invalid environment'
-            exit 1
-          fi
-
-          if [[ \
-            '${{ inputs.frontend-environment }}' != 'dev' && \
-            '${{ inputs.frontend-environment }}' != 'stage' && \
-            '${{ inputs.frontend-environment }}' != 'prod'
-          ]]; then
-            echo 'Invalid frontend environment'
-            exit 1
-          fi
-
-          # TODO: Remove when implemented
-          if [[ \
-            '${{ inputs.frontend-environment }}' != 'dev'
-          ]]; then
-            echo 'Only dev frontend environment is implemented at this moment'
-            exit 1
-          fi
-
-          # TODO: Remove when implemented
-          if [[ \
-            '${{ inputs.environment }}' == 'testnet' || \
-            '${{ inputs.environment }}' == 'mainnet' \
-          ]]; then
-            echo 'testnet and mainnet are not implemented yet'
-=======
             echo 'Invalid layer'
->>>>>>> origin/master
             exit 1
           fi
 
