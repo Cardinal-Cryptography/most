@@ -61,7 +61,7 @@ contract MostL2 is AbstractMost {
 
     /// Calculates min value of the swap we are happy with.
     /// Takes into account the difference in number of decimals between bazero and native token.
-    function calc_min_amount_out_swap(
+    function calcMinAmountOutSwap(
         uint256 amount,
         bool to_bazero
     ) internal pure returns (uint256) {
@@ -72,14 +72,14 @@ contract MostL2 is AbstractMost {
         }
     }
 
-    function swap_from_bazero(uint256 amount) internal returns (bool, uint256) {
+    function swapFromBazero(uint256 amount) internal returns (bool, uint256) {
         IWrappedToken bazero = IWrappedToken(bAzeroAddress);
         StableSwapTwoPool stablePool = StableSwapTwoPool(stableSwapAddress);
 
         // Allow swap to spend that many tokens
         bazero.approve(address(stableSwapAddress), amount);
         // at least 99% of what we gave to the swap
-        uint256 min_amount_out = calc_min_amount_out_swap(amount, false);
+        uint256 min_amount_out = calcMinAmountOutSwap(amount, false);
 
         (bool swapSuccess, bytes memory returndata) = address(stablePool).call(
             abi.encodeCall(
@@ -94,15 +94,15 @@ contract MostL2 is AbstractMost {
         return (false, 0);
     }
 
-    function swap_for_bazero(uint256 amount) internal returns (uint256) {
+    function swapForBazero(uint256 amount) internal returns (uint256) {
         // at least 99% of what we gave to the swap
-        uint256 min_amount_out = calc_min_amount_out_swap(amount, true);
+        uint256 min_amount_out = calcMinAmountOutSwap(amount, true);
 
         StableSwapTwoPool stablePool = StableSwapTwoPool(stableSwapAddress);
         return stablePool.exchange_from_native{value: amount}(min_amount_out);
     }
 
-    function native_transfer(
+    function nativeTransfer(
         bytes32 requestHash,
         uint256 amount,
         address _destReceiverAddress
@@ -115,7 +115,7 @@ contract MostL2 is AbstractMost {
         IWrappedToken bazero = IWrappedToken(bAzeroAddress);
         bazero.mint(address(this), amount);
 
-        (bool swapSuccess, uint256 amount_out) = swap_from_bazero(amount);
+        (bool swapSuccess, uint256 amount_out) = swapFromBazero(amount);
 
         if (!swapSuccess) {
             IERC20(bAzeroAddress).safeTransfer(_destReceiverAddress, amount);
@@ -123,20 +123,26 @@ contract MostL2 is AbstractMost {
             return;
         }
 
+        /// do not send more that requested
+        uint256 amount_to_send = clipTo(
+            amount_out,
+            amount * BAZERO_TO_NATIVE_RATIO
+        );
+
         // payout to receiver
         (bool sendNativeEthSuccess, ) = _destReceiverAddress.call{
-            value: amount_out,
+            value: amount_to_send,
             gas: GAS_LIMIT
         }("");
 
         if (!sendNativeEthSuccess) {
             emit NativeTransferFailed(requestHash);
         } else {
-            emit NativeTransferSwap(requestHash, amount_out);
+            emit NativeTransferSwap(requestHash, amount_to_send);
         }
     }
 
-    function remote_token_transfer(
+    function remoteTokenTransfer(
         address _destTokenAddress,
         uint256 amount,
         address _destReceiverAddress
@@ -165,9 +171,9 @@ contract MostL2 is AbstractMost {
 
         // transfer native
         if (_destTokenAddress == NATIVE_MARKER_ADDRESS) {
-            native_transfer(requestHash, amount, _destReceiverAddress);
+            nativeTransfer(requestHash, amount, _destReceiverAddress);
         } else {
-            remote_token_transfer(
+            remoteTokenTransfer(
                 _destTokenAddress,
                 amount,
                 _destReceiverAddress
@@ -177,9 +183,16 @@ contract MostL2 is AbstractMost {
         emit RequestProcessed(requestHash);
     }
 
-    function burn_bazero(uint256 amount) internal {
+    function burnBazero(uint256 amount) internal {
         IWrappedToken bazero = IWrappedToken(bAzeroAddress);
         bazero.burn(amount);
+    }
+
+    function clipTo(uint256 value, uint256 to) internal returns (uint256) {
+        if (value > to) {
+            return to;
+        }
+        return value;
     }
 
     /// @notice Invoke this tx to transfer funds to the destination chain.
@@ -203,13 +216,17 @@ contract MostL2 is AbstractMost {
             revert ZeroAddress();
         }
 
-        uint256 amount_out = swap_for_bazero(amount);
-        burn_bazero(amount_out);
+        uint256 amount_out = swapForBazero(amount);
+        uint256 amount_to_send = clipTo(
+            amount_out,
+            amount / BAZERO_TO_NATIVE_RATIO
+        );
+        burnBazero(amount_to_send);
 
         emit CrosschainTransferRequest(
             committeeId,
             NATIVE_MARKER_BYTES,
-            amount_out,
+            amount_to_send,
             destReceiverAddress,
             requestNonce
         );
