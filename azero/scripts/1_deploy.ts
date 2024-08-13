@@ -10,7 +10,6 @@ import {
   import_env,
   storeAddresses,
   Addresses,
-  import_eth_addresses,
   import_token_config,
   findTokenBySymbol,
 } from "./utils";

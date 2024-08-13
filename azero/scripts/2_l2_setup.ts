@@ -1,14 +1,6 @@
 import { ApiPromise, WsProvider, Keyring } from "@polkadot/api";
 import MostL2 from "../types/contracts/most_l2";
-import Token from "../types/contracts/token";
-import {
-  import_env,
-  import_azero_addresses,
-  accountIdToHex,
-  hexToBytes,
-  import_eth_addresses,
-  findTokenBySymbol,
-} from "./utils";
+import { import_env, findTokenBySymbol } from "./utils";
 import "dotenv/config";
 import "@polkadot/api-augment";
 import { ethers } from "ethers";

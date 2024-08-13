@@ -10,7 +10,7 @@ const DEV_MNEMONIC =
   "harsh master island dirt equip search awesome double turn crush wool grant";
 
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY;
-const SEPOLIA_KEY = process.env.SEPOLIA_KEY;
+const SEPOLIA_MNEMONIC = process.env.SEPOLIA_MNEMONIC;
 const SEPOLIA_ACCOUNT_NUMBER = process.env.SEPOLIA_ACCOUNT_NUMBER;
 const SEPOLIA_WETH = process.env.SEPOLIA_WETH;
 const SEPOLIA_TOKEN_CONFIG_PATH = process.env.SEPOLIA_TOKEN_CONFIG_PATH;
@@ -18,7 +18,8 @@ const SEPOLIA_URL = process.env.SEPOLIA_URL;
 const SEPOLIA_THRESHOLD = process.env.SEPOLIA_THRESHOLD;
 const ETHEREUM_PRIVATE_KEY = process.env.ETHEREUM_PRIVATE_KEY;
 const ETHEREUM_GUARDIAN_ADDRESS = process.env.ETHEREUM_GUARDIAN_ADDRESS;
-const L2_KEY = process.env.L2_KEY;
+const EVM_TESTNET_KEY = process.env.EVM_TESTNET_KEY;
+const EVM_TESTNET_ACCOUNT_NUMBER = process.env.EVM_TESTNET_ACCOUNT_NUMBER;
 
 var config = {
   defaultNetwork: "hardhat",
@@ -116,14 +117,14 @@ var config = {
   },
 };
 
-if (SEPOLIA_KEY) {
+if (SEPOLIA_MNEMONIC) {
   config.networks.sepolia = {
     url:
       typeof SEPOLIA_URL == "undefined" || SEPOLIA_URL == ""
         ? "https://ethereum-sepolia-rpc.publicnode.com"
         : SEPOLIA_URL,
     accounts: {
-      mnemonic: SEPOLIA_KEY,
+      mnemonic: SEPOLIA_MNEMONIC,
     },
     deploymentConfig: {
       guardianIds: [
@@ -149,13 +150,16 @@ if (SEPOLIA_KEY) {
   };
 }
 
-if (L2_KEY) {
-  config.networks.ldwa = {
+if (EVM_TESTNET_KEY) {
+  config.networks.evm_testnet = {
     url: "https://rpc.alephzero-testnet.gelato.digital",
-    accounts: [L2_KEY],
+    accounts: [EVM_TESTNET_KEY],
     deploymentConfig: {
       guardianIds: [
-        "0x5027E6E6548b2eb986D4CC440C2a0dBB05D88946", // L2 account address corresponding to L2_KEY
+        typeof EVM_TESTNET_ACCOUNT_NUMBER == "undefined" ||
+        EVM_TESTNET_ACCOUNT_NUMBER == ""
+          ? "0x5027E6E6548b2eb986D4CC440C2a0dBB05D88946"
+          : EVM_TESTNET_ACCOUNT_NUMBER, // L2 (evm testnet) account address corresponding to EVM_TESTNET_KEY
       ],
       threshold: 1,
       bazero_decimals: 12,
