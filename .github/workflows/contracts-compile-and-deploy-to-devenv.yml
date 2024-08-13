@@ -60,7 +60,7 @@ jobs:
       - name: Get latest eth block
         shell: bash
         env:
-          SEPOLIA_KEY: ${{ secrets.DEVENV_TESTNET_SEPOLIA_KEY }}
+          SEPOLIA_MNEMONIC: ${{ secrets.DEVENV_TESTNET_SEPOLIA_KEY }}
           SEPOLIA_ACCOUNT_NUMBER: ${{ secrets.DEVENV_TESTNET_SEPOLIA_ACCOUNT_NUMBER }}
           SEPOLIA_TOKEN_CONFIG_PATH: "../cfg/tokens_testnet.json"
         run: |
@@ -78,7 +78,7 @@ jobs:
       - name: Deploy eth contracts
         shell: bash
         env:
-          SEPOLIA_KEY: ${{ secrets.DEVENV_TESTNET_SEPOLIA_KEY }}
+          SEPOLIA_MNEMONIC: ${{ secrets.DEVENV_TESTNET_SEPOLIA_KEY }}
           SEPOLIA_ACCOUNT_NUMBER: ${{ secrets.DEVENV_TESTNET_SEPOLIA_ACCOUNT_NUMBER }}
           SEPOLIA_TOKEN_CONFIG_PATH: "../cfg/tokens_testnet.json"
         run: |
@@ -92,7 +92,7 @@ jobs:
       - name: Setup eth contracts
         shell: bash
         env:
-          SEPOLIA_KEY: ${{ secrets.DEVENV_TESTNET_SEPOLIA_KEY }}
+          SEPOLIA_MNEMONIC: ${{ secrets.DEVENV_TESTNET_SEPOLIA_KEY }}
           SEPOLIA_ACCOUNT_NUMBER: ${{ secrets.DEVENV_TESTNET_SEPOLIA_ACCOUNT_NUMBER }}
           SEPOLIA_TOKEN_CONFIG_PATH: "../cfg/tokens_testnet.json"
         run: make setup-eth NETWORK=sepolia
