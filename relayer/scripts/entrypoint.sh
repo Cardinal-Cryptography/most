@@ -141,5 +141,13 @@ if [[ "${ETH_GAS_LIMIT}" != "" && "${ETH_GAS_LIMIT}" =~ ^[0-9]+$ ]]; then
   echo "Setting --eth-gas-limit to ${ETH_GAS_LIMIT}"
   ARGS+=(--eth-gas-limit=${ETH_GAS_LIMIT})
 fi
+
+if [[ -n "${PAYOUT_ADDRESS}" ]]; then
+  ARGS+=(--payout-address=${PAYOUT_ADDRESS})
+else
+  echo "Payout address required but not provided." 1>&2
+  exit 1
+fi
+
 # --- RUN
 xargs most-relayer "${ARGS[@]}"

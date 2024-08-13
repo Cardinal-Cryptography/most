@@ -13,7 +13,7 @@ use aleph_client::{
     sp_weights::weight_v2::Weight,
     utility::BlocksApi,
     waiting::BlockStatus,
-    AccountId, AlephConfig, Connection, SignedConnectionApi, TxInfo,
+    AccountId, AlephConfig, Connection, TxInfo,
 };
 use log::{debug, error, trace};
 use subxt::events::Events;

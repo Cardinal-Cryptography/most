@@ -42,6 +42,13 @@ if [[ -n "${SIGNER_CID}" ]]; then
   ARGS+=(--signer-cid=${SIGNER_CID})
 fi
 
+if [[ -n "${PAYOUT_ADDRESS}" ]]; then
+  ARGS+=(--payout-address=${PAYOUT_ADDRESS})
+else
+  echo "Payout address required but not provided." 1>&2
+  exit 1
+fi
+
 # --- RUN
 
 export RUST_LOG=info,aleph-client=warn
