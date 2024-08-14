@@ -6,6 +6,7 @@ import "@polkadot/api-augment";
 import { ethers } from "ethers";
 import { KeyringPair } from "@polkadot/keyring/types";
 import type BN from "bn.js";
+import WrappedAzero from "../types/contracts/wrapped_azero";
 
 const envFile = process.env.AZERO_ENV;
 
@@ -38,6 +39,18 @@ async function main(): Promise<void> {
   // Set WAZERO address
   console.log(`wAZERO address set to ${wAzeroAddress}`);
   await most.tx.setWazero(wAzeroAddress);
+
+  if (config.dev) {
+    console.log("Creating WrappedAzero instance");
+    const wAzero = new WrappedAzero(wAzeroAddress, deployer, api);
+    const deposit = BigInt(10000 * 10 ** 12);
+
+    console.log("Depositing into wAZERO", deposit);
+    await wAzero.tx.deposit({ value: deposit });
+
+    console.log("Trnsfering wAZERO into MOST", deposit);
+    await wAzero.tx.transfer(most_azero, deposit.toString(), []);
+  }
 
   console.log("Unpausing Most");
   await most.tx.setHalted(false);
