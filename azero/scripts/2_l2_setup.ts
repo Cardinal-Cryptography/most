@@ -40,20 +40,20 @@ async function main(): Promise<void> {
   console.log(`wAZERO address set to ${wAzeroAddress}`);
   await most.tx.setWazero(wAzeroAddress);
 
+  console.log("Creating WrappedAzero instance");
+  const wAzero = new WrappedAzero(wAzeroAddress, deployer, api);
+  const deposit = BigInt(10000 * 10 ** 12);
+
+  console.log("Depositing into wAZERO", deposit);
+  await wAzero.tx.deposit({ value: deposit });
+
+  console.log("Transfering wAZERO into MOST", deposit);
+  await wAzero.tx.transfer(most_azero, deposit.toString(), []);
+
   if (config.dev) {
-    console.log("Creating WrappedAzero instance");
-    const wAzero = new WrappedAzero(wAzeroAddress, deployer, api);
-    const deposit = BigInt(10000 * 10 ** 12);
-
-    console.log("Depositing into wAZERO", deposit);
-    await wAzero.tx.deposit({ value: deposit });
-
-    console.log("Trnsfering wAZERO into MOST", deposit);
-    await wAzero.tx.transfer(most_azero, deposit.toString(), []);
+    console.log("Unpausing Most");
+    await most.tx.setHalted(false);
   }
-
-  console.log("Unpausing Most");
-  await most.tx.setHalted(false);
 
   await api.disconnect();
   console.log("Done");

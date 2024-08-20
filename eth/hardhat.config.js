@@ -155,6 +155,7 @@ if (EVM_TESTNET_KEY) {
     url: "https://rpc.alephzero-testnet.gelato.digital",
     accounts: [EVM_TESTNET_KEY],
     deploymentConfig: {
+      dev: false,
       guardianIds: [
         typeof EVM_TESTNET_ACCOUNT_NUMBER == "undefined" ||
         EVM_TESTNET_ACCOUNT_NUMBER == ""
@@ -163,7 +164,7 @@ if (EVM_TESTNET_KEY) {
       ],
       threshold: 1,
       bazero_decimals: 12,
-      bazero_token_mint: 10e6, // Mint 1 million tokens - will be scaled by decimals.
+      bazero_token_mint: 10_000,
       pool_config: {
         amplification_coefficient: 2000,
         admin_fee: 0,
@@ -171,6 +172,7 @@ if (EVM_TESTNET_KEY) {
         initial_token_supply: 10_000,
         initial_native_supply: 10_000,
       },
+      wazero_l1_address: "5EFDb7mKbougLtr5dnwd5KDfZ3wK55JPGPLiryKq4uRMPR46"
     },
   };
 }
