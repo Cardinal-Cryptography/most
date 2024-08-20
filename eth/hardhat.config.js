@@ -172,7 +172,7 @@ if (EVM_TESTNET_KEY) {
         initial_token_supply: 10_000,
         initial_native_supply: 10_000,
       },
-      wazero_l1_address: "5EFDb7mKbougLtr5dnwd5KDfZ3wK55JPGPLiryKq4uRMPR46"
+      wazero_l1_address: "5EFDb7mKbougLtr5dnwd5KDfZ3wK55JPGPLiryKq4uRMPR46",
     },
   };
 }
