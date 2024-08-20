@@ -101,48 +101,47 @@ async function initializePool(config, pool, lpAddress, bazero, owner) {
 }
 
 async function addTokenPair(
-    ethTokenAddress,
-    azeroTokenAddress,
-    isLocal,
-    mostContract,
-    ownerSigner,
+  ethTokenAddress,
+  azeroTokenAddress,
+  isLocal,
+  mostContract,
+  ownerSigner,
 ) {
   const ethTokenAddressBytes = ethers.zeroPadValue(
-      ethers.getBytes(ethTokenAddress),
-      32,
+    ethers.getBytes(ethTokenAddress),
+    32,
   );
   const azeroTokenAddressBytes = u8aToHex(
-      new Keyring({ type: "sr25519" }).decodeAddress(azeroTokenAddress),
+    new Keyring({ type: "sr25519" }).decodeAddress(azeroTokenAddress),
   );
 
   console.log(
-      "Adding token pair to Most:",
-      ethTokenAddress,
-      "=>",
-      azeroTokenAddress,
-      "( direction:",
-      isLocal ? "ETH -> Aleph" : "Aleph -> ETH",
-      ")",
+    "Adding token pair to Most:",
+    ethTokenAddress,
+    "=>",
+    azeroTokenAddress,
+    "( direction:",
+    isLocal ? "ETH -> Aleph" : "Aleph -> ETH",
+    ")",
   );
 
   const addPairTx = await mostContract.addPair(
-      ethTokenAddressBytes,
-      azeroTokenAddressBytes,
-      isLocal,
-      {
-        from: ownerSigner,
-      },
+    ethTokenAddressBytes,
+    azeroTokenAddressBytes,
+    isLocal,
+    {
+      from: ownerSigner,
+    },
   );
   await addPairTx.wait(1);
 
   console.log(
-      "Most now supports the token pair:",
-      ethTokenAddressBytes,
-      "=>",
-      await mostContract.supportedPairs(ethTokenAddressBytes),
+    "Most now supports the token pair:",
+    ethTokenAddressBytes,
+    "=>",
+    await mostContract.supportedPairs(ethTokenAddressBytes),
   );
 }
-
 
 /// 1. Mint Bazero.
 /// 2. Sets minter for LpToken to Pool.
@@ -154,7 +153,7 @@ async function main() {
   const accounts = signers.map((s) => s.address);
   const deployer_evm = accounts[0];
 
-  console.log(`Using EVM deployer account: ${deployer_evm}`)
+  console.log(`Using EVM deployer account: ${deployer_evm}`);
 
   const config = network.config.deploymentConfig;
 
@@ -162,7 +161,13 @@ async function main() {
 
   await assert_signer_has_funds(deployer_evm, config);
 
-  await addTokenPair(bazero.target, config.wazero_l1_address, false, most, deployer_evm);
+  await addTokenPair(
+    bazero.target,
+    config.wazero_l1_address,
+    false,
+    most,
+    deployer_evm,
+  );
 
   await mintInitialBazero(bazero, deployer_evm, config);
 
