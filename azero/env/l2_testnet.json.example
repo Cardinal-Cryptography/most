@@ -1,0 +1,11 @@
+{
+  "ws_node": "wss://ws.test.azero.dev",
+  "relayers": [
+    "<deployer account>"
+  ],
+  "deployer_seed": "<fill>",
+  "signature_threshold": 1,
+  "dev": false,
+  "azero_deposit": 10000,
+  "token_config_path": "/../../cfg/tokens_testnet.json"
+}
