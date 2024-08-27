@@ -25,6 +25,9 @@ pub mod most_l2 {
     const ZERO_ADDRESS: [u8; 32] = [0; 32];
     const NATIVE_MARKER_ADDRESS: [u8; 32] = [0; 32];
 
+    /// Flat fee equal to 0.5 azero = 1e12 / 2
+    const DEFAULT_FLAT_FEE: u128 = 1_000_000_000_000 / 2;
+
     #[ink(event)]
     #[derive(Debug)]
     #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
@@ -125,6 +128,8 @@ pub mod most_l2 {
         committee_id: CommitteeId,
         /// Is the bridge in a halted state
         is_halted: bool,
+        /// amount of flat fee paid upon sending transfer request
+        flat_fee: u128,
     }
 
     #[ink(storage)]
@@ -223,6 +228,7 @@ pub mod most_l2 {
                 request_nonce: 0,
                 committee_id,
                 is_halted: true,
+                flat_fee: DEFAULT_FLAT_FEE,
             });
 
             let mut ownable_data = Lazy::new();
@@ -284,11 +290,32 @@ pub mod most_l2 {
             Ok(())
         }
 
+        fn handle_flat_fee(&mut self, native_to_bridge: u128) -> Result<(), MostError> {
+            let transferred = self.env().transferred_value();
+            let flat_fee = self.data()?.flat_fee;
+
+            let surplus = transferred
+                .checked_sub(native_to_bridge.saturating_add(flat_fee))
+                .ok_or(MostError::ValueTransferredLowerThanAmount)?;
+
+            // payout owner flat fee
+            let owner = self.get_owner()?;
+            self.env().transfer(owner, flat_fee)?;
+
+            // Return surplus fee
+            if surplus > 0 {
+                let sender = self.env().caller();
+                self.env().transfer(sender, surplus)?;
+            }
+
+            Ok(())
+        }
+
         /// Invoke this tx to initiate funds transfer to the destination chain.
         ///
         /// Upon checking basic conditions the contract will burn the `amount` number of `src_token_address` tokens from the caller
         /// and emit an event which is to be picked up & acted on up by the bridge guardians.
-        #[ink(message)]
+        #[ink(message, payable)]
         pub fn send_request(
             &mut self,
             src_token_address: [u8; 32],
@@ -296,6 +323,7 @@ pub mod most_l2 {
             dest_receiver_address: [u8; 32],
         ) -> Result<(), MostError> {
             self.ensure_not_halted()?;
+            self.handle_flat_fee(0)?;
 
             let dest_token_address = self
                 .supported_pairs
@@ -318,16 +346,7 @@ pub mod most_l2 {
             dest_receiver_address: [u8; 32],
         ) -> Result<(), MostError> {
             self.ensure_not_halted()?;
-            let surplus = self
-                .env()
-                .transferred_value()
-                .checked_sub(amount_to_bridge)
-                .ok_or(MostError::ValueTransferredLowerThanAmount)?;
-            // Return surplus fee
-            if surplus > 0 {
-                let sender = self.env().caller();
-                self.env().transfer(sender, surplus)?;
-            }
+            self.handle_flat_fee(amount_to_bridge)?;
 
             let wrapped_azero_address = self.wazero.get().ok_or(MostError::WrappedAzeroNotSet)?;
             let mut wrapped_azero: contract_ref!(WrappedAZERO) = wrapped_azero_address.into();
@@ -446,6 +465,12 @@ pub mod most_l2 {
         }
 
         // --- getters
+        /// Get flat fee amount
+        #[ink(message)]
+        pub fn get_flat_fee(&self) -> Result<u128, MostError> {
+            Ok(self.data()?.flat_fee)
+        }
+
         /// Query token pair
         #[ink(message)]
         pub fn get_supported_pair(&self, src_token: [u8; 32]) -> Option<[u8; 32]> {
@@ -538,6 +563,21 @@ pub mod most_l2 {
         }
 
         // ---  setter txs
+
+        /// Sets flat fee to the new value
+        ///
+        /// Can only be called by the contracts owner but can be called without halting the bridge.
+        #[ink(message)]
+        pub fn set_flat_fee(&mut self, new_flat_fee: u128) -> Result<(), MostError> {
+            self.ensure_owner()?;
+
+            let mut data = self.data()?;
+            data.flat_fee = new_flat_fee;
+            self.data.set(&data);
+
+            Ok(())
+        }
+
         /// Removes a supported pair from bridging
         ///
         /// Can only be called by the contracts owner
