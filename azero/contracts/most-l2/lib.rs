@@ -290,7 +290,7 @@ pub mod most_l2 {
             Ok(())
         }
 
-        fn handle_flat_fee(&self, native_to_bridge: u128) -> Result<(), MostError> {
+        fn handle_flat_fee(&mut self, native_to_bridge: u128) -> Result<(), MostError> {
             let transferred = self.env().transferred_value();
             let flat_fee = self.data()?.flat_fee;
 
@@ -311,10 +311,6 @@ pub mod most_l2 {
             Ok(())
         }
 
-        fn get_owner(&self) -> Result<AccountId, MostError> {
-            Ok(self.ownable_data()?.get_owner()?)
-        }
-
         /// Invoke this tx to initiate funds transfer to the destination chain.
         ///
         /// Upon checking basic conditions the contract will burn the `amount` number of `src_token_address` tokens from the caller
@@ -327,7 +323,7 @@ pub mod most_l2 {
             dest_receiver_address: [u8; 32],
         ) -> Result<(), MostError> {
             self.ensure_not_halted()?;
-            self.handle_flat_fee(0);
+            self.handle_flat_fee(0)?;
 
             let dest_token_address = self
                 .supported_pairs
@@ -350,7 +346,7 @@ pub mod most_l2 {
             dest_receiver_address: [u8; 32],
         ) -> Result<(), MostError> {
             self.ensure_not_halted()?;
-            self.handle_flat_fee(amount_to_bridge);
+            self.handle_flat_fee(amount_to_bridge)?;
 
             let wrapped_azero_address = self.wazero.get().ok_or(MostError::WrappedAzeroNotSet)?;
             let mut wrapped_azero: contract_ref!(WrappedAZERO) = wrapped_azero_address.into();
@@ -469,6 +465,12 @@ pub mod most_l2 {
         }
 
         // --- getters
+        /// Get flat fee amount
+        #[ink(message)]
+        pub fn get_flat_fee(&self) -> Result<u128, MostError> {
+            Ok(self.data()?.flat_fee)
+        }
+
         /// Query token pair
         #[ink(message)]
         pub fn get_supported_pair(&self, src_token: [u8; 32]) -> Option<[u8; 32]> {
