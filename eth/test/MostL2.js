@@ -13,6 +13,7 @@ const {
 } = require("./TestUtils");
 
 const TOKEN_AMOUNT = 10000000000;
+const FEE = 10 ** 18 / 2;
 const ALEPH_ACCOUNT = getRandomAlephAccount(3);
 const WRAPPED_TOKEN_ADDRESS = getRandomAlephAccount(5);
 
@@ -152,7 +153,9 @@ describe("MostL2", function () {
         deployEightGuardianMostFixture,
       );
       const total_before = await bazero.totalSupply();
-      await most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT });
+      await most.sendRequestNative(ALEPH_ACCOUNT, TOKEN_AMOUNT, {
+        value: BigInt(TOKEN_AMOUNT) + BigInt(FEE),
+      });
       const after = await bazero.totalSupply();
 
       let delta = total_before - (after + BigInt(TOKEN_AMOUNT / 10 ** 6));
@@ -169,7 +172,9 @@ describe("MostL2", function () {
         return amount_out >= BigInt(TOKEN_AMOUNT / 10 ** 6 / 2);
       }
       await expect(
-        most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
+        most.sendRequestNative(ALEPH_ACCOUNT, TOKEN_AMOUNT, {
+          value: BigInt(TOKEN_AMOUNT) + BigInt(FEE),
+        }),
       )
         .to.emit(most, "CrosschainTransferRequest")
         .withArgs(0, native_address, at_least_half, ALEPH_ACCOUNT, 0);
