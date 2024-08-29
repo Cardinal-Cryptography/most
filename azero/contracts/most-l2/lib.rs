@@ -248,7 +248,7 @@ pub mod most_l2 {
                 processed_requests: Mapping::new(),
                 supported_pairs: Mapping::new(),
                 wazero,
-                flat_fee
+                flat_fee,
             })
         }
 
