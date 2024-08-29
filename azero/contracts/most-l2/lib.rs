@@ -128,8 +128,6 @@ pub mod most_l2 {
         committee_id: CommitteeId,
         /// Is the bridge in a halted state
         is_halted: bool,
-        /// amount of flat fee paid upon sending transfer request
-        flat_fee: u128,
     }
 
     #[ink(storage)]
@@ -153,6 +151,8 @@ pub mod most_l2 {
         supported_pairs: Mapping<[u8; 32], [u8; 32], ManualKey<0x53555050>>,
         /// Wrapped AZERO address
         wazero: Lazy<AccountId, ManualKey<0x77617a65>>,
+        /// amount of flat fee paid upon sending transfer request
+        flat_fee: Lazy<u128, ManualKey<0x666c6174>>,
     }
 
     #[derive(Debug, PartialEq, Eq, Encode, Decode)]
@@ -180,6 +180,7 @@ pub mod most_l2 {
         WrappedEthNotSet,
         WrappedAzeroNotSet,
         ValueTransferredLowerThanAmount,
+        FlatFeeNotSet,
     }
 
     impl From<InkEnvError> for MostError {
@@ -228,12 +229,13 @@ pub mod most_l2 {
                 request_nonce: 0,
                 committee_id,
                 is_halted: true,
-                flat_fee: DEFAULT_FLAT_FEE,
             });
 
             let mut ownable_data = Lazy::new();
             ownable_data.set(&Ownable2StepData::new(owner));
             let wazero = Lazy::new();
+            let mut flat_fee = Lazy::new();
+            flat_fee.set(&DEFAULT_FLAT_FEE);
 
             Ok(Self {
                 data,
@@ -246,6 +248,7 @@ pub mod most_l2 {
                 processed_requests: Mapping::new(),
                 supported_pairs: Mapping::new(),
                 wazero,
+                flat_fee,
             })
         }
 
@@ -292,7 +295,7 @@ pub mod most_l2 {
 
         fn handle_flat_fee(&mut self, native_to_bridge: u128) -> Result<(), MostError> {
             let transferred = self.env().transferred_value();
-            let flat_fee = self.data()?.flat_fee;
+            let flat_fee = self.flat_fee.get().ok_or(MostError::FlatFeeNotSet)?;
 
             let surplus = transferred
                 .checked_sub(native_to_bridge.saturating_add(flat_fee))
@@ -468,7 +471,7 @@ pub mod most_l2 {
         /// Get flat fee amount
         #[ink(message)]
         pub fn get_flat_fee(&self) -> Result<u128, MostError> {
-            Ok(self.data()?.flat_fee)
+            self.flat_fee.get().ok_or(MostError::FlatFeeNotSet)
         }
 
         /// Query token pair
@@ -571,9 +574,7 @@ pub mod most_l2 {
         pub fn set_flat_fee(&mut self, new_flat_fee: u128) -> Result<(), MostError> {
             self.ensure_owner()?;
 
-            let mut data = self.data()?;
-            data.flat_fee = new_flat_fee;
-            self.data.set(&data);
+            self.flat_fee.set(&new_flat_fee);
 
             Ok(())
         }
