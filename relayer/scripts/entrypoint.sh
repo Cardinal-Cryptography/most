@@ -146,9 +146,6 @@ fi
 
 if [[ -n "${PAYOUT_ADDRESS}" ]]; then
   ARGS+=(--payout-address=${PAYOUT_ADDRESS})
-else
-  echo "Payout address required but not provided." 1>&2
-  exit 1
 fi
 
 if [[ "${REDIS_AZERO_BLOCK_KEY}" =~ ^[a-z0-9_]+$ ]]; then

@@ -191,6 +191,33 @@ async fn create_eth_connections(
     ))
 }
 
+async fn set_payout_account(
+    config: &Config,
+    azero_signed_connection: &AzeroConnectionWithSigner,
+    payout_address: &str,
+) -> Result<(), RelayerError> {
+    let most_azero = MostInstance::new(
+        &config.azero_contract_address,
+        &config.azero_contract_metadata,
+        config.azero_ref_time_limit,
+        config.azero_proof_size_limit,
+    )?;
+
+    let current_committee_id = most_azero
+        .current_committee_id(azero_signed_connection.as_connection())
+        .await?;
+    most_azero
+        .set_payout_account(
+            &azero_signed_connection,
+            current_committee_id,
+            AccountId::from_string(payout_address)
+                .map_err(|why| AzeroContractError::NotAccountId(why.to_string()))?,
+        )
+        .await?;
+
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<(), RelayerError> {
     let config = Arc::new(Config::parse());
@@ -269,24 +296,9 @@ async fn run_relayer(
         create_eth_connections(&config, persistent_eth_connection).await?;
     info!("Established connection to the Ethereum node");
 
-    let most_azero = MostInstance::new(
-        &config.azero_contract_address,
-        &config.azero_contract_metadata,
-        config.azero_ref_time_limit,
-        config.azero_proof_size_limit,
-    )?;
-
-    let current_committee_id = most_azero
-        .current_committee_id(azero_connection.as_connection())
-        .await?;
-    most_azero
-        .set_payout_account(
-            &azero_signed_connection,
-            current_committee_id,
-            AccountId::from_string(&config.payout_address)
-                .map_err(|why| AzeroContractError::NotAccountId(why.to_string()))?,
-        )
-        .await?;
+    if let Some(payout_address) = &config.payout_address {
+        set_payout_account(&config, &azero_signed_connection, payout_address).await?;
+    }
 
     // Create channels
     let (eth_events_sender, eth_events_receiver) = mpsc::channel::<EthMostEvents>(1);

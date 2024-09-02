@@ -98,7 +98,7 @@ pub struct Config {
     pub sync_step: u32,
 
     #[arg(long)]
-    pub payout_address: String,
+    pub payout_address: Option<String>,
 
     #[arg(long, default_value = "redis://127.0.0.1:6379")]
     pub redis_node: String,
