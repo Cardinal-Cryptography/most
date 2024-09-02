@@ -1,14 +1,15 @@
 use std::{
     cmp::min,
+    str::FromStr,
     sync::Arc,
     time::{Duration, Instant},
 };
 
-use aleph_client::{AccountId, AsConnection, Ss58Codec};
+use azero_client::{keypair_from_string, AccountId, ClientWithSigner};
 use clap::Parser;
 use config::Config;
 use connections::{
-    azero::{AzeroConnectionWithSigner, AzeroWsConnection},
+    azero::AzeroWsConnection,
     eth::{EthConnection, EthConnectionError, GasEscalatingEthConnection, SignedEthConnection},
 };
 use ethers::signers::{coins_bip39::English, MnemonicBuilder, Signer};
@@ -30,6 +31,7 @@ use tokio::{
 use crate::{
     connections::{
         azero,
+        azero::{AzeroSigner, AzeroSignerClient},
         eth::{self, with_gas_escalator},
     },
     contracts::{AzeroContractError, MostInstance},
@@ -65,6 +67,9 @@ const MAX_BACKOFF_DURATION: Duration = Duration::from_millis(600000); // 10 minu
 enum RelayerError {
     #[error("AlephZero node connection error")]
     AzeroConnection(#[from] connections::azero::Error),
+
+    #[error("AlephZero client error")]
+    AzeroClient(#[from] azero_client::ClientError),
 
     #[error("Ethereum node connection error")]
     EthereumConnection(#[from] connections::eth::EthConnectionError),
@@ -119,33 +124,26 @@ enum CircuitBreakerEvent {
 
 async fn create_azero_connections(
     config: &Config,
-) -> Result<(Arc<AzeroWsConnection>, Arc<AzeroConnectionWithSigner>), connections::azero::Error> {
+) -> Result<(Arc<AzeroWsConnection>, Arc<ClientWithSigner<AzeroSigner>>), RelayerError> {
     let azero_connection = azero::init(&config.azero_node_wss_url).await;
-    let azero_signed_connection = if let Some(cid) = config.signer_cid {
+    let signer = if let Some(cid) = config.signer_cid {
         info!("[AlephZero] Creating signed connection using a Signer client");
-        AzeroConnectionWithSigner::with_signer(
-            azero::init(&config.azero_node_wss_url).await,
-            cid,
-            config.signer_port,
-        )
-        .await?
+        let client = AzeroSignerClient::new(cid, config.signer_port).await?;
+        AzeroSigner::Signer(client)
     } else if config.dev {
         let azero_seed = "//".to_owned() + &config.dev_account_index.to_string();
-        let keypair = aleph_client::keypair_from_string(&azero_seed);
+        let keypair = keypair_from_string(&azero_seed);
 
         info!(
             "Creating signed connection using a development key {}",
             keypair.account_id()
         );
 
-        AzeroConnectionWithSigner::with_keypair(
-            azero::init(&config.azero_node_wss_url).await,
-            keypair,
-        )
-        .await?
+        AzeroSigner::Dev(Box::new(keypair))
     } else {
         panic!("Use dev mode or connect to a signer");
     };
+    let azero_signed_connection = azero_connection.with_signer(signer).await?;
 
     Ok((
         Arc::new(azero_connection),
@@ -193,7 +191,7 @@ async fn create_eth_connections(
 
 async fn set_payout_account(
     config: &Config,
-    azero_signed_connection: &AzeroConnectionWithSigner,
+    azero_signed_connection: &ClientWithSigner<AzeroSigner>,
     payout_address: &str,
 ) -> Result<(), RelayerError> {
     let most_azero = MostInstance::new(
@@ -204,13 +202,13 @@ async fn set_payout_account(
     )?;
 
     let current_committee_id = most_azero
-        .current_committee_id(azero_signed_connection.as_connection())
+        .current_committee_id(azero_signed_connection.client())
         .await?;
     most_azero
         .set_payout_account(
             azero_signed_connection,
             current_committee_id,
-            AccountId::from_string(payout_address)
+            AccountId::from_str(payout_address)
                 .map_err(|why| AzeroContractError::NotAccountId(why.to_string()))?,
         )
         .await?;

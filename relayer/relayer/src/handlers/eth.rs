@@ -1,6 +1,6 @@
 use std::{str::FromStr, sync::Arc};
 
-use aleph_client::{waiting::BlockStatus, AsConnection, SignedConnectionApi};
+use azero_client::{AccountId, ClientWithSigner};
 use ethers::{core::types::H256, utils::keccak256};
 use log::{debug, error, info, trace, warn};
 use rustc_hex::FromHexError;
@@ -13,11 +13,11 @@ use tokio::{
 
 use crate::{
     config::Config,
-    connections::azero::AzeroConnectionWithSigner,
+    connections::azero::AzeroSigner,
     contracts::{AzeroContractError, CrosschainTransferRequestFilter, MostEvents, MostInstance},
     helpers::concat_u8_arrays,
     listeners::EthMostEvents,
-    AccountId, CircuitBreakerEvent,
+    CircuitBreakerEvent,
 };
 
 // Frequency of checking for finality of the transaction
@@ -29,6 +29,9 @@ const AZERO_WAIT_FOR_FINALITY_CHECK: Duration = Duration::from_millis(1000);
 pub enum EthereumEventHandlerError {
     #[error("azero contract error")]
     AzeroContract(#[from] AzeroContractError),
+
+    #[error("AzeroClient error")]
+    AzeroClient(#[from] azero_client::ClientError),
 
     #[error("receive_request tx has failed")]
     ReceiveRequestTxFailure {
@@ -53,7 +56,7 @@ impl EthereumEventHandler {
     pub async fn handle_event(
         event: MostEvents,
         config: &Config,
-        azero_connection: &AzeroConnectionWithSigner,
+        azero_connection: &ClientWithSigner<AzeroSigner>,
     ) -> Result<(), EthereumEventHandlerError> {
         let Config {
             azero_contract_address,
@@ -122,11 +125,11 @@ impl EthereumEventHandler {
 
             while contract
                 .needs_signature(
-                    azero_connection.as_connection(),
+                    azero_connection.client(),
                     request_hash,
                     azero_connection.account_id().clone(),
                     committee_id,
-                    BlockStatus::Finalized,
+                    true,
                 )
                 .await?
             {
@@ -134,11 +137,11 @@ impl EthereumEventHandler {
 
                 if !contract
                     .needs_signature(
-                        azero_connection.as_connection(),
+                        azero_connection.client(),
                         request_hash,
                         azero_connection.account_id().clone(),
                         committee_id,
-                        BlockStatus::Best,
+                        false,
                     )
                     .await?
                 {
@@ -176,12 +179,12 @@ impl EthereumEventHandler {
 
 async fn not_in_committee(
     most: &MostInstance,
-    connection: &AzeroConnectionWithSigner,
+    connection: &ClientWithSigner<AzeroSigner>,
     committee_id: u128,
 ) -> Result<bool, EthereumEventHandlerError> {
     if most
         .is_in_committee(
-            connection.as_connection(),
+            connection.client(),
             committee_id,
             connection.account_id().clone(),
         )
@@ -190,11 +193,7 @@ async fn not_in_committee(
         return Ok(false);
     }
 
-    if committee_id
-        > most
-            .current_committee_id(connection.as_connection())
-            .await?
-    {
+    if committee_id > most.current_committee_id(connection.client()).await? {
         error!("Request from a future committee {committee_id} - this likely indicates MOST contracts misconfiguration");
         return Err(EthereumEventHandlerError::CommitteeIdMismatch);
     }
@@ -221,7 +220,7 @@ impl EthereumEventsHandler {
     pub async fn run(
         config: Arc<Config>,
         mut eth_events_receiver: mpsc::Receiver<EthMostEvents>,
-        azero_signed_connection: Arc<AzeroConnectionWithSigner>,
+        azero_signed_connection: Arc<ClientWithSigner<AzeroSigner>>,
         circuit_breaker_sender: broadcast::Sender<CircuitBreakerEvent>,
         mut circuit_breaker_receiver: broadcast::Receiver<CircuitBreakerEvent>,
     ) -> Result<CircuitBreakerEvent, EthereumEventsHandlerError> {

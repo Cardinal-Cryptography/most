@@ -1,18 +1,16 @@
 use std::{cmp::min, sync::Arc, time::Duration};
 
-use aleph_client::{
-    contract::event::{BlockDetails, ContractEvent},
-    utility::BlocksApi,
-    AlephConfig, AsConnection, Connection,
+use azero_client::{Client, ContractEvent, ContractInstance};
+use futures::{
+    future::join_all,
+    stream::{FuturesOrdered, StreamExt},
 };
-use futures::stream::{FuturesOrdered, StreamExt};
 use log::{debug, error, info, warn};
-use subxt::events::Events;
 use thiserror::Error;
 use tokio::{
     select,
     sync::{broadcast, mpsc, oneshot},
-    task::{JoinError, JoinSet},
+    task::JoinError,
     time::sleep,
 };
 
@@ -33,14 +31,14 @@ pub enum AlephZeroListenerError {
     #[error("Aleph-client error")]
     AlephClient(#[from] anyhow::Error),
 
+    #[error("AzeroClient error")]
+    AzeroClient(#[from] azero_client::ClientError),
+
     #[error("Subxt error")]
     Subxt(#[from] subxt::Error),
 
     #[error("Azero contract error")]
     AzeroContract(#[from] AzeroContractError),
-
-    #[error("No block found")]
-    BlockNotFound,
 
     #[error("Task join error")]
     Join(#[from] JoinError),
@@ -71,7 +69,7 @@ impl AlephZeroListener {
     #[allow(clippy::too_many_arguments)]
     pub async fn run(
         config: Arc<Config>,
-        azero_connection: Arc<Connection>,
+        azero_connection: Arc<Client>,
         azero_events_sender: mpsc::Sender<AzeroMostEvents>,
         next_block_to_process_sender: broadcast::Sender<u32>,
         mut next_block_to_process_receiver: broadcast::Receiver<u32>,
@@ -135,20 +133,9 @@ impl AlephZeroListener {
                           unprocessed_block_number, to_block
                     );
 
+                    let events = fetch_events_in_block_range(&azero_connection, unprocessed_block_number, to_block, &[&most_azero.contract]).await?;
                     // Fetch the events in parallel.
-                    let all_events = fetch_events_in_block_range(
-                        azero_connection.clone(),
-                        unprocessed_block_number,
-                        to_block,
-                    )
-                        .await?;
 
-                    let filtered_events = all_events
-                        .into_iter()
-                        .flat_map(|(block_details, events)| {
-                            most_azero.filter_events(events, block_details.clone())
-                        })
-                        .collect::<Vec<ContractEvent>>();
 
                     let (ack_sender, ack_receiver) = oneshot::channel::<u32>();
                     event_batch_ack_receiver.push_back(ack_receiver);
@@ -161,12 +148,12 @@ impl AlephZeroListener {
 
                         Ok(_) = azero_events_sender
                             .send(AzeroMostEvents {
-                                events: filtered_events.clone(),
+                                events: events.clone(),
                                 from_block: unprocessed_block_number,
                                 to_block,
                                 ack: ack_sender
                             }) => {
-                                info!(target: "AlephZeroListener", "Sending a batch of {} events", &filtered_events.len());
+                                info!(target: "AlephZeroListener", "Sending a batch of {} events", &events.len());
                             },
                     }
 
@@ -184,48 +171,32 @@ impl AlephZeroListener {
 }
 
 async fn fetch_events_in_block_range(
-    azero_connection: Arc<AzeroWsConnection>,
+    azero_connection: &Arc<Client>,
     from_block: u32,
     to_block: u32,
-) -> Result<Vec<(BlockDetails, Events<AlephConfig>)>, AlephZeroListenerError> {
-    let mut event_fetching_tasks = JoinSet::new();
+    contracts: &[&ContractInstance],
+) -> Result<Vec<ContractEvent>, AlephZeroListenerError> {
+    let mut event_fetching_tasks = Vec::new();
 
     for block_number in from_block..=to_block {
         let azero_connection = azero_connection.clone();
 
-        event_fetching_tasks.spawn(async move {
-            let block_hash = azero_connection
-                .get_block_hash(block_number)
-                .await?
-                .ok_or(AlephZeroListenerError::BlockNotFound)?;
-
-            let events = azero_connection
-                .as_connection()
-                .as_client()
-                .blocks()
-                .at(block_hash)
-                .await?
-                .events()
-                .await?;
-
-            Ok::<_, AlephZeroListenerError>((
-                BlockDetails {
-                    block_number,
-                    block_hash,
-                },
-                events,
-            ))
+        event_fetching_tasks.push(async move {
+            azero_connection
+                .fetch_events_from_contracts(block_number, contracts)
+                .await
         });
     }
 
-    let mut block_events = Vec::new();
+    let events = join_all(event_fetching_tasks)
+        .await
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .flatten()
+        .collect();
 
-    // Wait for all event processing tasks to finish.
-    while let Some(result) = event_fetching_tasks.join_next().await {
-        block_events.push(result??);
-    }
-
-    Ok(block_events)
+    Ok(events)
 }
 
 async fn get_next_finalized_block_number_azero(

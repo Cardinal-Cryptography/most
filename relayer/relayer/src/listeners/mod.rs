@@ -1,4 +1,3 @@
-use aleph_client::contract::event::ContractEvent;
 use tokio::sync::oneshot;
 
 use crate::contracts::MostEvents;
@@ -25,4 +24,5 @@ pub struct AzeroMostEvents {
 
 pub use advisory::*;
 pub use azero::*;
+use azero_client::ContractEvent;
 pub use eth::*;
