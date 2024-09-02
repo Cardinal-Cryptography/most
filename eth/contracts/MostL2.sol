@@ -32,6 +32,9 @@ contract MostL2 is AbstractMost {
     bytes32 internal constant NATIVE_MARKER_BYTES = 0x0;
     address internal constant NATIVE_MARKER_ADDRESS = address(0);
 
+    /// flat fee paid upon requesting transfer
+    uint256 public flat_fee;
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -46,6 +49,8 @@ contract MostL2 is AbstractMost {
     ) public initializer {
         stableSwapAddress = _stableSwapAddress;
         bAzeroAddress = _bAzeroAddress;
+        // Initial fee set to 0.5 Azero
+        flat_fee = 1e18 / 2;
 
         // Set the weth address to zero address. We dont use this in L2 most
         __AbstractMost_init(
@@ -182,6 +187,38 @@ contract MostL2 is AbstractMost {
         bazero.burn(amount);
     }
 
+    /// This function, if it is possible, transfer flat fee to owner
+    /// and returns the surplus to the caller.
+    function handle_flat_fee(uint256 native_amount) internal {
+        uint256 transferred = msg.value;
+
+        require(
+            transferred >= native_amount,
+            "Not enough value send for transfer"
+        );
+
+        transferred -= native_amount;
+        require(transferred >= flat_fee, "Not enough value send for fees");
+
+        uint256 surplus = transferred - flat_fee;
+
+        (bool sent, ) = owner().call{value: flat_fee}("");
+        require(sent, "Failed to send fee to owner");
+
+        if (surplus > 0) {
+            (bool sent, ) = msg.sender.call{value: surplus}("");
+            require(sent, "Failed to return surplus");
+        }
+    }
+
+    function sendRequestNative(
+        bytes32
+    ) external payable override whenNotPaused {
+        revert(
+            "Not supported on L2 bridge, use `sendRequestNative` with additional arg"
+        );
+    }
+
     /// @notice Invoke this tx to transfer funds to the destination chain.
     /// Account needs to send native Azero which are swapped for bazero
     /// tokens. Since the Bazero have 12 decimals and Azero have 18,
@@ -190,20 +227,19 @@ contract MostL2 is AbstractMost {
     /// @dev Tx emits a CrosschainTransferRequest event that the relayers listen to
     /// & forward to the destination chain.
     function sendRequestNative(
-        bytes32 destReceiverAddress
-    ) external payable override whenNotPaused {
-        uint256 amount = msg.value;
-        require(amount != 0, "Zero amount");
-        if (amount == 0) revert ZeroAmount();
+        bytes32 destReceiverAddress,
+        uint256 amount_to_bridge
+    ) external payable whenNotPaused {
         require(
-            amount >= BAZERO_TO_NATIVE_RATIO,
+            amount_to_bridge >= BAZERO_TO_NATIVE_RATIO,
             "Value must be at least 10e6"
         );
         if (destReceiverAddress == bytes32(0)) {
             revert ZeroAddress();
         }
+        handle_flat_fee(amount_to_bridge);
 
-        uint256 amount_out = swap_for_bazero(amount);
+        uint256 amount_out = swap_for_bazero(amount_to_bridge);
         burn_bazero(amount_out);
 
         emit CrosschainTransferRequest(
@@ -217,25 +253,34 @@ contract MostL2 is AbstractMost {
         ++requestNonce;
     }
 
+    function sendRequest(
+        bytes32,
+        uint256,
+        bytes32
+    ) external override whenNotPaused {
+        revert("Not supported on L2 bridge, use `SendTokenRequest` instead");
+    }
+
     /// @notice Invoke this tx to transfer funds to the destination chain.
     /// Account needs to approve the Most contract to spend the `srcTokenAmount`
     /// of `srcTokenAddress` tokens on their behalf before executing the tx.
     ///
     /// @dev Tx emits a CrosschainTransferRequest event that the relayers listen to
     /// & forward to the destination chain.
-    function sendRequest(
+    function sendTokenRequest(
         bytes32 srcTokenAddress,
         uint256 amount,
         bytes32 destReceiverAddress
-    ) external override whenNotPaused {
+    ) external payable whenNotPaused {
         if (amount == 0) revert ZeroAmount();
         if (destReceiverAddress == bytes32(0)) revert ZeroAddress();
+        handle_flat_fee(0);
 
         address token = bytes32ToAddress(srcTokenAddress);
 
         bytes32 destTokenAddress = supportedPairs[srcTokenAddress];
-        if (destTokenAddress == EMPTY_STORAGE) revert UnsupportedPair();
 
+        if (destTokenAddress == EMPTY_STORAGE) revert UnsupportedPair();
         // Should not happen, see `addPair` function where we allow only nonLocal tokens.
         require(
             !isLocalToken[token],
@@ -278,6 +323,10 @@ contract MostL2 is AbstractMost {
         require(!isLocal, "L2 Most dont bridge local tokens");
         supportedPairs[from] = to;
         isLocalToken[bytes32ToAddress(from)] = false;
+    }
+
+    function setFlatFee(uint256 new_flat_fee) external onlyOwner {
+        flat_fee = new_flat_fee;
     }
 
     /// @dev Accept ether only from pool contract or through payable methods

@@ -6,6 +6,7 @@ import "@polkadot/api-augment";
 import { ethers } from "ethers";
 import { KeyringPair } from "@polkadot/keyring/types";
 import type BN from "bn.js";
+import WrappedAzero from "../types/contracts/wrapped_azero";
 
 const envFile = process.env.AZERO_ENV;
 
@@ -16,7 +17,7 @@ async function main(): Promise<void> {
 
   const config = await import_env(envFile);
 
-  const { ws_node, deployer_seed } = config;
+  const { ws_node, deployer_seed, azero_deposit } = config;
 
   const alephAddresses = await import(__dirname + "/../l2_addresses.json");
   const most_azero = alephAddresses.mostL2;
@@ -39,8 +40,20 @@ async function main(): Promise<void> {
   console.log(`wAZERO address set to ${wAzeroAddress}`);
   await most.tx.setWazero(wAzeroAddress);
 
-  console.log("Unpausing Most");
-  await most.tx.setHalted(false);
+  console.log("Creating WrappedAzero instance");
+  const wAzero = new WrappedAzero(wAzeroAddress, deployer, api);
+  const deposit = BigInt(azero_deposit * 10 ** 12);
+
+  console.log("Depositing into wAZERO", deposit);
+  await wAzero.tx.deposit({ value: deposit });
+
+  console.log("Transfering wAZERO into MOST", deposit);
+  await wAzero.tx.transfer(most_azero, deposit.toString(), []);
+
+  if (config.dev) {
+    console.log("Unpausing Most");
+    await most.tx.setHalted(false);
+  }
 
   await api.disconnect();
   console.log("Done");

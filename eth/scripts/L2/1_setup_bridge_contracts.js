@@ -1,6 +1,7 @@
 const { ethers, network } = require("hardhat");
 const fs = require("node:fs");
-
+const { u8aToHex } = require("@polkadot/util");
+const { Keyring } = require("@polkadot/keyring");
 const NATIVE_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 
 async function assert_signer_has_funds(signer, config) {
@@ -99,6 +100,49 @@ async function initializePool(config, pool, lpAddress, bazero, owner) {
   });
 }
 
+async function addTokenPair(
+  ethTokenAddress,
+  azeroTokenAddress,
+  isLocal,
+  mostContract,
+  ownerSigner,
+) {
+  const ethTokenAddressBytes = ethers.zeroPadValue(
+    ethers.getBytes(ethTokenAddress),
+    32,
+  );
+  const azeroTokenAddressBytes = u8aToHex(
+    new Keyring({ type: "sr25519" }).decodeAddress(azeroTokenAddress),
+  );
+
+  console.log(
+    "Adding token pair to Most:",
+    ethTokenAddress,
+    "=>",
+    azeroTokenAddress,
+    "( direction:",
+    isLocal ? "ETH -> Aleph" : "Aleph -> ETH",
+    ")",
+  );
+
+  const addPairTx = await mostContract.addPair(
+    ethTokenAddressBytes,
+    azeroTokenAddressBytes,
+    isLocal,
+    {
+      from: ownerSigner,
+    },
+  );
+  await addPairTx.wait(1);
+
+  console.log(
+    "Most now supports the token pair:",
+    ethTokenAddressBytes,
+    "=>",
+    await mostContract.supportedPairs(ethTokenAddressBytes),
+  );
+}
+
 /// 1. Mint Bazero.
 /// 2. Sets minter for LpToken to Pool.
 /// 3. Sets minter for bazero to Most.
@@ -107,23 +151,35 @@ async function initializePool(config, pool, lpAddress, bazero, owner) {
 async function main() {
   const signers = await ethers.getSigners();
   const accounts = signers.map((s) => s.address);
-  const owner = accounts[0];
+  const deployer_evm = accounts[0];
+
+  console.log(`Using EVM deployer account: ${deployer_evm}`);
 
   const config = network.config.deploymentConfig;
 
-  await assert_signer_has_funds(owner, config);
-
   const [bazero, lp, pool, most] = await load_contracts();
 
-  await mintInitialBazero(bazero, owner, config);
+  await assert_signer_has_funds(deployer_evm, config);
+
+  await addTokenPair(
+    bazero.target,
+    config.wazero_l1_address,
+    false,
+    most,
+    deployer_evm,
+  );
+
+  await mintInitialBazero(bazero, deployer_evm, config);
 
   await setMinterTo(lp, pool.target);
   await setMinterBurnerTo(bazero, most.target);
 
-  await initializePool(config, pool, lp.target, bazero, owner);
+  await initializePool(config, pool, lp.target, bazero, deployer_evm);
 
-  console.log("Unpause the most...");
-  await most.unpause();
+  if (config.dev) {
+    console.log("Unpause the most...");
+    await most.unpause();
+  }
 }
 
 main().catch((error) => {

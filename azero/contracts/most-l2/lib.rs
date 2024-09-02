@@ -25,6 +25,9 @@ pub mod most_l2 {
     const ZERO_ADDRESS: [u8; 32] = [0; 32];
     const NATIVE_MARKER_ADDRESS: [u8; 32] = [0; 32];
 
+    /// Flat fee equal to 0.5 azero = 1e12 / 2
+    const DEFAULT_FLAT_FEE: u128 = 1_000_000_000_000 / 2;
+
     #[ink(event)]
     #[derive(Debug)]
     #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
@@ -148,6 +151,8 @@ pub mod most_l2 {
         supported_pairs: Mapping<[u8; 32], [u8; 32], ManualKey<0x53555050>>,
         /// Wrapped AZERO address
         wazero: Lazy<AccountId, ManualKey<0x77617a65>>,
+        /// amount of flat fee paid upon sending transfer request
+        flat_fee: Lazy<u128, ManualKey<0x666c6174>>,
     }
 
     #[derive(Debug, PartialEq, Eq, Encode, Decode)]
@@ -175,6 +180,7 @@ pub mod most_l2 {
         WrappedEthNotSet,
         WrappedAzeroNotSet,
         ValueTransferredLowerThanAmount,
+        FlatFeeNotSet,
     }
 
     impl From<InkEnvError> for MostError {
@@ -228,6 +234,8 @@ pub mod most_l2 {
             let mut ownable_data = Lazy::new();
             ownable_data.set(&Ownable2StepData::new(owner));
             let wazero = Lazy::new();
+            let mut flat_fee = Lazy::new();
+            flat_fee.set(&DEFAULT_FLAT_FEE);
 
             Ok(Self {
                 data,
@@ -240,6 +248,7 @@ pub mod most_l2 {
                 processed_requests: Mapping::new(),
                 supported_pairs: Mapping::new(),
                 wazero,
+                flat_fee,
             })
         }
 
@@ -284,11 +293,32 @@ pub mod most_l2 {
             Ok(())
         }
 
+        fn handle_flat_fee(&mut self, native_to_bridge: u128) -> Result<(), MostError> {
+            let transferred = self.env().transferred_value();
+            let flat_fee = self.flat_fee.get().ok_or(MostError::FlatFeeNotSet)?;
+
+            let surplus = transferred
+                .checked_sub(native_to_bridge.saturating_add(flat_fee))
+                .ok_or(MostError::ValueTransferredLowerThanAmount)?;
+
+            // payout owner flat fee
+            let owner = self.get_owner()?;
+            self.env().transfer(owner, flat_fee)?;
+
+            // Return surplus fee
+            if surplus > 0 {
+                let sender = self.env().caller();
+                self.env().transfer(sender, surplus)?;
+            }
+
+            Ok(())
+        }
+
         /// Invoke this tx to initiate funds transfer to the destination chain.
         ///
         /// Upon checking basic conditions the contract will burn the `amount` number of `src_token_address` tokens from the caller
         /// and emit an event which is to be picked up & acted on up by the bridge guardians.
-        #[ink(message)]
+        #[ink(message, payable)]
         pub fn send_request(
             &mut self,
             src_token_address: [u8; 32],
@@ -296,6 +326,7 @@ pub mod most_l2 {
             dest_receiver_address: [u8; 32],
         ) -> Result<(), MostError> {
             self.ensure_not_halted()?;
+            self.handle_flat_fee(0)?;
 
             let dest_token_address = self
                 .supported_pairs
@@ -318,16 +349,7 @@ pub mod most_l2 {
             dest_receiver_address: [u8; 32],
         ) -> Result<(), MostError> {
             self.ensure_not_halted()?;
-            let surplus = self
-                .env()
-                .transferred_value()
-                .checked_sub(amount_to_bridge)
-                .ok_or(MostError::ValueTransferredLowerThanAmount)?;
-            // Return surplus fee
-            if surplus > 0 {
-                let sender = self.env().caller();
-                self.env().transfer(sender, surplus)?;
-            }
+            self.handle_flat_fee(amount_to_bridge)?;
 
             let wrapped_azero_address = self.wazero.get().ok_or(MostError::WrappedAzeroNotSet)?;
             let mut wrapped_azero: contract_ref!(WrappedAZERO) = wrapped_azero_address.into();
@@ -446,6 +468,12 @@ pub mod most_l2 {
         }
 
         // --- getters
+        /// Get flat fee amount
+        #[ink(message)]
+        pub fn get_flat_fee(&self) -> Result<u128, MostError> {
+            self.flat_fee.get().ok_or(MostError::FlatFeeNotSet)
+        }
+
         /// Query token pair
         #[ink(message)]
         pub fn get_supported_pair(&self, src_token: [u8; 32]) -> Option<[u8; 32]> {
@@ -538,6 +566,19 @@ pub mod most_l2 {
         }
 
         // ---  setter txs
+
+        /// Sets flat fee to the new value
+        ///
+        /// Can only be called by the contracts owner but can be called without halting the bridge.
+        #[ink(message)]
+        pub fn set_flat_fee(&mut self, new_flat_fee: u128) -> Result<(), MostError> {
+            self.ensure_owner()?;
+
+            self.flat_fee.set(&new_flat_fee);
+
+            Ok(())
+        }
+
         /// Removes a supported pair from bridging
         ///
         /// Can only be called by the contracts owner
