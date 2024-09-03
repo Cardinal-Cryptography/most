@@ -42,6 +42,10 @@ if [[ -n "${SIGNER_CID}" ]]; then
   ARGS+=(--signer-cid=${SIGNER_CID})
 fi
 
+if [[ -n "${PAYOUT_ADDRESS}" ]]; then
+  ARGS+=(--payout-address=${PAYOUT_ADDRESS})
+fi
+
 # --- RUN
 
 export RUST_LOG=info,aleph-client=warn

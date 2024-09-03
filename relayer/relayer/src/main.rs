@@ -4,7 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use aleph_client::AccountId;
+use aleph_client::{AccountId, AsConnection, Ss58Codec};
 use clap::Parser;
 use config::Config;
 use connections::{
@@ -26,20 +26,19 @@ use tokio::{
     task::{JoinError, JoinSet},
     time::sleep,
 };
-use trader::TraderError;
 
 use crate::{
     connections::{
         azero,
         eth::{self, with_gas_escalator},
     },
+    contracts::{AzeroContractError, MostInstance},
     handlers::{AlephZeroEventsHandler, EthereumEventsHandler},
     listeners::{
         AdvisoryListener, AlephZeroHaltedListener, AlephZeroListener, AzeroMostEvents,
         EthMostEvents, EthereumListener, EthereumPausedListener,
     },
     redis::RedisManager,
-    trader::Trader,
 };
 
 mod config;
@@ -49,7 +48,6 @@ mod handlers;
 mod helpers;
 mod listeners;
 mod redis;
-mod trader;
 
 const DEV_MNEMONIC: &str =
     "harsh master island dirt equip search awesome double turn crush wool grant";
@@ -104,8 +102,8 @@ enum RelayerError {
     #[error("Ethereum's Most paused listener failure")]
     EthereumPausedListener(#[from] EthereumPausedListenerError),
 
-    #[error("Trader component failure")]
-    TraderComponent(#[from] TraderError),
+    #[error("AlephZero contract error")]
+    AzeroContract(#[from] AzeroContractError),
 }
 
 #[derive(Debug, Clone)]
@@ -193,6 +191,33 @@ async fn create_eth_connections(
     ))
 }
 
+async fn set_payout_account(
+    config: &Config,
+    azero_signed_connection: &AzeroConnectionWithSigner,
+    payout_address: &str,
+) -> Result<(), RelayerError> {
+    let most_azero = MostInstance::new(
+        &config.azero_contract_address,
+        &config.azero_contract_metadata,
+        config.azero_ref_time_limit,
+        config.azero_proof_size_limit,
+    )?;
+
+    let current_committee_id = most_azero
+        .current_committee_id(azero_signed_connection.as_connection())
+        .await?;
+    most_azero
+        .set_payout_account(
+            azero_signed_connection,
+            current_committee_id,
+            AccountId::from_string(payout_address)
+                .map_err(|why| AzeroContractError::NotAccountId(why.to_string()))?,
+        )
+        .await?;
+
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<(), RelayerError> {
     let config = Arc::new(Config::parse());
@@ -246,9 +271,6 @@ async fn main() -> Result<(), RelayerError> {
                     tick = Instant::now();
                 }
             }
-            Err(RelayerError::TraderComponent(why)) => {
-                error!("Trader component exited with an error {why:?}. Restart is required to run Trader again.");
-            }
             Err(why) => {
                 error!("One of the core components exited with an error {why:?}. This is fatal");
                 std::process::exit(1);
@@ -273,6 +295,10 @@ async fn run_relayer(
     let (eth_connection, eth_signed_connection) =
         create_eth_connections(&config, persistent_eth_connection).await?;
     info!("Established connection to the Ethereum node");
+
+    if let Some(payout_address) = &config.payout_address {
+        set_payout_account(&config, &azero_signed_connection, payout_address).await?;
+    }
 
     // Create channels
     let (eth_events_sender, eth_events_receiver) = mpsc::channel::<EthMostEvents>(1);
@@ -312,7 +338,6 @@ async fn run_relayer(
     let eth_events_handler_circuit_breaker_receiver = circuit_breaker_sender.subscribe();
     let aleph_listener_circuit_breaker_receiver = circuit_breaker_sender.subscribe();
     let aleph_events_handler_circuit_breaker_receiver = circuit_breaker_sender.subscribe();
-    let trader_circuit_breaker_receiver = circuit_breaker_sender.subscribe();
 
     let redis_manager_eth_block_number_receiver = eth_block_number_sender.subscribe();
     let eth_listener_eth_block_number_receiver = eth_block_number_sender.subscribe();
@@ -408,16 +433,5 @@ async fn run_relayer(
         .map_err(RelayerError::from),
     );
 
-    if config.run_trader_component {
-        tasks.spawn(
-            Trader::run(
-                config,
-                azero_signed_connection.clone(),
-                eth_signed_connection,
-                trader_circuit_breaker_receiver,
-            )
-            .map_err(RelayerError::from),
-        );
-    }
     Ok(())
 }

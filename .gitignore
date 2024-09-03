@@ -35,7 +35,6 @@ azero/artifacts/*
 azero/types/
 azero/contracts/drink-tests/resources/*
 azero/contracts/drink-tests/src/wrappers/*
-!azero/artifacts/router.json
 block_latest.json
 
 # half of the internet
