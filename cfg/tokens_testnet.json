@@ -1,0 +1,12 @@
+{
+  "eth": [],
+  "aleph": [
+    {
+      "name": "Wrapped AZERO",
+      "symbol": "wAZERO",
+      "decimals": 12,
+      "deployed": true,
+      "address": "5EFDb7mKbougLtr5dnwd5KDfZ3wK55JPGPLiryKq4uRMPR46"
+    }
+  ]
+}
