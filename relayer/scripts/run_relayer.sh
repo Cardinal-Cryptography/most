@@ -44,9 +44,6 @@ fi
 
 if [[ -n "${PAYOUT_ADDRESS}" ]]; then
   ARGS+=(--payout-address=${PAYOUT_ADDRESS})
-else
-  echo "Payout address required but not provided." 1>&2
-  exit 1
 fi
 
 # --- RUN

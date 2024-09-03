@@ -208,7 +208,7 @@ async fn set_payout_account(
         .await?;
     most_azero
         .set_payout_account(
-            &azero_signed_connection,
+            azero_signed_connection,
             current_committee_id,
             AccountId::from_string(payout_address)
                 .map_err(|why| AzeroContractError::NotAccountId(why.to_string()))?,
