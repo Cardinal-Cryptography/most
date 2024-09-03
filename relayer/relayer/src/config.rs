@@ -43,50 +43,6 @@ pub struct Config {
     #[arg(long, use_value_delimiter = true, value_delimiter = ',')]
     pub blacklisted_requests: Option<Vec<H256>>,
 
-    /// Whether to include trading component that makes periodic swaps from A0 -> Ethereum
-    #[arg(
-        long,
-        default_value = "false",
-        requires("router_address"),
-        requires("azero_wrapped_azero_address"),
-        requires("azero_ether_address")
-    )]
-    pub run_trader_component: bool,
-
-    /// Trader component will always keep this + current base_fee in the guardians balance and will only sell the surplus
-    ///
-    /// Defaults to 1000 AZERO
-    #[arg(long, default_value = "1000000000000000")]
-    pub eth_to_azero_relaying_buffer: u128,
-
-    /// Trader component will bridge azero wETH after the balance exceeds this amount
-    ///
-    /// Defaults to 0.1 ETH
-    #[arg(long, default_value = "100000000000000000")]
-    pub bridging_threshold: u128,
-
-    /// Trader component will claim rewards when they exceed this value
-    ///
-    /// Defaults to 10 AZERO
-    #[arg(long, default_value = "10000000000000")]
-    pub reward_withdrawal_threshold: u128,
-
-    #[arg(long)]
-    pub router_address: Option<String>,
-
-    #[arg(long, default_value = "../azero/external_artifacts/router.json")]
-    pub router_metadata: String,
-
-    /// Ethereum PSP22 token on the AlephZero
-    #[arg(long)]
-    pub azero_ether_address: Option<String>,
-
-    #[arg(long, default_value = "../azero/artifacts/token.json")]
-    pub azero_ether_metadata: String,
-
-    #[arg(long)]
-    pub azero_wrapped_azero_address: Option<String>,
-
     #[arg(long, use_value_delimiter = true, value_delimiter = ',')]
     pub advisory_contract_addresses: Option<Vec<String>>,
 
@@ -140,6 +96,9 @@ pub struct Config {
 
     #[arg(long, default_value = "100")]
     pub sync_step: u32,
+
+    #[arg(long)]
+    pub payout_address: Option<String>,
 
     #[arg(long, default_value = "redis://127.0.0.1:6379")]
     pub redis_node: String,

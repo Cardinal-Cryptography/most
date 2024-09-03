@@ -6,6 +6,7 @@ services:
       - RELAYER_ID=1
       - DEV_MODE=true
       - RUST_LOG=info,aleph-client=warn
+      - PAYOUT_ADDRESS=5GBNeWRhZc2jXu7D55rBimKYDk8PGk8itRYFTPfC8RJLKG5o
     image: most-relayer
     network_mode: host
     restart: on-failure:3
@@ -15,6 +16,7 @@ services:
       - RELAYER_ID=2
       - DEV_MODE=true
       - RUST_LOG=info,aleph-client=warn
+      - PAYOUT_ADDRESS=5Dfis6XL8J2P6JHUnUtArnFWndn62SydeP8ee8sG2ky9nfm9
     image: most-relayer
     network_mode: host
     restart: on-failure:3
@@ -24,7 +26,8 @@ services:
       - RELAYER_ID=3
       - DEV_MODE=true
       - RUST_LOG=info,aleph-client=warn
+      - PAYOUT_ADDRESS=5F4H97f7nQovyrbiq4ZetaaviNwThSVcFobcA5aGab6167dK
     image: most-relayer
     network_mode: host
     restart: on-failure:3
-version: '3.9'
+version: "3.9"

@@ -52,8 +52,6 @@ echo "RELAYER_ID=${RELAYER_ID}"
 
 AZERO_MOST_METADATA=${AZERO_MOST_METADATA:-"/usr/local/most.json"}
 ADVISORY_METADATA=${ADVISORY_METADATA:-"/usr/local/advisory.json"}
-TOKEN_METADATA=${TOKEN_METADATA:-"/usr/local/token.json"}
-ROUTER_METADATA=${ROUTER_METADATA:-"/usr/local/router.json"}
 
 ARGS=(
   --name "guardian_${RELAYER_ID}"
@@ -63,8 +61,6 @@ ARGS=(
   --dev-account-index=${RELAYER_ID}
   --redis-node=${REDIS}
   --azero-contract-metadata=${AZERO_MOST_METADATA}
-  --azero-ether-metadata=${TOKEN_METADATA}
-  --router-metadata=${ROUTER_METADATA}
   --signer-port=${SIGNER_PORT}
 )
 
@@ -143,31 +139,13 @@ if [[ -n "${ETH_MIN_CONFIRMATIONS}" ]]; then
   ARGS+=(--eth-tx-min-confirmations=${ETH_MIN_CONFIRMATIONS})
 fi
 
-if [[ -n "${RUN_TRADER}" ]]; then
-  ARGS+=(
-    --run-trader-component
-    --router-address=$(get_address $COMMON_ADDRESSES_FILE azero_router)
-    --azero-ether-address=$(jq -r '.tokens[] | select(.[0] | endswith("ETH")) | .[2]' $AZERO_ADDRESSES_FILE)
-    --azero-wrapped-azero-address=$(get_address $COMMON_ADDRESSES_FILE azero_wazero)
-  )
-
-  if [[ -n "${ETH_TO_AZERO_RELAYING_BUFFER}" ]]; then
-    ARGS+=(--eth-to-azero-relaying-buffer=${ETH_TO_AZERO_RELAYING_BUFFER})
-  fi
-
-  if [[ -n "${BRIDGING_THRESHOLD}" ]]; then
-    ARGS+=(--bridging-threshold=${BRIDGING_THRESHOLD})
-  fi
-
-  if [[ -n "${REWARD_WITHDRAWAL_THRESHOLD}" ]]; then
-    ARGS+=(--reward-withdrawal-threshold=${REWARD_WITHDRAWAL_THRESHOLD})
-  fi
-
-fi
-
 if [[ "${ETH_GAS_LIMIT}" =~ ^[0-9]+$ ]]; then
   echo "Setting --eth-gas-limit to ${ETH_GAS_LIMIT}"
   ARGS+=(--eth-gas-limit=${ETH_GAS_LIMIT})
+fi
+
+if [[ -n "${PAYOUT_ADDRESS}" ]]; then
+  ARGS+=(--payout-address=${PAYOUT_ADDRESS})
 fi
 
 if [[ "${REDIS_AZERO_BLOCK_KEY}" =~ ^[a-z0-9_]+$ ]]; then
