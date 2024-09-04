@@ -188,8 +188,8 @@ if (EVM_MAINNET_KEY) {
       guardianIds: [
         typeof EVM_MAINNET_ACCOUNT_NUMBER == "undefined" ||
         EVM_MAINNET_ACCOUNT_NUMBER == ""
-            ? "0x66325D6a4C234b3927f9a9CA7Be510469c81e135"
-            : EVM_MAINNET_ACCOUNT_NUMBER, // EVM account address corresponding to EVM_MAINNET_KEY
+          ? "0x66325D6a4C234b3927f9a9CA7Be510469c81e135"
+          : EVM_MAINNET_ACCOUNT_NUMBER, // EVM account address corresponding to EVM_MAINNET_KEY
       ],
       threshold: 1,
       bazero_decimals: 12,
