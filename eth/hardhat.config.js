@@ -20,6 +20,8 @@ const ETHEREUM_PRIVATE_KEY = process.env.ETHEREUM_PRIVATE_KEY;
 const ETHEREUM_GUARDIAN_ADDRESS = process.env.ETHEREUM_GUARDIAN_ADDRESS;
 const EVM_TESTNET_KEY = process.env.EVM_TESTNET_KEY;
 const EVM_TESTNET_ACCOUNT_NUMBER = process.env.EVM_TESTNET_ACCOUNT_NUMBER;
+const EVM_MAINNET_KEY = process.env.EVM_MAINNET_KEY;
+const EVM_MAINNET_ACCOUNT_NUMBER = process.env.EVM_MAINNET_ACCOUNT_NUMBER;
 
 var config = {
   defaultNetwork: "hardhat",
@@ -173,6 +175,33 @@ if (EVM_TESTNET_KEY) {
         initial_native_supply: 10_000,
       },
       wazero_l1_address: "5EFDb7mKbougLtr5dnwd5KDfZ3wK55JPGPLiryKq4uRMPR46",
+    },
+  };
+}
+
+if (EVM_MAINNET_KEY) {
+  config.networks.evm_mainnet = {
+    url: "https://rpc.alephzero.raas.gelato.cloud",
+    accounts: [EVM_MAINNET_KEY],
+    deploymentConfig: {
+      dev: false,
+      guardianIds: [
+        typeof EVM_MAINNET_ACCOUNT_NUMBER == "undefined" ||
+        EVM_MAINNET_ACCOUNT_NUMBER == ""
+          ? "0x66325D6a4C234b3927f9a9CA7Be510469c81e135"
+          : EVM_MAINNET_ACCOUNT_NUMBER, // EVM account address corresponding to EVM_MAINNET_KEY
+      ],
+      threshold: 1,
+      bazero_decimals: 12,
+      bazero_token_mint: 100_000,
+      pool_config: {
+        amplification_coefficient: 2000,
+        admin_fee: 0,
+        fee: 0,
+        initial_token_supply: 100_000,
+        initial_native_supply: 100_000,
+      },
+      wazero_l1_address: "5CtuFVgEUz13SFPVY6s2cZrnLDEkxQXc19aXrNARwEBeCXgg",
     },
   };
 }

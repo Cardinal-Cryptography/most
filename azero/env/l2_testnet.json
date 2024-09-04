@@ -1,0 +1,11 @@
+{
+  "ws_node": "wss://ws.test.azero.dev",
+  "relayers": [
+    "<TZERO deployer address>"
+  ],
+  "deployer_seed": "<TZERO deployer seed>",
+  "signature_threshold": 1,
+  "dev": false,
+  "azero_deposit": 100000,
+  "token_config_path": "/../../cfg/l2_tokens_testnet.json"
+}
