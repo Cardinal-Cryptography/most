@@ -7,5 +7,5 @@
   "signature_threshold": 1,
   "dev": false,
   "azero_deposit": 100000,
-  "token_config_path": "/../../cfg/tokens_mainnet.json"
+  "token_config_path": "/../../cfg/l2_tokens_mainnet.json"
 }
