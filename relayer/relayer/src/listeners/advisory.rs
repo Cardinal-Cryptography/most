@@ -6,10 +6,10 @@ use log::{debug, info, warn};
 use thiserror::Error;
 use tokio::{select, sync::broadcast, time::sleep};
 
-use super::ALEPH_BLOCK_PROD_TIME_SEC;
 use crate::{
     config::Config,
     connections::azero::AzeroWsConnection,
+    consts::ALEPH_BLOCK_PROD_TIME_SEC,
     contracts::{AdvisoryInstance, AzeroContractError},
     CircuitBreakerEvent,
 };

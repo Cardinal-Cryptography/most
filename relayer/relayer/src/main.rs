@@ -43,6 +43,7 @@ use crate::{
 
 mod config;
 mod connections;
+mod consts;
 mod contracts;
 mod handlers;
 mod helpers;

@@ -22,7 +22,7 @@ use log::{debug, warn};
 use thiserror::Error;
 use tokio::{sync::Mutex, time::sleep};
 
-use crate::{config::Config, listeners::ETH_BLOCK_PROD_TIME_SEC};
+use crate::{config::Config, consts::ETH_BLOCK_PROD_TIME_SEC};
 
 pub type EthConnection = Provider<Http>;
 pub type GasEscalatingEthConnection = GasEscalatorMiddleware<EthConnection>;

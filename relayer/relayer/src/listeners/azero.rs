@@ -20,11 +20,10 @@ use super::AzeroMostEvents;
 use crate::{
     config::Config,
     connections::azero::AzeroWsConnection,
+    consts::ALEPH_BLOCK_PROD_TIME_SEC,
     contracts::{AzeroContractError, MostInstance},
     CircuitBreakerEvent,
 };
-
-pub const ALEPH_BLOCK_PROD_TIME_SEC: u64 = 1;
 
 #[derive(Debug, Error)]
 #[error(transparent)]

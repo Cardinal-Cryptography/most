@@ -17,11 +17,11 @@ use super::EthMostEvents;
 use crate::{
     config::Config,
     connections::eth::{get_next_finalized_block_number, EthConnection},
+    consts::ETH_BLOCK_PROD_TIME_SEC,
     contracts::Most,
     CircuitBreakerEvent,
 };
 
-pub const ETH_BLOCK_PROD_TIME_SEC: u64 = 12;
 const LOG_TARGET: &str = "EthereumListener";
 
 pub struct EthereumListener;
