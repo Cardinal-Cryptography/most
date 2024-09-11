@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - master
+      - byebye-ac
 
 jobs:
   check-vars-and-secrets:
