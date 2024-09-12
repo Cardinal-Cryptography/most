@@ -5,30 +5,6 @@ use contract_transcode::Value;
 
 use crate::AccountId;
 
-/// Temporary wrapper for converting from [Value] to primitive types.
-///
-/// ```
-/// # #![feature(assert_matches)]
-/// # #![feature(type_ascription)]
-/// # use std::assert_matches::assert_matches;
-/// # use anyhow::{anyhow, Result};
-/// # use aleph_client::{AccountId, contract::ConvertibleValue};
-/// use contract_transcode::Value;
-///
-/// assert_matches!(ConvertibleValue(Value::UInt(42)).try_into(), Ok(42u128));
-/// assert_matches!(ConvertibleValue(Value::UInt(42)).try_into(), Ok(42u32));
-/// assert_matches!(ConvertibleValue(Value::UInt(u128::MAX)).try_into(): Result<u32>, Err(_));
-/// assert_matches!(ConvertibleValue(Value::Bool(true)).try_into(), Ok(true));
-/// assert_matches!(
-///     ConvertibleValue(Value::Literal("5H8cjBBzCJrAvDn9LHZpzzJi2UKvEGC9VeVYzWX5TrwRyVCA".to_string())).
-///         try_into(): Result<AccountId>,
-///     Ok(_)
-/// );
-/// assert_matches!(
-///     ConvertibleValue(Value::String("not a number".to_string())).try_into(): Result<u128>,
-///     Err(_)
-/// );
-/// ```
 #[derive(Debug, Clone)]
 pub struct ConvertibleValue(pub Value);
 

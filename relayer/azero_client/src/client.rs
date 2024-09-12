@@ -139,7 +139,7 @@ impl Client {
         ClientWithSigner::new(self.clone(), signer).await
     }
 
-    pub async fn get_runtime_api_at(
+    async fn get_runtime_api_at(
         &self,
         at: Option<BlockHash>,
     ) -> ClientResult<RuntimeApi<PolkadotConfig, OnlineClient<PolkadotConfig>>> {
@@ -159,10 +159,8 @@ impl Client {
 
         let runtime_api = self.get_runtime_api_at(at).await?;
 
-        Ok(
-            ContractExecResult::decode(&mut runtime_api.call(payload).await?.encoded())
-                .map_err(|_| ClientError::Internal)?,
-        )
+        ContractExecResult::decode(&mut runtime_api.call(payload).await?.encoded())
+            .map_err(|_| ClientError::Internal)
     }
 
     pub async fn fetch_events_from_contracts(
