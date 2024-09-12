@@ -80,10 +80,10 @@ impl Signer for AzeroSigner {
     type Error = anyhow::Error;
 
     fn account_id(&self) -> &AccountId {
-        AzeroSigner::account_id(&self)
+        AzeroSigner::account_id(self)
     }
 
     async fn sign(&self, payload: &[u8]) -> Result<MultiSignature, Self::Error> {
-        AzeroSigner::sign(&self, payload).await
+        AzeroSigner::sign(self, payload).await
     }
 }
