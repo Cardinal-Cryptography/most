@@ -35,6 +35,8 @@ contract Most is
     mapping(bytes32 committeeMemberId => bool) private committee;
     mapping(uint256 committeeId => uint256) public committeeSize;
     mapping(uint256 committeeId => uint256) public signatureThreshold;
+    mapping(bytes32 token => uint256 min) public tokenMinAmount;
+    uint256 public default_min_amount;
 
     struct Request {
         uint256 signatureCount;
@@ -146,6 +148,7 @@ contract Most is
     ) external whenNotPaused {
         if (amount == 0) revert ZeroAmount();
         if (destReceiverAddress == bytes32(0)) revert ZeroAddress();
+        checkMinAmount(srcTokenAddress, amount);
 
         IERC20 token = IERC20(bytes32ToAddress(srcTokenAddress));
 
@@ -179,6 +182,7 @@ contract Most is
         uint256 amount = msg.value;
         if (amount == 0) revert ZeroAmount();
         if (destReceiverAddress == bytes32(0)) revert ZeroAddress();
+        checkMinAmount(bytes32(0), amount);
 
         bytes32 destTokenAddress = supportedPairs[
             addressToBytes32(wethAddress)
@@ -377,6 +381,29 @@ contract Most is
             success &&
             (returndata.length == 0 || abi.decode(returndata, (bool))) &&
             address(token).code.length > 0;
+    }
+
+    function checkMinAmount(
+        bytes32 tokenAddress,
+        uint256 amount
+    ) internal view {
+        uint256 minAmount = tokenMinAmount[tokenAddress];
+        if (minAmount == 0) {
+            minAmount = default_min_amount;
+        }
+
+        require(minAmount <= amount, "Min amount of transfer not met");
+    }
+
+    function set_default_min_amount(uint256 new_default) external onlyOwner {
+        default_min_amount = new_default;
+    }
+
+    function set_token_min_transfer_amount(
+        bytes32 tokenAddress,
+        uint256 min_transfer_amount
+    ) external onlyOwner whenPaused {
+        tokenMinAmount[tokenAddress] = min_transfer_amount;
     }
 
     /// @dev Accept ether only from weth contract or through payable methods
