@@ -36,7 +36,7 @@ contract Most is
     mapping(uint256 committeeId => uint256) public committeeSize;
     mapping(uint256 committeeId => uint256) public signatureThreshold;
     mapping(bytes32 token => uint256 min) public tokenMinAmount;
-    uint256 public default_min_amount;
+    uint256 public defaultMinAmount;
 
     struct Request {
         uint256 signatureCount;
@@ -389,21 +389,21 @@ contract Most is
     ) internal view {
         uint256 minAmount = tokenMinAmount[tokenAddress];
         if (minAmount == 0) {
-            minAmount = default_min_amount;
+            minAmount = defaultMinAmount;
         }
 
         require(minAmount <= amount, "Min amount of transfer not met");
     }
 
-    function set_default_min_amount(uint256 new_default) external onlyOwner {
-        default_min_amount = new_default;
+    function setDefaultMinAmount(uint256 new_default) external onlyOwner {
+        defaultMinAmount = new_default;
     }
 
-    function set_token_min_transfer_amount(
+    function setTokenMinTransferAmount(
         bytes32 tokenAddress,
-        uint256 min_transfer_amount
+        uint256 minTransferAmount
     ) external onlyOwner whenPaused {
-        tokenMinAmount[tokenAddress] = min_transfer_amount;
+        tokenMinAmount[tokenAddress] = minTransferAmount;
     }
 
     /// @dev Accept ether only from weth contract or through payable methods
