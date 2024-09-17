@@ -1,6 +1,6 @@
 use std::{str::FromStr, sync::Arc};
 
-use azero_client::{AccountId, ClientWithSigner};
+use contracts_azero_client::{AccountId, ClientWithSigner};
 use ethers::{core::types::H256, utils::keccak256};
 use log::{debug, error, info, trace, warn};
 use rustc_hex::FromHexError;
@@ -31,7 +31,7 @@ pub enum EthereumEventHandlerError {
     AzeroContract(#[from] AzeroContractError),
 
     #[error("AzeroClient error")]
-    AzeroClient(#[from] azero_client::ClientError),
+    AzeroClient(#[from] contracts_azero_client::ClientError),
 
     #[error("receive_request tx has failed")]
     ReceiveRequestTxFailure {

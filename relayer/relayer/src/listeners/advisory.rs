@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use azero_client::AccountId;
+use contracts_azero_client::AccountId;
 use futures::future::join_all;
 use log::{debug, info, warn};
 use thiserror::Error;

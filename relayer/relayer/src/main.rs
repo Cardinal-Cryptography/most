@@ -5,13 +5,13 @@ use std::{
     time::{Duration, Instant},
 };
 
-use azero_client::{keypair_from_string, AccountId, ClientWithSigner};
 use clap::Parser;
 use config::Config;
 use connections::{
     azero::AzeroWsConnection,
     eth::{EthConnection, EthConnectionError, GasEscalatingEthConnection, SignedEthConnection},
 };
+use contracts_azero_client::{keypair_from_string, AccountId, ClientWithSigner};
 use ethers::signers::{coins_bip39::English, MnemonicBuilder, Signer};
 use futures::TryFutureExt;
 use handlers::{AlephZeroEventsHandlerError, EthereumEventsHandlerError};
@@ -69,7 +69,7 @@ enum RelayerError {
     AzeroConnection(#[from] connections::azero::Error),
 
     #[error("AlephZero client error")]
-    AzeroClient(#[from] azero_client::ClientError),
+    AzeroClient(#[from] contracts_azero_client::ClientError),
 
     #[error("Ethereum node connection error")]
     EthereumConnection(#[from] connections::eth::EthConnectionError),

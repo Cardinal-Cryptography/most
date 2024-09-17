@@ -1,11 +1,11 @@
 use std::time::Duration;
 
-use azero_client::{AccountId, ClientConfig, KeyPair, MultiSignature, Signer};
+use contracts_azero_client::{AccountId, ClientConfig, KeyPair, MultiSignature, Signer};
 use signer_client::Client;
 use subxt::ext::sp_core::Pair;
 use tokio::sync::Mutex;
 
-pub type AzeroWsConnection = azero_client::Client;
+pub type AzeroWsConnection = contracts_azero_client::Client;
 
 pub async fn init(url: &str) -> AzeroWsConnection {
     AzeroWsConnection::new(&ClientConfig {

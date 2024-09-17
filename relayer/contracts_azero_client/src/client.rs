@@ -4,7 +4,7 @@ use std::{
 };
 
 use log::trace;
-use pallet_contracts_primitives::ContractExecResult;
+use pallet_contracts::ContractExecResult;
 use parity_scale_codec::Decode;
 use subxt::{
     backend::{

@@ -1,4 +1,4 @@
-use azero_client::H160;
+use contracts_azero_client::H160;
 use ethers::{
     contract::{abigen, ContractError},
     middleware::Middleware,

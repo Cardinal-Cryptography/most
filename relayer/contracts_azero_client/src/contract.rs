@@ -8,7 +8,7 @@ use contract_transcode::{ContractMessageTranscoder, Value};
 pub use convertible_value::ConvertibleValue;
 pub use events::translate_events;
 use log::info;
-use pallet_contracts_primitives::ContractExecResult;
+use pallet_contracts::ContractExecResult;
 
 use crate::{
     client::ClientWithSigner, AccountId, Balance, BlockHash, Client, ContractCallArgs, EventRecord,

@@ -1,6 +1,6 @@
 use std::{str::FromStr, sync::Arc};
 
-use azero_client::ContractEvent;
+use contracts_azero_client::ContractEvent;
 use ethers::{
     abi::{self, Token},
     core::types::{Address, H256},

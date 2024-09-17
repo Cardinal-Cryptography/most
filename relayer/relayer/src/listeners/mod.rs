@@ -24,5 +24,5 @@ pub struct AzeroMostEvents {
 
 pub use advisory::*;
 pub use azero::*;
-use azero_client::ContractEvent;
+use contracts_azero_client::ContractEvent;
 pub use eth::*;

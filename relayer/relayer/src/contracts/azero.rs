@@ -4,7 +4,7 @@ use std::{
     str::{FromStr, Utf8Error},
 };
 
-use azero_client::{
+use contracts_azero_client::{
     contract_transcode::{Value, Value::Seq},
     AccountId, Client, ClientWithSigner, ContractInstance, ExecCallParams, ReadonlyCallParams,
     Weight,
@@ -18,11 +18,11 @@ use crate::connections::azero::AzeroSigner;
 #[error(transparent)]
 #[non_exhaustive]
 pub enum AzeroContractError {
-    #[error("aleph-client error")]
-    AlephClient(#[from] anyhow::Error),
+    #[error("contract call error")]
+    ContractCall(#[from] anyhow::Error),
 
     #[error("AzeroClient error")]
-    AzeroClient(#[from] azero_client::ClientError),
+    AzeroClient(#[from] contracts_azero_client::ClientError),
 
     #[error("not account id")]
     NotAccountId(String),
@@ -59,7 +59,7 @@ impl AdvisoryInstance {
             .await
         {
             Ok(is_emergency) => Ok((is_emergency, self.address.clone())),
-            Err(why) => Err(AzeroContractError::AlephClient(why)),
+            Err(why) => Err(AzeroContractError::ContractCall(why)),
         }
     }
 }
@@ -116,7 +116,7 @@ impl MostInstance {
             .contract
             .exec(signed_connection, "receive_request", &args, params)
             .await
-            .map_err(AzeroContractError::AlephClient);
+            .map_err(AzeroContractError::ContractCall);
         debug!("receive_request: {:?}", call_result);
         call_result
     }
@@ -139,7 +139,7 @@ impl MostInstance {
             .contract
             .exec(signed_connection, "set_payout_account", &args, params)
             .await
-            .map_err(AzeroContractError::AlephClient);
+            .map_err(AzeroContractError::ContractCall);
         debug!("set_payout_account: {:?}", call_result);
         call_result
     }

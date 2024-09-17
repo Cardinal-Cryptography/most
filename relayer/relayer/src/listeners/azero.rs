@@ -1,6 +1,6 @@
 use std::{cmp::min, sync::Arc, time::Duration};
 
-use azero_client::{Client, ContractEvent, ContractInstance};
+use contracts_azero_client::{Client, ContractEvent, ContractInstance};
 use futures::{
     future::join_all,
     stream::{FuturesOrdered, StreamExt},
@@ -32,7 +32,7 @@ pub enum AlephZeroListenerError {
     AlephClient(#[from] anyhow::Error),
 
     #[error("AzeroClient error")]
-    AzeroClient(#[from] azero_client::ClientError),
+    AzeroClient(#[from] contracts_azero_client::ClientError),
 
     #[error("Subxt error")]
     Subxt(#[from] subxt::Error),
