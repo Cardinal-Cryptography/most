@@ -606,7 +606,7 @@ pub mod most {
             // don't revert if the transfer fails
             if self
                 .env()
-                .transfer(dest_receiver_address.into(), pocket_money_to_send)
+                .transfer(dest_receiver_address, pocket_money_to_send)
                 .is_ok()
             {
                 data.pocket_money_balance = data
