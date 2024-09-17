@@ -62,6 +62,7 @@ mod e2e {
     const GAS_ORACLE_MAX_AGE: u64 = 86400000;
     const ORACLE_CALL_GAS_LIMIT: u64 = 2000000000;
     const BASE_FEE_BUFFER_PERCENTAGE: u128 = 20;
+    const DEFAULT_ETH_TRANSFER_GAS_USAGE: u128 = 60_000;
 
     #[ink_e2e::test]
     fn simple_deploy_works(mut client: ink_e2e::Client<C, E>) {
@@ -79,6 +80,7 @@ mod e2e {
             ORACLE_CALL_GAS_LIMIT,
             BASE_FEE_BUFFER_PERCENTAGE,
             account_id(AccountKeyring::Alice),
+            DEFAULT_ETH_TRANSFER_GAS_USAGE,
         )
         .await;
     }
@@ -1148,6 +1150,7 @@ mod e2e {
         oracle_call_gas_limit: u64,
         base_fee_buffer_percentage: u128,
         owner: AccountId,
+        default_eth_transfer_gas_usage: u128,
     ) -> AccountId {
         let most_constructor = MostRef::new(
             guardians,
@@ -1162,6 +1165,7 @@ mod e2e {
             base_fee_buffer_percentage,
             None,
             owner,
+            default_eth_transfer_gas_usage,
         );
         client
             .instantiate("most", caller, most_constructor, 0, None)
@@ -1216,6 +1220,7 @@ mod e2e {
             ORACLE_CALL_GAS_LIMIT,
             BASE_FEE_BUFFER_PERCENTAGE,
             account_id(AccountKeyring::Alice),
+            DEFAULT_ETH_TRANSFER_GAS_USAGE,
         )
         .await;
 
