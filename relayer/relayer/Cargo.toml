@@ -5,9 +5,9 @@ authors = ["Cardinal Cryptography"]
 edition = "2021"
 
 [dependencies]
-aleph_client = { workspace = true }
+contracts_azero_client = { path = "../contracts_azero_client" }
 anyhow = "1.0.75"
-async-trait = "0.1.77"
+async-trait = "0.1.81"
 clap = { version = "4.3.4", features = ["derive"] }
 codec = { package = 'parity-scale-codec', version = "3.0.0", features = ['derive'] }
 env_logger = "0.10.0"
