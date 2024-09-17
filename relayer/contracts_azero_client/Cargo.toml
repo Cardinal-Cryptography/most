@@ -1,0 +1,21 @@
+[package]
+name = "contracts_azero_client"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+subxt = {  workspace = true, features = ["unstable-reconnecting-rpc-client", "substrate-compat"] }
+thiserror = "1.0.63"
+log = "0.4.20"
+async-trait = "0.1.81"
+tokio = "1.40.0"
+anyhow = "1.0.79"
+serde = "1.0.209"
+contract-transcode = "3.2.0"
+pallet-contracts = { git = "https://github.com/Cardinal-Cryptography/polkadot-sdk.git", branch = "aleph-v1.6.0" }
+parity-scale-codec = "3.6.12"
+futures = "0.3.30"
+scale-decode = "0.13.1"
+
+[dependencies.syn]
+version = "2.0.77"

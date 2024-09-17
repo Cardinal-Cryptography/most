@@ -4,29 +4,25 @@ use std::{
     str::{FromStr, Utf8Error},
 };
 
-use aleph_client::{
-    contract::{
-        event::{translate_events, BlockDetails, ContractEvent},
-        ContractInstance, ExecCallParams, ReadonlyCallParams,
-    },
-    contract_transcode::Value::{self, Seq},
-    sp_weights::weight_v2::Weight,
-    utility::BlocksApi,
-    waiting::BlockStatus,
-    AccountId, AlephConfig, Connection, TxInfo,
+use contracts_azero_client::{
+    contract_transcode::{Value, Value::Seq},
+    AccountId, Client, ClientWithSigner, ContractInstance, ExecCallParams, ReadonlyCallParams,
+    Weight,
 };
-use log::{debug, error, trace};
-use subxt::events::Events;
+use log::{debug, error};
 use thiserror::Error;
 
-use crate::connections::azero::AzeroConnectionWithSigner;
+use crate::connections::azero::AzeroSigner;
 
 #[derive(Debug, Error)]
 #[error(transparent)]
 #[non_exhaustive]
 pub enum AzeroContractError {
-    #[error("aleph-client error")]
-    AlephClient(#[from] anyhow::Error),
+    #[error("contract call error")]
+    ContractCall(#[from] anyhow::Error),
+
+    #[error("AzeroClient error")]
+    AzeroClient(#[from] contracts_azero_client::ClientError),
 
     #[error("not account id")]
     NotAccountId(String),
@@ -55,15 +51,15 @@ impl AdvisoryInstance {
 
     pub async fn is_emergency(
         &self,
-        connection: &Connection,
+        connection: &Client,
     ) -> Result<(bool, AccountId), AzeroContractError> {
         match self
             .contract
-            .read0::<bool, _>(connection, "is_emergency", Default::default())
+            .read0::<bool>(connection, "is_emergency", Default::default())
             .await
         {
             Ok(is_emergency) => Ok((is_emergency, self.address.clone())),
-            Err(why) => Err(AzeroContractError::AlephClient(why)),
+            Err(why) => Err(AzeroContractError::ContractCall(why)),
         }
     }
 }
@@ -93,14 +89,14 @@ impl MostInstance {
     #[allow(clippy::too_many_arguments)]
     pub async fn receive_request(
         &self,
-        signed_connection: &AzeroConnectionWithSigner,
+        signed_connection: &ClientWithSigner<AzeroSigner>,
         request_hash: [u8; 32],
         committee_id: u128,
         dest_token_address: [u8; 32],
         amount: u128,
         dest_receiver_address: [u8; 32],
         request_nonce: u128,
-    ) -> Result<TxInfo, AzeroContractError> {
+    ) -> Result<(), AzeroContractError> {
         let gas_limit = Weight {
             ref_time: self.ref_time_limit,
             proof_size: self.proof_size_limit,
@@ -120,17 +116,17 @@ impl MostInstance {
             .contract
             .exec(signed_connection, "receive_request", &args, params)
             .await
-            .map_err(AzeroContractError::AlephClient);
+            .map_err(AzeroContractError::ContractCall);
         debug!("receive_request: {:?}", call_result);
         call_result
     }
 
     pub async fn set_payout_account(
         &self,
-        signed_connection: &AzeroConnectionWithSigner,
+        signed_connection: &ClientWithSigner<AzeroSigner>,
         committee_id: u128,
         payout_account: AccountId,
-    ) -> Result<TxInfo, AzeroContractError> {
+    ) -> Result<(), AzeroContractError> {
         let gas_limit = Weight {
             ref_time: self.ref_time_limit,
             proof_size: self.proof_size_limit,
@@ -143,29 +139,29 @@ impl MostInstance {
             .contract
             .exec(signed_connection, "set_payout_account", &args, params)
             .await
-            .map_err(AzeroContractError::AlephClient);
+            .map_err(AzeroContractError::ContractCall);
         debug!("set_payout_account: {:?}", call_result);
         call_result
     }
 
-    pub async fn is_halted(&self, connection: &Connection) -> Result<bool, AzeroContractError> {
+    pub async fn is_halted(&self, connection: &Client) -> Result<bool, AzeroContractError> {
         Ok(self
             .contract
-            .read0::<Result<bool, _>, _>(connection, "is_halted", Default::default())
+            .read0::<Result<bool, _>>(connection, "is_halted", Default::default())
             .await??)
     }
 
     pub async fn needs_signature(
         &self,
-        connection: &Connection,
+        connection: &Client,
         request_hash: [u8; 32],
         account: AccountId,
         committee_id: u128,
-        block: BlockStatus,
+        block_finalized: bool,
     ) -> Result<bool, AzeroContractError> {
-        let params = match block {
-            BlockStatus::Best => ReadonlyCallParams::new(),
-            BlockStatus::Finalized => {
+        let params = match block_finalized {
+            false => ReadonlyCallParams::new(),
+            true => {
                 let finalized_hash = connection.get_finalized_block_hash().await?;
                 ReadonlyCallParams::new().at(finalized_hash)
             }
@@ -187,17 +183,17 @@ impl MostInstance {
 
     pub async fn current_committee_id(
         &self,
-        connection: &Connection,
+        connection: &Client,
     ) -> Result<u128, AzeroContractError> {
         Ok(self
             .contract
-            .read0::<Result<u128, _>, _>(connection, "get_current_committee_id", Default::default())
+            .read0::<Result<u128, _>>(connection, "get_current_committee_id", Default::default())
             .await??)
     }
 
     pub async fn is_in_committee(
         &self,
-        connection: &Connection,
+        connection: &Client,
         committee_id: u128,
         account: AccountId,
     ) -> Result<bool, AzeroContractError> {
@@ -210,24 +206,6 @@ impl MostInstance {
                 Default::default(),
             )
             .await?)
-    }
-
-    pub fn filter_events(
-        &self,
-        events: Events<AlephConfig>,
-        block_details: BlockDetails,
-    ) -> Vec<ContractEvent> {
-        translate_events(events.iter(), &[&self.contract], Some(block_details))
-            .into_iter()
-            .filter_map(|event_res| {
-                if let Ok(event) = event_res {
-                    Some(event)
-                } else {
-                    trace!("Failed to translate event: {:?}", event_res);
-                    None
-                }
-            })
-            .collect()
     }
 }
 
