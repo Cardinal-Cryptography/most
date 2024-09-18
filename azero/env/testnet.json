@@ -1,0 +1,22 @@
+{
+  "ws_node": "wss://ws.test.azero.dev",
+  "relayers": [
+    "<deployer account id>"
+  ],
+  "deployer_seed": "<deployer seed>",
+  "signature_threshold": 1,
+  "pocket_money": 1000000000000,
+  "min_gas_price": 60000000,
+  "max_gas_price": 450000000,
+  "default_gas_price": 180000000,
+  "relay_gas_usage": 450000,
+  "dev": true,
+  "tokens": [
+    {
+      "symbol": "wETH",
+      "name": "Wrapped Ether",
+      "decimals": 18,
+      "checkAddress": "weth"
+    }
+  ]
+}
