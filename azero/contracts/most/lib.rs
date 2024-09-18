@@ -610,6 +610,8 @@ pub mod most {
             Ok(())
         }
 
+        /// Calculates amount of pocket money that will be transferred to destination account upon
+        /// bridging transfer.
         #[ink(message)]
         pub fn current_pocket_money_value(&self) -> u128 {
             const DEFAULT_POCKET_MONEY: u128 = 0;
@@ -628,6 +630,7 @@ pub mod most {
             };
             let max_pocket_money = data.max_pocket_money;
 
+            // ~75% of the gas spend on eth side but no more than allowed max
             let pocket_money =
                 u128::min(max_pocket_money, eth_transfer_gas_usage * gas_price * 3 / 4);
 
