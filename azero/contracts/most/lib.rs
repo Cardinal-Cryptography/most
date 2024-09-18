@@ -4,14 +4,6 @@ pub use ownable2step::Ownable2StepError;
 
 pub use self::most::{MostError, MostRef};
 
-fn min<T: Ord>(a: T, b: T) -> T {
-    if a < b {
-        a
-    } else {
-        b
-    }
-}
-
 #[ink::contract]
 pub mod most {
     use gas_oracle_trait::EthGasPriceOracle;
@@ -27,8 +19,6 @@ pub mod most {
     use psp22_traits::{Burnable, Mintable, WrappedAZERO};
     use scale::{Decode, Encode};
     use shared::{hash_request_data, Keccak256HashOutput as HashedRequest};
-
-    use super::min;
 
     type CommitteeId = u128;
 
@@ -637,9 +627,10 @@ pub mod most {
             };
             let max_pocket_money = data.max_pocket_money;
 
-            let pocket_money = min(max_pocket_money, eth_transfer_gas_usage * gas_price * 3 / 4);
+            let pocket_money =
+                u128::min(max_pocket_money, eth_transfer_gas_usage * gas_price * 3 / 4);
 
-            min(pocket_money, data.pocket_money_balance)
+            u128::min(pocket_money, data.pocket_money_balance)
         }
 
         /// Request payout of rewards for signing & relaying cross-chain transfers.

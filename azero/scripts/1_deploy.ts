@@ -151,7 +151,7 @@ async function main(): Promise<void> {
       base_fee_buffer_percentage!,
       oracleAddress,
       deployer.address,
-      eth_transfer_gas_usage
+      eth_transfer_gas_usage,
     ],
   );
 
