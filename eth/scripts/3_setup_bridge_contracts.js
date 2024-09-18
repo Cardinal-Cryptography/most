@@ -23,7 +23,7 @@ async function addTokenPair(
   const azeroTokenAddressBytes = u8aToHex(
     new Keyring({ type: "sr25519" }).decodeAddress(azeroTokenAddress),
   );
-  mostContract.addPair(
+  await mostContract.addPair(
       ethTokenAddressBytes,
       azeroTokenAddressBytes,
   );
