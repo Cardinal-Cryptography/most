@@ -563,7 +563,7 @@ pub mod most {
                     )?;
                 }
 
-                self.send_pocket_money(dest_token_address.into())?;
+                self.send_pocket_money(dest_receiver_address.into())?;
 
                 // mark it as processed
                 self.processed_requests.insert(request_hash, &());

@@ -548,6 +548,12 @@ mod e2e {
     fn pocket_money(mut client: ink_e2e::Client<C, E>) {
         let (most_address, token_address) = setup_default_most_and_token(&mut client, false).await;
 
+        let oracle_address = instantiate_oracle(&mut client, &alice(), 2 * DEFAULT_GAS_PRICE).await;
+
+        most_set_gas_oracle(&mut client, &alice(), most_address, oracle_address)
+            .await
+            .expect("can set gas oracle");
+
         // seed contract with some funds for pocket money transfers
         most_fund_pocket_money(
             &mut client,
@@ -596,9 +602,13 @@ mod e2e {
             .await
             .expect("native balance after");
 
+        let expected_pocket_money = u128::min(
+            DEFAULT_POCKET_MONEY,
+            2 * DEFAULT_GAS_PRICE * DEFAULT_ETH_TRANSFER_GAS_USAGE * 3 / 4,
+        );
         assert_eq!(
             azero_balance_after,
-            azero_balance_before + DEFAULT_POCKET_MONEY
+            azero_balance_before + expected_pocket_money
         );
     }
 
