@@ -1,11 +1,9 @@
 import { ApiPromise, WsProvider, Keyring } from "@polkadot/api";
-import Migrations from "../types/contracts/migrations";
 import Most from "../types/contracts/most";
 import Token from "../types/contracts/token";
 import {
   import_env,
   import_azero_addresses,
-  import_eth_addresses,
   accountIdToHex,
   hexToBytes,
 } from "./utils";
@@ -56,7 +54,6 @@ async function main(): Promise<void> {
   const {
     tokens,
     most: most_azero,
-    migrations: migrations_azero,
   } = await import_azero_addresses();
 
   const wsProvider = new WsProvider(ws_node);
@@ -66,17 +63,6 @@ async function main(): Promise<void> {
   const deployer = keyring.addFromUri(deployer_seed);
 
   console.log("Using ", deployer.address, "as the transaction signer");
-
-  const migrations = new Migrations(migrations_azero, deployer, api);
-
-  // check migrations
-  let lastCompletedMigration = await migrations.query.lastCompletedMigration();
-  const number = lastCompletedMigration.value.ok;
-  console.log("Last completed migration: ", number);
-  if (number != 1) {
-    console.error("Previous migration has not been completed");
-    process.exit(-1);
-  }
 
   // premint some token for DEV
   if (dev) {
@@ -100,12 +86,6 @@ async function main(): Promise<void> {
       await most.tx.setWeth(azero_address);
     }
   }
-
-  if (dev) {
-    await most.tx.setHalted(false);
-  }
-
-  await migrations.tx.setCompleted(2);
 
   await api.disconnect();
   console.log("Done");

@@ -1,6 +1,5 @@
 import { ApiPromise, WsProvider, Keyring } from "@polkadot/api";
 import { KeyringPair } from "@polkadot/keyring/types";
-import Migrations from "../types/contracts/migrations";
 import MigrationsConstructors from "../types/constructors/migrations";
 import MostConstructors from "../types/constructors/most";
 import TokenConstructors from "../types/constructors/token";
@@ -174,9 +173,6 @@ async function main(): Promise<void> {
 
     tokenAddresses.push([token.symbol, ethAddress, address]);
   }
-
-  const migrations = new Migrations(migrationsAddress, deployer, api);
-  await migrations.tx.setCompleted(1);
 
   const addresses: Addresses = {
     migrations: migrationsAddress,

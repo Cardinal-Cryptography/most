@@ -47,31 +47,6 @@ var config = {
         governanceThreshold: 2,
       },
     },
-
-    bridgenet: {
-      url: "https://rpc-eth-bridgenet.dev.azero.dev",
-      accounts: {
-        mnemonic: DEV_MNEMONIC,
-      },
-      governanceThreshold: 2,
-      chainId: 12_345,
-      gas: 25e6, // Gas limit
-      gasPrice: 20e9,
-      deploymentConfig: {
-        guardianIds: [
-          "0x05501355922a6529670DB49158676D98D6c34245",
-          "0x084321C892ebb289dA2131d18a39fdfC3CCC0D2C",
-          "0xd7a898720ab24ae154d67f51F2F75341D2A3719f",
-        ],
-        threshold: 2,
-        governanceIds: [
-          "0x05501355922a6529670DB49158676D98D6c34245",
-          "0x084321C892ebb289dA2131d18a39fdfC3CCC0D2C",
-          "0xd7a898720ab24ae154d67f51F2F75341D2A3719f",
-        ],
-        governanceThreshold: 2,
-      },
-    },
   },
   solidity: {
     compilers: [
@@ -112,11 +87,14 @@ if (SEPOLIA_KEY) {
     accounts: [SEPOLIA_KEY],
     deploymentConfig: {
       guardianIds: [
-        "0xc4E0B92Df2DE77C077D060e49ec63DC196980716", // sepolia account address corresponding to SEPOLIA_KEY
+        "0xc4E0B92Df2DE77C077D060e49ec63DC196980716",
       ],
       threshold: 1,
-      weth: "0xd91aE8FD2Be53F74876a9cc4aFb416645A0c8420",
     },
+    weth: "0xd91aE8FD2Be53F74876a9cc4aFb416645A0c8420",
+    dev: false,
+    gas: 25e6,
+    gasPrice: 20e9,
   };
 }
 
