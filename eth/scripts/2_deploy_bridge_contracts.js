@@ -10,12 +10,12 @@ async function main() {
 
 
   let addresses = {};
-  if (fs.existsSync("addresses.json") {
+  if (fs.existsSync("addresses.json")) {
     addresses = JSON.parse(
         fs.readFileSync("addresses.json", { encoding: "utf8", flag: "r" }),
     );
   }
-  
+
   if (config.dev) {
     const WETH = await ethers.getContractFactory("WETH9");
     console.log("Deploying WETH...");
