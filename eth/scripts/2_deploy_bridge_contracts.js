@@ -8,11 +8,14 @@ async function main() {
 
   console.log("Using ", accounts[0], "as the transaction signer");
 
-  // read addresses
-  let addresses = JSON.parse(
-    fs.readFileSync("addresses.json", { encoding: "utf8", flag: "r" }),
-  );
 
+  let addresses = {};
+  if (fs.existsSync("addresses.json") {
+    addresses = JSON.parse(
+        fs.readFileSync("addresses.json", { encoding: "utf8", flag: "r" }),
+    );
+  }
+  
   if (config.dev) {
     const WETH = await ethers.getContractFactory("WETH9");
     console.log("Deploying WETH...");
