@@ -218,6 +218,7 @@ pub mod most {
         WrappedEthNotSet,
         WrappedAzeroNotSet,
         ValueTransferredLowerThanAmount,
+        Other,
     }
 
     impl From<InkEnvError> for MostError {
@@ -614,7 +615,7 @@ pub mod most {
             const DEFAULT_POCKET_MONEY: u128 = 0;
 
             let gas_price = match self.get_gas_price() {
-                Ok(price) => price,
+                Ok(Some((price, _))) => price,
                 _ => return DEFAULT_POCKET_MONEY,
             };
             let data = match self.data() {
@@ -847,34 +848,41 @@ pub mod most {
             Ok(0)
         }
 
-        fn get_gas_price(&self) -> Result<Balance, MostError> {
-            let gas_price = if let Some(gas_price_oracle_address) = self.data()?.gas_price_oracle {
+        fn get_gas_price(&self) -> Result<Option<(Balance, u64)>, MostError> {
+            if let Some(gas_price_oracle_address) = self.data()?.gas_price_oracle {
                 let gas_price_oracle: contract_ref!(EthGasPriceOracle) =
                     gas_price_oracle_address.into();
 
-                match gas_price_oracle
-                    .call()
-                    .get_price()
-                    .gas_limit(self.data()?.oracle_call_gas_limit)
-                    .try_invoke()
-                {
-                    Ok(Ok((gas_price, timestamp))) => {
-                        if timestamp + self.data()?.gas_oracle_max_age
-                            < self.env().block_timestamp()
-                        {
-                            self.data()?.default_gas_price
-                        } else if gas_price < self.data()?.min_gas_price {
-                            self.data()?.min_gas_price
-                        } else if gas_price > self.data()?.max_gas_price {
-                            self.data()?.max_gas_price
-                        } else {
-                            gas_price
-                        }
+                return Ok(
+                    match gas_price_oracle
+                        .call()
+                        .get_price()
+                        .gas_limit(self.data()?.oracle_call_gas_limit)
+                        .try_invoke()
+                    {
+                        Ok(Ok(res)) => Some(res),
+                        _ => None,
+                    },
+                );
+            }
+
+            Ok(None)
+        }
+
+        fn get_gas_price_with_limits(&self) -> Result<Balance, MostError> {
+            let gas_price = match self.get_gas_price()? {
+                Some((gas_price, timestamp)) => {
+                    if timestamp + self.data()?.gas_oracle_max_age < self.env().block_timestamp() {
+                        self.data()?.default_gas_price
+                    } else if gas_price < self.data()?.min_gas_price {
+                        self.data()?.min_gas_price
+                    } else if gas_price > self.data()?.max_gas_price {
+                        self.data()?.max_gas_price
+                    } else {
+                        gas_price
                     }
-                    _ => self.data()?.default_gas_price,
                 }
-            } else {
-                self.data()?.default_gas_price
+                _ => self.data()?.default_gas_price,
             };
 
             Ok(gas_price)
@@ -883,7 +891,7 @@ pub mod most {
         /// Queries a gas price oracle and returns the current base_fee charged per cross chain transfer denominated in AZERO
         #[ink(message)]
         pub fn get_base_fee(&self) -> Result<Balance, MostError> {
-            let gas_price = self.get_gas_price()?;
+            let gas_price = self.get_gas_price_with_limits()?;
 
             let base_fee = gas_price
                 .checked_mul(self.data()?.relay_gas_usage)
