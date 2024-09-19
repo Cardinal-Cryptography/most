@@ -1102,6 +1102,19 @@ pub mod most {
             Ok(())
         }
 
+        /// Sets an `eth_transfer_gas_usage`.
+        ///
+        /// Can only be called by the contracts owner
+        #[ink(message)]
+        pub fn set_eth_transfer_gas_usage(
+            &mut self,
+            new_eth_transfer_gas_usage: u128,
+        ) -> Result<(), crate::most::MostError> {
+            self.ensure_owner()?;
+            self.eth_transfer_gas_usage.set(&new_eth_transfer_gas_usage);
+            Ok(())
+        }
+
         /// Change the committee and increase committe id
         /// Can only be called by the contracts owner
         ///
