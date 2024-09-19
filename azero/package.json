@@ -6,7 +6,7 @@
     "description": "azero most bridge",
     "scripts": {
         "watch": "gulp default",
-        "compile": "typechain-compiler --release --toolchain nightly-2024-02-16",
+        "compile": "typechain-compiler --release --toolchain nightly-2024-04-28",
         "predrink-tests": "npm config set script-shell \"/bin/bash\"; ./scripts/predrink_tests.sh",
         "drink-tests": "npm config set script-shell \"/bin/bash\"; ./scripts/drink_tests.sh",
         "deploy": "npm config set script-shell \"/bin/bash\"; ts-node scripts/0_upload_code.ts; ts-node scripts/1_deploy.ts",
