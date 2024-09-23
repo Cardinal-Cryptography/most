@@ -10,6 +10,7 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/acces
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {IWETH9} from "./IWETH9.sol";
 import {IWrappedToken} from "./IWrappedToken.sol";
+import {ITransferLimit} from "./ITransferLimit.sol";
 
 /// @title Most
 /// @author Cardinal Cryptography
@@ -39,6 +40,8 @@ abstract contract AbstractMost is
     mapping(address => bool) public isLocalToken;
 
     address public wrappedAzeroAddress;
+
+    ITransferLimit public transferLimit;
 
     struct Request {
         uint256 signatureCount;
@@ -85,6 +88,7 @@ abstract contract AbstractMost is
     error EthTransfer();
     error ZeroAddress();
     error AzeroAddressNotSet();
+    error LimitExceeded();
 
     function __AbstractMost_init(
         address[] calldata _committee,
@@ -154,10 +158,14 @@ abstract contract AbstractMost is
         if (amount == 0) revert ZeroAmount();
         if (destReceiverAddress == bytes32(0)) revert ZeroAddress();
 
-        address token = bytes32ToAddress(srcTokenAddress);
-
         bytes32 destTokenAddress = supportedPairs[srcTokenAddress];
         if (destTokenAddress == 0x0) revert UnsupportedPair();
+
+        address token = bytes32ToAddress(srcTokenAddress);
+        if (
+            transferLimit != ITransferLimit(address(0)) &&
+            !transferLimit.isRequestAllowed(token, amount)
+        ) revert LimitExceeded();
 
         // burn or lock tokens in this contract
         // message sender needs to give approval else this tx will revert
@@ -198,6 +206,10 @@ abstract contract AbstractMost is
         ];
 
         if (destTokenAddress == 0x0) revert UnsupportedPair();
+        if (
+            transferLimit != ITransferLimit(address(0)) &&
+            !transferLimit.isRequestAllowed(wethAddress, amount)
+        ) revert LimitExceeded();
 
         (bool success, ) = wethAddress.call{value: amount}(
             abi.encodeCall(IWETH9.deposit, ())
@@ -230,6 +242,10 @@ abstract contract AbstractMost is
         bytes32 destTokenAddress = supportedPairs[wrappedAzeroAddressBytes32];
 
         if (destTokenAddress == 0x0) revert UnsupportedPair();
+        if (
+            transferLimit != ITransferLimit(address(0)) &&
+            !transferLimit.isRequestAllowed(wrappedAzeroAddress, amount)
+        ) revert LimitExceeded();
 
         IERC20 azeroToken = IERC20(wrappedAzeroAddress);
         azeroToken.safeTransferFrom(msg.sender, address(this), amount);
@@ -379,6 +395,12 @@ abstract contract AbstractMost is
         address _wrappedAzeroAddress
     ) external onlyOwner whenPaused {
         wrappedAzeroAddress = _wrappedAzeroAddress;
+    }
+
+    function setTransferLimit(
+        ITransferLimit _transferLimit
+    ) external onlyOwner {
+        transferLimit = _transferLimit;
     }
 
     function addPair(
