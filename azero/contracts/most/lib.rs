@@ -449,6 +449,8 @@ pub mod most {
                 .checked_sub(amount_to_bridge)
                 .ok_or(MostError::ValueTransferredLowerThanAmount)?;
 
+            let amount = amount_to_bridge.saturating_mul(RATIO);
+
             let wrapped_azero_address = self.wazero.get().ok_or(MostError::WrappedAzeroNotSet)?;
             let wrapped_azero_address_bytes: [u8; 32] = *wrapped_azero_address.as_ref();
             let mut wrapped_azero: contract_ref!(WrappedAZERO) = wrapped_azero_address.into();
@@ -456,15 +458,13 @@ pub mod most {
             wrapped_azero
                 .call_mut()
                 .deposit()
-                .transferred_value(amount_to_bridge)
+                .transferred_value(amount)
                 .invoke()?;
 
             let dest_token_address = self
                 .supported_pairs
                 .get(wrapped_azero_address_bytes)
                 .ok_or(MostError::UnsupportedPair)?;
-
-            let amount = amount_to_bridge.saturating_mul(RATIO);
 
             self._send_request(
                 wrapped_azero_address,
