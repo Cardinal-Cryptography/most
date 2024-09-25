@@ -100,10 +100,11 @@ if (SEPOLIA_MNEMONIC || SEPOLIA_KEY) {
       typeof SEPOLIA_URL == "undefined" || SEPOLIA_URL == ""
         ? "https://ethereum-sepolia-rpc.publicnode.com"
         : SEPOLIA_URL,
-    accounts: SEPOLIA_MNEMONIC ? {
-      mnemonic: SEPOLIA_MNEMONIC
-    } :
-       [SEPOLIA_KEY],
+    accounts: SEPOLIA_MNEMONIC
+      ? {
+          mnemonic: SEPOLIA_MNEMONIC,
+        }
+      : [SEPOLIA_KEY],
     deploymentConfig: {
       guardianIds: [
         typeof SEPOLIA_ACCOUNT_NUMBER == "undefined" ||
@@ -188,9 +189,7 @@ if (ETHEREUM_PRIVATE_KEY) {
     url: "https://ethereum-rpc.publicnode.com",
     accounts: [ETHEREUM_PRIVATE_KEY],
     deploymentConfig: {
-      guardianIds: [
-        ETHEREUM_GUARDIAN_ADDRESS,
-      ],
+      guardianIds: [ETHEREUM_GUARDIAN_ADDRESS],
       threshold: 1,
       weth: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
     },
