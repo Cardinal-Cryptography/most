@@ -77,6 +77,7 @@ pub const RELAY_GAS_USAGE: u128 = 450000;
 pub const GAS_ORACLE_MAX_AGE: u64 = 86400000;
 pub const ORACLE_CALL_GAS_LIMIT: u64 = 2000000000;
 pub const BASE_FEE_BUFFER_PERCENTAGE: u128 = 20;
+pub const DEFAULT_ETH_TRANSFER_GAS_USAGE: u128 = 60_000;
 
 pub mod most {
     use super::*;
@@ -98,6 +99,7 @@ pub mod most {
         gas_price_oracle: Option<AccountId>,
         owner: AccountId,
         caller: drink::AccountId32,
+        eth_transfer_gas_usage: u128,
     ) -> Most {
         let _code_hash = session.upload_code(most::upload()).unwrap();
 
@@ -116,6 +118,7 @@ pub mod most {
             base_fee_buffer_percentage,
             gas_price_oracle,
             owner,
+            eth_transfer_gas_usage,
         );
 
         session

@@ -6,7 +6,6 @@ pub use self::most::{MostError, MostRef};
 
 #[ink::contract]
 pub mod most {
-
     use gas_oracle_trait::EthGasPriceOracle;
     use ink::{
         codegen::TraitCallBuilder,
@@ -134,8 +133,8 @@ pub mod most {
         request_nonce: u128,
         /// accounting helper
         committee_id: CommitteeId,
-        /// a fixed subsidy transferred along with the bridged tokens to the destination account on aleph zero to bootstrap
-        pocket_money: u128,
+        /// max value of a subsidy transferred along with the bridged tokens to the destination account on aleph zero to bootstrap
+        max_pocket_money: u128,
         /// balance that can be paid out as pocket money
         pocket_money_balance: u128,
         /// How much gas does a single confirmation of a cross-chain transfer request use on the destination chain on average.
@@ -190,6 +189,8 @@ pub mod most {
         local_token: Mapping<AccountId, (), ManualKey<0x6c6f6361>>,
         /// Wrapped AZERO address
         wazero: Lazy<AccountId, ManualKey<0x77617a65>>,
+        /// How much gas does user use when requesting a bridging transfer.
+        eth_transfer_gas_usage: Lazy<u128, ManualKey<0x6574685f>>,
     }
 
     #[derive(Debug, PartialEq, Eq, Encode, Decode)]
@@ -217,6 +218,7 @@ pub mod most {
         WrappedEthNotSet,
         WrappedAzeroNotSet,
         ValueTransferredLowerThanAmount,
+        Other,
     }
 
     impl From<InkEnvError> for MostError {
@@ -243,7 +245,7 @@ pub mod most {
         pub fn new(
             committee: Vec<AccountId>,
             signature_threshold: u128,
-            pocket_money: Balance,
+            max_pocket_money: Balance,
             relay_gas_usage: u128,
             min_gas_price: u128,
             max_gas_price: u128,
@@ -253,6 +255,7 @@ pub mod most {
             base_fee_buffer_percentage: u128,
             gas_price_oracle: Option<AccountId>,
             owner: AccountId,
+            initial_eth_transfer_gas_usage: u128,
         ) -> Result<Self, MostError> {
             Self::check_committee(&committee, signature_threshold)?;
 
@@ -273,7 +276,7 @@ pub mod most {
             data.set(&Data {
                 request_nonce: 0,
                 committee_id,
-                pocket_money,
+                max_pocket_money,
                 pocket_money_balance: 0,
                 relay_gas_usage,
                 min_gas_price,
@@ -290,6 +293,8 @@ pub mod most {
             ownable_data.set(&Ownable2StepData::new(owner));
             let weth = Lazy::new();
             let wazero = Lazy::new();
+            let mut eth_transfer_gas_usage = Lazy::new();
+            eth_transfer_gas_usage.set(&initial_eth_transfer_gas_usage);
 
             Ok(Self {
                 data,
@@ -307,6 +312,7 @@ pub mod most {
                 weth,
                 local_token: Mapping::new(),
                 wazero,
+                eth_transfer_gas_usage,
             })
         }
 
@@ -557,22 +563,7 @@ pub mod most {
                     )?;
                 }
 
-                let mut data = self.data()?;
-                // bootstrap account with pocket money
-                if data.pocket_money_balance >= data.pocket_money {
-                    // don't revert if the transfer fails
-                    if self
-                        .env()
-                        .transfer(dest_receiver_address.into(), data.pocket_money)
-                        .is_ok()
-                    {
-                        data.pocket_money_balance = data
-                            .pocket_money_balance
-                            .checked_sub(data.pocket_money)
-                            .ok_or(MostError::Arithmetic)?;
-                        self.data.set(&data);
-                    }
-                }
+                self.send_pocket_money(dest_receiver_address.into())?;
 
                 // mark it as processed
                 self.processed_requests.insert(request_hash, &());
@@ -587,6 +578,63 @@ pub mod most {
             }
 
             Ok(())
+        }
+
+        fn send_pocket_money(&mut self, dest_receiver_address: AccountId) -> Result<(), MostError> {
+            let mut data = self.data()?;
+            let pocket_money_to_send = self.current_pocket_money_value();
+
+            // we have nothing to send
+            if pocket_money_to_send == 0 {
+                return Ok(());
+            }
+
+            // bootstrap account with pocket money
+            if data.pocket_money_balance < pocket_money_to_send {
+                return Ok(());
+            }
+
+            // don't revert if the transfer fails
+            if self
+                .env()
+                .transfer(dest_receiver_address, pocket_money_to_send)
+                .is_ok()
+            {
+                data.pocket_money_balance = data
+                    .pocket_money_balance
+                    .checked_sub(pocket_money_to_send)
+                    .ok_or(MostError::Arithmetic)?;
+                self.data.set(&data);
+            }
+
+            Ok(())
+        }
+
+        /// Calculates amount of pocket money that will be transferred to destination account upon
+        /// bridging transfer.
+        #[ink(message)]
+        pub fn current_pocket_money_value(&self) -> u128 {
+            const DEFAULT_POCKET_MONEY: u128 = 0;
+
+            let gas_price = match self.get_gas_price() {
+                Ok(Some((price, _))) => price,
+                _ => return DEFAULT_POCKET_MONEY,
+            };
+            let data = match self.data() {
+                Ok(data) => data,
+                _ => return DEFAULT_POCKET_MONEY,
+            };
+            let eth_transfer_gas_usage = match self.eth_transfer_gas_usage.get() {
+                Some(gas_usage) => gas_usage,
+                _ => return DEFAULT_POCKET_MONEY,
+            };
+            let max_pocket_money = data.max_pocket_money;
+
+            // ~75% of the gas spend on eth side but no more than allowed max
+            let pocket_money =
+                u128::min(max_pocket_money, eth_transfer_gas_usage * gas_price * 3 / 4);
+
+            u128::min(pocket_money, data.pocket_money_balance)
         }
 
         /// Request payout of rewards for signing & relaying cross-chain transfers.
@@ -634,13 +682,16 @@ pub mod most {
             Ok(())
         }
 
-        /// Method used to change pocket_money value.
+        /// Method used to change max_pocket_money value.
         #[ink(message)]
-        pub fn set_pocket_money(&mut self, new_pocket_money: u128) -> Result<(), MostError> {
+        pub fn set_max_pocket_money(
+            &mut self,
+            new_max_pocket_money: u128,
+        ) -> Result<(), MostError> {
             self.ensure_owner()?;
             let mut data = self.data()?;
 
-            data.pocket_money = new_pocket_money;
+            data.max_pocket_money = new_max_pocket_money;
             self.data.set(&data);
 
             Ok(())
@@ -730,8 +781,8 @@ pub mod most {
         ///
         /// An amount of the native token that is tranferred with every request
         #[ink(message)]
-        pub fn get_pocket_money(&self) -> Result<Balance, MostError> {
-            Ok(self.data()?.pocket_money)
+        pub fn get_max_pocket_money(&self) -> Result<Balance, MostError> {
+            Ok(self.data()?.max_pocket_money)
         }
 
         /// Query pocket money balance
@@ -800,37 +851,50 @@ pub mod most {
             Ok(0)
         }
 
-        /// Queries a gas price oracle and returns the current base_fee charged per cross chain transfer denominated in AZERO
-        #[ink(message)]
-        pub fn get_base_fee(&self) -> Result<Balance, MostError> {
-            let gas_price = if let Some(gas_price_oracle_address) = self.data()?.gas_price_oracle {
+        fn get_gas_price(&self) -> Result<Option<(Balance, u64)>, MostError> {
+            if let Some(gas_price_oracle_address) = self.data()?.gas_price_oracle {
                 let gas_price_oracle: contract_ref!(EthGasPriceOracle) =
                     gas_price_oracle_address.into();
 
-                match gas_price_oracle
-                    .call()
-                    .get_price()
-                    .gas_limit(self.data()?.oracle_call_gas_limit)
-                    .try_invoke()
-                {
-                    Ok(Ok((gas_price, timestamp))) => {
-                        if timestamp + self.data()?.gas_oracle_max_age
-                            < self.env().block_timestamp()
-                        {
-                            self.data()?.default_gas_price
-                        } else if gas_price < self.data()?.min_gas_price {
-                            self.data()?.min_gas_price
-                        } else if gas_price > self.data()?.max_gas_price {
-                            self.data()?.max_gas_price
-                        } else {
-                            gas_price
-                        }
+                return Ok(
+                    match gas_price_oracle
+                        .call()
+                        .get_price()
+                        .gas_limit(self.data()?.oracle_call_gas_limit)
+                        .try_invoke()
+                    {
+                        Ok(Ok(res)) => Some(res),
+                        _ => None,
+                    },
+                );
+            }
+
+            Ok(None)
+        }
+
+        fn get_gas_price_with_limits(&self) -> Result<Balance, MostError> {
+            let gas_price = match self.get_gas_price()? {
+                Some((gas_price, timestamp)) => {
+                    if timestamp + self.data()?.gas_oracle_max_age < self.env().block_timestamp() {
+                        self.data()?.default_gas_price
+                    } else if gas_price < self.data()?.min_gas_price {
+                        self.data()?.min_gas_price
+                    } else if gas_price > self.data()?.max_gas_price {
+                        self.data()?.max_gas_price
+                    } else {
+                        gas_price
                     }
-                    _ => self.data()?.default_gas_price,
                 }
-            } else {
-                self.data()?.default_gas_price
+                _ => self.data()?.default_gas_price,
             };
+
+            Ok(gas_price)
+        }
+
+        /// Queries a gas price oracle and returns the current base_fee charged per cross chain transfer denominated in AZERO
+        #[ink(message)]
+        pub fn get_base_fee(&self) -> Result<Balance, MostError> {
+            let gas_price = self.get_gas_price_with_limits()?;
 
             let base_fee = gas_price
                 .checked_mul(self.data()?.relay_gas_usage)
@@ -1035,6 +1099,19 @@ pub mod most {
             let mut data = self.data()?;
             data.gas_price_oracle = Some(gas_price_oracle);
             self.data.set(&data);
+            Ok(())
+        }
+
+        /// Sets an `eth_transfer_gas_usage`.
+        ///
+        /// Can only be called by the contracts owner
+        #[ink(message)]
+        pub fn set_eth_transfer_gas_usage(
+            &mut self,
+            new_eth_transfer_gas_usage: u128,
+        ) -> Result<(), crate::most::MostError> {
+            self.ensure_owner()?;
+            self.eth_transfer_gas_usage.set(&new_eth_transfer_gas_usage);
             Ok(())
         }
 
@@ -1274,7 +1351,7 @@ pub mod most {
         use super::*;
 
         const THRESHOLD: u128 = 3;
-        const POCKET_MONEY: Balance = 1000000000000;
+        const MAX_POCKET_MONEY: Balance = 1000000000000;
         const RELAY_GAS_USAGE: u128 = 50000;
         const MIN_FEE: Balance = 1000000000000;
         const MAX_FEE: Balance = 100000000000000;
@@ -1282,6 +1359,7 @@ pub mod most {
         const GAS_ORACLE_MAX_AGE: u64 = 86400000;
         const ORACLE_CALL_GAS_LIMIT: u64 = 2000000000;
         const BASE_FEE_BUFFER_PERCENTAGE: u128 = 20;
+        const ETH_GAS_USAGE: u128 = 60_000;
 
         type DefEnv = DefaultEnvironment;
         type AccountId = <DefEnv as Environment>::AccountId;
@@ -1306,7 +1384,7 @@ pub mod most {
                 Most::new(
                     guardian_accounts(),
                     0,
-                    POCKET_MONEY,
+                    MAX_POCKET_MONEY,
                     RELAY_GAS_USAGE,
                     MIN_FEE,
                     MAX_FEE,
@@ -1315,7 +1393,8 @@ pub mod most {
                     ORACLE_CALL_GAS_LIMIT,
                     BASE_FEE_BUFFER_PERCENTAGE,
                     None,
-                    alice
+                    alice,
+                    ETH_GAS_USAGE
                 )
                 .expect_err("Threshold is zero, instantiation should fail."),
                 MostError::InvalidThreshold
@@ -1331,7 +1410,7 @@ pub mod most {
                 Most::new(
                     guardian_accounts(),
                     (guardian_accounts().len() + 1) as u128,
-                    POCKET_MONEY,
+                    MAX_POCKET_MONEY,
                     RELAY_GAS_USAGE,
                     MIN_FEE,
                     MAX_FEE,
@@ -1340,7 +1419,8 @@ pub mod most {
                     ORACLE_CALL_GAS_LIMIT,
                     BASE_FEE_BUFFER_PERCENTAGE,
                     None,
-                    alice
+                    alice,
+                    ETH_GAS_USAGE
                 )
                 .expect_err("Threshold is larger than guardians, instantiation should fail."),
                 MostError::InvalidThreshold
@@ -1355,7 +1435,7 @@ pub mod most {
             let most = Most::new(
                 guardian_accounts(),
                 THRESHOLD,
-                POCKET_MONEY,
+                MAX_POCKET_MONEY,
                 RELAY_GAS_USAGE,
                 MIN_FEE,
                 MAX_FEE,
@@ -1365,6 +1445,7 @@ pub mod most {
                 BASE_FEE_BUFFER_PERCENTAGE,
                 None,
                 alice,
+                ETH_GAS_USAGE,
             )
             .expect("Threshold is valid.");
 
@@ -1384,7 +1465,7 @@ pub mod most {
             let most = Most::new(
                 guardian_accounts(),
                 THRESHOLD,
-                POCKET_MONEY,
+                MAX_POCKET_MONEY,
                 RELAY_GAS_USAGE,
                 MIN_FEE,
                 MAX_FEE,
@@ -1394,6 +1475,7 @@ pub mod most {
                 BASE_FEE_BUFFER_PERCENTAGE,
                 None,
                 accounts.alice,
+                ETH_GAS_USAGE,
             )
             .expect("Threshold is valid.");
 
@@ -1411,7 +1493,7 @@ pub mod most {
             let mut most = Most::new(
                 guardian_accounts(),
                 THRESHOLD,
-                POCKET_MONEY,
+                MAX_POCKET_MONEY,
                 RELAY_GAS_USAGE,
                 MIN_FEE,
                 MAX_FEE,
@@ -1421,6 +1503,7 @@ pub mod most {
                 BASE_FEE_BUFFER_PERCENTAGE,
                 None,
                 accounts.alice,
+                ETH_GAS_USAGE,
             )
             .expect("Threshold is valid.");
             set_caller::<DefEnv>(accounts.bob);
@@ -1455,7 +1538,7 @@ pub mod most {
             let mut most = Most::new(
                 guardian_accounts(),
                 THRESHOLD,
-                POCKET_MONEY,
+                MAX_POCKET_MONEY,
                 RELAY_GAS_USAGE,
                 MIN_FEE,
                 MAX_FEE,
@@ -1465,6 +1548,7 @@ pub mod most {
                 BASE_FEE_BUFFER_PERCENTAGE,
                 None,
                 accounts.alice,
+                ETH_GAS_USAGE,
             )
             .expect("Threshold is valid.");
 
@@ -1482,7 +1566,7 @@ pub mod most {
             let mut most = Most::new(
                 guardian_accounts(),
                 THRESHOLD,
-                POCKET_MONEY,
+                MAX_POCKET_MONEY,
                 RELAY_GAS_USAGE,
                 MIN_FEE,
                 MAX_FEE,
@@ -1492,6 +1576,7 @@ pub mod most {
                 BASE_FEE_BUFFER_PERCENTAGE,
                 None,
                 accounts.alice,
+                ETH_GAS_USAGE,
             )
             .expect("Threshold is valid.");
 
@@ -1503,13 +1588,13 @@ pub mod most {
         }
 
         #[ink::test]
-        fn owner_calling_set_pocket_money_test() {
+        fn owner_calling_set_max_pocket_money_test() {
             let accounts = default_accounts::<DefEnv>();
             set_caller::<DefEnv>(accounts.alice);
             let mut most = Most::new(
                 guardian_accounts(),
                 THRESHOLD,
-                POCKET_MONEY,
+                MAX_POCKET_MONEY,
                 RELAY_GAS_USAGE,
                 MIN_FEE,
                 MAX_FEE,
@@ -1519,22 +1604,23 @@ pub mod most {
                 BASE_FEE_BUFFER_PERCENTAGE,
                 None,
                 accounts.alice,
+                ETH_GAS_USAGE,
             )
             .expect("Threshold is valid.");
 
-            assert_eq!(most.get_pocket_money(), Ok(POCKET_MONEY));
-            assert_eq!(most.set_pocket_money(420), Ok(()));
-            assert_eq!(most.get_pocket_money(), Ok(420));
+            assert_eq!(most.get_max_pocket_money(), Ok(MAX_POCKET_MONEY));
+            assert_eq!(most.set_max_pocket_money(420), Ok(()));
+            assert_eq!(most.get_max_pocket_money(), Ok(420));
         }
 
         #[ink::test]
-        fn not_owner_calling_set_pocket_money() {
+        fn not_owner_calling_set_max_pocket_money() {
             let accounts = default_accounts::<DefEnv>();
             set_caller::<DefEnv>(accounts.bob);
             let mut most = Most::new(
                 guardian_accounts(),
                 THRESHOLD,
-                POCKET_MONEY,
+                MAX_POCKET_MONEY,
                 RELAY_GAS_USAGE,
                 MIN_FEE,
                 MAX_FEE,
@@ -1544,17 +1630,18 @@ pub mod most {
                 BASE_FEE_BUFFER_PERCENTAGE,
                 None,
                 accounts.alice,
+                ETH_GAS_USAGE,
             )
             .expect("Threshold is valid.");
 
-            assert_eq!(most.get_pocket_money(), Ok(POCKET_MONEY));
+            assert_eq!(most.get_max_pocket_money(), Ok(MAX_POCKET_MONEY));
             assert_eq!(
-                most.set_pocket_money(420),
+                most.set_max_pocket_money(420),
                 Err(MostError::Ownable(Ownable2StepError::CallerNotOwner(
                     accounts.bob
                 )))
             );
-            assert_eq!(most.get_pocket_money(), Ok(POCKET_MONEY));
+            assert_eq!(most.get_max_pocket_money(), Ok(MAX_POCKET_MONEY));
         }
     }
 }

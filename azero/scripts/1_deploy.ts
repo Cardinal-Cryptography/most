@@ -72,6 +72,7 @@ async function main(): Promise<void> {
     gas_oracle_max_age,
     oracle_call_gas_limit,
     base_fee_buffer_percentage,
+    eth_transfer_gas_usage,
     dev,
   } = config;
 
@@ -150,6 +151,7 @@ async function main(): Promise<void> {
       base_fee_buffer_percentage!,
       oracleAddress,
       deployer.address,
+      eth_transfer_gas_usage,
     ],
   );
 
@@ -166,6 +168,7 @@ async function main(): Promise<void> {
     base_fee_buffer_percentage!,
     oracleAddress,
     deployer.address,
+    eth_transfer_gas_usage,
     { gasLimit: estimatedGasMost },
   );
 
