@@ -775,6 +775,21 @@ pub mod most {
             self.payout_accounts.get(member_id)
         }
 
+        #[ink(message)]
+        pub fn get_wazero(&self) -> Option<AccountId> {
+            self.wazero.get()
+        }
+
+        #[ink(message)]
+        pub fn get_weth(&self) -> Option<AccountId> {
+            self.weth.get()
+        }
+
+        #[ink(message)]
+        pub fn is_local_token(&self, token_address: AccountId) -> bool {
+            self.local_token.contains::<AccountId>(token_address);
+        }
+
         /// Query request nonce
         ///
         /// Nonce is incremented with every request
@@ -1055,6 +1070,7 @@ pub mod most {
         #[ink(message)]
         pub fn set_weth(&mut self, weth_address: AccountId) -> Result<(), MostError> {
             self.ensure_owner()?;
+            self.ensure_halted()?;
             self.weth.set(&weth_address);
             Ok(())
         }
