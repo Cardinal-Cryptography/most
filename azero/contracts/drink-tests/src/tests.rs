@@ -25,6 +25,7 @@ fn no_duplicate_guardians_allowed(mut session: Session) {
         None,
         owner(),
         BOB,
+        DEFAULT_ETH_TRANSFER_GAS_USAGE,
     );
 
     guardians.push(guardians[0]);
@@ -51,6 +52,7 @@ fn no_zero_amount_allowed(mut session: Session) {
         None,
         owner(),
         BOB,
+        DEFAULT_ETH_TRANSFER_GAS_USAGE,
     );
     let token = token::setup(&mut session, "TestToken".to_string(), most.into(), BOB);
 
@@ -100,6 +102,7 @@ fn most_needs_to_be_token_minter_to_add_pair(mut session: Session) {
         None,
         owner(),
         BOB,
+        DEFAULT_ETH_TRANSFER_GAS_USAGE,
     );
     let token = token::setup(&mut session, "TestToken".to_string(), bob(), BOB);
 
@@ -135,6 +138,7 @@ fn most_is_not_a_minter_for_native_psp22(mut session: Session) {
         None,
         owner(),
         BOB,
+        DEFAULT_ETH_TRANSFER_GAS_USAGE,
     );
     let token = token::setup(&mut session, "TestToken".to_string(), bob(), BOB);
 
@@ -170,6 +174,7 @@ fn most_native_azero_transfer(mut session: Session) {
         None,
         owner(),
         BOB,
+        DEFAULT_ETH_TRANSFER_GAS_USAGE,
     );
     let most_address: ink_primitives::AccountId = most.into();
 
@@ -246,6 +251,7 @@ fn most_native_psp22_gets_locked_and_not_burned(mut session: Session) {
         None,
         owner(),
         BOB,
+        DEFAULT_ETH_TRANSFER_GAS_USAGE,
     );
     let most_address: ink_primitives::AccountId = most.into();
 
@@ -332,6 +338,7 @@ fn most_native_psp22_unlock(mut session: Session) {
         None,
         owner(),
         BOB,
+        DEFAULT_ETH_TRANSFER_GAS_USAGE,
     );
     let most_address: ink_primitives::AccountId = most.into();
 
@@ -439,6 +446,7 @@ fn most_native_azero_unlock(mut session: Session) {
         None,
         owner(),
         BOB,
+        DEFAULT_ETH_TRANSFER_GAS_USAGE,
     );
 
     let most_address: ink_primitives::AccountId = most.into();
@@ -556,6 +564,7 @@ fn correct_receive_request(mut session: Session) {
         None,
         owner(),
         BOB,
+        DEFAULT_ETH_TRANSFER_GAS_USAGE,
     );
     let token = token::setup(&mut session, "TestToken".to_string(), most.into(), BOB);
 
@@ -625,6 +634,7 @@ fn outdated_oracle_price(mut session: Session) {
         None,
         owner(),
         BOB,
+        DEFAULT_ETH_TRANSFER_GAS_USAGE,
     );
 
     let oracle = gas_price_oracle::setup(&mut session, alice(), 2 * MIN_GAS_PRICE, BOB);
@@ -669,6 +679,7 @@ fn receive_request_after_switching_to_higher_threshold(mut session: Session) {
         None,
         owner(),
         BOB,
+        DEFAULT_ETH_TRANSFER_GAS_USAGE,
     );
     let token = token::setup(&mut session, "TestToken".to_string(), most.into(), BOB);
 
