@@ -25,6 +25,9 @@ pub mod most {
     const ZERO_ADDRESS: [u8; 32] = [0; 32];
     const NATIVE_MARKER_ADDRESS: [u8; 32] = [0; 32];
 
+    /// ratio between wazero decimals on l1 and azero-erc20 on eth. 12 vs 18 decimals
+    const RATIO: u128 = 1_000_000;
+
     #[ink(event)]
     #[derive(Debug)]
     #[cfg_attr(feature = "std", derive(Eq, PartialEq))]
@@ -467,10 +470,12 @@ pub mod most {
                 .get(wrapped_azero_address_bytes)
                 .ok_or(MostError::UnsupportedPair)?;
 
+            let amount = amount_to_bridge.saturating_mul(RATIO);
+
             self._send_request(
                 wrapped_azero_address,
                 dest_token_address,
-                amount_to_bridge,
+                amount,
                 dest_receiver_address,
                 true,
                 transferred_fee,
@@ -548,6 +553,7 @@ pub mod most {
                     .contains::<AccountId>(dest_token_address.into());
 
                 if dest_token_address == NATIVE_MARKER_ADDRESS {
+                    let amount = amount.saturating_div(RATIO);
                     self.unwrap_azero_to(dest_receiver_address.into(), amount)?;
                 } else if is_local_token {
                     self.transfer(

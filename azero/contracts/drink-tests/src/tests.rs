@@ -4,6 +4,7 @@ use most::MostError;
 
 use drink::session::Session;
 use shared::hash_request_data;
+const WAZERO_RATIO: u128 = 1_000_000;
 
 #[drink::test]
 fn no_duplicate_guardians_allowed(mut session: Session) {
@@ -495,7 +496,7 @@ fn most_native_azero_unlock(mut session: Session) {
     let request_hash = hash_request_data(
         committee_id,
         ZERO_ADDRESS.into(),
-        amount_transferred,
+        amount_transferred * WAZERO_RATIO, // we multiply here since the decimals=18 on eth
         alice(),
         nonce,
     );
@@ -516,7 +517,7 @@ fn most_native_azero_unlock(mut session: Session) {
                 request_hash,
                 committee_id,
                 ZERO_ADDRESS,
-                amount_transferred,
+                amount_transferred * WAZERO_RATIO,
                 *alice().as_ref(),
                 nonce,
                 guardian.clone(),
