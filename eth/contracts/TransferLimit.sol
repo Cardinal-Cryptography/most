@@ -22,6 +22,10 @@ contract TransferLimit is
 
     mapping(address => USDMinimum) public usdMinima;
 
+    function initialize(address owner) public initializer {
+        __Ownable_init(owner);
+    }
+
     function _authorizeUpgrade(
         address newImplementation
     ) internal override onlyOwner {}
@@ -47,6 +51,7 @@ contract TransferLimit is
     ) public view returns (uint256) {
         uint256 minimum = defaultMinima[_token];
 
+        // TODO handle crashes
         USDMinimum memory config = usdMinima[_token];
         if (config.limit > 0) {
             (, int usdPrice, , , ) = config.oracle.latestRoundData();

@@ -11,6 +11,7 @@ const DEV_MNEMONIC =
 
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY;
 const SEPOLIA_MNEMONIC = process.env.SEPOLIA_MNEMONIC;
+const SEPOLIA_PRIVATE_KEY = process.env.SEPOLIA_PRIVATE_KEY;
 const SEPOLIA_ACCOUNT_NUMBER = process.env.SEPOLIA_ACCOUNT_NUMBER;
 const SEPOLIA_WETH = process.env.SEPOLIA_WETH;
 const SEPOLIA_TOKEN_CONFIG_PATH = process.env.SEPOLIA_TOKEN_CONFIG_PATH;
@@ -119,15 +120,21 @@ var config = {
   },
 };
 
+var SEPOLIA_ACCOUNT;
+
 if (SEPOLIA_MNEMONIC) {
+  SEPOLIA_ACCOUNT = { mnemonic: SEPOLIA_MNEMONIC };
+} else if (SEPOLIA_PRIVATE_KEY) {
+  SEPOLIA_ACCOUNT = [SEPOLIA_PRIVATE_KEY];
+}
+
+if (SEPOLIA_ACCOUNT) {
   config.networks.sepolia = {
     url:
       typeof SEPOLIA_URL == "undefined" || SEPOLIA_URL == ""
         ? "https://ethereum-sepolia-rpc.publicnode.com"
         : SEPOLIA_URL,
-    accounts: {
-      mnemonic: SEPOLIA_MNEMONIC,
-    },
+    accounts: SEPOLIA_ACCOUNT,
     deploymentConfig: {
       guardianIds: [
         typeof SEPOLIA_ACCOUNT_NUMBER == "undefined" ||
