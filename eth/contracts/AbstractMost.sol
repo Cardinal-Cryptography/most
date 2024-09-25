@@ -162,10 +162,7 @@ abstract contract AbstractMost is
         if (destTokenAddress == 0x0) revert UnsupportedPair();
 
         address token = bytes32ToAddress(srcTokenAddress);
-        if (
-            transferLimit != ITransferLimit(address(0)) &&
-            !transferLimit.isRequestAllowed(token, amount)
-        ) revert LimitExceeded();
+        checkTransferLimit(token, amount);
 
         // burn or lock tokens in this contract
         // message sender needs to give approval else this tx will revert
@@ -206,10 +203,7 @@ abstract contract AbstractMost is
         ];
 
         if (destTokenAddress == 0x0) revert UnsupportedPair();
-        if (
-            transferLimit != ITransferLimit(address(0)) &&
-            !transferLimit.isRequestAllowed(wethAddress, amount)
-        ) revert LimitExceeded();
+        checkTransferLimit(wethAddress, amount);
 
         (bool success, ) = wethAddress.call{value: amount}(
             abi.encodeCall(IWETH9.deposit, ())
@@ -242,10 +236,7 @@ abstract contract AbstractMost is
         bytes32 destTokenAddress = supportedPairs[wrappedAzeroAddressBytes32];
 
         if (destTokenAddress == 0x0) revert UnsupportedPair();
-        if (
-            transferLimit != ITransferLimit(address(0)) &&
-            !transferLimit.isRequestAllowed(wrappedAzeroAddress, amount)
-        ) revert LimitExceeded();
+        checkTransferLimit(wrappedAzeroAddress, amount);
 
         IERC20 azeroToken = IERC20(wrappedAzeroAddress);
         azeroToken.safeTransferFrom(msg.sender, address(this), amount);
@@ -480,5 +471,19 @@ abstract contract AbstractMost is
     /// @dev Accept ether only from weth contract or through payable methods
     receive() external payable virtual {
         require(msg.sender == wethAddress);
+    }
+
+    function checkTransferLimit(address token, uint256 amount) internal view {
+        if (transferLimit != ITransferLimit(address(0))) {
+            try transferLimit.isRequestAllowed(token, amount) returns (
+                bool result
+            ) {
+                if (!result) {
+                    revert LimitExceeded();
+                }
+            } catch {
+                // Ignore - behave as if the transferLimit is not set if it doesn't work for any reason
+            }
+        }
     }
 }

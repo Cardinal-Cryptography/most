@@ -51,7 +51,6 @@ contract TransferLimit is
     ) public view returns (uint256) {
         uint256 minimum = defaultMinima[_token];
 
-        // TODO handle crashes
         USDMinimum memory config = usdMinima[_token];
         if (config.limit > 0) {
             (, int usdPrice, , , ) = config.oracle.latestRoundData();
