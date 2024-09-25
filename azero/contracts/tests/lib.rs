@@ -282,13 +282,13 @@ mod e2e {
     fn correct_request_native_ether(mut client: ink_e2e::Client<C, E>) {
         let (most_address, weth_address) = setup_default_most_and_token(&mut client, true).await;
 
-        most_set_halted(client, &alice(), most_address, true)
+        most_set_halted(&mut client, &alice(), most_address, true)
             .await
             .expect("Set halt should succeed");
         most_set_weth(&mut client, &alice(), most_address, weth_address)
             .await
             .expect("Setting weth should succeed");
-        most_set_halted(client, &alice(), most_address, false)
+        most_set_halted(&mut client, &alice(), most_address, false)
             .await
             .expect("Set halt should succeed");
 
