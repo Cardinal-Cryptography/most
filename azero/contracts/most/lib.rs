@@ -787,7 +787,7 @@ pub mod most {
 
         #[ink(message)]
         pub fn is_local_token(&self, token_address: AccountId) -> bool {
-            self.local_token.contains::<AccountId>(token_address);
+            self.local_token.contains::<AccountId>(token_address)
         }
 
         /// Query request nonce
