@@ -62,6 +62,7 @@ mod e2e {
     const GAS_ORACLE_MAX_AGE: u64 = 86400000;
     const ORACLE_CALL_GAS_LIMIT: u64 = 2000000000;
     const BASE_FEE_BUFFER_PERCENTAGE: u128 = 20;
+    const DEFAULT_ETH_TRANSFER_GAS_USAGE: u128 = 60_000;
 
     #[ink_e2e::test]
     fn simple_deploy_works(mut client: ink_e2e::Client<C, E>) {
@@ -79,6 +80,7 @@ mod e2e {
             ORACLE_CALL_GAS_LIMIT,
             BASE_FEE_BUFFER_PERCENTAGE,
             account_id(AccountKeyring::Alice),
+            DEFAULT_ETH_TRANSFER_GAS_USAGE,
         )
         .await;
     }
@@ -544,134 +546,43 @@ mod e2e {
 
     #[ink_e2e::test]
     fn pocket_money(mut client: ink_e2e::Client<C, E>) {
-        let (most_address, token_address) = setup_default_most_and_token(&mut client, false).await;
+        let (azero_balance_before, azero_balance_after) =
+            setup_pocket_money_tests(&mut client, 10 * DEFAULT_POCKET_MONEY, DEFAULT_GAS_PRICE)
+                .await;
 
-        // seed contract with some funds for pocket money transfers
-        most_fund_pocket_money(
-            &mut client,
-            &alice(),
-            most_address,
-            10 * DEFAULT_POCKET_MONEY,
-        )
-        .await
-        .expect("fund pocket money should succeed");
-
-        let amount = 841189100000000;
-        let receiver_address = account_id(AccountKeyring::One);
-        let request_nonce = 1;
-
-        let request_hash = hash_request_data(
-            DEFAULT_COMMITTEE_ID,
-            token_address,
-            amount,
-            receiver_address,
-            request_nonce,
+        let expected_pocket_money = u128::min(
+            DEFAULT_POCKET_MONEY,
+            2 * DEFAULT_GAS_PRICE * DEFAULT_ETH_TRANSFER_GAS_USAGE * 3 / 4,
         );
-
-        let azero_balance_before = client
-            .balance(receiver_address)
-            .await
-            .expect("native balance before");
-
-        for signer in &guardian_keys()[0..(DEFAULT_THRESHOLD as usize)] {
-            most_receive_request(
-                &mut client,
-                signer,
-                most_address,
-                request_hash,
-                DEFAULT_COMMITTEE_ID,
-                *token_address.as_ref(),
-                amount,
-                *receiver_address.as_ref(),
-                request_nonce,
-            )
-            .await
-            .expect("Receive request should succeed");
-        }
-
-        let azero_balance_after = client
-            .balance(receiver_address)
-            .await
-            .expect("native balance after");
-
         assert_eq!(
             azero_balance_after,
-            azero_balance_before + DEFAULT_POCKET_MONEY
+            azero_balance_before + expected_pocket_money
         );
     }
 
     #[ink_e2e::test]
     fn pocket_money_wont_pay_from_rewards(mut client: ink_e2e::Client<C, E>) {
-        let (most_address, token_address) = setup_default_most_and_token(&mut client, true).await;
-
-        let amount_to_send = 1000;
-
-        let base_fee = most_base_fee(&mut client, most_address)
-            .await
-            .expect("should return base fee");
-
-        psp22_approve(
-            &mut client,
-            &alice(),
-            token_address,
-            most_address,
-            amount_to_send,
-        )
-        .await
-        .expect("approval should succeed");
-
-        // Send request so there are rewards in the contract
-        most_send_request(
-            &mut client,
-            &alice(),
-            most_address,
-            token_address,
-            amount_to_send,
-            REMOTE_RECEIVER,
-            base_fee,
-        )
-        .await
-        .expect("Request should succeed");
-
-        let amount = 841189100000000;
-        let receiver_address = account_id(AccountKeyring::One);
-        let request_nonce = 1;
-
-        let request_hash = hash_request_data(
-            DEFAULT_COMMITTEE_ID,
-            token_address,
-            amount,
-            receiver_address,
-            request_nonce,
-        );
-
-        let azero_balance_before = client
-            .balance(receiver_address)
-            .await
-            .expect("native balance before");
-
-        for signer in &guardian_keys()[0..(DEFAULT_THRESHOLD as usize)] {
-            most_receive_request(
-                &mut client,
-                signer,
-                most_address,
-                request_hash,
-                DEFAULT_COMMITTEE_ID,
-                *token_address.as_ref(),
-                amount,
-                *receiver_address.as_ref(),
-                request_nonce,
-            )
-            .await
-            .expect("Receive request should succeed");
-        }
-
-        let azero_balance_after = client
-            .balance(receiver_address)
-            .await
-            .expect("native balance after");
+        let (azero_balance_before, azero_balance_after) =
+            setup_pocket_money_tests(&mut client, 0, DEFAULT_GAS_PRICE).await;
 
         assert_eq!(azero_balance_after, azero_balance_before);
+    }
+
+    #[ink_e2e::test]
+    fn pocket_money_adjust_to_gas_price(mut client: ink_e2e::Client<C, E>) {
+        let gas_price = 420_000;
+        let (azero_balance_before, azero_balance_after) =
+            setup_pocket_money_tests(&mut client, 10 * DEFAULT_POCKET_MONEY, gas_price).await;
+
+        let expected_pocket_money = u128::min(
+            DEFAULT_POCKET_MONEY,
+            gas_price * DEFAULT_ETH_TRANSFER_GAS_USAGE * 3 / 4,
+        );
+
+        assert_eq!(
+            azero_balance_after,
+            azero_balance_before + expected_pocket_money
+        );
     }
 
     #[ink_e2e::test]
@@ -1148,6 +1059,7 @@ mod e2e {
         oracle_call_gas_limit: u64,
         base_fee_buffer_percentage: u128,
         owner: AccountId,
+        default_eth_transfer_gas_usage: u128,
     ) -> AccountId {
         let most_constructor = MostRef::new(
             guardians,
@@ -1162,6 +1074,7 @@ mod e2e {
             base_fee_buffer_percentage,
             None,
             owner,
+            default_eth_transfer_gas_usage,
         );
         client
             .instantiate("most", caller, most_constructor, 0, None)
@@ -1216,6 +1129,7 @@ mod e2e {
             ORACLE_CALL_GAS_LIMIT,
             BASE_FEE_BUFFER_PERCENTAGE,
             account_id(AccountKeyring::Alice),
+            DEFAULT_ETH_TRANSFER_GAS_USAGE,
         )
         .await;
 
@@ -1240,6 +1154,65 @@ mod e2e {
             .expect("Set halt should succeed");
 
         (most_address, token_address)
+    }
+
+    async fn setup_pocket_money_tests(
+        client: &mut E2EClient,
+        pocket_money_funds: u128,
+        gas_price: u128,
+    ) -> (u128, u128) {
+        let (most_address, token_address) = setup_default_most_and_token(client, false).await;
+
+        let oracle_address = instantiate_oracle(client, &alice(), gas_price).await;
+
+        most_set_gas_oracle(client, &alice(), most_address, oracle_address)
+            .await
+            .expect("can set gas oracle");
+
+        // seed contract with some funds for pocket money transfers
+        most_fund_pocket_money(client, &alice(), most_address, pocket_money_funds)
+            .await
+            .expect("fund pocket money should succeed");
+
+        let amount = 841189100000000;
+        let receiver_address = account_id(AccountKeyring::One);
+        let request_nonce = 1;
+
+        let request_hash = hash_request_data(
+            DEFAULT_COMMITTEE_ID,
+            token_address,
+            amount,
+            receiver_address,
+            request_nonce,
+        );
+
+        let azero_balance_before = client
+            .balance(receiver_address)
+            .await
+            .expect("native balance before");
+
+        for signer in &guardian_keys()[0..(DEFAULT_THRESHOLD as usize)] {
+            most_receive_request(
+                client,
+                signer,
+                most_address,
+                request_hash,
+                DEFAULT_COMMITTEE_ID,
+                *token_address.as_ref(),
+                amount,
+                *receiver_address.as_ref(),
+                request_nonce,
+            )
+            .await
+            .expect("Receive request should succeed");
+        }
+
+        let azero_balance_after = client
+            .balance(receiver_address)
+            .await
+            .expect("native balance after");
+
+        (azero_balance_before, azero_balance_after)
     }
 
     async fn most_add_pair(
