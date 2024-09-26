@@ -111,7 +111,7 @@ async function main() {
   await setWrappedAzeroTx.wait(1);
   console.log("Wrapped azero address set to", await most.wrappedAzeroAddress());
 
-  if (network.name == "development" || network.name == "bridgenet") {
+  if (network.config.dev) {
     // NOTE : TEMPorary before devnet is fixed and uses proper genesis that seeds these accounts with funds
     for (const to of signers.slice(1, 4)) {
       await signers[0].sendTransaction({
@@ -133,9 +133,6 @@ async function main() {
     const USDT = await ethers.getContractFactory("TetherToken");
     const usdt = USDT.attach(usdtAddress);
     await usdt.transfer(addresses.most, 1000000000000000);
-
-    // --- unpause most
-    await unpauseMost(most, signers[0]);
   }
 
   console.log("Done");

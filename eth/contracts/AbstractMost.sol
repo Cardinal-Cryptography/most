@@ -219,7 +219,7 @@ abstract contract AbstractMost is
     function sendRequestAzeroToNative(
         uint256 amount,
         bytes32 destReceiverAddress
-    ) external virtual {
+    ) external virtual whenNotPaused {
         if (amount == 0) revert ZeroAmount();
         if (destReceiverAddress == bytes32(0)) revert ZeroAddress();
         if (wrappedAzeroAddress == address(0)) revert AzeroAddressNotSet();
