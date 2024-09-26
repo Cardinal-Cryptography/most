@@ -13,8 +13,8 @@ function getTokenAddressBySymbol(symbol, tokens) {
 async function main() {
   const signers = await ethers.getSigners();
   const accounts = signers.map((s) => s.address);
-  const config = network.config.deploymentConfig;
-  const tokenConfigPath = config.tokenConfigPath;
+  const deploymentConfig = network.config.deploymentConfig;
+  const tokenConfigPath = deploymentConfig.tokenConfigPath;
 
   let tokenConfig = JSON.parse(
     fs.readFileSync(tokenConfigPath, { encoding: "utf8", flag: "r" }),
@@ -29,7 +29,7 @@ async function main() {
 
   addresses = {};
 
-  if (network.name == "development" || network.name == "bridgenet") {
+  if (network.config.dev) {
     const WETH = await ethers.getContractFactory("WETH9");
     console.log("Deploying WETH...");
     const weth = await WETH.deploy();
@@ -60,8 +60,8 @@ async function main() {
   const most = await upgrades.deployProxy(
     Most,
     [
-      config.guardianIds,
-      config.threshold,
+      deploymentConfig.guardianIds,
+      deploymentConfig.threshold,
       accounts[0],
       getTokenAddressBySymbol("WETH", ethTokenAdresses),
     ],

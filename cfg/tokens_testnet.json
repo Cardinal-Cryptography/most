@@ -5,7 +5,7 @@
             "symbol": "WETH",
             "decimals": 18,
             "deployed": true,
-            "address": "0xfff9976782d46cc05630d1f6ebab18b2324d6b14"
+            "address": "0xd91aE8FD2Be53F74876a9cc4aFb416645A0c8420"
         }
     ],
     "aleph": [
@@ -14,7 +14,7 @@
             "symbol": "wAZERO",
             "decimals": 12,
             "deployed": true,
-            "address": "5CtuFVgEUz13SFPVY6s2cZrnLDEkxQXc19aXrNARwEBeCXgg"
+            "address": "5EFDb7mKbougLtr5dnwd5KDfZ3wK55JPGPLiryKq4uRMPR46"
         }
     ]
 }
