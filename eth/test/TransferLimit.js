@@ -124,7 +124,7 @@ async function setupTransferLimitFixture(most) {
     kind: "uups",
   });
 
-  most.setTransferLimit(await limit.getAddress());
+  most.setTransferLimitContract(await limit.getAddress());
 
   return limit;
 }

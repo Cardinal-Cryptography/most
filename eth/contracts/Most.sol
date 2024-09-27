@@ -15,7 +15,7 @@ contract Most is AbstractMost {
         _disableInitializers();
     }
 
-    function setTransferLimit(
+    function setTransferLimitContract(
         ITransferLimit _transferLimit
     ) external onlyOwner {
         transferLimit = _transferLimit;
