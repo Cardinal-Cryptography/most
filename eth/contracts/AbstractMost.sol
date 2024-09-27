@@ -10,7 +10,6 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/acces
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {IWETH9} from "./IWETH9.sol";
 import {IWrappedToken} from "./IWrappedToken.sol";
-import {ITransferLimit} from "./ITransferLimit.sol";
 
 /// @title Most
 /// @author Cardinal Cryptography
@@ -40,8 +39,6 @@ abstract contract AbstractMost is
     mapping(address => bool) public isLocalToken;
 
     address public wrappedAzeroAddress;
-
-    ITransferLimit public transferLimit;
 
     struct Request {
         uint256 signatureCount;
@@ -162,7 +159,7 @@ abstract contract AbstractMost is
         if (destTokenAddress == 0x0) revert UnsupportedPair();
 
         address token = bytes32ToAddress(srcTokenAddress);
-        checkTransferLimit(token, amount);
+        checkTransferAllowed(token, amount);
 
         // burn or lock tokens in this contract
         // message sender needs to give approval else this tx will revert
@@ -203,7 +200,7 @@ abstract contract AbstractMost is
         ];
 
         if (destTokenAddress == 0x0) revert UnsupportedPair();
-        checkTransferLimit(wethAddress, amount);
+        checkTransferAllowed(wethAddress, amount);
 
         (bool success, ) = wethAddress.call{value: amount}(
             abi.encodeCall(IWETH9.deposit, ())
@@ -236,7 +233,7 @@ abstract contract AbstractMost is
         bytes32 destTokenAddress = supportedPairs[wrappedAzeroAddressBytes32];
 
         if (destTokenAddress == 0x0) revert UnsupportedPair();
-        checkTransferLimit(wrappedAzeroAddress, amount);
+        checkTransferAllowed(wrappedAzeroAddress, amount);
 
         IERC20 azeroToken = IERC20(wrappedAzeroAddress);
         azeroToken.safeTransferFrom(msg.sender, address(this), amount);
@@ -388,12 +385,6 @@ abstract contract AbstractMost is
         wrappedAzeroAddress = _wrappedAzeroAddress;
     }
 
-    function setTransferLimit(
-        ITransferLimit _transferLimit
-    ) external onlyOwner {
-        transferLimit = _transferLimit;
-    }
-
     function addPair(
         bytes32 from,
         bytes32 to,
@@ -473,17 +464,8 @@ abstract contract AbstractMost is
         require(msg.sender == wethAddress);
     }
 
-    function checkTransferLimit(address token, uint256 amount) internal view {
-        if (transferLimit != ITransferLimit(address(0))) {
-            try transferLimit.isRequestAllowed(token, amount) returns (
-                bool result
-            ) {
-                if (!result) {
-                    revert LimitExceeded();
-                }
-            } catch {
-                // Ignore - behave as if the transferLimit is not set if it doesn't work for any reason
-            }
-        }
-    }
+    function checkTransferAllowed(
+        address token,
+        uint256 amount
+    ) internal view virtual {}
 }
