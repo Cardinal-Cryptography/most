@@ -55,7 +55,7 @@ async function setupWazeroFixture(most) {
     "Wrapped AZERO",
     "wAZERO",
     WAZERO_DECIMALS,
-    await most.getAddress()
+    await most.getAddress(),
   );
   const wrappedAzeroAddress = await wazero.getAddress();
   const wrappedAzeroAddressBytes32 = addressToBytes32(wrappedAzeroAddress);
@@ -82,7 +82,7 @@ async function setupTokenFixture(most) {
     "10000000000000000000000000",
     "15",
     "TestToken",
-    "TEST"
+    "TEST",
   );
 
   const tokenAddressBytes32 = addressToBytes32(await token.getAddress());
@@ -105,7 +105,7 @@ async function setupMostFixture() {
     {
       initializer: "initialize",
       kind: "uups",
-    }
+    },
   );
 
   const wethAddressBytes32 = addressToBytes32(await weth.getAddress());
@@ -161,10 +161,10 @@ describe("TransferLimit", function () {
 
       expect(await limit.minimumTransferAmount(weth)).to.equal(100);
       await expect(
-        most.sendRequestNative(ALEPH_ACCOUNT, { value: 10 })
+        most.sendRequestNative(ALEPH_ACCOUNT, { value: 10 }),
       ).to.be.revertedWithCustomError(most, "LimitExceeded");
       await expect(
-        most.sendRequestNative(ALEPH_ACCOUNT, { value: 100 })
+        most.sendRequestNative(ALEPH_ACCOUNT, { value: 100 }),
       ).to.not.be.revertedWithCustomError(most, "LimitExceeded");
     });
 
@@ -175,7 +175,7 @@ describe("TransferLimit", function () {
         weth,
         WETH_DECIMALS,
         await oracle.getAddress(),
-        2
+        2,
       );
 
       const oracleDecimals = await oracle.decimals();
@@ -185,17 +185,17 @@ describe("TransferLimit", function () {
       const expectedMinimumAmount =
         BigInt(1 * 10 ** WETH_DECIMALS) / BigInt(50);
       expect(await limit.minimumTransferAmount(weth)).to.equal(
-        expectedMinimumAmount
+        expectedMinimumAmount,
       );
       await expect(
         most.sendRequestNative(ALEPH_ACCOUNT, {
           value: expectedMinimumAmount - BigInt(1),
-        })
+        }),
       ).to.be.revertedWithCustomError(most, "LimitExceeded");
       await expect(
         most.sendRequestNative(ALEPH_ACCOUNT, {
           value: expectedMinimumAmount,
-        })
+        }),
       ).to.not.be.reverted;
     });
 
@@ -206,7 +206,7 @@ describe("TransferLimit", function () {
         weth,
         WETH_DECIMALS,
         await oracle.getAddress(),
-        2
+        2,
       );
 
       const oracleDecimals = await oracle.decimals();
@@ -218,12 +218,12 @@ describe("TransferLimit", function () {
       await expect(
         most.sendRequestNative(ALEPH_ACCOUNT, {
           value: defaultLimit - BigInt(1),
-        })
+        }),
       ).to.be.revertedWithCustomError(most, "LimitExceeded");
       await expect(
         most.sendRequestNative(ALEPH_ACCOUNT, {
           value: defaultLimit,
-        })
+        }),
       ).to.not.be.reverted;
     });
   });
@@ -266,7 +266,7 @@ describe("TransferLimit", function () {
 
       expect(await limit.minimumTransferAmount(tokenAddress)).to.equal(100);
       await expect(
-        most.sendRequest(tokenAddressBytes32, 10, ALEPH_ACCOUNT)
+        most.sendRequest(tokenAddressBytes32, 10, ALEPH_ACCOUNT),
       ).to.be.revertedWithCustomError(most, "LimitExceeded");
       await expect(most.sendRequest(tokenAddressBytes32, 100, ALEPH_ACCOUNT)).to
         .not.be.reverted;
@@ -287,13 +287,13 @@ describe("TransferLimit", function () {
         token,
         TOKEN_DECIMALS,
         await oracle.getAddress(),
-        2
+        2,
       );
 
       const oracleDecimals = await oracle.decimals();
       await limit.setDefaultLimit(
         tokenAddress,
-        BigInt(1000 * 10 ** TOKEN_DECIMALS)
+        BigInt(1000 * 10 ** TOKEN_DECIMALS),
       );
       await oracle.setPrice(BigInt(100) * BigInt(10) ** oracleDecimals);
       const expectedMinimumAmount =
@@ -301,21 +301,21 @@ describe("TransferLimit", function () {
       await token.approve(mostAddress, expectedMinimumAmount);
 
       expect(await limit.minimumTransferAmount(tokenAddress)).to.equal(
-        expectedMinimumAmount
+        expectedMinimumAmount,
       );
       await expect(
         most.sendRequest(
           tokenAddressBytes32,
           expectedMinimumAmount - BigInt(1),
-          ALEPH_ACCOUNT
-        )
+          ALEPH_ACCOUNT,
+        ),
       ).to.be.revertedWithCustomError(most, "LimitExceeded");
       await expect(
         most.sendRequest(
           tokenAddressBytes32,
           expectedMinimumAmount,
-          ALEPH_ACCOUNT
-        )
+          ALEPH_ACCOUNT,
+        ),
       ).to.not.be.reverted;
     });
 
@@ -334,7 +334,7 @@ describe("TransferLimit", function () {
         token,
         TOKEN_DECIMALS,
         await oracle.getAddress(),
-        2
+        2,
       );
 
       const oracleDecimals = await oracle.decimals();
@@ -344,17 +344,17 @@ describe("TransferLimit", function () {
       await token.approve(mostAddress, defaultLimit);
 
       expect(await limit.minimumTransferAmount(tokenAddress)).to.equal(
-        defaultLimit
+        defaultLimit,
       );
       await expect(
         most.sendRequest(
           tokenAddressBytes32,
           defaultLimit - BigInt(1),
-          ALEPH_ACCOUNT
-        )
+          ALEPH_ACCOUNT,
+        ),
       ).to.be.revertedWithCustomError(most, "LimitExceeded");
       await expect(
-        most.sendRequest(tokenAddressBytes32, defaultLimit, ALEPH_ACCOUNT)
+        most.sendRequest(tokenAddressBytes32, defaultLimit, ALEPH_ACCOUNT),
       ).to.not.be.reverted;
     });
   });
@@ -389,7 +389,7 @@ describe("TransferLimit", function () {
 
       expect(await limit.minimumTransferAmount(wazeroAddress)).to.equal(100);
       await expect(
-        most.sendRequestAzeroToNative(10, ALEPH_ACCOUNT)
+        most.sendRequestAzeroToNative(10, ALEPH_ACCOUNT),
       ).to.be.revertedWithCustomError(most, "LimitExceeded");
       await expect(most.sendRequestAzeroToNative(100, ALEPH_ACCOUNT)).to.not.be
         .reverted;
@@ -403,13 +403,13 @@ describe("TransferLimit", function () {
         wazeroAddress,
         WAZERO_DECIMALS,
         await oracle.getAddress(),
-        2
+        2,
       );
 
       const oracleDecimals = await oracle.decimals();
       await limit.setDefaultLimit(
         wazeroAddress,
-        BigInt(1000 * 10 ** WAZERO_DECIMALS)
+        BigInt(1000 * 10 ** WAZERO_DECIMALS),
       );
       await oracle.setPrice(BigInt(100) * BigInt(10) ** oracleDecimals);
       const expectedMinimumAmount =
@@ -417,16 +417,16 @@ describe("TransferLimit", function () {
       await wazero.approve(mostAddress, expectedMinimumAmount);
 
       expect(await limit.minimumTransferAmount(wazeroAddress)).to.equal(
-        expectedMinimumAmount
+        expectedMinimumAmount,
       );
       await expect(
         most.sendRequestAzeroToNative(
           expectedMinimumAmount - BigInt(1),
-          ALEPH_ACCOUNT
-        )
+          ALEPH_ACCOUNT,
+        ),
       ).to.be.revertedWithCustomError(most, "LimitExceeded");
       await expect(
-        most.sendRequestAzeroToNative(expectedMinimumAmount, ALEPH_ACCOUNT)
+        most.sendRequestAzeroToNative(expectedMinimumAmount, ALEPH_ACCOUNT),
       ).to.not.be.reverted;
     });
 
@@ -438,7 +438,7 @@ describe("TransferLimit", function () {
         wazero,
         WAZERO_DECIMALS,
         await oracle.getAddress(),
-        2
+        2,
       );
 
       const oracleDecimals = await oracle.decimals();
@@ -448,10 +448,10 @@ describe("TransferLimit", function () {
       await wazero.approve(mostAddress, defaultLimit);
 
       expect(await limit.minimumTransferAmount(wazeroAddress)).to.equal(
-        defaultLimit
+        defaultLimit,
       );
       await expect(
-        most.sendRequestAzeroToNative(defaultLimit - BigInt(1), ALEPH_ACCOUNT)
+        most.sendRequestAzeroToNative(defaultLimit - BigInt(1), ALEPH_ACCOUNT),
       ).to.be.revertedWithCustomError(most, "LimitExceeded");
       await expect(most.sendRequestAzeroToNative(defaultLimit, ALEPH_ACCOUNT))
         .to.not.be.reverted;
