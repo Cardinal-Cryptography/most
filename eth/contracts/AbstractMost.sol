@@ -85,6 +85,7 @@ abstract contract AbstractMost is
     error EthTransfer();
     error ZeroAddress();
     error AzeroAddressNotSet();
+    error LimitExceeded();
 
     function __AbstractMost_init(
         address[] calldata _committee,
@@ -154,10 +155,11 @@ abstract contract AbstractMost is
         if (amount == 0) revert ZeroAmount();
         if (destReceiverAddress == bytes32(0)) revert ZeroAddress();
 
-        address token = bytes32ToAddress(srcTokenAddress);
-
         bytes32 destTokenAddress = supportedPairs[srcTokenAddress];
         if (destTokenAddress == 0x0) revert UnsupportedPair();
+
+        address token = bytes32ToAddress(srcTokenAddress);
+        checkTransferAllowed(token, amount);
 
         // burn or lock tokens in this contract
         // message sender needs to give approval else this tx will revert
@@ -198,6 +200,7 @@ abstract contract AbstractMost is
         ];
 
         if (destTokenAddress == 0x0) revert UnsupportedPair();
+        checkTransferAllowed(wethAddress, amount);
 
         (bool success, ) = wethAddress.call{value: amount}(
             abi.encodeCall(IWETH9.deposit, ())
@@ -230,6 +233,7 @@ abstract contract AbstractMost is
         bytes32 destTokenAddress = supportedPairs[wrappedAzeroAddressBytes32];
 
         if (destTokenAddress == 0x0) revert UnsupportedPair();
+        checkTransferAllowed(wrappedAzeroAddress, amount);
 
         IERC20 azeroToken = IERC20(wrappedAzeroAddress);
         azeroToken.safeTransferFrom(msg.sender, address(this), amount);
@@ -459,4 +463,9 @@ abstract contract AbstractMost is
     receive() external payable virtual {
         require(msg.sender == wethAddress);
     }
+
+    function checkTransferAllowed(
+        address token,
+        uint256 amount
+    ) internal view virtual {}
 }

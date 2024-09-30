@@ -5,6 +5,7 @@
     "author": "fbielejec",
     "license": "MIT",
     "dependencies": {
+        "@chainlink/contracts": "^1.2.0",
         "@openzeppelin-4.5.0/contracts": "npm:@openzeppelin/contracts@4.5.0",
         "@openzeppelin/contracts": "=5.0.2",
         "@openzeppelin/contracts-upgradeable": "=5.0.2"
