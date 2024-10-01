@@ -18,7 +18,6 @@ contract MostL2 is AbstractMost {
 
     address payable public stableSwapAddress;
     address public bAzeroAddress;
-    address public transferLimiterAddress;
 
     /// Rate of swap in stable swap we are content with
     uint256 public constant MIN_SWAP_RATE = 99;
