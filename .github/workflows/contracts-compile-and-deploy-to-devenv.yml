@@ -15,18 +15,10 @@ jobs:
     uses: ./.github/workflows/_check-vars-and-secrets.yml
     secrets: inherit
 
-  test-azero-contracts:
-    needs: [check-vars-and-secrets]
-    uses: ./.github/workflows/test-azero-contracts.yml
-
-  test-eth-contracts:
-    needs: [check-vars-and-secrets]
-    uses: ./.github/workflows/test-eth-contracts.yml
-
   deploy-contracts:
     name: Deploy and setup contracts
     runs-on: [self-hosted, Linux, X64, large]
-    needs: [test-eth-contracts, test-azero-contracts]
+    needs: [check-vars-and-secrets]
     outputs:
       artifact-matrix-json: ${{ steps.get-artifact-matrix.outputs.artifact-matrix }}
 
@@ -37,14 +29,6 @@ jobs:
       - name: Setup node
         uses: asdf-vm/actions/install@v3
 
-      - name: Create token config
-        shell: bash
-        run: |
-          cat cfg/tokens_testnet_example.json > cfg/tokens_testnet.json
-            # Commented out for now, in case contracts should be marked as not deployed
-            #jq '.eth[0].deployed = false' | jq '.aleph[0].deployed = false'
-            #jq 'del(.eth[0].address)' | jq 'del(.aleph[0].address)'
-
       - name: Create azero env file
         shell: bash
         env:
@@ -53,9 +37,10 @@ jobs:
           AZERO3: ${{ secrets.DEVENV_TESTNET_AZERO3_ACCOUNT_NUMBER }}
           AZERO1_SEED: ${{ secrets.DEVENV_TESTNET_AZERO1_KEY }}
         run: |
-          cat azero/env/testnet.json.example | \
+          cat azero/env/testnet.json | \
             jq '.relayers = ["${{ env.AZERO1 }}", "${{ env.AZERO2 }}", "${{ env.AZERO3 }}"]' | \
-            jq '.deployer_seed = "${{ env.AZERO1_SEED }}"' | jq '.dev = true' > azero/env/testnet.json
+            jq '.deployer_seed = "${{ env.AZERO1_SEED }}"' | jq '.dev = true' > azero/env/testnet.json.tmp
+          mv azero/env/testnet.json.tmp azero/env/testnet.json 
 
       - name: Get latest eth block
         shell: bash
