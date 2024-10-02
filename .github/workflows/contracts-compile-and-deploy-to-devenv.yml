@@ -1,8 +1,7 @@
 ---
-name: Devenv - deploy contracts
+name: Devenv - deploy contracts (on demand)
 
 on:
-  workflow_call:
   workflow_dispatch:
 
 concurrency:
