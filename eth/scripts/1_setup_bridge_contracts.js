@@ -56,7 +56,7 @@ async function addTokenPair(
 }
 
 async function unpauseMost(mostContract, ownerSigner) {
-  console.log("Unpausing Most:");
+  console.log("Unpausing Most");
   await mostContract.unpause({ from: ownerSigner });
   console.log("Most is now unpaused.");
 }
@@ -133,6 +133,8 @@ async function main() {
     const USDT = await ethers.getContractFactory("TetherToken");
     const usdt = USDT.attach(usdtAddress);
     await usdt.transfer(addresses.most, 1000000000000000);
+
+    unpauseMost(most, signers[0]);
   }
 
   console.log("Done");
