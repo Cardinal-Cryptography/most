@@ -227,12 +227,6 @@ abstract contract AbstractMost is
         if (destReceiverAddress == bytes32(0)) revert ZeroAddress();
         if (wrappedAzeroAddress == address(0)) revert AzeroAddressNotSet();
 
-        bytes32 wrappedAzeroAddressBytes32 = addressToBytes32(
-            wrappedAzeroAddress
-        );
-        bytes32 destTokenAddress = supportedPairs[wrappedAzeroAddressBytes32];
-
-        if (destTokenAddress == 0x0) revert UnsupportedPair();
         checkTransferAllowed(wrappedAzeroAddress, amount);
 
         IERC20 azeroToken = IERC20(wrappedAzeroAddress);

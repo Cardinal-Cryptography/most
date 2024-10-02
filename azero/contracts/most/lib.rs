@@ -403,6 +403,13 @@ pub mod most {
         ) -> Result<(), MostError> {
             self.ensure_not_halted()?;
 
+            let wrapped_azero_address = self.wazero.get().ok_or(MostError::WrappedAzeroNotSet)?;
+            let wrapped_azero_address_bytes: [u8; 32] = *wrapped_azero_address.as_ref();
+            if src_token_address == wrapped_azero_address_bytes {
+                // native AZERO transfers must be called via send_request_native_azero
+                return Err(MostError::UnsupportedPair);
+            }
+
             let dest_token_address = self
                 .supported_pairs
                 .get(src_token_address)

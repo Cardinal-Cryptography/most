@@ -56,6 +56,12 @@ fn no_zero_amount_allowed(mut session: Session) {
     );
     let token = token::setup(&mut session, "TestToken".to_string(), most.into(), BOB);
 
+    let wazero = wrapped_azero::setup(&mut session, BOB);
+    let wazero_address: ink_primitives::AccountId = wazero.into();
+
+    most::set_wazero(&mut session, &most, wazero_address, OWNER)
+        .expect("Set wazero should succeed");
+
     let token_address: ink_primitives::AccountId = token.into();
     most::add_pair(
         &mut session,
@@ -230,93 +236,6 @@ fn most_native_azero_transfer(mut session: Session) {
         wazero_total_supply_after,
         wazero_total_supply_before + amount_transferred
     );
-}
-
-#[drink::test]
-fn most_native_psp22_gets_locked_and_not_burned(mut session: Session) {
-    mint_to_default_accounts(&mut session);
-
-    let most = most::setup(
-        &mut session,
-        guardian_accounts(),
-        DEFAULT_THRESHOLD,
-        POCKET_MONEY,
-        RELAY_GAS_USAGE,
-        MIN_GAS_PRICE,
-        MAX_GAS_PRICE,
-        DEFAULT_GAS_PRICE,
-        GAS_ORACLE_MAX_AGE,
-        ORACLE_CALL_GAS_LIMIT,
-        BASE_FEE_BUFFER_PERCENTAGE,
-        None,
-        owner(),
-        BOB,
-        DEFAULT_ETH_TRANSFER_GAS_USAGE,
-    );
-    let most_address: ink_primitives::AccountId = most.into();
-
-    let wazero = wrapped_azero::setup(&mut session, BOB);
-    let wazero_address: ink_primitives::AccountId = wazero.into();
-
-    most::add_pair(
-        &mut session,
-        &most,
-        *wazero_address.as_ref(),
-        REMOTE_TOKEN,
-        true,
-        OWNER,
-    )
-    .expect("Add pair should succeed");
-
-    most::set_halted(&mut session, &most, false, OWNER).expect("Unhalt should succeed");
-
-    let amount_transferred = 1121;
-    let base_fee = most::get_base_fee(&mut session, &most).expect("Get base fee should succeed");
-
-    // Ensure that the sender has enough balance to cover the transfer
-    session
-        .sandbox()
-        .mint_into(ALICE, 2 * base_fee + amount_transferred)
-        .unwrap();
-
-    wrapped_azero::deposit(&mut session, &wazero, amount_transferred, ALICE)
-        .expect("Deposit should succeed");
-
-    wrapped_azero::increase_allowance(
-        &mut session,
-        &wazero,
-        most_address,
-        amount_transferred,
-        ALICE,
-    )
-    .expect("Increase allowance should succeed");
-
-    let most_balance_before = wrapped_azero::balance_of(&mut session, &wazero, most_address);
-    let alice_balance_before = wrapped_azero::balance_of(&mut session, &wazero, alice());
-    let wazero_total_supply_before = wrapped_azero::total_supply(&mut session, &wazero);
-
-    let result = most::send_request(
-        &mut session,
-        &most,
-        *wazero_address.as_ref(),
-        amount_transferred,
-        REMOTE_RECEIVER,
-        base_fee,
-        ALICE,
-    );
-
-    assert_eq!(result, Ok(()));
-
-    let most_balance_after = wrapped_azero::balance_of(&mut session, &wazero, most_address);
-    let alice_balance_after = wrapped_azero::balance_of(&mut session, &wazero, alice());
-    let wazero_total_supply_after = wrapped_azero::total_supply(&mut session, &wazero);
-
-    assert_eq!(most_balance_after, most_balance_before + amount_transferred);
-    assert_eq!(
-        alice_balance_after,
-        alice_balance_before - amount_transferred
-    );
-    assert_eq!(wazero_total_supply_after, wazero_total_supply_before);
 }
 
 #[drink::test]

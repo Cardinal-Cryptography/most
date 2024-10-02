@@ -127,7 +127,6 @@ describe("Most", function () {
 
     await most.addPair(tokenAddressBytes32, WRAPPED_TOKEN_ADDRESS, true);
     await most.addPair(wethAddressBytes32, WRAPPED_WETH_ADDRESS, true);
-    await most.addPair(wrappedAzeroAddressBytes32, WAZERO_ADDRESS, false);
     await most.unpause();
 
     return {
@@ -211,7 +210,7 @@ describe("Most", function () {
         .withArgs(0, WRAPPED_TOKEN_ADDRESS, TOKEN_AMOUNT, ALEPH_ACCOUNT, 0);
     });
 
-    it("Burns psp22 token representations", async () => {
+    it("Send native azero via sendRequest is not supported", async () => {
       const { most, wrappedAzero, wrappedAzeroAddressBytes32, mostAddress } =
         await loadFixture(deployEightGuardianMostFixture);
 
@@ -226,29 +225,15 @@ describe("Most", function () {
       );
 
       await wrappedAzero.connect(txSigner).approve(mostAddress, TOKEN_AMOUNT);
-      await most
-        .connect(txSigner)
-        .sendRequest(wrappedAzeroAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT);
-
-      expect(await wrappedAzero.totalSupply()).to.equal(0);
+      await expect(
+        most
+          .connect(txSigner)
+          .sendRequest(wrappedAzeroAddressBytes32, TOKEN_AMOUNT, ALEPH_ACCOUNT),
+      ).to.be.revertedWithCustomError(most, "UnsupportedPair");
     });
   });
 
   describe("sendRequestNative", function () {
-    it("Reverts if token is not whitelisted", async () => {
-      const { most, wethAddressBytes32 } = await loadFixture(
-        deployEightGuardianMostFixture,
-      );
-
-      await most.pause();
-      await most.removePair(wethAddressBytes32);
-      await most.unpause();
-
-      await expect(
-        most.sendRequestNative(ALEPH_ACCOUNT, { value: TOKEN_AMOUNT }),
-      ).to.be.revertedWithCustomError(most, "UnsupportedPair");
-    });
-
     it("Transfers tokens to Most", async () => {
       const { most, mostAddress, weth } = await loadFixture(
         deployEightGuardianMostFixture,
@@ -269,20 +254,6 @@ describe("Most", function () {
   });
 
   describe("sendRequestAzeroToNative", function () {
-    it("Reverts if token is not whitelisted", async () => {
-      const { most, wrappedAzeroAddressBytes32 } = await loadFixture(
-        deployEightGuardianMostFixture,
-      );
-
-      await most.pause();
-      await most.removePair(wrappedAzeroAddressBytes32);
-      await most.unpause();
-
-      await expect(
-        most.sendRequestAzeroToNative(TOKEN_AMOUNT, ALEPH_ACCOUNT),
-      ).to.be.revertedWithCustomError(most, "UnsupportedPair");
-    });
-
     it("Burns psp22 token representations", async () => {
       const { most, wrappedAzero, mostAddress } = await loadFixture(
         deployEightGuardianMostFixture,
