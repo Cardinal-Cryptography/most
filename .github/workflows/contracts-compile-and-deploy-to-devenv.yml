@@ -3,6 +3,7 @@ name: Devenv - deploy contracts (on demand)
 
 on:
   workflow_dispatch:
+  workflow_call:
 
 concurrency:
   group: "${{ github.ref }}-${{ github.workflow }}"

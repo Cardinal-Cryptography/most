@@ -7,10 +7,6 @@ on:
         description: Relayer to build - L1 or L2
         type: string
         required: true
-      download-contracts:
-        description: Whether to download contracts from S3
-        type: boolean
-        default: false
     outputs:
       docker-tag:
         description: Docker image tag
@@ -51,8 +47,6 @@ jobs:
         uses: Cardinal-Cryptography/github-actions/get-ref-properties@v6
 
       - name: Download artifacts from S3 bucket
-        # disable this step
-        if: ${{ inputs.download-contracts }}
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.CONTRACTS_MOST_ARTIFACTS_RO_AWS_SECRET_ACCESS_KEY }}
