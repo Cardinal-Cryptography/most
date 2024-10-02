@@ -49,6 +49,7 @@ mod e2e {
     const DECIMALS: u8 = 8;
     const REMOTE_TOKEN: [u8; 32] = [0x1; 32];
     const REMOTE_RECEIVER: [u8; 32] = [0x2; 32];
+    const DEFAULT_WAZERO: [u8; 32] = [0x3; 32];
 
     const APPROX_GWEI_PRICE: u128 = 3000000;
 
@@ -1154,6 +1155,16 @@ mod e2e {
                 .expect("Add pair should succeed");
         }
 
+        // for sake of tests we need to set wazero to something other than zero address
+        most_set_wazero(
+            client,
+            &alice(),
+            most_address,
+            account_id(AccountKeyring::Bob),
+        )
+        .await
+        .expect("set_wazero succeed");
+
         // Activate the most contract
         most_set_halted(client, &alice(), most_address, false)
             .await
@@ -1233,6 +1244,22 @@ mod e2e {
             caller,
             most,
             |most| most.add_pair(*token.as_ref(), remote_token, false),
+            None,
+        )
+        .await
+    }
+
+    async fn most_set_wazero(
+        client: &mut E2EClient,
+        caller: &Keypair,
+        most: AccountId,
+        wazero: AccountId,
+    ) -> CallResult<(), MostError> {
+        call_message::<MostRef, (), _, _, _>(
+            client,
+            caller,
+            most,
+            |most| most.set_wazero(wazero),
             None,
         )
         .await
