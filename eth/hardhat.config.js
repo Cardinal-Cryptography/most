@@ -44,6 +44,7 @@ var config = {
       },
       gas: 25e6, // Gas limit
       gasPrice: 20e9,
+      dev: true,
       deploymentConfig: {
         guardianIds: [
           "0x05501355922a6529670DB49158676D98D6c34245",
