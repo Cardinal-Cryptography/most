@@ -3,7 +3,7 @@
   "relayers": [
     "<deployer account id>>"
   ],
-  "deployer_seed": "<deployer seed>>",
+  "deployer_seed": "<deployer seed>",
   "signature_threshold": 1,
   "pocket_money": 1000000000000,
   "min_gas_price": 60000000,
