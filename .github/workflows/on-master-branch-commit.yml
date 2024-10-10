@@ -12,6 +12,12 @@ jobs:
     uses: ./.github/workflows/_check-vars-and-secrets.yml
     secrets: inherit
 
+  compile-contracts-and-deploy-to-devenv:
+    needs: [check-vars-and-secrets]
+    name: Compile contracts and deploy to devenv
+    uses: ./.github/workflows/contracts-compile-and-deploy-to-devenv.yml
+    secrets: inherit
+
   test-azero-contracts:
     needs: [check-vars-and-secrets]
     uses: ./.github/workflows/test-azero-contracts.yml
@@ -21,13 +27,19 @@ jobs:
     uses: ./.github/workflows/test-eth-contracts.yml
 
   build-l1-relayer:
-    needs: [test-eth-contracts, test-azero-contracts]
+    needs:
+      - test-eth-contracts
+      - test-azero-contracts
+      - compile-contracts-and-deploy-to-devenv
     name: Build L1 relayer
     uses: ./.github/workflows/l1-relayer-build.yml
     secrets: inherit
 
   build-l2-relayer:
-    needs: [test-eth-contracts, test-azero-contracts]
+    needs:
+      - test-eth-contracts
+      - test-azero-contracts
+      - compile-contracts-and-deploy-to-devenv
     name: Build L2 relayer
     uses: ./.github/workflows/l2-relayer-build.yml
     secrets: inherit
