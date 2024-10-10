@@ -210,7 +210,7 @@ compile-azero: azero-deps
 
 .PHONY: typechain-azero
 typechain-azero: # Generate typechain typings for azero contracts
-typechain-azero: azero-deps compile-azero
+typechain-azero:
 	cd azero && npm run typechain
 
 .PHONY: deploy-azero
