@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - master
+      - A0-192-another-approach
 
 jobs:
   check-vars-and-secrets:
