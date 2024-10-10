@@ -44,3 +44,31 @@ jobs:
     name: Build L2 relayer
     uses: ./.github/workflows/l2-relayer-build.yml
     secrets: inherit
+
+  check-pipeline-completion:
+    needs: [build-l1-relayer,
+            build-l2-relayer]
+    name: Check pipeline completion
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: All nightly tests completed
+        run: |
+          # due to the fact GitHub treats skipped jobs as success, and when any of dependant
+          # jobs fail, this check will be skipped, we need to check status manually
+          jq --exit-status 'all(.result == "success")' <<< '${{ toJson(needs) }}'
+
+  slack:
+    name: Slack notification
+    runs-on: ubuntu-latest
+    needs: [check-pipeline-completion]
+    if: >
+      !cancelled() &&
+      github.event_name != 'workflow_dispatch'
+    steps:
+      - name: Send Slack message
+        uses: Cardinal-Cryptography/github-actions/slack-notification@v7
+        with:
+          notify-on: "failure"
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_DEV_ONDUTY }}

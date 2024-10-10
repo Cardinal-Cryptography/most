@@ -69,6 +69,15 @@ jobs:
         run: |
           make deploy-eth NETWORK=sepolia
 
+      - name: Deploy eth contracts (TransferLimit)
+        shell: bash
+        env:
+          SEPOLIA_MNEMONIC: ${{ secrets.DEVENV_TESTNET_SEPOLIA_KEY }}
+          SEPOLIA_ACCOUNT_NUMBER: ${{ secrets.DEVENV_TESTNET_SEPOLIA_ACCOUNT_NUMBER }}
+          SEPOLIA_TOKEN_CONFIG_PATH: "../cfg/tokens_testnet.json"
+        run: |
+          make deploy-eth-transfer-limit NETWORK=sepolia      
+
       - name: Deploy azero contracts
         shell: bash
         run: |
