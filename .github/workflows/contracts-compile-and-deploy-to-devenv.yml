@@ -48,7 +48,7 @@ jobs:
       - name: Compile ink! contracts
         shell: bash
         run: |
-          make compile-azero
+          make compile-azero-docker
 
       - name: Compile azero JS types contracts
         shell: bash
