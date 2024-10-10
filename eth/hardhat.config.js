@@ -106,6 +106,9 @@ if (SEPOLIA_MNEMONIC || SEPOLIA_PRIVATE_KEY) {
           mnemonic: SEPOLIA_MNEMONIC,
         }
       : [SEPOLIA_PRIVATE_KEY],
+    gasPrice: 10e9, // 10 Gwei; it's set to have an upper bound for contract deployment costs
+    timeout: 20000, // 20s; if gas prices are higher than 20 Gwei, any tx would likely
+    // become stuck in the mempool, hence we need a timeout for a deployment script to finish
     deploymentConfig: {
       guardianIds: [
         typeof SEPOLIA_ACCOUNT_NUMBER == "undefined" ||
