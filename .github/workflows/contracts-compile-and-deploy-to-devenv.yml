@@ -61,7 +61,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
           path: |
-            eth/artifacts
+            eth
 
       - uses: actions/upload-artifact@v4
         with:
@@ -69,8 +69,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
           path: |
-            azero/artifacts
-            azero/types
+            azero
 
       - name: Get list of contract artifacts
         shell: bash
