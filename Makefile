@@ -99,12 +99,11 @@ compile-eth: eth-deps
 deploy-eth: # Deploy eth contracts
 deploy-eth: compile-eth
 	cd eth && \
-	npx hardhat run --network $(NETWORK) scripts/0_deploy_bridge_contracts.js \
-	&& npx hardhat run --network $(NETWORK) scripts/deploy_transfer_limit.js
+	npx hardhat run --network $(NETWORK) scripts/0_deploy_bridge_contracts.js
 
 .PHONY: deploy-eth-transfer-limit
-deploy-eth: # Deploy eth contracts
-deploy-eth: compile-eth
+deploy-eth-transfer-limit: # Deploy TransferLimit eth contract
+deploy-eth-transfer-limit: compile-eth
 	cd eth && \
 	npx hardhat run --network $(NETWORK) scripts/deploy_transfer_limit.js
 
