@@ -126,6 +126,10 @@ async function main(): Promise<void> {
     findTokenBySymbol("wAZERO", alephAddresses.alephTokens).address,
   );
 
+  if (dev) {
+    await most.tx.setHalted(false);
+  }
+
   await api.disconnect();
   console.log("Done");
 }

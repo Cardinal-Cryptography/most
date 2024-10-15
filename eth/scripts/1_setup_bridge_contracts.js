@@ -55,12 +55,6 @@ async function addTokenPair(
   );
 }
 
-async function unpauseMost(mostContract, ownerSigner) {
-  console.log("Unpausing Most:");
-  await mostContract.unpause({ from: ownerSigner });
-  console.log("Most is now unpaused.");
-}
-
 async function main() {
   const signers = await ethers.getSigners();
   accounts = signers.map((s) => s.address);
@@ -80,6 +74,8 @@ async function main() {
   // --- setup
   const Most = await ethers.getContractFactory("Most");
   const most = Most.attach(addresses.most);
+
+
 
   // --- add Ethereum -> Aleph token pairs
   for (let token of addresses.ethTokens) {
@@ -133,6 +129,9 @@ async function main() {
     const USDT = await ethers.getContractFactory("TetherToken");
     const usdt = USDT.attach(usdtAddress);
     await usdt.transfer(addresses.most, 1000000000000000);
+
+    console.log("Unpause the most...");
+    await most.unpause();
   }
 
   console.log("Done");

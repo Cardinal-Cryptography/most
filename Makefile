@@ -76,9 +76,9 @@ local-bridgenet: devnet-azero devnet-eth redis-instance
 .PHONY: stop-local-bridgenet
 stop-local-bridgenet:
 stop-local-bridgenet: stop-relayers
-	docker compose -f ./devnet-azero/devnet-azero-compose.yml down && \
-	docker compose -f ./devnet-eth/devnet-eth-compose.yml down && \
-	docker compose -f ./relayer/scripts/redis-compose.yml down
+	docker compose -f ./devnet-azero/devnet-azero-compose.yml down -v && \
+	docker compose -f ./devnet-eth/devnet-eth-compose.yml down -v && \
+	docker compose -f ./relayer/scripts/redis-compose.yml down -v
 
 .PHONY: eth-deps
 eth-deps: # Install eth dependencies
@@ -250,7 +250,7 @@ run-relayers: build-docker-relayer
 
 .PHONY: stop-relayers
 stop-relayers:
-	docker compose -f ./relayer/scripts/devnet-relayers-compose.yml down
+	docker compose -f ./relayer/scripts/devnet-relayers-compose.yml down -v
 
 .PHONY: bridge
 bridge: # Run the bridge
