@@ -61,7 +61,6 @@ async function main() {
 
   console.log("Using ", accounts[0], "as signer");
 
-  // read addresses
   let addresses = JSON.parse(
     fs.readFileSync("addresses.json", { encoding: "utf8", flag: "r" }),
   );
@@ -74,24 +73,13 @@ async function main() {
   // --- setup
   const Most = await ethers.getContractFactory("Most");
   const most = Most.attach(addresses.most);
-
+  //
   // --- add Ethereum -> Aleph token pairs
   for (let token of addresses.ethTokens) {
     await addTokenPair(
       token.address,
       getTokenAddressBySymbol(token.symbol, alephAddresses.ethTokens),
       true,
-      most,
-      signers[0],
-    );
-  }
-
-  // --- add Aleph -> Ethereum token pairs
-  for (let token of addresses.alephTokens) {
-    await addTokenPair(
-      token.address,
-      getTokenAddressBySymbol(token.symbol, alephAddresses.alephTokens),
-      false,
       most,
       signers[0],
     );
