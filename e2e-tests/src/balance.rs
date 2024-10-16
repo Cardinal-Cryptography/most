@@ -91,13 +91,14 @@ impl Balance {
     /// Bridge AZERO to wAZERO.
     pub fn bridge_azero_azero_to_eth(&self, transfer_amount: u128) -> Result<Self> {
         let mut balance = self.clone();
+        let azero_wzaero_decimal_ratio = 1_000_000;
         balance.azero = balance
             .azero
             .checked_sub(transfer_amount)
             .ok_or(anyhow!("Insufficient AZERO."))?;
         balance.wazero_eth = balance
             .wazero_eth
-            .checked_add(transfer_amount)
+            .checked_add(transfer_amount * azero_wzaero_decimal_ratio)
             .ok_or(anyhow!("wAZERO overflow."))?;
         Ok(balance)
     }

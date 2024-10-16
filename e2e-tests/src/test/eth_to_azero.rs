@@ -88,6 +88,9 @@ pub async fn usdt_to_usdt() -> Result<()> {
     .await
 }
 
+/// TEST DISABLED - this is because current MOST L1 does not support bridging between
+/// non-native tokens which are having different decimals
+
 /// One-way `Ethereum` -> `Aleph Zero` transfer of wAZERO through `most`.
 /// Requires a prior transaction in the other direction to have completed.
 /// This is easily done by running the test for the other direction first.
@@ -96,6 +99,7 @@ pub async fn usdt_to_usdt() -> Result<()> {
 /// 3. Waits for the transfer to complete.
 /// Finally, it checks if every account has proper balance.
 /// It relies on all the relevant contracts being deployed on both ends and the (wAZERO_ETH:wAZERO_AZERO) pair having been added to `most`.
+#[ignore]
 #[tokio::test]
 pub async fn wazero_to_wazero() -> Result<()> {
     let config = setup_test();

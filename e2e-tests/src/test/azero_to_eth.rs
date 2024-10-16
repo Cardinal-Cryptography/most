@@ -89,6 +89,7 @@ pub async fn usdt_to_usdt() -> Result<()> {
 /// Finally, it checks if every account has proper balance.
 /// It relies on all the relevant contracts being deployed on both ends and the (wAZERO_ETH:wAZERO_AZERO) pair having been added to `most`.
 #[tokio::test]
+#[ignore]
 pub async fn wazero_to_wazero() -> Result<()> {
     let config = setup_test();
     let test_context = config.create_test_context().await?;

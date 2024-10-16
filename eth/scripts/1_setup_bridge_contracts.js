@@ -55,19 +55,12 @@ async function addTokenPair(
   );
 }
 
-async function unpauseMost(mostContract, ownerSigner) {
-  console.log("Unpausing Most:");
-  await mostContract.unpause({ from: ownerSigner });
-  console.log("Most is now unpaused.");
-}
-
 async function main() {
   const signers = await ethers.getSigners();
   accounts = signers.map((s) => s.address);
 
   console.log("Using ", accounts[0], "as signer");
 
-  // read addresses
   let addresses = JSON.parse(
     fs.readFileSync("addresses.json", { encoding: "utf8", flag: "r" }),
   );
@@ -87,17 +80,6 @@ async function main() {
       token.address,
       getTokenAddressBySymbol(token.symbol, alephAddresses.ethTokens),
       true,
-      most,
-      signers[0],
-    );
-  }
-
-  // --- add Aleph -> Ethereum token pairs
-  for (let token of addresses.alephTokens) {
-    await addTokenPair(
-      token.address,
-      getTokenAddressBySymbol(token.symbol, alephAddresses.alephTokens),
-      false,
       most,
       signers[0],
     );
@@ -133,6 +115,9 @@ async function main() {
     const USDT = await ethers.getContractFactory("TetherToken");
     const usdt = USDT.attach(usdtAddress);
     await usdt.transfer(addresses.most, 1000000000000000);
+
+    console.log("Unpause the most...");
+    await most.unpause();
   }
 
   console.log("Done");
