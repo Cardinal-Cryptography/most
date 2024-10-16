@@ -73,7 +73,7 @@ async function main() {
   // --- setup
   const Most = await ethers.getContractFactory("Most");
   const most = Most.attach(addresses.most);
-  //
+
   // --- add Ethereum -> Aleph token pairs
   for (let token of addresses.ethTokens) {
     await addTokenPair(
