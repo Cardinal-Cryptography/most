@@ -1,6 +1,8 @@
 use anyhow::{anyhow, Result};
 use ethers::types::U256;
 
+const AZERO_EVM_TO_WASM_RATIO: u128 = 1_000_000;
+
 /// Struct holding the current balances on both chains for a given account pair.
 /// It includes the native coins, and all the wrapped tokens we're concerned with.
 /// It also serves as a model for the transfers we want to test, each such transfer
@@ -83,7 +85,7 @@ impl Balance {
             .ok_or(anyhow!("Insufficient wAZERO."))?;
         balance.azero = balance
             .azero
-            .checked_add(transfer_amount)
+            .checked_add(transfer_amount / AZERO_EVM_TO_WASM_RATIO)
             .ok_or(anyhow!("AZERO overflow."))?;
         Ok(balance)
     }
@@ -91,14 +93,13 @@ impl Balance {
     /// Bridge AZERO to wAZERO.
     pub fn bridge_azero_azero_to_eth(&self, transfer_amount: u128) -> Result<Self> {
         let mut balance = self.clone();
-        let azero_wzaero_decimal_ratio = 1_000_000;
         balance.azero = balance
             .azero
             .checked_sub(transfer_amount)
             .ok_or(anyhow!("Insufficient AZERO."))?;
         balance.wazero_eth = balance
             .wazero_eth
-            .checked_add(transfer_amount * azero_wzaero_decimal_ratio)
+            .checked_add(transfer_amount * AZERO_EVM_TO_WASM_RATIO)
             .ok_or(anyhow!("wAZERO overflow."))?;
         Ok(balance)
     }
