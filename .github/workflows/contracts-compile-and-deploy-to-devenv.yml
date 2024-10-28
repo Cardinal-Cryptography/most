@@ -144,12 +144,12 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: azero-compiled-contracts
-          path: azero
+          path: azero/artifacts
 
       - uses: actions/download-artifact@v4
         with:
           name: eth-compiled-contracts
-          path: eth
+          path: eth/artifacts
 
       - name: Setup node
         uses: asdf-vm/actions/install@v3
