@@ -80,9 +80,9 @@ local-bridgenet: devnet-azero devnet-eth redis-instance
 .PHONY: stop-local-bridgenet
 stop-local-bridgenet:
 stop-local-bridgenet: stop-relayers
-	docker compose -f ./devnet-azero/devnet-azero-compose.yml down && \
-	docker compose -f ./devnet-eth/devnet-eth-compose.yml down && \
-	docker compose -f ./relayer/scripts/redis-compose.yml down
+	docker compose -f ./devnet-azero/devnet-azero-compose.yml down -v && \
+	docker compose -f ./devnet-eth/devnet-eth-compose.yml down -v && \
+	docker compose -f ./relayer/scripts/redis-compose.yml down -v
 
 .PHONY: eth-deps
 eth-deps: # Install eth dependencies
@@ -106,6 +106,12 @@ deploy-eth: compile-eth
 endif
 	cd eth && \
 	npx hardhat run --network $(NETWORK) scripts/0_deploy_bridge_contracts.js
+
+.PHONY: deploy-eth-transfer-limit
+deploy-eth-transfer-limit: # Deploy TransferLimit eth contract
+deploy-eth-transfer-limit: compile-eth
+	cd eth && \
+	npx hardhat run --network $(NETWORK) scripts/deploy_transfer_limit.js
 
 .PHONY: upload-eth
 upload-eth: # Upload the MOST contract to a live ethereum network (testnet or mainnet) for an upgrade
@@ -260,7 +266,7 @@ run-relayers: build-docker-relayer
 
 .PHONY: stop-relayers
 stop-relayers:
-	docker compose -f ./relayer/scripts/devnet-relayers-compose.yml down
+	docker compose -f ./relayer/scripts/devnet-relayers-compose.yml down -v
 
 .PHONY: bridge
 bridge: # Run the bridge

@@ -193,9 +193,11 @@ if (ETHEREUM_PRIVATE_KEY) {
     url: "https://ethereum-rpc.publicnode.com",
     accounts: [ETHEREUM_PRIVATE_KEY],
     deploymentConfig: {
-      guardianIds: [ETHEREUM_GUARDIAN_ADDRESS],
+      dev: false,
+      guardianIds: ["0xD9fc6a92a9E4b9994B5F0A2Ca0d92bF4Fd80DF50"],
       threshold: 1,
       weth: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      tokenConfigPath: "../cfg/tokens_mainnet.json",
     },
   };
 }

@@ -1,5 +1,5 @@
 {
-  "ws_node": "wss://ws.test.azero.dev",
+  "ws_node": "wss://ws.azero.dev",
   "relayers": [
     "<deployer account id>"
   ],
@@ -12,5 +12,5 @@
   "relay_gas_usage": 450000,
   "eth_transfer_gas_usage": 60000,
   "dev": false,
-  "token_config_path": "/../../cfg/tokens_testnet.json"
+  "token_config_path": "/../../cfg/tokens_mainnet.json"
 }
