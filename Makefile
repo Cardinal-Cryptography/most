@@ -482,4 +482,4 @@ get-latest-eth-block: eth-deps
 .PHONY: get-latest-azero-block
 get-latest-azero-block: # Get latest eth block
 get-latest-azero-block: azero-deps
-	cd azerpo && AZERO_ENV=$(AZERO_ENV) npm run get-latest-block
+	cd azero && AZERO_ENV=$(AZERO_ENV) npm run get-latest-block

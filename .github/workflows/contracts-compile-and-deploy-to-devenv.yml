@@ -61,7 +61,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
           path: |
-            eth
+            eth/artifacts
 
       - uses: actions/upload-artifact@v4
         with:
@@ -69,7 +69,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
           path: |
-            azero
+            azero/artifacts
 
       - name: Get list of contract artifacts
         shell: bash
@@ -115,12 +115,12 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: azero-compiled-contracts
-          path: azero
+          path: azero/artifacts
 
       - uses: actions/download-artifact@v4
         with:
           name: eth-compiled-contracts
-          path: eth
+          path: eth/artifacts
 
       - name: Store artifact in S3 bucket
         shell: bash
