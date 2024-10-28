@@ -109,7 +109,9 @@ endif
 
 .PHONY: deploy-eth-transfer-limit
 deploy-eth-transfer-limit: # Deploy TransferLimit eth contract
+ifeq ($(COMPILE_ETH_CONTRACTS_WHEN_DEPLOYING),compile)
 deploy-eth-transfer-limit: compile-eth
+endif
 	cd eth && \
 	npx hardhat run --network $(NETWORK) scripts/deploy_transfer_limit.js
 

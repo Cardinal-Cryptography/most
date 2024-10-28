@@ -201,13 +201,15 @@ jobs:
           SEPOLIA_MNEMONIC: ${{ secrets.DEVENV_TESTNET_SEPOLIA_KEY }}
           SEPOLIA_ACCOUNT_NUMBER: ${{ secrets.DEVENV_TESTNET_SEPOLIA_ACCOUNT_NUMBER }}
           SEPOLIA_TOKEN_CONFIG_PATH: "../cfg/tokens_testnet.json"
+          NETWORK: "sepolia"
+          COMPILE_ETH_CONTRACTS_WHEN_DEPLOYING: "no-compile"
         run: |
-          make deploy-eth-transfer-limit NETWORK=sepolia
+          make deploy-eth-transfer-limit
 
       - name: Deploy azero contracts
         shell: bash
         env:
-          NETWORK: "sepolia"
+          AZERO_ENV: "testnet"
           COMPILE_AZERO_CONTRACTS_WHEN_DEPLOYING: "no-compile"
         run: |
           make deploy-azero-docker
