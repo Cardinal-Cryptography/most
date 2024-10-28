@@ -71,6 +71,14 @@ jobs:
           path: |
             azero/artifacts
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: azero-compiled-contracts-types
+          if-no-files-found: error
+          retention-days: 1
+          path: |
+            azero/types
+
       - name: Get list of contract artifacts
         shell: bash
         id: get-artifact-matrix
@@ -116,6 +124,11 @@ jobs:
         with:
           name: azero-compiled-contracts
           path: azero/artifacts
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: azero-compiled-contracts-types
+          path: azero/types
 
       - uses: actions/download-artifact@v4
         with:
