@@ -49,7 +49,7 @@ jobs:
             build-l2-relayer]
     name: Check pipeline completion
     if: ${{ !cancelled() }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: All nightly tests completed
         run: |
@@ -59,7 +59,7 @@ jobs:
 
   slack:
     name: Slack notification
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [check-pipeline-completion]
     if: >
       !cancelled() &&
